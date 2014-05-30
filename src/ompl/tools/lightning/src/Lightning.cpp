@@ -37,10 +37,8 @@
 
 #include "ompl/tools/lightning/Lightning.h"
 #include "ompl/base/goals/GoalSampleableRegion.h"
-//#include "ompl/geometric/planners/rrt/RRTConnect.h"
-#include "ompl/geometric/planners/rrt/RRT.h"
-#include "ompl/geometric/planners/kpiece/LBKPIECE1.h" // TODO remove this planner
-//#include "ompl/geometric/planners/kpiece/KPIECE1.h"
+#include "ompl/geometric/planners/experience/RetrieveRepair.h"
+#include "ompl/geometric/SimpleSetup.h" // use their implementation of getDefaultPlanner
 
 ompl::tools::Lightning::Lightning(const base::StateSpacePtr &space) :
     configured_(false), 
@@ -79,7 +77,7 @@ void ompl::tools::Lightning::setup(void)
         // Setup planning from experience planner
         if (!eplanner_)
         {
-            eplanner_ = ob::PlannerPtr(new og::LBKPIECE1(si_)); // TODO: change this planner to a custom one
+            eplanner_ = ob::PlannerPtr(new og::RetrieveRepair(si_)); // TODO: change this planner to a custom one
         }
         eplanner_->setProblemDefinition(pdef_);
         if (!eplanner_->isSetup())
@@ -122,8 +120,10 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
     lastStatus_ = base::PlannerStatus::UNKNOWN;
     time::point start = time::now();
 
-    // ZEBRA TODO
-    lastStatus_ = pp_->solve(ptc, true);
+    // Start both threads
+    bool hybridize = false;
+    lastStatus_ = pp_->solve(ptc, hybridize);
+    
 
     // Results
     planTime_ = time::seconds(time::now() - start);
@@ -136,19 +136,8 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
 
 ompl::base::PlannerStatus ompl::tools::Lightning::solve(double time)
 {
-    OMPL_ERROR("This version of solve for Lightning is not implemented yet");
-    exit(2);
-
-    setup();
-    lastStatus_ = base::PlannerStatus::UNKNOWN;
-    time::point start = time::now();
-    lastStatus_ = planner_->solve(time);
-    planTime_ = time::seconds(time::now() - start);
-    if (lastStatus_)
-        OMPL_INFORM("Solution found in %f seconds", planTime_);
-    else
-        OMPL_INFORM("No solution found after %f seconds", planTime_);
-    return lastStatus_;
+    ob::PlannerTerminationCondition ptc = ob::timedPlannerTerminationCondition( time );
+    return solve(ptc);
 }
 
 void ompl::tools::Lightning::simplifySolution(const base::PlannerTerminationCondition &ptc)
@@ -170,22 +159,8 @@ void ompl::tools::Lightning::simplifySolution(const base::PlannerTerminationCond
 
 void ompl::tools::Lightning::simplifySolution(double duration)
 {
-    if (pdef_)
-    {
-        const base::PathPtr &p = pdef_->getSolutionPath();
-        if (p)
-        {
-            time::point start = time::now();
-            if (duration < std::numeric_limits<double>::epsilon())
-              psk_->simplifyMax(static_cast<og::PathGeometric&>(*p));
-            else
-              psk_->simplify(static_cast<og::PathGeometric&>(*p), duration);
-            simplifyTime_ = time::seconds(time::now() - start);
-            OMPL_INFORM("Path simplification took %f seconds", simplifyTime_);
-            return;
-        }
-    }
-    OMPL_WARN("No solution to simplify");
+    ob::PlannerTerminationCondition ptc = ob::timedPlannerTerminationCondition( duration );
+    simplifySolution(ptc);  
 }
 
 ompl::geometric::PathGeometric& ompl::tools::Lightning::getSolutionPath(void) const

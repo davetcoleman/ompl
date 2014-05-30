@@ -52,7 +52,6 @@
 #include "ompl/util/Console.h"
 #include "ompl/util/Exception.h"
 #include "ompl/tools/multiplan/ParallelPlan.h"
-#include "ompl/geometric/SimpleSetup.h" // use their implementation of getDefaultPlanner
 
 namespace og = ompl::geometric;
 namespace ob = ompl::base;
@@ -63,6 +62,16 @@ namespace ompl
 
     namespace tools
     {
+        /**
+           @anchor Lightning
+           @par Short description
+           The Lightning Framework is a experienced-based motion planner that recalls from a databse of
+           previous actions the most similar one to the current planning problem and attempts to repair it,
+           while at the same time planning from scratch in a different thread
+           @par External documentation
+           Berenson, Dmitry, Pieter Abbeel, and Ken Goldberg: A robot path planning framework that learns from experience, in <em>Robotics and Automation (ICRA), 2012 IEEE International Conference on. IEEE</em>, 2012. 
+           <a href="http://users.wpi.edu/~dberenson/lightning.pdf">[PDF]</a>
+        */
 
         /// @cond IGNORE
         OMPL_CLASS_FORWARD(Lightning);
