@@ -39,6 +39,7 @@
 #include "ompl/base/goals/GoalSampleableRegion.h"
 #include "ompl/geometric/planners/experience/RetrieveRepair.h"
 #include "ompl/geometric/SimpleSetup.h" // use their implementation of getDefaultPlanner
+#include "ompl/base/StateSpace.h" // for storing to file
 
 ompl::tools::Lightning::Lightning(const base::StateSpacePtr &space) :
     configured_(false), 
@@ -124,13 +125,31 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
     bool hybridize = false;
     lastStatus_ = pp_->solve(ptc, hybridize);
     
-
     // Results
     planTime_ = time::seconds(time::now() - start);
     if (lastStatus_)
         OMPL_INFORM("Solution found in %f seconds", planTime_);
     else
         OMPL_INFORM("No solution found after %f seconds", planTime_);
+
+    // TESTING:
+    // Save solution path to file
+
+    // Get information about the exploration data structure the motion planner used. Used later in visualizing
+    og::PathGeometric solution_path = getSolutionPath();
+
+    OMPL_INFORM("Solution path is: ");
+    getSolutionPath().print(std::cout);
+
+    // Save the entire graph for testing
+    ob::GraphStateStorage storage(si_->getStateSpace()); // TODO: don't use Graph, just regular?
+    for (std::size_t i = 0; i < solution_path.getStates().size(); ++i)
+    {
+      storage.addState( solution_path.getStates()[i] );
+    }
+
+    storage.store(ompl::tools::OMPL_STORAGE_PATH.c_str());
+
     return lastStatus_;
 }
 
