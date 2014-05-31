@@ -210,36 +210,40 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
     bool approximate = false;
     double  approxdif = std::numeric_limits<double>::infinity();
 
-    // Search for previous solution in database
-    OMPL_INFORM("Getting states:");
-    std::vector<const ompl::base::State*> states = storage_.getStates();
-    for (std::size_t i = 0; i < states.size(); ++i)
+    bool use_database = false;
+    if (use_database)
     {
-        si_->printState(states[i], std::cout);
-    }
-
-    // Check if we have a solution
-    if (!states.empty())
-    {
-        // Create the solution path
-        PathGeometric *path = new PathGeometric(si_);
-        for (int i = states.size() - 1 ; i >= 0 ; --i)
+        // Search for previous solution in database
+        OMPL_INFORM("Getting states:");
+        std::vector<const ompl::base::State*> states = storage_.getStates();
+        for (std::size_t i = 0; i < states.size(); ++i)
         {
-            path->append(states[i]);
+            si_->printState(states[i], std::cout);
         }
-        approxdif = 0; // ??
-        pdef_->addSolutionPath(base::PathPtr(path), approximate, approxdif);
-        solved = true;
-    }
 
-    /*
-    while (ptc == false)
-    {
-        // Dummy work
-        usleep(0.1 * 1000000);
+        // Check if we have a solution
+        if (!states.empty())
+        {
+            // Create the solution path
+            PathGeometric *path = new PathGeometric(si_);
+            for (int i = states.size() - 1 ; i >= 0 ; --i)
+            {
+                path->append(states[i]);
+            }
+            approxdif = 0; // ??
+            pdef_->addSolutionPath(base::PathPtr(path), approximate, approxdif);
+            solved = true;
+        }
     }
-    OMPL_INFORM("DONE doing dummy work in RetrieveRepair thread");
-    */
+    else
+    {
+        while (ptc == false)
+        {
+            // Dummy work
+            usleep(0.1 * 1000000);
+        }
+        OMPL_INFORM("DONE doing dummy work in RetrieveRepair thread");
+    }
 
     OMPL_INFORM("%s: Created %u states", getName().c_str(), nn_->size());
 

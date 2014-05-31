@@ -45,6 +45,7 @@
 
 #include "ompl/base/Planner.h"
 #include "ompl/base/PlannerData.h"
+#include "ompl/base/ProblemDefinition.h"
 #include "ompl/base/SpaceInformation.h"
 #include "ompl/base/StateStorage.h"
 #include "ompl/base/ProblemDefinition.h"
@@ -176,6 +177,12 @@ namespace ompl
             void setStateValidityChecker(const base::StateValidityCheckerFn &svc)
             {
                 si_->setStateValidityChecker(svc);
+            }
+
+            /** \brief Set the state validity checker to use */
+            void setOptimizationObjective(const base::OptimizationObjectivePtr &optimizationObjective)
+            {
+                pdef_->setOptimizationObjective(optimizationObjective);
             }
 
             /** \brief Set the start and goal states to use. */
