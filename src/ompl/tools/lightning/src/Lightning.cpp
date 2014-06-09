@@ -80,13 +80,13 @@ void ompl::tools::Lightning::setup(void)
             planner_->setup();
 
         // Setup planning from experience planner
-        if (!eplanner_)
+        if (!rrPlanner_)
         {
-            eplanner_ = ob::PlannerPtr(new og::RetrieveRepair(si_)); // TODO: change this planner to a custom one
+            rrPlanner_ = ob::PlannerPtr(new og::RetrieveRepair(si_, experience_db_)); // TODO: change this planner to a custom one
         }
-        eplanner_->setProblemDefinition(pdef_);
-        if (!eplanner_->isSetup())
-            eplanner_->setup();
+        rrPlanner_->setProblemDefinition(pdef_);
+        if (!rrPlanner_->isSetup())
+            rrPlanner_->setup();
 
         // Setup parameters
         params_.clear();
@@ -97,7 +97,7 @@ void ompl::tools::Lightning::setup(void)
         // Create the parallel component for splitting into two threads
         pp_ = ot::ParallelPlanPtr(new ot::ParallelPlan(pdef_) );
         pp_->addPlanner(planner_);   // Add the planning from scratch planner
-        pp_->addPlanner(eplanner_);  // Add the planning from experience planner
+        pp_->addPlanner(rrPlanner_);  // Add the planning from experience planner
     }
 }
 
@@ -132,9 +132,9 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
     // Results
     planTime_ = time::seconds(time::now() - start);
     if (lastStatus_)
-        OMPL_INFORM("Solution found in %f seconds", planTime_);
+        OMPL_INFORM("Lightning Solve: solution found in %f seconds", planTime_);
     else
-        OMPL_INFORM("No solution found after %f seconds", planTime_);
+        OMPL_INFORM("Lightning Solve: No solution found after %f seconds", planTime_);
 
     // TESTING:
     // Save solution path to file
@@ -142,11 +142,19 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
     // Get information about the exploration data structure the motion planner used. Used later in visualizing
     og::PathGeometric solution_path = getSolutionPath();
 
-    OMPL_INFORM("Solution path is: ");
-    solution_path.print(std::cout);
+    OMPL_INFORM("Solution path has %d states and was generated from planner %s", solution_path.getStateCount(), getSolutionPlannerName().c_str());
+    //solution_path.print(std::cout);
 
-    // Save to database
-    experience_db_->addPath(solution_path);
+    // Save to database if the solution is not from the experience database
+    if (getSolutionPlannerName() != "RetrieveRepair")
+    {
+        OMPL_INFORM("Saving to database because best solution was not from database");
+        experience_db_->addPath(solution_path);
+    }
+    else
+    {
+        OMPL_INFORM("NOT saving to database because best solution was not from database");
+    }
 
     return lastStatus_;
 }
@@ -178,6 +186,15 @@ void ompl::tools::Lightning::simplifySolution(double duration)
 {
     ob::PlannerTerminationCondition ptc = ob::timedPlannerTerminationCondition( duration );
     simplifySolution(ptc);  
+}
+
+const std::string ompl::tools::Lightning::getSolutionPlannerName(void) const
+{
+    if (pdef_)
+    {
+        return pdef_->getSolutionPlannerName();
+    }
+    throw Exception("No solution");
 }
 
 ompl::geometric::PathGeometric& ompl::tools::Lightning::getSolutionPath(void) const

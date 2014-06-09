@@ -63,7 +63,7 @@ namespace ompl
         public:
 
             /** \brief Constructor */
-            RetrieveRepair(const base::SpaceInformationPtr &si);
+            RetrieveRepair(const base::SpaceInformationPtr &si, ompl::tools::ExperienceDBPtr experience_db);
 
             virtual ~RetrieveRepair(void);
 

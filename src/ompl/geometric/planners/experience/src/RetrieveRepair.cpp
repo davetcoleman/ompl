@@ -39,8 +39,9 @@
 #include "ompl/tools/config/SelfConfig.h"
 #include <limits>
 
-ompl::geometric::RetrieveRepair::RetrieveRepair(const base::SpaceInformationPtr &si)
-    : base::Planner(si, "RetrieveRepair")
+ompl::geometric::RetrieveRepair::RetrieveRepair(const base::SpaceInformationPtr &si, ompl::tools::ExperienceDBPtr experience_db)
+    : base::Planner(si, "RetrieveRepair"),
+      experience_db_(experience_db)
 {
     specs_.approximateSolutions = true;
     specs_.directed = true;
@@ -205,7 +206,8 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
     if (use_database)
     {
         // Search for previous solution in database
-        OMPL_INFORM("Getting states:");
+        OMPL_INFORM("Using database for RetrieveRepair planner.");
+        OMPL_INFORM("Available states:");
         std::vector<const ompl::base::State*> states = experience_db_->getStates();
         for (std::size_t i = 0; i < states.size(); ++i)
         {
@@ -222,12 +224,18 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
                 path->append(states[i]);
             }
             approxdif = 0; // ??
-            pdef_->addSolutionPath(base::PathPtr(path), approximate, approxdif);
+            pdef_->addSolutionPath(base::PathPtr(path), approximate, approxdif, getName());
             solved = true;
+        }
+        else
+        {
+            OMPL_WARN("No states found in experience database, unable to retrieve repair");
         }
     }
     else
     {
+        OMPL_INFORM("NOT using database for RetrieveRepair planner.");
+
         while (ptc == false)
         {
             // Dummy work
@@ -236,7 +244,7 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
         OMPL_INFORM("DONE doing dummy work in RetrieveRepair thread");
     }
 
-    OMPL_INFORM("%s: Created %u states", getName().c_str(), nn_->size());
+    //OMPL_INFORM("%s: Created %u states", getName().c_str(), nn_->size());
 
     return base::PlannerStatus(solved, approximate);
 }
