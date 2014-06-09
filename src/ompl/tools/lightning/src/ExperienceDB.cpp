@@ -39,27 +39,6 @@
 //#include "ompl/base/goals/GoalSampleableRegion.h"
 //#include "ompl/geometric/planners/experience/RetrieveRepair.h"
 //#include "ompl/geometric/SimpleSetup.h" // use their implementation of getDefaultPlanner
-#include "ompl/base/StateSpace.h" // for storing to file
 
-ompl::tools::ExperienceDB::ExperienceDB(const base::StateSpacePtr &space) :
-{
-    si_.reset(new base::SpaceInformation(space));
-}
 
-void ompl::tools::ExperienceDB::print(std::ostream &out) const
-{
-    /*
-    if (si_)
-    {
-        si_->printProperties(out);
-        si_->printSettings(out);
-    }
-    if (planner_)
-    {
-        planner_->printProperties(out);
-        planner_->printSettings(out);
-    }
-    if (pdef_)
-        pdef_->print(out);
-    */
-}
+

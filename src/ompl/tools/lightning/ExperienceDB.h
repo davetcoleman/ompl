@@ -43,21 +43,22 @@
 #ifndef OMPL_TOOLS_LIGHTNING_EXPERIENCEDB_
 #define OMPL_TOOLS_LIGHTNING_EXPERIENCEDB_
 
+#include "ompl/base/StateStorage.h"
+#include "ompl/base/StateSpace.h" // for storing to file
 //#include "ompl/base/Planner.h"
 //#include "ompl/base/PlannerData.h"
 //#include "ompl/base/ProblemDefinition.h"
 //#include "ompl/base/SpaceInformation.h"
-//#include "ompl/base/StateStorage.h"
 //#include "ompl/base/ProblemDefinition.h"
 //#include "ompl/geometric/PathGeometric.h"
 //#include "ompl/geometric/PathSimplifier.h"
 //#include "ompl/util/Console.h"
 //#include "ompl/util/Exception.h"
 //#include "ompl/tools/multiplan/ParallelPlan.h"
+//#include "ompl/tools/config/SelfConfig.h"
 
 namespace og = ompl::geometric;
 namespace ob = ompl::base;
-namespace ot = ompl::tools;
 
 namespace ompl
 {
@@ -74,6 +75,9 @@ namespace ompl
         OMPL_CLASS_FORWARD(ExperienceDB);
         /// @endcond
 
+        // TODO: move
+        static const std::string OMPL_STORAGE_PATH = "/home/dave/ros/ompl_storage/file1";
+
         /** \class ompl::geometric::ExperienceDBPtr
             \brief A boost shared pointer wrapper for ompl::tools::ExperienceDB */
 
@@ -84,18 +88,77 @@ namespace ompl
 
             /** \brief Constructor needs the state space used for planning. */
             explicit
-            ExperienceDB(const base::StateSpacePtr &space);
+            ExperienceDB(const base::StateSpacePtr &space)
+            {
+                si_.reset(new base::SpaceInformation(space));
+
+                OMPL_INFORM("LOADING Experience DATABASE");
+
+                // Create a file storage object
+                storage_db_.reset(new ob::GraphStateStorage(space)); // TODO: don't use Graph, just regular?
+            }
 
             virtual ~ExperienceDB(void)
             {
             }
 
-            void print(std::ostream &out) const;
+            void print(std::ostream &out) const
+            {
+                /*
+                  if (si_)
+                  {
+                  si_->printProperties(out);
+                  si_->printSettings(out);
+                  }
+                  if (planner_)
+                  {
+                  planner_->printProperties(out);
+                  planner_->printSettings(out);
+                  }
+                  if (pdef_)
+                  pdef_->print(out);
+                */
+            }
 
+            void addPath(og::PathGeometric& solution_path)
+            {
+
+                for (std::size_t i = 0; i < solution_path.getStates().size(); ++i)
+                {
+                    storage_db_->addState( solution_path.getStates()[i] );
+                }
+
+                storage_db_->store(ompl::tools::OMPL_STORAGE_PATH.c_str());
+            }
+
+            void load()
+            {
+                // Load database from file, track loading time
+                time::point start = time::now();
+                OMPL_INFORM("Loading database from file: %s", OMPL_STORAGE_PATH.c_str());
+
+                // Note: the StateStorage class checks if the states match for us
+                storage_db_->load(OMPL_STORAGE_PATH.c_str());
+
+                // Check how many states are stored
+                OMPL_INFORM("Loaded %d states", storage_db_->size());
+
+                double loadTime = time::seconds(time::now() - start);
+                OMPL_INFORM("Loaded database from file in %f sec", loadTime);
+            }
+
+            std::vector<const ompl::base::State*> getStates()
+            {
+                return storage_db_->getStates();
+            }
+            
         protected:
 
             /// The created space information
             base::SpaceInformationPtr     si_; // TODO: is this even necessary?
+
+            /// The storage file
+            ompl::base::GraphStateStoragePtr storage_db_;
 
         }; // end of class ExperienceDB
 

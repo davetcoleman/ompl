@@ -39,7 +39,7 @@
 
 #include "ompl/geometric/planners/PlannerIncludes.h"
 #include "ompl/datastructures/NearestNeighbors.h"
-#include "ompl/base/StateStorage.h"
+#include "ompl/tools/lightning/ExperienceDB.h"
 
 namespace ompl
 {
@@ -56,9 +56,6 @@ namespace ompl
            Berenson, Dmitry, Pieter Abbeel, and Ken Goldberg: A robot path planning framework that learns from experience, in <em>Robotics and Automation (ICRA), 2012 IEEE International Conference on. IEEE</em>, 2012. 
            <a href="http://users.wpi.edu/~dberenson/lightning.pdf">[PDF]</a>
         */
-
-        // TODO: move
-        static const std::string OMPL_STORAGE_PATH = "/home/dave/ros/ompl_storage/file1";
 
         /** \brief The Lightning Framework's Retrieve-Repair component */
         class RetrieveRepair : public base::Planner
@@ -82,6 +79,8 @@ namespace ompl
             {
                 nn_.reset(new NN<Motion*>());
             }
+
+            void setExperienceDB(ompl::tools::ExperienceDBPtr experience_db);
 
             virtual void setup(void);
 
@@ -139,7 +138,7 @@ namespace ompl
             Motion                                         *lastGoalMotion_;
 
             /** \breif The database of motions to search through */
-            ompl::base::GraphStateStorage storage_; // TODO: don't use Graph, just regular?    
+            ompl::tools::ExperienceDBPtr experience_db_;
         };
 
     }

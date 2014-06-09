@@ -47,13 +47,13 @@
 #include "ompl/base/PlannerData.h"
 #include "ompl/base/ProblemDefinition.h"
 #include "ompl/base/SpaceInformation.h"
-#include "ompl/base/StateStorage.h"
 #include "ompl/base/ProblemDefinition.h"
 #include "ompl/geometric/PathGeometric.h"
 #include "ompl/geometric/PathSimplifier.h"
 #include "ompl/util/Console.h"
 #include "ompl/util/Exception.h"
 #include "ompl/tools/multiplan/ParallelPlan.h"
+#include "ompl/tools/lightning/ExperienceDB.h"
 
 namespace og = ompl::geometric;
 namespace ob = ompl::base;
@@ -81,9 +81,6 @@ namespace ompl
 
         /** \class ompl::geometric::LightningPtr
             \brief A boost shared pointer wrapper for ompl::tools::Lightning */
-
-        // TODO: move
-        static const std::string OMPL_STORAGE_PATH = "/home/dave/ros/ompl_storage/file1";
 
         /** \brief Built off of SimpleSetup but provides support for planning from experience */
         class Lightning
@@ -340,6 +337,9 @@ namespace ompl
 
             /** \brief Instance of parallel planning to use for computing solutions in parallel */
             ot::ParallelPlanPtr           pp_;
+
+            /** \brief A shared object between all the planners for saving and loading previous experience */
+            ompl::tools::ExperienceDBPtr experience_db_;
           
         }; // end of class Lightning
 

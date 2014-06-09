@@ -51,6 +51,10 @@ ompl::tools::Lightning::Lightning(const base::StateSpacePtr &space) :
     pdef_.reset(new base::ProblemDefinition(si_));
     psk_.reset(new og::PathSimplifier(si_));
     params_.include(si_->params());
+
+    // Load the experience database
+    experience_db_.reset(new ompl::tools::ExperienceDB(si_->getStateSpace()));
+    experience_db_->load(); // load from file
 }
 
 void ompl::tools::Lightning::setup(void)
@@ -139,16 +143,10 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
     og::PathGeometric solution_path = getSolutionPath();
 
     OMPL_INFORM("Solution path is: ");
-    getSolutionPath().print(std::cout);
+    solution_path.print(std::cout);
 
-    // Save the entire graph for testing
-    ob::GraphStateStorage storage(si_->getStateSpace()); // TODO: don't use Graph, just regular?
-    for (std::size_t i = 0; i < solution_path.getStates().size(); ++i)
-    {
-      storage.addState( solution_path.getStates()[i] );
-    }
-
-    storage.store(ompl::tools::OMPL_STORAGE_PATH.c_str());
+    // Save to database
+    experience_db_->addPath(solution_path);
 
     return lastStatus_;
 }

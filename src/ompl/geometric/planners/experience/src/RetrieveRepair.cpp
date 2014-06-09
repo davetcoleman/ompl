@@ -40,26 +40,12 @@
 #include <limits>
 
 ompl::geometric::RetrieveRepair::RetrieveRepair(const base::SpaceInformationPtr &si)
-    : base::Planner(si, "RetrieveRepair"),
-      storage_(si->getStateSpace()) // TODO: don't use Graph, just regular?
+    : base::Planner(si, "RetrieveRepair")
 {
     specs_.approximateSolutions = true;
     specs_.directed = true;
 
     lastGoalMotion_ = NULL;
-
-    // Load database from file, track loading time
-    time::point start = time::now();
-    OMPL_INFORM("Loading database from file: %s", OMPL_STORAGE_PATH.c_str());
-
-    // Note: the StateStorage class checks if the states match for us
-    storage_.load(OMPL_STORAGE_PATH.c_str());
-
-    // Check how many states are stored
-    OMPL_INFORM("Loaded %d states", storage_.size());
-
-    double loadTime = time::seconds(time::now() - start);
-    OMPL_INFORM("Loaded database from file in %f sec", loadTime);
 }
 
 ompl::geometric::RetrieveRepair::~RetrieveRepair(void)
@@ -75,6 +61,11 @@ void ompl::geometric::RetrieveRepair::clear(void)
     if (nn_)
         nn_->clear();
     lastGoalMotion_ = NULL;
+}
+
+void ompl::geometric::RetrieveRepair::setExperienceDB(ompl::tools::ExperienceDBPtr experience_db)
+{
+    experience_db_ = experience_db;
 }
 
 void ompl::geometric::RetrieveRepair::setup(void)
@@ -215,7 +206,7 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
     {
         // Search for previous solution in database
         OMPL_INFORM("Getting states:");
-        std::vector<const ompl::base::State*> states = storage_.getStates();
+        std::vector<const ompl::base::State*> states = experience_db_->getStates();
         for (std::size_t i = 0; i < states.size(); ++i)
         {
             si_->printState(states[i], std::cout);
