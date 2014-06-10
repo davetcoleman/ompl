@@ -54,7 +54,7 @@ ompl::tools::Lightning::Lightning(const base::StateSpacePtr &space) :
 
     // Load the experience database
     experience_db_.reset(new ompl::tools::ExperienceDB(si_->getStateSpace()));
-    experience_db_->load(); // load from file
+    experience_db_->load(OMPL_STORAGE_PATH); // load from file
 }
 
 void ompl::tools::Lightning::setup(void)

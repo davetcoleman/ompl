@@ -45,14 +45,14 @@
 
 #include "ompl/base/StateStorage.h"
 #include "ompl/base/StateSpace.h" // for storing to file
+#include "ompl/base/SpaceInformation.h"
+#include "ompl/geometric/PathGeometric.h"
+#include "ompl/util/Time.h" 
 //#include "ompl/base/Planner.h"
 //#include "ompl/base/PlannerData.h"
 //#include "ompl/base/ProblemDefinition.h"
-//#include "ompl/base/SpaceInformation.h"
 //#include "ompl/base/ProblemDefinition.h"
-//#include "ompl/geometric/PathGeometric.h"
 //#include "ompl/geometric/PathSimplifier.h"
-//#include "ompl/util/Console.h"
 //#include "ompl/util/Exception.h"
 //#include "ompl/tools/multiplan/ParallelPlan.h"
 //#include "ompl/tools/config/SelfConfig.h"
@@ -75,9 +75,6 @@ namespace ompl
         OMPL_CLASS_FORWARD(ExperienceDB);
         /// @endcond
 
-        // TODO: move
-        static const std::string OMPL_STORAGE_PATH = "/home/dave/ros/ompl_storage/file1";
-
         /** \class ompl::geometric::ExperienceDBPtr
             \brief A boost shared pointer wrapper for ompl::tools::ExperienceDB */
 
@@ -86,7 +83,10 @@ namespace ompl
         {
         public:
 
-            /** \brief Constructor needs the state space used for planning. */
+            /** \brief Constructor needs the state space used for planning. 
+             *  \param space - state space
+             *  \param fileNmae - database to read and write from with experiences
+             */
             explicit
             ExperienceDB(const base::StateSpacePtr &space)
             {
@@ -95,7 +95,7 @@ namespace ompl
                 OMPL_INFORM("LOADING Experience DATABASE");
 
                 // Create a file storage object
-                storage_db_.reset(new ob::GraphStateStorage(space)); // TODO: don't use Graph, just regular?
+                storageDB_.reset(new ob::GraphStateStorage(space)); // TODO: don't use Graph, just regular?
             }
 
             virtual ~ExperienceDB(void)
@@ -120,28 +120,34 @@ namespace ompl
                 */
             }
 
-            void addPath(og::PathGeometric& solution_path)
+            void addPath(og::PathGeometric& solutionPath)
             {
-
-                for (std::size_t i = 0; i < solution_path.getStates().size(); ++i)
+                // Add the states to one nodes files
+                for (std::size_t i = 0; i < solutionPath.getStates().size(); ++i)
                 {
-                    storage_db_->addState( solution_path.getStates()[i] );
+                    storageDB_->addState( solutionPath.getStates()[i] );
                 }
+                
+                // Add the edges to a edges file
+                
 
-                storage_db_->store(ompl::tools::OMPL_STORAGE_PATH.c_str());
+                storageDB_->store(fileName_.c_str());
             }
 
-            void load()
+            void load(const std::string& fileName)
             {
+                // Remember so that we can save later
+                fileName_ = fileName;
+
                 // Load database from file, track loading time
                 time::point start = time::now();
-                OMPL_INFORM("Loading database from file: %s", OMPL_STORAGE_PATH.c_str());
+                OMPL_INFORM("Loading database from file: %s", fileName_.c_str());
 
                 // Note: the StateStorage class checks if the states match for us
-                storage_db_->load(OMPL_STORAGE_PATH.c_str());
+                storageDB_->load(fileName_.c_str());
 
                 // Check how many states are stored
-                OMPL_INFORM("Loaded %d states", storage_db_->size());
+                OMPL_INFORM("Loaded %d states", storageDB_->size());
 
                 double loadTime = time::seconds(time::now() - start);
                 OMPL_INFORM("Loaded database from file in %f sec", loadTime);
@@ -149,7 +155,7 @@ namespace ompl
 
             std::vector<const ompl::base::State*> getStates()
             {
-                return storage_db_->getStates();
+                return storageDB_->getStates();
             }
             
         protected:
@@ -158,7 +164,10 @@ namespace ompl
             base::SpaceInformationPtr     si_; // TODO: is this even necessary?
 
             /// The storage file
-            ompl::base::GraphStateStoragePtr storage_db_;
+            ompl::base::GraphStateStoragePtr storageDB_;
+
+            /// The storage file location
+            std::string fileName_;
 
         }; // end of class ExperienceDB
 

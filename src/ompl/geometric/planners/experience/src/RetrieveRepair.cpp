@@ -39,9 +39,9 @@
 #include "ompl/tools/config/SelfConfig.h"
 #include <limits>
 
-ompl::geometric::RetrieveRepair::RetrieveRepair(const base::SpaceInformationPtr &si, ompl::tools::ExperienceDBPtr experience_db)
+ompl::geometric::RetrieveRepair::RetrieveRepair(const base::SpaceInformationPtr &si, ompl::tools::ExperienceDBPtr experienceDB)
     : base::Planner(si, "RetrieveRepair"),
-      experience_db_(experience_db)
+      experienceDB_(experienceDB)
 {
     specs_.approximateSolutions = true;
     specs_.directed = true;
@@ -64,9 +64,9 @@ void ompl::geometric::RetrieveRepair::clear(void)
     lastGoalMotion_ = NULL;
 }
 
-void ompl::geometric::RetrieveRepair::setExperienceDB(ompl::tools::ExperienceDBPtr experience_db)
+void ompl::geometric::RetrieveRepair::setExperienceDB(ompl::tools::ExperienceDBPtr experienceDB)
 {
-    experience_db_ = experience_db;
+    experienceDB_ = experienceDB;
 }
 
 void ompl::geometric::RetrieveRepair::setup(void)
@@ -208,7 +208,7 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
         // Search for previous solution in database
         OMPL_INFORM("Using database for RetrieveRepair planner.");
         OMPL_INFORM("Available states:");
-        std::vector<const ompl::base::State*> states = experience_db_->getStates();
+        std::vector<const ompl::base::State*> states = experienceDB_->getStates();
         for (std::size_t i = 0; i < states.size(); ++i)
         {
             si_->printState(states[i], std::cout);

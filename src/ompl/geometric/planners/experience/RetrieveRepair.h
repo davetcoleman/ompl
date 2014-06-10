@@ -63,7 +63,7 @@ namespace ompl
         public:
 
             /** \brief Constructor */
-            RetrieveRepair(const base::SpaceInformationPtr &si, ompl::tools::ExperienceDBPtr experience_db);
+            RetrieveRepair(const base::SpaceInformationPtr &si, ompl::tools::ExperienceDBPtr experienceDB);
 
             virtual ~RetrieveRepair(void);
 
@@ -80,7 +80,7 @@ namespace ompl
                 nn_.reset(new NN<Motion*>());
             }
 
-            void setExperienceDB(ompl::tools::ExperienceDBPtr experience_db);
+            void setExperienceDB(ompl::tools::ExperienceDBPtr experienceDB);
 
             virtual void setup(void);
 
@@ -138,7 +138,7 @@ namespace ompl
             Motion                                         *lastGoalMotion_;
 
             /** \breif The database of motions to search through */
-            ompl::tools::ExperienceDBPtr experience_db_;
+            ompl::tools::ExperienceDBPtr experienceDB_;
         };
 
     }

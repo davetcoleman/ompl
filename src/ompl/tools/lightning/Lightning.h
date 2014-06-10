@@ -79,6 +79,9 @@ namespace ompl
         OMPL_CLASS_FORWARD(Lightning);
         /// @endcond
 
+        // TODO: move
+        static const std::string OMPL_STORAGE_PATH = "/home/dave/ros/ompl_storage/file1";
+
         /** \class ompl::geometric::LightningPtr
             \brief A boost shared pointer wrapper for ompl::tools::Lightning */
 
