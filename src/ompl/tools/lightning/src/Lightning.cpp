@@ -38,6 +38,7 @@
 #include "ompl/tools/lightning/Lightning.h"
 #include "ompl/base/goals/GoalSampleableRegion.h"
 #include "ompl/geometric/planners/experience/RetrieveRepair.h"
+#include "ompl/geometric/PathGeometric.h"
 #include "ompl/geometric/SimpleSetup.h" // use their implementation of getDefaultPlanner
 #include "ompl/base/StateSpace.h" // for storing to file
 
@@ -146,10 +147,13 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
     //solution_path.print(std::cout);
 
     // Save to database if the solution is not from the experience database
-    if (getSolutionPlannerName() != "RetrieveRepair")
+    if (getSolutionPlannerName() != rrPlanner_->getName())
     {
-        OMPL_INFORM("Saving to database because best solution was not from database");
+        OMPL_INFORM("Adding to database because best solution was not from database");
         experience_db_->addPath(solution_path);
+
+        OMPL_INFORM("Saving database:");
+        experience_db_->save(OMPL_STORAGE_PATH);
     }
     else
     {
@@ -192,9 +196,14 @@ const std::string ompl::tools::Lightning::getSolutionPlannerName(void) const
 {
     if (pdef_)
     {
-        return pdef_->getSolutionPlannerName();
+        ob::PathPtr path(new og::PathGeometric(si_)); // convert to a generic path ptr
+        ob::PlannerSolution solution(path); // a dummy solution
+
+        // Get our desired solution
+        pdef_->getSolution(solution);
+        return solution.plannerName_;
     }
-    throw Exception("No solution");
+    throw Exception("No problem definition found");
 }
 
 ompl::geometric::PathGeometric& ompl::tools::Lightning::getSolutionPath(void) const

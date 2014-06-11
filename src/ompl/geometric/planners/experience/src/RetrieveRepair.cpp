@@ -202,7 +202,7 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
     bool approximate = false;
     double  approxdif = std::numeric_limits<double>::infinity();
 
-    bool use_database = true;
+    bool use_database = false;
     if (use_database)
     {
         // Search for previous solution in database

@@ -43,19 +43,15 @@
 #ifndef OMPL_TOOLS_LIGHTNING_EXPERIENCEDB_
 #define OMPL_TOOLS_LIGHTNING_EXPERIENCEDB_
 
-#include "ompl/base/StateStorage.h"
-#include "ompl/base/StateSpace.h" // for storing to file
+// OMPL
+#include "ompl/base/PlannerDataStorage.h"
+#include "ompl/base/StateSpace.h"
 #include "ompl/base/SpaceInformation.h"
 #include "ompl/geometric/PathGeometric.h"
 #include "ompl/util/Time.h" 
-//#include "ompl/base/Planner.h"
-//#include "ompl/base/PlannerData.h"
-//#include "ompl/base/ProblemDefinition.h"
-//#include "ompl/base/ProblemDefinition.h"
-//#include "ompl/geometric/PathSimplifier.h"
-//#include "ompl/util/Exception.h"
-//#include "ompl/tools/multiplan/ParallelPlan.h"
-//#include "ompl/tools/config/SelfConfig.h"
+
+// Boost
+#include <boost/filesystem.hpp>
 
 namespace og = ompl::geometric;
 namespace ob = ompl::base;
@@ -92,10 +88,12 @@ namespace ompl
             {
                 si_.reset(new base::SpaceInformation(space));
 
+                
+
                 OMPL_INFORM("LOADING Experience DATABASE");
 
                 // Create a file storage object
-                storageDB_.reset(new ob::GraphStateStorage(space)); // TODO: don't use Graph, just regular?
+                //storageDB_.reset(new ob::PlannerDataStorage()); // TODO: don't use Graph, just regular?
             }
 
             virtual ~ExperienceDB(void)
@@ -122,40 +120,162 @@ namespace ompl
 
             void addPath(og::PathGeometric& solutionPath)
             {
+                // Create a new planner data instance
+                ompl::base::PlannerDataPtr pd(new ompl::base::PlannerData(si_));
+                               
                 // Add the states to one nodes files
                 for (std::size_t i = 0; i < solutionPath.getStates().size(); ++i)
                 {
-                    storageDB_->addState( solutionPath.getStates()[i] );
+                    ompl::base::PlannerDataVertex vert( solutionPath.getStates()[i] ); // TODO tag?
+                    pd->addVertex( vert );
                 }
                 
                 // Add the edges to a edges file
-                
+                // TODO
 
-                storageDB_->store(fileName_.c_str());
+                // Save to vector
+                plannerDatas_.push_back(pd);
+
+                // note: does not save to file
+            }
+            
+            bool save(const std::string& fileName)
+            {
+                // Error checking
+                if (fileName.empty())
+                {
+                    OMPL_ERROR("Empty filename passed to save function");
+                    return false;
+                }
+
+                // Save database from file, track saving time
+                time::point start = time::now();
+
+                OMPL_INFORM("Saving database to file: %s", fileName.c_str());                
+
+                // Open a binary output stream
+                std::ofstream outStream(fileName.c_str(), std::ios::binary);
+
+                // Write the number of paths we will be saving
+                double numPaths = plannerDatas_.size();
+                outStream << numPaths;
+
+                // Start saving each planner data object
+                for (std::size_t i = 0; i < numPaths; ++i)
+                {
+                    // Save a single planner data
+                    storageDB_.store((*plannerDatas_[i].get()), outStream);
+                }
+
+                // Close file
+                outStream.close();
+
+                // Benchmark
+                double loadTime = time::seconds(time::now() - start);
+                OMPL_INFORM("Saved database to file in %f sec with %d paths", loadTime, plannerDatas_.size()); 
+
+                return true;
             }
 
-            void load(const std::string& fileName)
+            bool load(const std::string& fileName)
             {
-                // Remember so that we can save later
-                fileName_ = fileName;
+                // Error checking
+                if (fileName.empty())
+                {
+                    OMPL_ERROR("Empty filename passed to save function");
+                    return false;
+                }
+                if ( !boost::filesystem::exists( fileName ) )
+                {
+                    OMPL_WARN("Database file does not exist: %s", fileName.c_str());
+                    return false;
+                }
 
                 // Load database from file, track loading time
                 time::point start = time::now();
-                OMPL_INFORM("Loading database from file: %s", fileName_.c_str());
 
-                // Note: the StateStorage class checks if the states match for us
-                storageDB_->load(fileName_.c_str());
+                OMPL_INFORM("Loading database from file: %s", fileName.c_str());
 
-                // Check how many states are stored
-                OMPL_INFORM("Loaded %d states", storageDB_->size());
+                // Open a binary input stream
+                std::ifstream ifStream(fileName.c_str(), std::ios::binary);
+                std::istream& iStream = ifStream;
+
+                // Get the total number of paths saved
+                double numPaths = 0;
+                iStream >> numPaths;
+
+                // Check that the number of paths makes sense
+                if (numPaths < 0 || numPaths > std::numeric_limits<double>::max())
+                {
+                    OMPL_WARN("Number of paths to load %d is a bad value", numPaths);
+                    return false;
+                }
+
+                // Start loading all the PlannerDatas
+                for (std::size_t i = 0; i < numPaths; ++i)
+                {                    
+                    // Create a new planner data instance
+                    ompl::base::PlannerDataPtr pd(new ompl::base::PlannerData(si_));
+                
+                    // Note: the StateStorage class checks if the states match for us
+                    storageDB_.load(iStream, *pd.get());
+
+                    OMPL_INFORM("Loaded plan with %d states (vertices)", pd->numVertices());
+
+                    // Add planner data to vector
+                    plannerDatas_.push_back(pd);
+                }
+                
+                // Close file
+                ifStream.close();
 
                 double loadTime = time::seconds(time::now() - start);
-                OMPL_INFORM("Loaded database from file in %f sec", loadTime);
+                OMPL_INFORM("Loaded database from file in %f sec with %d paths", loadTime, plannerDatas_.size()); 
+                return true;
             }
 
+            // Deprecated
             std::vector<const ompl::base::State*> getStates()
             {
-                return storageDB_->getStates();
+                std::vector<const ompl::base::State*> states;
+
+                // TODO: make more than just 1
+                if (plannerDatas_.empty())
+                {
+                    OMPL_INFORM("There are no planner datas loaded");
+                }
+                else
+                {
+                    ompl::base::PlannerDataPtr pd = plannerDatas_[0];
+
+                    // Convert the planner data verticies into a vector of states
+                    for (std::size_t i = 0; i < pd->numVertices(); ++i)
+                    {
+                        states.push_back(pd->getVertex(i).getState());
+                    }
+
+                }
+                return states;
+            }
+
+            std::vector<ompl::geometric::PathGeometric> getAllPaths()
+            {
+                std::vector<ompl::geometric::PathGeometric> paths;
+
+                // Loop through all PlannerDatas
+                for (std::size_t i = 0; i < plannerDatas_.size(); ++i)
+                {
+                    ompl::base::PlannerDataPtr pd = plannerDatas_[i];
+                    ompl::geometric::PathGeometric path(si_);
+
+                    // Convert the planner data verticies into a vector of states
+                    for (std::size_t i = 0; i < pd->numVertices(); ++i)
+                    {
+                        path.append(pd->getVertex(i).getState());
+                    }
+                    paths.push_back(path);
+                }
+                return paths;
             }
             
         protected:
@@ -164,10 +284,10 @@ namespace ompl
             base::SpaceInformationPtr     si_; // TODO: is this even necessary?
 
             /// The storage file
-            ompl::base::GraphStateStoragePtr storageDB_;
+            ompl::base::PlannerDataStorage storageDB_;
 
-            /// The storage file location
-            std::string fileName_;
+            // Create a new planner data instance to be loaded
+            std::vector<ompl::base::PlannerDataPtr> plannerDatas_;
 
         }; // end of class ExperienceDB
 
