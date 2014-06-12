@@ -107,6 +107,19 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
         OMPL_INFORM("Found %d similar paths", nearestPaths_.size());
 
         // Filter down to just 1 chosen path
+        for (std::size_t i = 0; i < nearestPaths_.size(); ++i)
+        {
+            // Score this path
+
+
+            // Check if the sampled points are valid
+            //if( si_->isValid(state) )
+
+            // TODO 
+            
+        }
+
+
         // TODO       
         ob::PlannerDataPtr chosenPath;
         if (nearestPaths_.empty())

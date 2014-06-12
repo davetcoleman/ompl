@@ -289,9 +289,8 @@ namespace ompl
                     // Convert the planner data verticies into a vector of states
                     for (std::size_t i = 0; i < plannerData->numVertices(); ++i)
                     {
-                        OMPL_INFORM("Creating path for plan %d", i);
-                        debugVertex(plannerData->getVertex(i));
-
+                        //OMPL_INFORM("Creating path for plan %d", i);
+                        //debugVertex(plannerData->getVertex(i));
                         path.append(plannerData->getVertex(i).getState());
                     }
                     paths.push_back(path);
