@@ -255,6 +255,9 @@ namespace ompl
 
             /** \brief Run the planner until \e ptc becomes true (at most) */
             virtual base::PlannerStatus solve(const base::PlannerTerminationCondition &ptc);
+            
+            /** \brief Save the experience database to file */
+            bool save();
 
             /** \brief Return the status of the last planning attempt */
             base::PlannerStatus getLastPlannerStatus(void) const
@@ -345,7 +348,7 @@ namespace ompl
             ot::ParallelPlanPtr           pp_;
 
             /** \brief A shared object between all the planners for saving and loading previous experience */
-            ompl::tools::ExperienceDBPtr experience_db_;
+            ompl::tools::ExperienceDBPtr  experienceDB_;
           
         }; // end of class Lightning
 

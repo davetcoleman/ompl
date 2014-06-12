@@ -35,7 +35,8 @@
 /* Author: Dave Coleman */
 
 #include "ompl/geometric/planners/experience/RetrieveRepair.h"
-#include "ompl/base/goals/GoalSampleableRegion.h"
+//#include "ompl/base/goals/GoalSampleableRegion.h"
+#include "ompl/base/goals/GoalState.h"
 #include "ompl/tools/config/SelfConfig.h"
 #include <limits>
 
@@ -95,141 +96,77 @@ void ompl::geometric::RetrieveRepair::freeMemory(void)
 
 ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::PlannerTerminationCondition &ptc)
 {
-    /*
-      checkValidity();
-      base::Goal                 *goal   = pdef_->getGoal().get();
-      //base::GoalSampleableRegion *goal_s = dynamic_cast<base::GoalSampleableRegion*>(goal);
-
-      while (const base::State *st = pis_.nextStart())
-      {
-      Motion *motion = new Motion(si_);
-      si_->copyState(motion->state, st);
-      nn_->add(motion);
-      }
-
-      if (nn_->size() == 0)
-      {
-      OMPL_ERROR("%s: There are no valid initial states!", getName().c_str());
-      return base::PlannerStatus::INVALID_START;
-      p  }
-
-      if (!sampler_)
-      sampler_ = si_->allocStateSampler();
-
-      OMPL_INFORM("%s: Starting with %u states", getName().c_str(), nn_->size());
-
-      Motion *solution  = NULL;
-      Motion *approxsol = NULL;
-      double  approxdif = std::numeric_limits<double>::infinity();
-      Motion *rmotion   = new Motion(si_);
-      base::State *rstate = rmotion->state;
-      base::State *xstate = si_->allocState();
-
-      while (ptc == false)
-      {
-
-
-      // find closest state in the tree
-      Motion *nmotion = nn_->nearest(rmotion);
-      base::State *dstate = rstate;
-
-      // find state to add
-      //double d = si_->distance(nmotion->state, rstate);
-
-      if (si_->checkMotion(nmotion->state, dstate))
-      {
-      // create a motion
-      Motion *motion = new Motion(si_);
-      si_->copyState(motion->state, dstate);
-      motion->parent = nmotion;
-
-      nn_->add(motion);
-      double dist = 0.0;
-      bool sat = goal->isSatisfied(motion->state, &dist);
-      if (sat)
-      {
-      approxdif = dist;
-      solution = motion;
-      break;
-      }
-      if (dist < approxdif)
-      {
-      approxdif = dist;
-      approxsol = motion;
-      }
-      }
-      }
-
-      bool solved = false;
-      bool approximate = false;
-      if (solution == NULL)
-      {
-      solution = approxsol;
-      approximate = true;
-      }
-
-      if (solution != NULL)
-      {
-      lastGoalMotion_ = solution;
-
-      // construct the solution path
-      std::vector<Motion*> mpath;
-      while (solution != NULL)
-      {
-      mpath.push_back(solution);
-      solution = solution->parent;
-      }
-
-      // set the solution path
-      PathGeometric *path = new PathGeometric(si_);
-      for (int i = mpath.size() - 1 ; i >= 0 ; --i)
-      path->append(mpath[i]->state);
-      pdef_->addSolutionPath(base::PathPtr(path), approximate, approxdif);
-      solved = true;
-      }
-
-      si_->freeState(xstate);
-      if (rmotion->state)
-      si_->freeState(rmotion->state);
-      delete rmotion;
-
-      OMPL_INFORM("%s: Created %u states", getName().c_str(), nn_->size());
-
-      return base::PlannerStatus(solved, approximate);
-    */
-
     bool solved = false;
     bool approximate = false;
-    double  approxdif = std::numeric_limits<double>::infinity();
+    double approxdif = std::numeric_limits<double>::infinity();
 
     bool use_database = false;
     if (use_database)
     {
-        // Search for previous solution in database
         OMPL_INFORM("Using database for RetrieveRepair planner.");
+
+        // Get a single start state TODO: more than one
+        const base::State *startState = pis_.nextStart();
+        //Motion *motion = new Motion(si_);
+        //si_->copyState(motion->state, st);
+        //nn_->add(motion);
+
+        // Get a single goal state TODO: more than one
+        base::Goal *goal   = pdef_->getGoal().get();
+        // Check that we have the correct type of goal
+        if (!goal || !goal->hasType(ompl::base::GOAL_STATE))
+        {
+            OMPL_ERROR("Goal cannot be converted into a goal state");
+            OMPL_ERROR("%s: Unknown type of goal", getName().c_str());
+            return base::PlannerStatus::UNRECOGNIZED_GOAL_TYPE;
+        }
+        const base::GoalState *goalStateClass = dynamic_cast<base::GoalState*>(goal);
+        const base::State *goalState = goalStateClass->getState();
+
+        // Search for previous solution in database
+        int nearestK = 1; // TODO: make this 10 then check candidate solutions for amount of invalidness
+        std::vector<ob::PlannerDataPtr> nearest;
+        nearest = experienceDB_->findNearestStartGoal(nearestK, startState, goalState);
+
+        /*
         OMPL_INFORM("Available states:");
         std::vector<const ompl::base::State*> states = experienceDB_->getStates();
         for (std::size_t i = 0; i < states.size(); ++i)
         {
             si_->printState(states[i], std::cout);
         }
+        */
 
+        // Filter down to just 1 chosen path
+        // TODO       
+        ob::PlannerDataPtr chosenPath;
+        if (nearest.empty())
+        {
+            OMPL_WARN("No similar path founds in nearest neighbor tree, unable to retrieve repair");
+            return base::PlannerStatus::TIMEOUT; // The planner failed to find a solution
+        }
+        else
+        {
+            chosenPath = nearest[0];
+        }
+       
         // Check if we have a solution
-        if (!states.empty())
+        if (!chosenPath->numVertices() || chosenPath->numVertices() == 1)
+        {
+            OMPL_ERROR("Only %d verticies found in PlannerData loaded from file. This is a bug.", chosenPath->numVertices());
+            return base::PlannerStatus::CRASH;
+        }
+        else
         {
             // Create the solution path
             PathGeometric *path = new PathGeometric(si_);
-            for (int i = states.size() - 1 ; i >= 0 ; --i)
+            for (int i = chosenPath->numVertices() - 1 ; i >= 0 ; --i)
             {
-                path->append(states[i]);
+                path->append(chosenPath->getVertex(i).getState());
             }
             approxdif = 0; // ??
             pdef_->addSolutionPath(base::PathPtr(path), approximate, approxdif, getName());
             solved = true;
-        }
-        else
-        {
-            OMPL_WARN("No states found in experience database, unable to retrieve repair");
         }
     }
     else

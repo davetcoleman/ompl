@@ -54,8 +54,8 @@ ompl::tools::Lightning::Lightning(const base::StateSpacePtr &space) :
     params_.include(si_->params());
 
     // Load the experience database
-    experience_db_.reset(new ompl::tools::ExperienceDB(si_->getStateSpace()));
-    experience_db_->load(OMPL_STORAGE_PATH); // load from file
+    experienceDB_.reset(new ompl::tools::ExperienceDB(si_->getStateSpace()));
+    experienceDB_->load(OMPL_STORAGE_PATH); // load from file
 }
 
 void ompl::tools::Lightning::setup(void)
@@ -83,7 +83,7 @@ void ompl::tools::Lightning::setup(void)
         // Setup planning from experience planner
         if (!rrPlanner_)
         {
-            rrPlanner_ = ob::PlannerPtr(new og::RetrieveRepair(si_, experience_db_)); // TODO: change this planner to a custom one
+            rrPlanner_ = ob::PlannerPtr(new og::RetrieveRepair(si_, experienceDB_)); // TODO: change this planner to a custom one
         }
         rrPlanner_->setProblemDefinition(pdef_);
         if (!rrPlanner_->isSetup())
@@ -94,6 +94,7 @@ void ompl::tools::Lightning::setup(void)
         params_.include(si_->params());
         params_.include(planner_->params());
         configured_ = true;
+
 
         // Create the parallel component for splitting into two threads
         pp_ = ot::ParallelPlanPtr(new ot::ParallelPlan(pdef_) );
@@ -150,10 +151,7 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
     if (getSolutionPlannerName() != rrPlanner_->getName())
     {
         OMPL_INFORM("Adding to database because best solution was not from database");
-        experience_db_->addPath(solution_path);
-
-        OMPL_INFORM("Saving database:");
-        experience_db_->save(OMPL_STORAGE_PATH);
+        experienceDB_->addPath(solution_path);
     }
     else
     {
@@ -167,6 +165,12 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(double time)
 {
     ob::PlannerTerminationCondition ptc = ob::timedPlannerTerminationCondition( time );
     return solve(ptc);
+}
+
+bool ompl::tools::Lightning::save()
+{
+    OMPL_INFORM("Saving database:");
+    return experienceDB_->save(OMPL_STORAGE_PATH);
 }
 
 void ompl::tools::Lightning::simplifySolution(const base::PlannerTerminationCondition &ptc)
