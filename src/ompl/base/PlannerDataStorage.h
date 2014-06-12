@@ -251,7 +251,7 @@ namespace ompl
             /// \brief Read \e numEdges from the binary input \e ia and store them as PlannerData.
             virtual void loadEdges(PlannerData &pd, unsigned int numEdges, boost::archive::binary_iarchive &ia)
             {
-                OMPL_DEBUG("Loading %d PlannerDataEdge objects", numEdges);
+                //OMPL_DEBUG("Loading %d PlannerDataEdge objects", numEdges);
 
                 for (unsigned int i = 0; i < numEdges; ++i)
                 {
