@@ -73,72 +73,20 @@ namespace ompl
 
             virtual void clear(void);
 
-            /** \brief Set a different nearest neighbors datastructure */
-            template<template<typename T> class NN>
-            void setNearestNeighbors(void)
-            {
-                nn_.reset(new NN<Motion*>());
-            }
-
             void setExperienceDB(ompl::tools::ExperienceDBPtr experienceDB);
 
             virtual void setup(void);
 
         protected:
 
-
-            /** \brief Representation of a motion
-
-                This only contains pointers to parent motions as we
-                only need to go backwards in the tree. */
-            class Motion
-            {
-            public:
-
-                Motion(void) : state(NULL), parent(NULL)
-                {
-                }
-
-                /** \brief Constructor that allocates memory for the state */
-                Motion(const base::SpaceInformationPtr &si) : state(si->allocState()), parent(NULL)
-                {
-                }
-
-                ~Motion(void)
-                {
-                }
-
-                /** \brief The state contained by the motion */
-                base::State       *state;
-
-                /** \brief The parent motion in the exploration tree */
-                Motion            *parent;
-
-            };
-
             /** \brief Free the memory allocated by this planner */
             void freeMemory(void);
 
-            /** \brief Compute distance between motions (actually distance between contained states) */
-            double distanceFunction(const Motion* a, const Motion* b) const
-            {
-                return si_->distance(a->state, b->state);
-            }
+            /** \brief The database of motions to search through */
+            ompl::tools::ExperienceDBPtr                   experienceDB_;
 
-            /** \brief State sampler */
-            base::StateSamplerPtr                          sampler_;
-
-            /** \brief A nearest-neighbors datastructure containing the tree of motions */
-            boost::shared_ptr< NearestNeighbors<Motion*> > nn_;
-
-            /** \brief The random number generator */
-            RNG                                            rng_;
-
-            /** \brief The most recent goal motion.  Used for PlannerData computation */
-            Motion                                         *lastGoalMotion_;
-
-            /** \breif The database of motions to search through */
-            ompl::tools::ExperienceDBPtr experienceDB_;
+            /** \brief Recall the nearest paths and store this in planner data for introspection */
+            std::vector<ob::PlannerDataPtr>                nearestPaths_;
         };
 
     }

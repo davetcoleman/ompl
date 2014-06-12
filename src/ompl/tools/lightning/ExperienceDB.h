@@ -158,7 +158,7 @@ namespace ompl
                     // Note: the StateStorage class checks if the states match for us
                     plannerDataStorage_.load(iStream, *plannerData.get());
 
-                    OMPL_INFORM("Loaded plan with %d states (vertices)", plannerData->numVertices());
+                    //OMPL_INFORM("Loaded plan with %d states (vertices)", plannerData->numVertices());
 
                     // Add to nearest neighbor tree
                     nn_->add(plannerData);
@@ -206,6 +206,13 @@ namespace ompl
                 saveRequired_ = true;
             }
             
+            bool saveIfChanged(const std::string& fileName)
+            {
+                if (saveRequired_)
+                    return save(fileName);
+                return true;
+            }
+
             bool save(const std::string& fileName)
             {
                 // Error checking
@@ -236,7 +243,7 @@ namespace ompl
                 {
                     ob::PlannerData &pd = *plannerDatas[i].get();
 
-                    OMPL_INFORM("Saving experience %d with %d verticies and %d edges", i, pd.numVertices(), pd.numEdges());
+                    //OMPL_INFORM("Saving experience %d with %d verticies and %d edges", i, pd.numVertices(), pd.numEdges());
 
                     if (false) // debug code
                     {

@@ -259,6 +259,9 @@ namespace ompl
             /** \brief Save the experience database to file */
             bool save();
 
+            /** \brief Save the experience database to file if there has been a change */
+            bool saveIfChanged();
+
             /** \brief Return the status of the last planning attempt */
             base::PlannerStatus getLastPlannerStatus(void) const
             {
@@ -309,6 +312,15 @@ namespace ompl
                 return params_;
             }
 
+            /** \brief Optionally disable the ability to use previous plans in solutions (but will still save them) */
+            void enableRecall(bool enable);
+
+            /** \brief Get a vector of all the paths in the database */
+            void getAllPaths(std::vector<ompl::geometric::PathGeometric>& paths)
+            {
+                experienceDB_->getAllPaths(paths);                
+            };
+
         protected:
 
             /// The created space information
@@ -331,6 +343,9 @@ namespace ompl
 
             /// Flag indicating whether the classes needed for planning are set up
             bool                          configured_;
+
+            /// Flag indicating whether recalled plans should be used to find solutions. Enabled by default.
+            bool                          recallEnabled_;
 
             /// The amount of time the last planning step took
             double                        planTime_;

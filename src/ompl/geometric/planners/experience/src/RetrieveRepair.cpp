@@ -46,8 +46,6 @@ ompl::geometric::RetrieveRepair::RetrieveRepair(const base::SpaceInformationPtr 
 {
     specs_.approximateSolutions = true;
     specs_.directed = true;
-
-    lastGoalMotion_ = NULL;
 }
 
 ompl::geometric::RetrieveRepair::~RetrieveRepair(void)
@@ -58,11 +56,7 @@ ompl::geometric::RetrieveRepair::~RetrieveRepair(void)
 void ompl::geometric::RetrieveRepair::clear(void)
 {
     Planner::clear();
-    sampler_.reset();
     freeMemory();
-    if (nn_)
-        nn_->clear();
-    lastGoalMotion_ = NULL;
 }
 
 void ompl::geometric::RetrieveRepair::setExperienceDB(ompl::tools::ExperienceDBPtr experienceDB)
@@ -73,25 +67,11 @@ void ompl::geometric::RetrieveRepair::setExperienceDB(ompl::tools::ExperienceDBP
 void ompl::geometric::RetrieveRepair::setup(void)
 {
     Planner::setup();
-
-    if (!nn_)
-        nn_.reset(tools::SelfConfig::getDefaultNearestNeighbors<Motion*>(si_->getStateSpace()));
-    nn_->setDistanceFunction(boost::bind(&RetrieveRepair::distanceFunction, this, _1, _2));
 }
 
 void ompl::geometric::RetrieveRepair::freeMemory(void)
 {
-    if (nn_)
-    {
-        std::vector<Motion*> motions;
-        nn_->list(motions);
-        for (unsigned int i = 0 ; i < motions.size() ; ++i)
-        {
-            if (motions[i]->state)
-                si_->freeState(motions[i]->state);
-            delete motions[i];
-        }
-    }
+
 }
 
 ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::PlannerTerminationCondition &ptc)
@@ -100,16 +80,14 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
     bool approximate = false;
     double approxdif = std::numeric_limits<double>::infinity();
 
-    bool use_database = false;
+    bool use_database = true;
     if (use_database)
     {
         OMPL_INFORM("Using database for RetrieveRepair planner.");
 
         // Get a single start state TODO: more than one
         const base::State *startState = pis_.nextStart();
-        //Motion *motion = new Motion(si_);
         //si_->copyState(motion->state, st);
-        //nn_->add(motion);
 
         // Get a single goal state TODO: more than one
         base::Goal *goal   = pdef_->getGoal().get();
@@ -124,30 +102,21 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
         const base::State *goalState = goalStateClass->getState();
 
         // Search for previous solution in database
-        int nearestK = 1; // TODO: make this 10 then check candidate solutions for amount of invalidness
-        std::vector<ob::PlannerDataPtr> nearest;
-        nearest = experienceDB_->findNearestStartGoal(nearestK, startState, goalState);
-
-        /*
-        OMPL_INFORM("Available states:");
-        std::vector<const ompl::base::State*> states = experienceDB_->getStates();
-        for (std::size_t i = 0; i < states.size(); ++i)
-        {
-            si_->printState(states[i], std::cout);
-        }
-        */
+        int nearestK = 10; // TODO: make this 10 then check candidate solutions for amount of invalidness
+        nearestPaths_ = experienceDB_->findNearestStartGoal(nearestK, startState, goalState);
+        OMPL_INFORM("Found %d similar paths", nearestPaths_.size());
 
         // Filter down to just 1 chosen path
         // TODO       
         ob::PlannerDataPtr chosenPath;
-        if (nearest.empty())
+        if (nearestPaths_.empty())
         {
             OMPL_WARN("No similar path founds in nearest neighbor tree, unable to retrieve repair");
             return base::PlannerStatus::TIMEOUT; // The planner failed to find a solution
         }
         else
         {
-            chosenPath = nearest[0];
+            chosenPath = nearestPaths_[0];
         }
        
         // Check if we have a solution
@@ -181,28 +150,24 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
         OMPL_INFORM("DONE doing dummy work in RetrieveRepair thread");
     }
 
-    //OMPL_INFORM("%s: Created %u states", getName().c_str(), nn_->size());
-
     return base::PlannerStatus(solved, approximate);
 }
 
 void ompl::geometric::RetrieveRepair::getPlannerData(base::PlannerData &data) const
 {
+    OMPL_INFORM("RetrieveRepair getPlannerData: including %d similar paths", nearestPaths_.size());
+
     Planner::getPlannerData(data);
 
-    std::vector<Motion*> motions;
-    if (nn_)
-        nn_->list(motions);
-
-    if (lastGoalMotion_)
-        data.addGoalVertex(base::PlannerDataVertex(lastGoalMotion_->state));
-
-    for (unsigned int i = 0 ; i < motions.size() ; ++i)
+    // Visualize the n candidate paths that we recalled from the database
+    for (std::size_t i = 0 ; i < nearestPaths_.size() ; ++i)
     {
-        if (motions[i]->parent == NULL)
-            data.addStartVertex(base::PlannerDataVertex(motions[i]->state));
-        else
-            data.addEdge(base::PlannerDataVertex(motions[i]->parent->state),
-                base::PlannerDataVertex(motions[i]->state));
+        ob::PlannerDataPtr pd = nearestPaths_[i];
+        for (std::size_t j = 1; j < pd->numVertices(); ++j)
+        {
+            data.addEdge(
+                base::PlannerDataVertex(pd->getVertex(j-1).getState() ),
+                base::PlannerDataVertex(pd->getVertex(j).getState()   ));
+        }
     }
 }

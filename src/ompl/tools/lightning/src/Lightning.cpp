@@ -43,10 +43,11 @@
 #include "ompl/base/StateSpace.h" // for storing to file
 
 ompl::tools::Lightning::Lightning(const base::StateSpacePtr &space) :
-    configured_(false), 
-    planTime_(0.0), 
-    simplifyTime_(0.0), 
-    lastStatus_(base::PlannerStatus::UNKNOWN)
+    configured_(false),
+    planTime_(0.0),
+    simplifyTime_(0.0),
+    lastStatus_(base::PlannerStatus::UNKNOWN),
+    recallEnabled_(true)
 {
     si_.reset(new base::SpaceInformation(space));
     pdef_.reset(new base::ProblemDefinition(si_));
@@ -60,7 +61,7 @@ ompl::tools::Lightning::Lightning(const base::StateSpacePtr &space) :
 
 void ompl::tools::Lightning::setup(void)
 {
-    if (!configured_ || !si_->isSetup() || !planner_->isSetup())
+    if (!configured_ || !si_->isSetup() || !planner_->isSetup() || !rrPlanner_->isSetup())
     {
         if (!si_->isSetup())
             si_->setup();
@@ -95,11 +96,13 @@ void ompl::tools::Lightning::setup(void)
         params_.include(planner_->params());
         configured_ = true;
 
-
         // Create the parallel component for splitting into two threads
         pp_ = ot::ParallelPlanPtr(new ot::ParallelPlan(pdef_) );
-        pp_->addPlanner(planner_);   // Add the planning from scratch planner
-        pp_->addPlanner(rrPlanner_);  // Add the planning from experience planner
+        pp_->addPlanner(planner_);   // Always add the planning from scratch planner
+        if (recallEnabled_)
+        {
+            pp_->addPlanner(rrPlanner_);  // Add the planning from experience planner if desired
+        }
     }
 }
 
@@ -119,7 +122,7 @@ void ompl::tools::Lightning::clear(void)
 // we provide a duplicate implementation here to allow the planner to choose how the time is turned into a planner termination condition
 ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTerminationCondition &ptc)
 {
-    OMPL_INFORM("EXPERIENCED-BASED SOLVING starts now:");
+    OMPL_INFORM("Lightning Framework: Starting solve()");
 
     // Setup again in case it has not been done yet
     setup();
@@ -130,7 +133,7 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
     // Start both threads
     bool hybridize = false;
     lastStatus_ = pp_->solve(ptc, hybridize);
-    
+
     // Results
     planTime_ = time::seconds(time::now() - start);
     if (lastStatus_)
@@ -169,8 +172,12 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(double time)
 
 bool ompl::tools::Lightning::save()
 {
-    OMPL_INFORM("Saving database:");
     return experienceDB_->save(OMPL_STORAGE_PATH);
+}
+
+bool ompl::tools::Lightning::saveIfChanged()
+{
+    return experienceDB_->saveIfChanged(OMPL_STORAGE_PATH);
 }
 
 void ompl::tools::Lightning::simplifySolution(const base::PlannerTerminationCondition &ptc)
@@ -193,7 +200,7 @@ void ompl::tools::Lightning::simplifySolution(const base::PlannerTerminationCond
 void ompl::tools::Lightning::simplifySolution(double duration)
 {
     ob::PlannerTerminationCondition ptc = ob::timedPlannerTerminationCondition( duration );
-    simplifySolution(ptc);  
+    simplifySolution(ptc);
 }
 
 const std::string ompl::tools::Lightning::getSolutionPlannerName(void) const
@@ -229,8 +236,13 @@ bool ompl::tools::Lightning::haveExactSolutionPath(void) const
 void ompl::tools::Lightning::getPlannerData(base::PlannerData &pd) const
 {
     pd.clear();
-    if (planner_)
-        planner_->getPlannerData(pd);
+    /*
+      if (planner_)
+      planner_->getPlannerData(pd);
+    */
+    // Get the planner data from our experience-based planner
+    if (rrPlanner_)
+        rrPlanner_->getPlannerData(pd);
 }
 
 void ompl::tools::Lightning::print(std::ostream &out) const
@@ -247,4 +259,13 @@ void ompl::tools::Lightning::print(std::ostream &out) const
     }
     if (pdef_)
         pdef_->print(out);
+}
+
+void ompl::tools::Lightning::enableRecall(bool enable)
+{    
+    // Remember state
+    recallEnabled_ = enable;
+
+    // Flag the planners as possibly misconfigured
+    configured_ = false;
 }
