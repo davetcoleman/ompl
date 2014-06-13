@@ -240,6 +240,19 @@ namespace ompl
                 configured_ = false;
             }
 
+            /** \brief Set the planner to use for repairing experience paths
+                inside the RetrieveRepair planner. If the planner is not
+                set, a default planner is set. */
+            void setRepairPlanner(const base::PlannerPtr &planner)
+            {
+                rrPlanner_->setRepairPlanner(planner);
+
+                if (planner && planner->getSpaceInformation().get() != si_.get())
+                    throw Exception("Planner instance does not match space information");
+                repairPlanner_ = planner;
+                configured_ = false;
+            }
+
             /** \brief Set the planner allocator to use. This is only
                 used if no planner has been set. This is optional -- a default
                 planner will be used if no planner is otherwise specified. */
@@ -247,6 +260,8 @@ namespace ompl
             {
                 pa_ = pa;
                 planner_.reset();
+                repairPlanner_.reset();
+                // note: the rrPlanner_ never uses the allocator so does not need to be reset
                 configured_ = false;
             }
 
@@ -300,13 +315,13 @@ namespace ompl
                 function automatically. */
             virtual void setup(void);
 
-            /** \brief Get the  parameters for this planning context */
+            /** \brief Get the parameters for this planning context */
             base::ParamSet& params(void)
             {
                 return params_;
             }
 
-            /** \brief Get the  parameters for this planning context */
+            /** \brief Get the parameters for this planning context */
             const base::ParamSet& params(void) const
             {
                 return params_;
@@ -321,6 +336,12 @@ namespace ompl
                 experienceDB_->getAllPaths(paths);                
             };
 
+            /** \brief Get the total number of paths stored in the database */
+            const std::size_t& getExperiencesCount() const
+            {
+                return experienceDB_->getExperiencesCount();
+            }
+
         protected:
 
             /// The created space information
@@ -334,6 +355,9 @@ namespace ompl
 
             /// The maintained experience planner instance
             base::PlannerPtr              rrPlanner_;
+
+            /// The maintained experience repairing planner instance
+            base::PlannerPtr              repairPlanner_;
 
             /// The optional planner allocator
             base::PlannerAllocator        pa_;

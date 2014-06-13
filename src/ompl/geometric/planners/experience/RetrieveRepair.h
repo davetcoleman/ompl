@@ -38,6 +38,7 @@
 #define OMPL_GEOMETRIC_PLANNERS_EXPERIENCE_RETRIEVEREPAIR_
 
 #include "ompl/geometric/planners/PlannerIncludes.h"
+#include <ompl/geometric/planners/rrt/TRRT.h>
 #include "ompl/datastructures/NearestNeighbors.h"
 #include "ompl/tools/lightning/ExperienceDB.h"
 
@@ -77,6 +78,34 @@ namespace ompl
 
             virtual void setup(void);
 
+            /**
+             * \brief Filters the top n paths in nearestPaths_ to the top 1, based on state validity with current environment
+             * \return true if no error
+             */
+            bool findBestPath(ob::PlannerDataPtr& chosenPath);
+
+            /**
+             * \brief Repairs a path to be valid in the current planning environment
+             * \param oldPath - from experience
+             * \return true if no error
+             */
+            bool repairPath(PathGeometricPtr path); // \todo is this the best way to pass around a path?
+
+            /**
+             * \brief Use our secondary planner to find a valid path between start and goal, and return that path
+             * \param start
+             * \param goal
+             * \param newPathSegment - the solution
+             * \return true if path found
+             */
+            bool replan(ob::State* start, ob::State goal, PathGeometricPtr& newPathSegment)
+
+            /**
+             * \brief Count the number of states along the discretized path that are in collision
+             * // TODO: move this into DiscreteMotionValidator??
+             */
+            std::size_t checkMotionScore(const ob::State *s1, const ob::State *s2) const;
+
         protected:
 
             /** \brief Free the memory allocated by this planner */
@@ -87,6 +116,11 @@ namespace ompl
 
             /** \brief Recall the nearest paths and store this in planner data for introspection */
             std::vector<ob::PlannerDataPtr>                nearestPaths_;
+
+            /** \brief A secondary planner for replanning */
+            ob::PlannerPtr                                 repairPlanner_;
+
+            ob::ProblemDefinitionPtr                       repairProbleDef_;
         };
 
     }

@@ -46,8 +46,8 @@ ompl::tools::Lightning::Lightning(const base::StateSpacePtr &space) :
     configured_(false),
     planTime_(0.0),
     simplifyTime_(0.0),
-    lastStatus_(base::PlannerStatus::UNKNOWN),
-    recallEnabled_(true)
+    recallEnabled_(true),
+    lastStatus_(base::PlannerStatus::UNKNOWN)
 {
     si_.reset(new base::SpaceInformation(space));
     pdef_.reset(new base::ProblemDefinition(si_));
@@ -61,7 +61,7 @@ ompl::tools::Lightning::Lightning(const base::StateSpacePtr &space) :
 
 void ompl::tools::Lightning::setup(void)
 {
-    if (!configured_ || !si_->isSetup() || !planner_->isSetup() || !rrPlanner_->isSetup())
+    if (!configured_ || !si_->isSetup() || !planner_->isSetup() || !rrPlanner_->isSetup() || !repairPlanner_->isSetup())
     {
         if (!si_->isSetup())
             si_->setup();
@@ -81,12 +81,29 @@ void ompl::tools::Lightning::setup(void)
         if (!planner_->isSetup())
             planner_->setup();
 
+        // Setup repair planner (for use by the rrPlanner)
+        // Note: does not use the same pdef as the other two planners!
+        if (!repairPlanner_)
+        {
+            if (pa_)
+                repairPlanner_ = pa_(si_);
+            if (!repairPlanner_)
+            {
+                OMPL_INFORM("No repairing planner specified. Using default.");
+                repairPlanner_ = ompl::geometric::getDefaultPlanner(getGoal());
+            }
+        }
+        if (!repairPlanner_->isSetup())
+            repairPlanner_->setup();
+
         // Setup planning from experience planner
         if (!rrPlanner_)
         {
-            rrPlanner_ = ob::PlannerPtr(new og::RetrieveRepair(si_, experienceDB_)); // TODO: change this planner to a custom one
+            rrPlanner_ = ob::PlannerPtr(new og::RetrieveRepair(si_, experienceDB_));
         }
         rrPlanner_->setProblemDefinition(pdef_);
+        // Pass the repair planner to the RetrieveRepair component
+        todo
         if (!rrPlanner_->isSetup())
             rrPlanner_->setup();
 
@@ -94,6 +111,8 @@ void ompl::tools::Lightning::setup(void)
         params_.clear();
         params_.include(si_->params());
         params_.include(planner_->params());
+        params_.include(repairPlanner_->params());
+        params_.include(rrPlanner_->params());
         configured_ = true;
 
         // Create the parallel component for splitting into two threads
@@ -110,6 +129,10 @@ void ompl::tools::Lightning::clear(void)
 {
     if (planner_)
         planner_->clear();
+    if (repairPlanner_)
+        repairPlanner_->clear();
+    if (rrPlanner_)
+        rrPlanner_->clear();
     if (pdef_)
         pdef_->clearSolutionPaths();
     if (pp_)
@@ -256,6 +279,16 @@ void ompl::tools::Lightning::print(std::ostream &out) const
     {
         planner_->printProperties(out);
         planner_->printSettings(out);
+    }
+    if (repairPlanner_)
+    {
+        repairPlanner_->printProperties(out);
+        repairPlanner_->printSettings(out);
+    }
+    if (rrPlanner_)
+    {
+        rrPlanner_->printProperties(out);
+        rrPlanner_->printSettings(out);
     }
     if (pdef_)
         pdef_->print(out);

@@ -103,7 +103,7 @@ namespace ompl
                 // Load the PlannerData instance to be used for searching 
                 nnSearchKey_.reset(new ob::PlannerData(si_));
                 // Add 2 vertexes - one for start and one for goal - so the future searching is faster
-                ob::State *temp;
+                ob::State *temp  = si_->allocState();
                 ob::PlannerDataVertex vert( temp );
                 nnSearchKey_->addVertex( vert );
                 nnSearchKey_->addVertex( vert );
@@ -327,6 +327,12 @@ namespace ompl
 
                 // Add to vector of results
                 OMPL_INFORM("Get value: %f and %f", real_state->values[0], real_state->values[1]);                
+            }
+
+            /** \brief Get the total number of paths stored in the database */
+            const std::size_t& getExperiencesCount() const
+            {
+                return nn_->size();
             }
 
             void print(std::ostream &out) const
