@@ -38,7 +38,8 @@
 #define OMPL_GEOMETRIC_PLANNERS_EXPERIENCE_RETRIEVEREPAIR_
 
 #include "ompl/geometric/planners/PlannerIncludes.h"
-#include <ompl/geometric/planners/rrt/TRRT.h>
+#include "ompl/geometric/PathGeometric.h"
+//#include ompl/geometric/planners/rrt/TRRT.h>
 #include "ompl/datastructures/NearestNeighbors.h"
 #include "ompl/tools/lightning/ExperienceDB.h"
 
@@ -76,20 +77,23 @@ namespace ompl
 
             void setExperienceDB(ompl::tools::ExperienceDBPtr experienceDB);
 
+            /** \brief Set the planner that will be used for repairing invalid paths recalled from experience */
+            void setRepairPlanner(const base::PlannerPtr &planner);
+    
             virtual void setup(void);
 
             /**
              * \brief Filters the top n paths in nearestPaths_ to the top 1, based on state validity with current environment
              * \return true if no error
              */
-            bool findBestPath(ob::PlannerDataPtr& chosenPath);
+            bool findBestPath(const base::State *startState, const base::State *goalState, ob::PlannerDataPtr& chosenPath);
 
             /**
              * \brief Repairs a path to be valid in the current planning environment
              * \param oldPath - from experience
              * \return true if no error
              */
-            bool repairPath(PathGeometricPtr path); // \todo is this the best way to pass around a path?
+            bool repairPath(og::PathGeometricPtr path); // \todo is this the best way to pass around a path?
 
             /**
              * \brief Use our secondary planner to find a valid path between start and goal, and return that path
@@ -98,7 +102,7 @@ namespace ompl
              * \param newPathSegment - the solution
              * \return true if path found
              */
-            bool replan(ob::State* start, ob::State goal, PathGeometricPtr& newPathSegment)
+            bool replan(ob::State* start, ob::State* goal, og::PathGeometricPtr& newPathSegment);
 
             /**
              * \brief Count the number of states along the discretized path that are in collision
@@ -120,7 +124,8 @@ namespace ompl
             /** \brief A secondary planner for replanning */
             ob::PlannerPtr                                 repairPlanner_;
 
-            ob::ProblemDefinitionPtr                       repairProbleDef_;
+            /** \brief A secondary problem definition for the repair planner to use */
+            ob::ProblemDefinitionPtr                       repairProblemDef_;
         };
 
     }

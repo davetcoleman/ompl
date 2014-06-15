@@ -330,7 +330,7 @@ namespace ompl
             }
 
             /** \brief Get the total number of paths stored in the database */
-            const std::size_t& getExperiencesCount() const
+            std::size_t getExperiencesCount()
             {
                 return nn_->size();
             }

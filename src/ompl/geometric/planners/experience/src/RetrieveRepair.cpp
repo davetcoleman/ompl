@@ -35,10 +35,12 @@
 /* Author: Dave Coleman */
 
 #include "ompl/geometric/planners/experience/RetrieveRepair.h"
-//#include "ompl/base/goals/GoalSampleableRegion.h"
+#include "ompl/geometric/SimpleSetup.h" // use their implementation of getDefaultPlanner
 #include "ompl/base/goals/GoalState.h"
 #include "ompl/tools/config/SelfConfig.h"
+
 #include <limits>
+#include <boost/make_shared.hpp>
 
 ompl::geometric::RetrieveRepair::RetrieveRepair(const base::SpaceInformationPtr &si, ompl::tools::ExperienceDBPtr experienceDB)
     : base::Planner(si, "RetrieveRepair"),
@@ -48,7 +50,7 @@ ompl::geometric::RetrieveRepair::RetrieveRepair(const base::SpaceInformationPtr 
     specs_.directed = true;
 
     // Repair Planner Specific:
-    repairProbleDef_.reset(new base::ProblemDefinition(si)_);
+    repairProblemDef_.reset(new base::ProblemDefinition(si_));
 }
 
 ompl::geometric::RetrieveRepair::~RetrieveRepair(void)
@@ -62,8 +64,8 @@ void ompl::geometric::RetrieveRepair::clear(void)
     freeMemory();
 
     // Clear the inner planner
-    if (rePlanner_)
-        rePlanner_->clear();    
+    if (repairPlanner_)
+        repairPlanner_->clear();
 }
 
 void ompl::geometric::RetrieveRepair::setExperienceDB(ompl::tools::ExperienceDBPtr experienceDB)
@@ -71,15 +73,33 @@ void ompl::geometric::RetrieveRepair::setExperienceDB(ompl::tools::ExperienceDBP
     experienceDB_ = experienceDB;
 }
 
+void ompl::geometric::RetrieveRepair::setRepairPlanner(const base::PlannerPtr &planner)
+{
+    if (planner && planner->getSpaceInformation().get() != si_.get())
+        throw Exception("Repair planner instance does not match space information");
+    repairPlanner_ = planner;
+    setup_ = false; // Not sure if this is necessary
+}
+
 void ompl::geometric::RetrieveRepair::setup(void)
 {
     Planner::setup();
 
-    // Create an inner, secondary planner for replanning
-    rePlanner_ = new og::TRRT( si_ ); // \todo Make this planner be the same as the primary planning from scratch one. automatically
-    rePlanner_->setProblemDefinition(pdef_);
-    if (!rePlanner_->isSetup())
-        rePlanner_->setup();    
+    // Setup repair planner (for use by the rrPlanner)
+    // Note: does not use the same pdef as the main planner in this class
+    if (!repairPlanner_)
+    {
+        OMPL_INFORM("No repairing planner specified. Using default.");
+        repairPlanner_ = ompl::geometric::getDefaultPlanner(pdef_->getGoal()); // we could use the repairProblemDef_ here but that isn't setup yet
+    }
+    // Setup repair planner
+    if (!repairPlanner_->isSetup())
+        repairPlanner_->setup();
+
+    // Setup the problem definition
+    repairProblemDef_->setOptimizationObjective(pdef_->getOptimizationObjective()); // copy primary problem def
+
+    repairPlanner_->setProblemDefinition(repairProblemDef_);
 }
 
 void ompl::geometric::RetrieveRepair::freeMemory(void)
@@ -129,13 +149,13 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
         ob::PlannerDataPtr chosenPath;
 
         // Filter top n paths to 1
-        if (!findBestPath(chosenPath))
+        if (!findBestPath(startState, goalState, chosenPath))
         {
             return base::PlannerStatus::CRASH;
         }
 
         // Convert chosen PlanningData experience to an actual path
-        PathGeometricPtr path(new PathGeometric(si_));
+        og::PathGeometricPtr path(new og::PathGeometric(si_));
         // Add start
         path->append(startState);
         // Add old states
@@ -150,9 +170,9 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
         if (!repairPath(path))
         {
             return base::PlannerStatus::CRASH;
-        }        
+        }
 
-
+        // Finished
         approxdif = 0; // ??
         pdef_->addSolutionPath(base::PathPtr(path), approximate, approxdif, getName());
         solved = true;
@@ -172,7 +192,7 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
     return base::PlannerStatus(solved, approximate);
 }
 
-bool ompl::geometric::RetrieveRepair::findBestPath(ob::PlannerDataPtr& chosenPath)
+bool ompl::geometric::RetrieveRepair::findBestPath(const base::State *startState, const base::State *goalState, ob::PlannerDataPtr& chosenPath)
 {
     // Filter down to just 1 chosen path
     ob::PlannerDataPtr bestPath = nearestPaths_.front();
@@ -245,12 +265,12 @@ bool ompl::geometric::RetrieveRepair::findBestPath(ob::PlannerDataPtr& chosenPat
     return true;
 }
 
-bool ompl::geometric::RetrieveRepair::repairPath(PathGeometricPtr path) // \todo is this the best way to pass around a path?
+bool ompl::geometric::RetrieveRepair::repairPath(og::PathGeometricPtr path) // \todo is this the best way to pass around a path?
 {
     // \todo: we could reuse our collision checking from the previous step to make this faster
     //        but that complicates everything and I'm not suppose to be spending too much time
     //        on this prototype - DTC
-    
+
     OMPL_INFORM("Repairing path");
 
     // Error check
@@ -260,38 +280,131 @@ bool ompl::geometric::RetrieveRepair::repairPath(PathGeometricPtr path) // \todo
         return false;
     }
 
-    // Loop through every pair of states and make sure path is valid. 
+    // Loop through every pair of states and make sure path is valid.
     // If not, replan between those states
-    for (std::size_t i = 1; i < path->getStateCount(); ++i)
+    for (std::size_t to_id = 1; to_id < path->getStateCount(); ++to_id)
     {
-        ob::State* from = path->getState(i-1);
-        ob::State* to = path->getState(i);
-        
-        if (!si_->checkMotion(from, to))
-        {
-            PathGeometricPtr newPathSegment;
+        std::size_t from_id = to_id-1; // this is our last known valid state
+        ob::State* from_state = path->getState(from_id);
+        ob::State* to_state = path->getState(to_id);
 
-            // Not valid motion, replan
-            if (!replan(from, to, newPathSegment))
+        if (!si_->checkMotion(from_state, to_state))
+        {
+            // Path between (from, to) states not valid, but perhaps to STATE is
+            // Search until next valid STATE is found in existing path
+            std::size_t subsearch_id = to_id;
+            ob::State* new_to;
+            OMPL_DEBUG("Searching for next valid state, because state %d to %d was not valid out a total path length of %d.",
+                from_id,to_id,path->getStateCount());
+            while (subsearch_id < path->getStateCount())
             {
-                OMPL_ERROR("Unable to repair path between state %d and %d", i-1, i);
+                OMPL_DEBUG("Checking state %d", subsearch_id);
+
+                new_to = path->getState(subsearch_id);
+                if (si_->isValid(new_to))
+                {
+                    OMPL_DEBUG("State %d was found to valid, we are done searching", subsearch_id);
+                    // This future state is valid, we can stop searching
+                    to_id = subsearch_id;
+                    to_state = new_to;
+                    break;
+                }
+                ++subsearch_id; // keep searching for a new state to plan to
+            }
+            // Check if we ever found a next state that is valid
+            if (subsearch_id >= path->getStateCount())
+            {
+                // We never found a valid state to plan to, instead we reached the goal state and it too wasn't valid. This is bad.
+                // I think this is a bug.
+                OMPL_ERROR("No state was found valid in the remainder of the path. Invalid goal state. This should not happen.");
                 return false;
             }
 
+            // Plan between our two valid states
+            PathGeometricPtr newPathSegment;
+
+            // Not valid motion, replan
+            OMPL_DEBUG("Planning from %d to %d", from_id, to_id);
+            if (!replan(from_state, to_state, newPathSegment))
+            {
+                OMPL_ERROR("Unable to repair path between state %d and %d", from_id, to_id);
+                return false;
+            }
+
+            // Reference to the path
+            std::vector<base::State*>& states = path->getStates();
+
+            // Remove all invalid states between (from_id, to_id) - not including those states themselves
+            while (from_id != to_id - 1)
+            {
+                OMPL_INFORM("Deleting state %d", from_id + 1);
+                states.erase(states.begin() + from_id + 1);
+                --to_id; // because vector has shrunk
+                OMPL_INFORM("to_id is now %d", to_id);
+            }
+
+            // Deep copy the states in the newPathSegement from the repair problem def
+            // so that they are not unloaded when we repair a different segement
+
             // Insert new path segment into current path
-            // TODO
+            OMPL_DEBUG("Inserting new %d states into old path. Previous length: %d", newPathSegment->getStateCount(), states.size());
+            states.insert( states.begin() + to_id, newPathSegment->getStates().begin(), newPathSegment->getStates().end() );
+            OMPL_DEBUG("Inserting new states into old path. New length: %d", states.size());
+
+            // Set the to_id to jump over the newly inserted states to the next unchecked state
+            to_id = to_id + newPathSegment->getStateCount();
+            OMPL_DEBUG("Continuing searching at state %d", to_id);
         }
     }
+
+    OMPL_INFORM("Done repairing path");
 
     return true;
 }
 
-bool ompl::geometric::RetrieveRepair::replan(ob::State* start, ob::State goal, PathGeometricPtr& newPathSegment)
+bool ompl::geometric::RetrieveRepair::replan(ob::State* start, ob::State* goal, PathGeometricPtr& newPathSegment)
 {
+    // Reset problem definition
+    repairProblemDef_->clearSolutionPaths();
+    repairProblemDef_->clearStartStates();
+    repairProblemDef_->clearGoal();
 
+    // Configure problem definition
+    repairProblemDef_->setStartAndGoalStates(start, goal);
 
-    repairPlanner_->setProblemDefinition(pdef_);
-    rePlanner_->
+    // Solve
+    OMPL_INFORM("Preparing to repair path-----------------------------------------");
+    base::PlannerStatus lastStatus = base::PlannerStatus::UNKNOWN;
+    time::point startTime = time::now();
+
+    double seconds = 5; // TODO move this somewhere
+    base::PlannerTerminationCondition ptc = ob::timedPlannerTerminationCondition( seconds ); // TODO: this does not address pre-empting a planner
+    lastStatus = repairPlanner_->solve(ptc);
+
+    // Results
+    double planTime = time::seconds(time::now() - startTime);
+    if (!lastStatus)
+    {
+        OMPL_INFORM("Replan Solve: No solution found after %f seconds", planTime);
+        return false;
+    }
+
+    // Convert solution into a PathGeometric path
+    base::PathPtr p = repairProblemDef_->getSolutionPath();
+    if (!p)
+    {
+        OMPL_ERROR("Unable to get solution path from problem definition");
+        return false;
+    }
+
+    og::PathGeometric ogPath = static_cast<og::PathGeometric&>(*p);
+    newPathSegment = boost::make_shared<og::PathGeometric>( ogPath );
+
+    // TODO: deep copy the states from the problem definition into our base::Path so that states are not unloaded
+    OMPL_ERROR("TODO: deep copy");
+
+    // Return success
+    OMPL_INFORM("Replan Solve: solution found in %f seconds with %d states", planTime, newPathSegment->getStateCount() );
 
     return true;
 }

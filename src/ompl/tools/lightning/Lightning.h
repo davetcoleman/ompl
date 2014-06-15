@@ -54,6 +54,7 @@
 #include "ompl/util/Exception.h"
 #include "ompl/tools/multiplan/ParallelPlan.h"
 #include "ompl/tools/lightning/ExperienceDB.h"
+#include "ompl/geometric/planners/experience/RetrieveRepair.h"
 
 namespace og = ompl::geometric;
 namespace ob = ompl::base;
@@ -245,12 +246,7 @@ namespace ompl
                 set, a default planner is set. */
             void setRepairPlanner(const base::PlannerPtr &planner)
             {
-                rrPlanner_->setRepairPlanner(planner);
-
-                if (planner && planner->getSpaceInformation().get() != si_.get())
-                    throw Exception("Planner instance does not match space information");
-                repairPlanner_ = planner;
-                configured_ = false;
+                static_cast<og::RetrieveRepair&>(*rrPlanner_).setRepairPlanner(planner);
             }
 
             /** \brief Set the planner allocator to use. This is only
@@ -260,7 +256,6 @@ namespace ompl
             {
                 pa_ = pa;
                 planner_.reset();
-                repairPlanner_.reset();
                 // note: the rrPlanner_ never uses the allocator so does not need to be reset
                 configured_ = false;
             }
@@ -337,7 +332,7 @@ namespace ompl
             };
 
             /** \brief Get the total number of paths stored in the database */
-            const std::size_t& getExperiencesCount() const
+            std::size_t getExperiencesCount() const
             {
                 return experienceDB_->getExperiencesCount();
             }
@@ -356,9 +351,6 @@ namespace ompl
             /// The maintained experience planner instance
             base::PlannerPtr              rrPlanner_;
 
-            /// The maintained experience repairing planner instance
-            base::PlannerPtr              repairPlanner_;
-
             /// The optional planner allocator
             base::PlannerAllocator        pa_;
 
@@ -371,11 +363,11 @@ namespace ompl
             /// Flag indicating whether recalled plans should be used to find solutions. Enabled by default.
             bool                          recallEnabled_;
 
-            /// The amount of time the last planning step took
-            double                        planTime_;
-
             /// The amount of time the last path simplification step took
             double                        simplifyTime_;
+
+            /// The amount of time the last planning step took
+            double                        planTime_;
 
             /// The status of the last planning request
             base::PlannerStatus           lastStatus_;
