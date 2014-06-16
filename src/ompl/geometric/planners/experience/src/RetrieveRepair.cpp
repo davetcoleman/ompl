@@ -155,26 +155,26 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
         }
 
         // Convert chosen PlanningData experience to an actual path
-        og::PathGeometricPtr path(new og::PathGeometric(si_));
+        og::PathGeometricPtr primaryPath(new og::PathGeometric(si_));
         // Add start
-        path->append(startState);
+        primaryPath->append(startState);
         // Add old states
         for (int i = chosenPath->numVertices() - 1 ; i >= 0 ; --i)
         {
-            path->append(chosenPath->getVertex(i).getState());
+            primaryPath->append(chosenPath->getVertex(i).getState());
         }
         // Add goal
-        path->append(goalState);
+        primaryPath->append(goalState);
 
         // Repair chosen path
-        if (!repairPath(path))
+        if (!repairPath(primaryPath))
         {
             return base::PlannerStatus::CRASH;
         }
 
         // Finished
         approxdif = 0; // ??
-        pdef_->addSolutionPath(base::PathPtr(path), approximate, approxdif, getName());
+        pdef_->addSolutionPath(base::PathPtr(primaryPath), approximate, approxdif, getName());
         solved = true;
     }
     else
@@ -265,7 +265,7 @@ bool ompl::geometric::RetrieveRepair::findBestPath(const base::State *startState
     return true;
 }
 
-bool ompl::geometric::RetrieveRepair::repairPath(og::PathGeometricPtr path) // \todo is this the best way to pass around a path?
+bool ompl::geometric::RetrieveRepair::repairPath(og::PathGeometricPtr primaryPath) // \todo is this the best way to pass around a path?
 {
     // \todo: we could reuse our collision checking from the previous step to make this faster
     //        but that complicates everything and I'm not suppose to be spending too much time
@@ -274,7 +274,7 @@ bool ompl::geometric::RetrieveRepair::repairPath(og::PathGeometricPtr path) // \
     OMPL_INFORM("Repairing path");
 
     // Error check
-    if (path->getStateCount() < 2)
+    if (primaryPath->getStateCount() < 2)
     {
         OMPL_ERROR("Cannot repair a path with less than 2 states");
         return false;
@@ -282,11 +282,11 @@ bool ompl::geometric::RetrieveRepair::repairPath(og::PathGeometricPtr path) // \
 
     // Loop through every pair of states and make sure path is valid.
     // If not, replan between those states
-    for (std::size_t to_id = 1; to_id < path->getStateCount(); ++to_id)
+    for (std::size_t to_id = 1; to_id < primaryPath->getStateCount(); ++to_id)
     {
         std::size_t from_id = to_id-1; // this is our last known valid state
-        ob::State* from_state = path->getState(from_id);
-        ob::State* to_state = path->getState(to_id);
+        ob::State* from_state = primaryPath->getState(from_id);
+        ob::State* to_state = primaryPath->getState(to_id);
 
         if (!si_->checkMotion(from_state, to_state))
         {
@@ -295,12 +295,12 @@ bool ompl::geometric::RetrieveRepair::repairPath(og::PathGeometricPtr path) // \
             std::size_t subsearch_id = to_id;
             ob::State* new_to;
             OMPL_DEBUG("Searching for next valid state, because state %d to %d was not valid out a total path length of %d.",
-                from_id,to_id,path->getStateCount());
-            while (subsearch_id < path->getStateCount())
+                from_id,to_id,primaryPath->getStateCount());
+            while (subsearch_id < primaryPath->getStateCount())
             {
                 OMPL_DEBUG("Checking state %d", subsearch_id);
 
-                new_to = path->getState(subsearch_id);
+                new_to = primaryPath->getState(subsearch_id);
                 if (si_->isValid(new_to))
                 {
                     OMPL_DEBUG("State %d was found to valid, we are done searching", subsearch_id);
@@ -312,7 +312,7 @@ bool ompl::geometric::RetrieveRepair::repairPath(og::PathGeometricPtr path) // \
                 ++subsearch_id; // keep searching for a new state to plan to
             }
             // Check if we ever found a next state that is valid
-            if (subsearch_id >= path->getStateCount())
+            if (subsearch_id >= primaryPath->getStateCount())
             {
                 // We never found a valid state to plan to, instead we reached the goal state and it too wasn't valid. This is bad.
                 // I think this is a bug.
@@ -332,13 +332,13 @@ bool ompl::geometric::RetrieveRepair::repairPath(og::PathGeometricPtr path) // \
             }
 
             // Reference to the path
-            std::vector<base::State*>& states = path->getStates();
+            std::vector<base::State*>& primaryPathStates = primaryPath->getStates();
 
             // Remove all invalid states between (from_id, to_id) - not including those states themselves
             while (from_id != to_id - 1)
             {
                 OMPL_INFORM("Deleting state %d", from_id + 1);
-                states.erase(states.begin() + from_id + 1);
+                primaryPathStates.erase(primaryPathStates.begin() + from_id + 1);
                 --to_id; // because vector has shrunk
                 OMPL_INFORM("to_id is now %d", to_id);
             }
@@ -347,9 +347,16 @@ bool ompl::geometric::RetrieveRepair::repairPath(og::PathGeometricPtr path) // \
             // so that they are not unloaded when we repair a different segement
 
             // Insert new path segment into current path
-            OMPL_DEBUG("Inserting new %d states into old path. Previous length: %d", newPathSegment->getStateCount(), states.size());
-            states.insert( states.begin() + to_id, newPathSegment->getStates().begin(), newPathSegment->getStates().end() );
-            OMPL_DEBUG("Inserting new states into old path. New length: %d", states.size());
+            OMPL_DEBUG("Inserting new %d states into old path. Previous length: %d", newPathSegment->getStateCount(), primaryPathStates.size());
+            base::State *copiedState;
+            for (std::size_t i = 0; i < newPathSegment->getStateCount(); ++i)
+            {
+                OMPL_DEBUG("Inserting state %d into old path at position %d", i, to_id + i);
+                si_->copyState(newPathSegment->getStates()[i], copiedState);
+                primaryPathStates.insert( primaryPathStates.begin() + to_id + i, copiedState );  
+            }
+            //primaryPathStates.insert( primaryPathStates.begin() + to_id, newPathSegment->getStates().begin(), newPathSegment->getStates().end() );
+            OMPL_DEBUG("Inserted new states into old path. New length: %d", primaryPathStates.size());
 
             // Set the to_id to jump over the newly inserted states to the next unchecked state
             to_id = to_id + newPathSegment->getStateCount();
@@ -362,7 +369,7 @@ bool ompl::geometric::RetrieveRepair::repairPath(og::PathGeometricPtr path) // \
     return true;
 }
 
-bool ompl::geometric::RetrieveRepair::replan(ob::State* start, ob::State* goal, PathGeometricPtr& newPathSegment)
+bool ompl::geometric::RetrieveRepair::replan(const ob::State* start, const ob::State* goal, PathGeometricPtr& newPathSegment)
 {
     // Reset problem definition
     repairProblemDef_->clearSolutionPaths();
@@ -397,11 +404,7 @@ bool ompl::geometric::RetrieveRepair::replan(ob::State* start, ob::State* goal, 
         return false;
     }
 
-    og::PathGeometric ogPath = static_cast<og::PathGeometric&>(*p);
-    newPathSegment = boost::make_shared<og::PathGeometric>( ogPath );
-
-    // TODO: deep copy the states from the problem definition into our base::Path so that states are not unloaded
-    OMPL_ERROR("TODO: deep copy");
+    newPathSegment = boost::make_shared<og::PathGeometric>( static_cast<og::PathGeometric&>(*p) );
 
     // Return success
     OMPL_INFORM("Replan Solve: solution found in %f seconds with %d states", planTime, newPathSegment->getStateCount() );

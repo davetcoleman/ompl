@@ -135,8 +135,7 @@ namespace ompl
                 OMPL_INFORM("Loading database from file: %s", fileName.c_str());
 
                 // Open a binary input stream
-                std::ifstream ifStream(fileName.c_str(), std::ios::binary);
-                std::istream& iStream = ifStream;
+                std::ifstream iStream(fileName.c_str(), std::ios::binary);
 
                 // Get the total number of paths saved
                 double numPaths = 0;
@@ -165,7 +164,7 @@ namespace ompl
                 }
                 
                 // Close file
-                ifStream.close();
+                iStream.close();
 
                 double loadTime = time::seconds(time::now() - start);
                 OMPL_INFORM("Loaded database from file in %f sec with %d paths", loadTime, nn_->size()); 

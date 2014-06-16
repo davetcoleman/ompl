@@ -102,7 +102,7 @@ namespace ompl
              * \param newPathSegment - the solution
              * \return true if path found
              */
-            bool replan(ob::State* start, ob::State* goal, og::PathGeometricPtr& newPathSegment);
+            bool replan(const ob::State* start, const ob::State* goal, og::PathGeometricPtr& newPathSegment);
 
             /**
              * \brief Count the number of states along the discretized path that are in collision
@@ -118,7 +118,7 @@ namespace ompl
             /** \brief The database of motions to search through */
             ompl::tools::ExperienceDBPtr                   experienceDB_;
 
-            /** \brief Recall the nearest paths and store this in planner data for introspection */
+            /** \brief Recall the nearest paths and store this in planner data for introspection later */
             std::vector<ob::PlannerDataPtr>                nearestPaths_;
 
             /** \brief A secondary planner for replanning */
