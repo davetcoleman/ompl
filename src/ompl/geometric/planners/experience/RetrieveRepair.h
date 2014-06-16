@@ -69,7 +69,11 @@ namespace ompl
 
             virtual ~RetrieveRepair(void);
 
+            /** \brief Get information about the exploration data structure the motion planner used. */
             virtual void getPlannerData(base::PlannerData &data) const;
+
+            /** \brief Get information about the exploration data structure the repair motion planner used each call. */
+            void getRepairPlannerDatas(std::vector<base::PlannerDataPtr> &data) const;
 
             virtual base::PlannerStatus solve(const base::PlannerTerminationCondition &ptc);
 
@@ -126,6 +130,9 @@ namespace ompl
 
             /** \brief A secondary problem definition for the repair planner to use */
             ob::ProblemDefinitionPtr                       repairProblemDef_;
+
+            /** \brief Debug the repair planner by saving its planner data each time it is used */
+            std::vector<ob::PlannerDataPtr>                repairPlannerDatas_;
         };
 
     }

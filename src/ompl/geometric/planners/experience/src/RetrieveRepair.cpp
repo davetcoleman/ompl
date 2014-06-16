@@ -92,14 +92,15 @@ void ompl::geometric::RetrieveRepair::setup(void)
         OMPL_INFORM("No repairing planner specified. Using default.");
         repairPlanner_ = ompl::geometric::getDefaultPlanner(pdef_->getGoal()); // we could use the repairProblemDef_ here but that isn't setup yet
     }
+    // Setup the problem definition for the repair planner
+    repairProblemDef_->setOptimizationObjective(pdef_->getOptimizationObjective()); // copy primary problem def
+
     // Setup repair planner
+    repairPlanner_->setProblemDefinition(repairProblemDef_);
     if (!repairPlanner_->isSetup())
         repairPlanner_->setup();
 
-    // Setup the problem definition
-    repairProblemDef_->setOptimizationObjective(pdef_->getOptimizationObjective()); // copy primary problem def
 
-    repairPlanner_->setProblemDefinition(repairProblemDef_);
 }
 
 void ompl::geometric::RetrieveRepair::freeMemory(void)
@@ -334,6 +335,9 @@ bool ompl::geometric::RetrieveRepair::repairPath(og::PathGeometricPtr primaryPat
             // Reference to the path
             std::vector<base::State*>& primaryPathStates = primaryPath->getStates();
 
+            OMPL_DEBUG("Before deleting invalid state part:");
+            primaryPath->print(std::cout);
+
             // Remove all invalid states between (from_id, to_id) - not including those states themselves
             while (from_id != to_id - 1)
             {
@@ -343,15 +347,19 @@ bool ompl::geometric::RetrieveRepair::repairPath(og::PathGeometricPtr primaryPat
                 OMPL_INFORM("to_id is now %d", to_id);
             }
 
+            OMPL_DEBUG("After deleting invalid state part:");
+            primaryPath->print(std::cout);
+
             // Deep copy the states in the newPathSegement from the repair problem def
             // so that they are not unloaded when we repair a different segement
 
             // Insert new path segment into current path
             OMPL_DEBUG("Inserting new %d states into old path. Previous length: %d", newPathSegment->getStateCount(), primaryPathStates.size());
-            base::State *copiedState;
+
             for (std::size_t i = 0; i < newPathSegment->getStateCount(); ++i)
             {
-                OMPL_DEBUG("Inserting state %d into old path at position %d", i, to_id + i);
+                base::State *copiedState = si_->allocState();                
+                OMPL_DEBUG("Inserting newPathSegment state %d into old path at position %d", i, to_id + i);
                 si_->copyState(newPathSegment->getStates()[i], copiedState);
                 primaryPathStates.insert( primaryPathStates.begin() + to_id + i, copiedState );  
             }
@@ -405,6 +413,10 @@ bool ompl::geometric::RetrieveRepair::replan(const ob::State* start, const ob::S
     }
 
     newPathSegment = boost::make_shared<og::PathGeometric>( static_cast<og::PathGeometric&>(*p) );
+    
+    // Save the planner data for debugging purposes
+    repairPlannerDatas_.push_back(ob::PlannerDataPtr( new ob::PlannerData(si_) ));
+    repairPlanner_->getPlannerData( *repairPlannerDatas_.back() );
 
     // Return success
     OMPL_INFORM("Replan Solve: solution found in %f seconds with %d states", planTime, newPathSegment->getStateCount() );
@@ -415,8 +427,6 @@ bool ompl::geometric::RetrieveRepair::replan(const ob::State* start, const ob::S
 void ompl::geometric::RetrieveRepair::getPlannerData(base::PlannerData &data) const
 {
     OMPL_INFORM("RetrieveRepair getPlannerData: including %d similar paths", nearestPaths_.size());
-
-    Planner::getPlannerData(data);
 
     // Visualize the n candidate paths that we recalled from the database
     for (std::size_t i = 0 ; i < nearestPaths_.size() ; ++i)
@@ -429,6 +439,11 @@ void ompl::geometric::RetrieveRepair::getPlannerData(base::PlannerData &data) co
                 base::PlannerDataVertex(pd->getVertex(j).getState()   ));
         }
     }
+}
+
+void ompl::geometric::RetrieveRepair::getRepairPlannerDatas(std::vector<base::PlannerDataPtr> &data) const
+{
+    data = repairPlannerDatas_;
 }
 
 std::size_t ompl::geometric::RetrieveRepair::checkMotionScore(const ob::State *s1, const ob::State *s2) const

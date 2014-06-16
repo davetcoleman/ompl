@@ -171,6 +171,9 @@ namespace ompl
             /** \brief Get information about the exploration data structure the motion planner used. */
             void getPlannerData(base::PlannerData &pd) const;
 
+            /** \brief Get information about the exploration data structure the repair motion planner used each call. */
+            void getRepairPlannerDatas(std::vector<base::PlannerDataPtr> &data) const;
+
             /** \brief Set the state validity checker to use */
             void setStateValidityChecker(const base::StateValidityCheckerPtr &svc)
             {
@@ -246,6 +249,9 @@ namespace ompl
                 set, a default planner is set. */
             void setRepairPlanner(const base::PlannerPtr &planner)
             {
+                // Make sure the retrieve repair planner is setup first
+                if (!rrPlanner_)
+                    throw Exception("Retrieve repair planner has not been initialized yet");
                 static_cast<og::RetrieveRepair&>(*rrPlanner_).setRepairPlanner(planner);
             }
 

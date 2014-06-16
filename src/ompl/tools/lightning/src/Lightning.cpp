@@ -56,6 +56,9 @@ ompl::tools::Lightning::Lightning(const base::StateSpacePtr &space) :
     // Load the experience database
     experienceDB_.reset(new ompl::tools::ExperienceDB(si_->getStateSpace()));
     experienceDB_->load(OMPL_STORAGE_PATH); // load from file
+
+    // Load the Retrieve repair database. We do it here so that setRepairPlanner() works
+    rrPlanner_ = ob::PlannerPtr(new og::RetrieveRepair(si_, experienceDB_));
 }
 
 void ompl::tools::Lightning::setup(void)
@@ -82,10 +85,6 @@ void ompl::tools::Lightning::setup(void)
             planner_->setup();
 
         // Setup planning from experience planner
-        if (!rrPlanner_)
-        {
-            rrPlanner_ = ob::PlannerPtr(new og::RetrieveRepair(si_, experienceDB_));
-        }
         rrPlanner_->setProblemDefinition(pdef_);
 
         if (!rrPlanner_->isSetup())
@@ -249,6 +248,11 @@ void ompl::tools::Lightning::getPlannerData(base::PlannerData &pd) const
     // Get the planner data from our experience-based planner
     if (rrPlanner_)
         rrPlanner_->getPlannerData(pd);
+}
+
+void ompl::tools::Lightning::getRepairPlannerDatas(std::vector<base::PlannerDataPtr> &data) const
+{
+    static_cast<og::RetrieveRepair&>(*rrPlanner_).getRepairPlannerDatas(data);
 }
 
 void ompl::tools::Lightning::print(std::ostream &out) const
