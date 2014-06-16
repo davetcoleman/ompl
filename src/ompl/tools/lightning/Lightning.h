@@ -168,11 +168,18 @@ namespace ompl
             /** \brief Get the best solution path. Throw an exception if no solution is available */
             og::PathGeometric& getSolutionPath(void) const;
 
-            /** \brief Get information about the exploration data structure the motion planner used. */
+            /** \brief Get information about the exploration data structure the planning from scratch motion planner used. */
             void getPlannerData(base::PlannerData &pd) const;
 
-            /** \brief Get information about the exploration data structure the repair motion planner used each call. */
-            void getRepairPlannerDatas(std::vector<base::PlannerDataPtr> &data) const;
+            /**
+             * \brief Get a pointer to the retrieve repair planner
+             */
+            og::RetrieveRepair& getRetrieveRepairPlanner()
+            {
+                if (!rrPlanner_)
+                    throw Exception("RetrieveRepair planner not loaded yet");
+                return static_cast<og::RetrieveRepair&>(*rrPlanner_);
+            }
 
             /** \brief Set the state validity checker to use */
             void setStateValidityChecker(const base::StateValidityCheckerPtr &svc)
@@ -249,9 +256,9 @@ namespace ompl
                 set, a default planner is set. */
             void setRepairPlanner(const base::PlannerPtr &planner)
             {
-                // Make sure the retrieve repair planner is setup first
                 if (!rrPlanner_)
                     throw Exception("Retrieve repair planner has not been initialized yet");
+
                 static_cast<og::RetrieveRepair&>(*rrPlanner_).setRepairPlanner(planner);
             }
 
@@ -331,10 +338,13 @@ namespace ompl
             /** \brief Optionally disable the ability to use previous plans in solutions (but will still save them) */
             void enableRecall(bool enable);
 
+            /** \brief Optionally disable the ability to plan from scratch (but will still save them) */
+            void enableScratch(bool enable);
+
             /** \brief Get a vector of all the paths in the database */
-            void getAllPaths(std::vector<ompl::geometric::PathGeometric>& paths)
+            void getAllPaths(std::vector<ob::PlannerDataPtr> &plannerDatas)
             {
-                experienceDB_->getAllPaths(paths);                
+                experienceDB_->getAllPaths(plannerDatas);
             };
 
             /** \brief Get the total number of paths stored in the database */
@@ -368,6 +378,9 @@ namespace ompl
 
             /// Flag indicating whether recalled plans should be used to find solutions. Enabled by default.
             bool                          recallEnabled_;
+
+            /// Flag indicating whether planning from scratch should be used to find solutions. Enabled by default.
+            bool                          scratchEnabled_;
 
             /// The amount of time the last path simplification step took
             double                        simplifyTime_;

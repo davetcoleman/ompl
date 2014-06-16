@@ -119,6 +119,13 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
     {
         OMPL_INFORM("Using database for RetrieveRepair planner.");
 
+        // Check if the database is empty
+        if (!experienceDB_->getExperiencesCount())
+        {
+            OMPL_INFORM("Experience database is empty so unable to run RetrieveRepair algorithm.");
+            return base::PlannerStatus::TIMEOUT; // The planner failed to find a solution     
+        }
+
         // Get a single start state TODO: more than one
         const base::State *startState = pis_.nextStart();
         //si_->copyState(motion->state, st);
@@ -140,10 +147,10 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
         nearestPaths_ = experienceDB_->findNearestStartGoal(nearestK, startState, goalState);
         OMPL_INFORM("Found %d similar paths", nearestPaths_.size());
 
-        // Error check
+        // Check if there are any solutions
         if (nearestPaths_.empty())
         {
-            OMPL_WARN("No similar path founds in nearest neighbor tree, unable to retrieve repair");
+            OMPL_INFORM("No similar path founds in nearest neighbor tree, unable to retrieve repair");
             return base::PlannerStatus::TIMEOUT; // The planner failed to find a solution
         }
 
@@ -157,15 +164,15 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
 
         // Convert chosen PlanningData experience to an actual path
         og::PathGeometricPtr primaryPath(new og::PathGeometric(si_));
-        // Add start
-        primaryPath->append(startState);
+        // Add goal
+        primaryPath->append(goalState);
         // Add old states
         for (int i = chosenPath->numVertices() - 1 ; i >= 0 ; --i)
         {
             primaryPath->append(chosenPath->getVertex(i).getState());
         }
-        // Add goal
-        primaryPath->append(goalState);
+        // Add start
+        primaryPath->append(startState);
 
         // Repair chosen path
         if (!repairPath(primaryPath))
@@ -244,6 +251,7 @@ bool ompl::geometric::RetrieveRepair::findBestPath(const base::State *startState
             OMPL_DEBUG("This path is the best we've seen so far. Previous best: %d", bestPathScore);
             bestPathScore = invalidCount;
             bestPath = currentPath;
+            nearestPathsChosenID_ = path_id;
         }
         else
             OMPL_DEBUG("Best score: %d", bestPathScore);
@@ -332,6 +340,8 @@ bool ompl::geometric::RetrieveRepair::repairPath(og::PathGeometricPtr primaryPat
                 return false;
             }
 
+            // TODO make sure not approximate solution
+
             // Reference to the path
             std::vector<base::State*>& primaryPathStates = primaryPath->getStates();
 
@@ -356,12 +366,11 @@ bool ompl::geometric::RetrieveRepair::repairPath(og::PathGeometricPtr primaryPat
             // Insert new path segment into current path
             OMPL_DEBUG("Inserting new %d states into old path. Previous length: %d", newPathSegment->getStateCount(), primaryPathStates.size());
 
-            for (std::size_t i = 0; i < newPathSegment->getStateCount(); ++i)
+            // Note: skip first and last states because they should be same as our start and goal state, same as `from_id` and `to_id`
+            for (std::size_t i = 1; i < newPathSegment->getStateCount() - 1; ++i)                
             {
-                base::State *copiedState = si_->allocState();                
                 OMPL_DEBUG("Inserting newPathSegment state %d into old path at position %d", i, to_id + i);
-                si_->copyState(newPathSegment->getStates()[i], copiedState);
-                primaryPathStates.insert( primaryPathStates.begin() + to_id + i, copiedState );  
+                primaryPathStates.insert( primaryPathStates.begin() + to_id + i, si_->cloneState(newPathSegment->getStates()[i]) );                    
             }
             //primaryPathStates.insert( primaryPathStates.begin() + to_id, newPathSegment->getStates().begin(), newPathSegment->getStates().end() );
             OMPL_DEBUG("Inserted new states into old path. New length: %d", primaryPathStates.size());
@@ -392,7 +401,7 @@ bool ompl::geometric::RetrieveRepair::replan(const ob::State* start, const ob::S
     base::PlannerStatus lastStatus = base::PlannerStatus::UNKNOWN;
     time::point startTime = time::now();
 
-    double seconds = 5; // TODO move this somewhere
+    double seconds = 0.2; // TODO move this somewhere
     base::PlannerTerminationCondition ptc = ob::timedPlannerTerminationCondition( seconds ); // TODO: this does not address pre-empting a planner
     lastStatus = repairPlanner_->solve(ptc);
 
@@ -439,6 +448,13 @@ void ompl::geometric::RetrieveRepair::getPlannerData(base::PlannerData &data) co
                 base::PlannerDataVertex(pd->getVertex(j).getState()   ));
         }
     }
+}
+
+
+void ompl::geometric::RetrieveRepair::getRecalledPlannerDatas(std::vector<base::PlannerDataPtr> &data, std::size_t &chosenID) const
+{
+    data = nearestPaths_; // list of candidate paths
+    chosenID = nearestPathsChosenID_;
 }
 
 void ompl::geometric::RetrieveRepair::getRepairPlannerDatas(std::vector<base::PlannerDataPtr> &data) const

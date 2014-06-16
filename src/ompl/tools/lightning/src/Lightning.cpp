@@ -98,11 +98,14 @@ void ompl::tools::Lightning::setup(void)
 
         // Create the parallel component for splitting into two threads
         pp_ = ot::ParallelPlanPtr(new ot::ParallelPlan(pdef_) );
-        pp_->addPlanner(planner_);   // Always add the planning from scratch planner
-        if (recallEnabled_)
+        if (!scratchEnabled_ && !recallEnabled_)
         {
-            pp_->addPlanner(rrPlanner_);  // Add the planning from experience planner if desired
+            throw Exception("Both planning from scratch and experience have been disabled, unable to plan");
         }
+        if (scratchEnabled_)
+            pp_->addPlanner(planner_);   // Add the planning from scratch planner if desired
+        if (recallEnabled_)
+            pp_->addPlanner(rrPlanner_);  // Add the planning from experience planner if desired
 
         // Set the configured flag
         configured_ = true;       
@@ -146,8 +149,9 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
     else
         OMPL_INFORM("Lightning Solve: No solution found after %f seconds", planTime_);
 
-    // TESTING:
-    // Save solution path to file
+    // Smooth the result
+    OMPL_INFORM("Simplifying solution (smoothing)...");
+    //simplifySolution(ptc);
 
     // Get information about the exploration data structure the motion planner used. Used later in visualizing
     og::PathGeometric solution_path = getSolutionPath();
@@ -193,9 +197,11 @@ void ompl::tools::Lightning::simplifySolution(const base::PlannerTerminationCond
         if (p)
         {
             time::point start = time::now();
-            psk_->simplify(static_cast<og::PathGeometric&>(*p), ptc);
+            og::PathGeometric &path = static_cast<og::PathGeometric&>(*p);
+            std::size_t numStates = path.getStateCount();
+            psk_->simplify(path, ptc);
             simplifyTime_ = time::seconds(time::now() - start);
-            OMPL_INFORM("Path simplification took %f seconds", simplifyTime_);
+            OMPL_INFORM("Path simplification took %f seconds and removed %d states", simplifyTime_, numStates - path.getStateCount());
             return;
         }
     }
@@ -241,18 +247,8 @@ bool ompl::tools::Lightning::haveExactSolutionPath(void) const
 void ompl::tools::Lightning::getPlannerData(base::PlannerData &pd) const
 {
     pd.clear();
-    /*
-      if (planner_)
+    if (planner_)
       planner_->getPlannerData(pd);
-    */
-    // Get the planner data from our experience-based planner
-    if (rrPlanner_)
-        rrPlanner_->getPlannerData(pd);
-}
-
-void ompl::tools::Lightning::getRepairPlannerDatas(std::vector<base::PlannerDataPtr> &data) const
-{
-    static_cast<og::RetrieveRepair&>(*rrPlanner_).getRepairPlannerDatas(data);
 }
 
 void ompl::tools::Lightning::print(std::ostream &out) const
@@ -280,6 +276,16 @@ void ompl::tools::Lightning::enableRecall(bool enable)
 {    
     // Remember state
     recallEnabled_ = enable;
+
+    // Flag the planners as possibly misconfigured
+    configured_ = false;
+}
+
+
+void ompl::tools::Lightning::enableScratch(bool enable)
+{    
+    // Remember state
+    scratchEnabled_ = enable;
 
     // Flag the planners as possibly misconfigured
     configured_ = false;

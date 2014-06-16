@@ -269,31 +269,14 @@ namespace ompl
                 return true;
             }
 
-            void getAllPaths(std::vector<og::PathGeometric> &paths)
+            void getAllPaths(std::vector<ob::PlannerDataPtr> &plannerDatas)
             {
                 OMPL_DEBUG("ExperienceDB: getAllPaths");
 
                 // Convert the NN tree to a vector
-                std::vector<ob::PlannerDataPtr> plannerDatas;
                 nn_->list(plannerDatas);
 
                 OMPL_DEBUG("Number of paths found: %d", plannerDatas.size());
-
-                // Loop through all PlannerDatas
-                for (std::size_t i = 0; i < plannerDatas.size(); ++i)
-                {
-                    ob::PlannerDataPtr plannerData = plannerDatas[i];
-                    og::PathGeometric path(si_);
-
-                    // Convert the planner data verticies into a vector of states
-                    for (std::size_t i = 0; i < plannerData->numVertices(); ++i)
-                    {
-                        //OMPL_INFORM("Creating path for plan %d", i);
-                        //debugVertex(plannerData->getVertex(i));
-                        path.append(plannerData->getVertex(i).getState());
-                    }
-                    paths.push_back(path);
-                }
             }
 
             std::vector<ob::PlannerDataPtr> findNearestStartGoal(int nearestK, const base::State* start, const base::State* goal)

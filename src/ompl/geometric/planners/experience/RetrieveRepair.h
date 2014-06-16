@@ -49,6 +49,14 @@ namespace ompl
     namespace geometric
     {
 
+        /// @cond IGNORE
+        /** \brief Forward declaration of ompl::base::RetrieveRepair */
+        OMPL_CLASS_FORWARD(RetrieveRepair);
+        /// @endcond
+
+        /** \class ompl::base::RetrieveRepairPtr
+            \brief A boost shared pointer wrapper for ompl::base::RetrieveRepair */
+
         /**
            @anchor RetrieveRepair
            @par Short description
@@ -69,8 +77,14 @@ namespace ompl
 
             virtual ~RetrieveRepair(void);
 
-            /** \brief Get information about the exploration data structure the motion planner used. */
+            /** \brief Get information about the exploration data structure the planning from scratch motion planner used. */
             virtual void getPlannerData(base::PlannerData &data) const;
+
+            /** \brief Get information about the recalled paths 
+             *  \param data - vector of PlannerData objects that each hold a single path
+             *  \param chosenID - the index of the PlannerData object that was chosen for repair
+             */
+            void getRecalledPlannerDatas(std::vector<base::PlannerDataPtr> &data, std::size_t &chosenID) const;
 
             /** \brief Get information about the exploration data structure the repair motion planner used each call. */
             void getRepairPlannerDatas(std::vector<base::PlannerDataPtr> &data) const;
@@ -124,6 +138,9 @@ namespace ompl
 
             /** \brief Recall the nearest paths and store this in planner data for introspection later */
             std::vector<ob::PlannerDataPtr>                nearestPaths_;
+
+            /** \brief the ID within nearestPaths_ of the path that was chosen for repair */
+            std::size_t                                    nearestPathsChosenID_;
 
             /** \brief A secondary planner for replanning */
             ob::PlannerPtr                                 repairPlanner_;
