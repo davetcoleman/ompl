@@ -81,7 +81,7 @@ namespace ompl
         /// @endcond
 
         // TODO: move
-        static const std::string OMPL_STORAGE_PATH = "/home/dave/ros/ompl_storage/file1";
+        static const std::string OMPL_STORAGE_PATH = "/home/dave/ros/ompl_storage/lightning_database.ompl";
 
         /** \class ompl::geometric::LightningPtr
             \brief A boost shared pointer wrapper for ompl::tools::Lightning */

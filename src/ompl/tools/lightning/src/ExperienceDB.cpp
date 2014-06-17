@@ -230,29 +230,10 @@ std::vector<ob::PlannerDataPtr> ompl::tools::ExperienceDB::findNearestStartGoal(
     // Fill in our pre-made PlannerData instance with the new start and goal states to be searched for
     nnSearchKey_->addVertex( ob::PlannerDataVertex(start) );
     nnSearchKey_->addVertex( ob::PlannerDataVertex(goal) );
-
-    std::cout << "NUMBER OF VERTICES: " << nnSearchKey_->numVertices() << std::endl;
     assert( nnSearchKey_->numVertices() == 2);
-
-    std::cout << "========================= BEGINNING NN SEARCH" << std::endl;
-    std::cout << "Start, Goal: " << std::endl;
-    si_->printState(start, std::cout);
-    si_->printState(goal, std::cout);
-
-    std::cout << "number of vertices: " << nnSearchKey_->numVertices() << std::endl;
 
     std::vector<ob::PlannerDataPtr> nearest;
     nn_->nearestK(nnSearchKey_, nearestK, nearest);
-
-    // DEBUG
-    std::cout << "======================== SORTED " << std::endl;
-    for (std::size_t i = 0; i < nearest.size(); ++i)
-    {
-        OMPL_DEBUG("Index %d with distance %f", i, distanceFunction(nearest[i], nnSearchKey_));        
-        si_->printState(nearest[i]->getVertex(0).getState());
-        si_->printState(nearest[i]->getVertex(nearest[i]->numVertices()-1).getState());
-    }
-
 
     return nearest;
 }
@@ -266,7 +247,15 @@ double ompl::tools::ExperienceDB::distanceFunction(const ob::PlannerDataPtr a, c
     */
 
     // Bi-directional implementation - check path b from [start, goal] and [goal, start] 
+    return std::min(
+        // [ a.start, b.start] + [a.goal + b.goal]
+        si_->distance( a->getVertex(0).getState(), b->getVertex(0).getState() ) + 
+        si_->distance( a->getVertex(a->numVertices()-1).getState(), b->getVertex(b->numVertices()-1).getState() ),
+        // [ a.start, b.goal] + [a.goal + b.start]
+        si_->distance( a->getVertex(0).getState(), b->getVertex(b->numVertices()-1).getState() ) + 
+        si_->distance( a->getVertex(a->numVertices()-1).getState(), b->getVertex(0).getState() ) );
 
+    /*
     // [ a.start, b.start] + [a.goal + b.goal]
     double n1 = si_->distance( a->getVertex(0).getState(), b->getVertex(0).getState() );
     double n2 = si_->distance( a->getVertex(a->numVertices()-1).getState(), b->getVertex(b->numVertices()-1).getState() );
@@ -285,6 +274,7 @@ double ompl::tools::ExperienceDB::distanceFunction(const ob::PlannerDataPtr a, c
         std::cout << "Dist weird  " << dist << " | w1: " << w1 << " | w2: " << w2 << std::endl;
 
     return dist;
+    */
 }
 
 void ompl::tools::ExperienceDB::debugVertex(const ob::PlannerDataVertex& vertex)

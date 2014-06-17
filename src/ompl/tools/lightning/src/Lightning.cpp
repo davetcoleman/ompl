@@ -154,20 +154,31 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
     //simplifySolution(ptc);
 
     // Get information about the exploration data structure the motion planner used. Used later in visualizing
-    og::PathGeometric solution_path = getSolutionPath();
+    og::PathGeometric solutionPath = getSolutionPath();
 
-    OMPL_INFORM("Solution path has %d states and was generated from planner %s", solution_path.getStateCount(), getSolutionPlannerName().c_str());
-    //solution_path.print(std::cout);
+    OMPL_INFORM("Solution path has %d states and was generated from planner %s", solutionPath.getStateCount(), getSolutionPlannerName().c_str());
+    //solutionPath.print(std::cout);
 
-    // Save to database if the solution is not from the experience database
-    if (getSolutionPlannerName() != rrPlanner_->getName())
+    // Make sure solution has at least 2 states
+    if (solutionPath.getStateCount() < 2)
     {
-        OMPL_INFORM("Adding to database because best solution was not from database");
-        experienceDB_->addPath(solution_path);
+        throw Exception("I just want to see if this can happen"); 
+        OMPL_INFORM("NOT saving to database because solution is less than 2 states long");
+    }
+    // Do not save if approximate
+    else if (!haveExactSolutionPath())
+    {
+        OMPL_INFORM("NOT saving to database because the solution is APPROXIMATE");
+    }
+    // Save to database if the solution is not from the experience database
+    else if (getSolutionPlannerName() == rrPlanner_->getName())
+    {
+        OMPL_INFORM("NOT saving to database because best solution was not from database");
     }
     else
     {
-        OMPL_INFORM("NOT saving to database because best solution was not from database");
+        OMPL_INFORM("Adding to database because best solution was not from database");
+        experienceDB_->addPath(solutionPath);
     }
 
     return lastStatus_;
