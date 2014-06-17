@@ -34,13 +34,231 @@
 
 /* Author: Dave Coleman */
 
-
-
-
+// OMPL
+#include "ompl/base/ScopedState.h"
 #include "ompl/tools/lightning/ExperienceDB.h"
-//#include "ompl/base/goals/GoalSampleableRegion.h"
-//#include "ompl/geometric/planners/experience/RetrieveRepair.h"
-//#include "ompl/geometric/SimpleSetup.h" // use their implementation of getDefaultPlanner
+#include "ompl/util/Time.h" 
+#include "ompl/tools/config/SelfConfig.h"
+//#include "ompl/base/spaces/RealVectorStateSpace.h" //temp
 
+// Boost
+#include <boost/filesystem.hpp>
 
+ompl::tools::ExperienceDB::ExperienceDB(const base::StateSpacePtr &space)
+    : saveRequired_(false)
+{
+    si_.reset(new base::SpaceInformation(space));
 
+    // Set nearest neighbor type
+    nn_.reset(tools::SelfConfig::getDefaultNearestNeighbors<ob::PlannerDataPtr>(si_->getStateSpace()));
+
+    // Use our custom distance function for nearest neighbor tree
+    nn_->setDistanceFunction(boost::bind(&ompl::tools::ExperienceDB::distanceFunction, this, _1, _2));
+
+    // Load the PlannerData instance to be used for searching
+    nnSearchKey_.reset(new ob::PlannerData(si_));
+    // Add 2 vertexes - one for start and one for goal - so the future searching is faster
+    ob::State *temp  = si_->allocState();
+    ob::PlannerDataVertex vert( temp );
+    nnSearchKey_->addVertex( vert );
+    nnSearchKey_->addVertex( vert );
+}
+
+ompl::tools::ExperienceDB::~ExperienceDB(void)
+{
+    if (saveRequired_)
+        OMPL_WARN("The database is being unloaded with unsaved experiences");
+}
+
+bool ompl::tools::ExperienceDB::load(const std::string& fileName)
+{
+    // Error checking
+    if (fileName.empty())
+    {
+        OMPL_ERROR("Empty filename passed to save function");
+        return false;
+    }
+    if ( !boost::filesystem::exists( fileName ) )
+    {
+        OMPL_WARN("Database file does not exist: %s", fileName.c_str());
+        return false;
+    }
+
+    // Load database from file, track loading time
+    time::point start = time::now();
+
+    OMPL_INFORM("Loading database from file: %s", fileName.c_str());
+
+    // Open a binary input stream
+    std::ifstream iStream(fileName.c_str(), std::ios::binary);
+
+    // Get the total number of paths saved
+    double numPaths = 0;
+    iStream >> numPaths;
+
+    // Check that the number of paths makes sense
+    if (numPaths < 0 || numPaths > std::numeric_limits<double>::max())
+    {
+        OMPL_WARN("Number of paths to load %d is a bad value", numPaths);
+        return false;
+    }
+
+    // Start loading all the PlannerDatas
+    for (std::size_t i = 0; i < numPaths; ++i)
+    {
+        // Create a new planner data instance
+        ob::PlannerDataPtr plannerData(new ob::PlannerData(si_));
+
+        // Note: the StateStorage class checks if the states match for us
+        plannerDataStorage_.load(iStream, *plannerData.get());
+
+        //OMPL_INFORM("Loaded plan with %d states (vertices)", plannerData->numVertices());
+
+        // Add to nearest neighbor tree
+        nn_->add(plannerData);
+    }
+
+    // Close file
+    iStream.close();
+
+    double loadTime = time::seconds(time::now() - start);
+    OMPL_INFORM("Loaded database from file in %f sec with %d paths", loadTime, nn_->size());
+    return true;
+}
+
+void ompl::tools::ExperienceDB::addPath(og::PathGeometric& solutionPath)
+{
+    OMPL_INFORM("Adding path to Experience Database");
+
+    // Create a new planner data instance
+    ob::PlannerDataPtr plannerData(new ob::PlannerData(si_));
+
+    // Add the states to one nodes files
+    for (std::size_t i = 0; i < solutionPath.getStates().size(); ++i)
+    {
+        ob::PlannerDataVertex vert( solutionPath.getStates()[i] ); // TODO tag?
+
+        //OMPL_INFORM("Vertex %d:", i);
+        //debugVertex(vert);
+
+        plannerData->addVertex( vert );
+    }
+
+    // TODO: Add the edges to a edges file
+    // This might not be necessary actually since we're just using direct paths
+
+    // Deep copy the states in the vertices so that when the planner goes out of scope, all data remains intact
+    plannerData->decoupleFromPlanner();
+
+    // Add to nearest neighbor tree
+    nn_->add(plannerData);
+
+    saveRequired_ = true;
+}
+
+bool ompl::tools::ExperienceDB::saveIfChanged(const std::string& fileName)
+{
+    if (saveRequired_)
+        return save(fileName);
+    return true;
+}
+
+bool ompl::tools::ExperienceDB::save(const std::string& fileName)
+{
+    // Error checking
+    if (fileName.empty())
+    {
+        OMPL_ERROR("Empty filename passed to save function");
+        return false;
+    }
+
+    // Save database from file, track saving time
+    time::point start = time::now();
+
+    OMPL_INFORM("Saving database to file: %s", fileName.c_str());
+
+    // Open a binary output stream
+    std::ofstream outStream(fileName.c_str(), std::ios::binary);
+
+    // Convert the NN tree to a vector
+    std::vector<ob::PlannerDataPtr> plannerDatas;
+    nn_->list(plannerDatas);
+
+    // Write the number of paths we will be saving
+    double numPaths = plannerDatas.size();
+    outStream << numPaths;
+
+    // Start saving each planner data object
+    for (std::size_t i = 0; i < numPaths; ++i)
+    {
+        ob::PlannerData &pd = *plannerDatas[i].get();
+
+        //OMPL_INFORM("Saving experience %d with %d verticies and %d edges", i, pd.numVertices(), pd.numEdges());
+
+        if (false) // debug code
+        {
+            for (std::size_t i = 0; i < pd.numVertices(); ++i)
+            {
+                OMPL_INFORM("Vertex %d:", i);
+                debugVertex(pd.getVertex(i));
+            }
+        }
+
+        // Save a single planner data
+        plannerDataStorage_.store(pd, outStream);
+    }
+
+    // Close file
+    outStream.close();
+
+    // Benchmark
+    double loadTime = time::seconds(time::now() - start);
+    OMPL_INFORM("Saved database to file in %f sec with %d paths", loadTime, plannerDatas.size());
+
+    saveRequired_ = false;
+
+    return true;
+}
+
+void ompl::tools::ExperienceDB::getAllPaths(std::vector<ob::PlannerDataPtr> &plannerDatas)
+{
+    OMPL_DEBUG("ExperienceDB: getAllPaths");
+
+    // Convert the NN tree to a vector
+    nn_->list(plannerDatas);
+
+    OMPL_DEBUG("Number of paths found: %d", plannerDatas.size());
+}
+
+std::vector<ob::PlannerDataPtr> ompl::tools::ExperienceDB::findNearestStartGoal(int nearestK, const base::State* start, const base::State* goal)
+{
+    // Fill in our pre-made PlannerData instance with the new start and goal states to be searched for
+    nnSearchKey_->getVertex( 0 ) = ob::PlannerDataVertex(start);
+    nnSearchKey_->getVertex( 1 ) = ob::PlannerDataVertex(goal);
+
+    std::vector<ob::PlannerDataPtr> nearest;
+    nn_->nearestK(nnSearchKey_, nearestK, nearest);
+
+    return nearest;
+}
+
+double ompl::tools::ExperienceDB::distanceFunction(const ob::PlannerDataPtr a, const ob::PlannerDataPtr b) const
+{
+    return si_->distance( a->getVertex(0).getState(), b->getVertex(0).getState() ) +
+        si_->distance( a->getVertex(a->numVertices()-1).getState(), b->getVertex(b->numVertices()-1).getState() );
+}
+
+void ompl::tools::ExperienceDB::debugVertex(const ob::PlannerDataVertex& vertex)
+{
+    const ob::State* state = vertex.getState();
+
+    ob::ScopedState<> realState(si_->getStateSpace(), state);
+
+    // Add to vector of results
+    OMPL_INFORM("Get value: %f and %f", realState[0], realState[1]);
+}
+
+std::size_t ompl::tools::ExperienceDB::getExperiencesCount()
+{
+    return nn_->size();
+}

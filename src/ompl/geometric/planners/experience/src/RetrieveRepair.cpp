@@ -130,7 +130,6 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
 
         // Get a single start state TODO: more than one
         const base::State *startState = pis_.nextStart();
-        //si_->copyState(motion->state, st);
 
         // Get a single goal state TODO: more than one
         base::Goal *goal   = pdef_->getGoal().get();
