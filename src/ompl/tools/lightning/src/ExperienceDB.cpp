@@ -35,11 +35,10 @@
 /* Author: Dave Coleman */
 
 // OMPL
-#include "ompl/base/ScopedState.h"
 #include "ompl/tools/lightning/ExperienceDB.h"
+#include "ompl/base/ScopedState.h"
 #include "ompl/util/Time.h" 
 #include "ompl/tools/config/SelfConfig.h"
-//#include "ompl/base/spaces/RealVectorStateSpace.h" //temp
 
 // Boost
 #include <boost/filesystem.hpp>
@@ -50,18 +49,14 @@ ompl::tools::ExperienceDB::ExperienceDB(const base::StateSpacePtr &space)
     si_.reset(new base::SpaceInformation(space));
 
     // Set nearest neighbor type
-    nn_.reset(tools::SelfConfig::getDefaultNearestNeighbors<ob::PlannerDataPtr>(si_->getStateSpace()));
+    //nn_.reset(tools::SelfConfig::getDefaultNearestNeighbors<ob::PlannerDataPtr>(si_->getStateSpace()));
+    nn_.reset(new ompl::NearestNeighborsSqrtApprox<ob::PlannerDataPtr>());
 
     // Use our custom distance function for nearest neighbor tree
     nn_->setDistanceFunction(boost::bind(&ompl::tools::ExperienceDB::distanceFunction, this, _1, _2));
 
     // Load the PlannerData instance to be used for searching
     nnSearchKey_.reset(new ob::PlannerData(si_));
-    // Add 2 vertexes - one for start and one for goal - so the future searching is faster
-    ob::State *temp  = si_->allocState();
-    ob::PlannerDataVertex vert( temp );
-    nnSearchKey_->addVertex( vert );
-    nnSearchKey_->addVertex( vert );
 }
 
 ompl::tools::ExperienceDB::~ExperienceDB(void)
@@ -233,29 +228,73 @@ void ompl::tools::ExperienceDB::getAllPaths(std::vector<ob::PlannerDataPtr> &pla
 std::vector<ob::PlannerDataPtr> ompl::tools::ExperienceDB::findNearestStartGoal(int nearestK, const base::State* start, const base::State* goal)
 {
     // Fill in our pre-made PlannerData instance with the new start and goal states to be searched for
-    nnSearchKey_->getVertex( 0 ) = ob::PlannerDataVertex(start);
-    nnSearchKey_->getVertex( 1 ) = ob::PlannerDataVertex(goal);
+    nnSearchKey_->addVertex( ob::PlannerDataVertex(start) );
+    nnSearchKey_->addVertex( ob::PlannerDataVertex(goal) );
+
+    std::cout << "NUMBER OF VERTICES: " << nnSearchKey_->numVertices() << std::endl;
+    assert( nnSearchKey_->numVertices() == 2);
+
+    std::cout << "========================= BEGINNING NN SEARCH" << std::endl;
+    std::cout << "Start, Goal: " << std::endl;
+    si_->printState(start, std::cout);
+    si_->printState(goal, std::cout);
+
+    std::cout << "number of vertices: " << nnSearchKey_->numVertices() << std::endl;
 
     std::vector<ob::PlannerDataPtr> nearest;
     nn_->nearestK(nnSearchKey_, nearestK, nearest);
+
+    // DEBUG
+    std::cout << "======================== SORTED " << std::endl;
+    for (std::size_t i = 0; i < nearest.size(); ++i)
+    {
+        OMPL_DEBUG("Index %d with distance %f", i, distanceFunction(nearest[i], nnSearchKey_));        
+        si_->printState(nearest[i]->getVertex(0).getState());
+        si_->printState(nearest[i]->getVertex(nearest[i]->numVertices()-1).getState());
+    }
+
 
     return nearest;
 }
 
 double ompl::tools::ExperienceDB::distanceFunction(const ob::PlannerDataPtr a, const ob::PlannerDataPtr b) const
 {
+    // Basic implementation
+    /*
     return si_->distance( a->getVertex(0).getState(), b->getVertex(0).getState() ) +
         si_->distance( a->getVertex(a->numVertices()-1).getState(), b->getVertex(b->numVertices()-1).getState() );
+    */
+
+    // Bi-directional implementation - check path b from [start, goal] and [goal, start] 
+
+    // [ a.start, b.start] + [a.goal + b.goal]
+    double n1 = si_->distance( a->getVertex(0).getState(), b->getVertex(0).getState() );
+    double n2 = si_->distance( a->getVertex(a->numVertices()-1).getState(), b->getVertex(b->numVertices()-1).getState() );
+
+    // [ a.start, b.goal] + [a.goal + b.start]
+    double w1 = si_->distance( a->getVertex(0).getState(), b->getVertex(b->numVertices()-1).getState() );
+    double w2 = si_->distance( a->getVertex(a->numVertices()-1).getState(), b->getVertex(0).getState() );
+
+    double dist = std::min(n1 + n2, w1 + w2);
+
+    std::cout << "a count " << a->numVertices() << " b count " << b->numVertices() << std::endl;
+
+    if (n1 + n2 <= w1 + w2)
+        std::cout << "Dist normal " << dist << " | n1: " << n1 << " | n2: " << n2 << std::endl;
+    else
+        std::cout << "Dist weird  " << dist << " | w1: " << w1 << " | w2: " << w2 << std::endl;
+
+    return dist;
 }
 
 void ompl::tools::ExperienceDB::debugVertex(const ob::PlannerDataVertex& vertex)
 {
-    const ob::State* state = vertex.getState();
+    debugState(vertex.getState());
+}
 
-    ob::ScopedState<> realState(si_->getStateSpace(), state);
-
-    // Add to vector of results
-    OMPL_INFORM("Get value: %f and %f", realState[0], realState[1]);
+void ompl::tools::ExperienceDB::debugState(const ob::State* state)
+{
+    si_->printState(state, std::cout);    
 }
 
 std::size_t ompl::tools::ExperienceDB::getExperiencesCount()

@@ -152,7 +152,7 @@ namespace ompl
             std::vector<ob::PlannerDataPtr>                repairPlannerDatas_;
 
             /** \brief The instance of the path simplifier */
-            og::PathSimplifierPtr                          psk_;
+            og::PathSimplifierPtr                          psk_;         
         };
 
     }

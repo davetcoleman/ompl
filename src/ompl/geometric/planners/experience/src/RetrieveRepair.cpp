@@ -40,6 +40,7 @@
 #include "ompl/tools/config/SelfConfig.h"
 
 #include <limits>
+#include <cstddef> // ?
 #include <boost/make_shared.hpp>
 
 ompl::geometric::RetrieveRepair::RetrieveRepair(const base::SpaceInformationPtr &si, ompl::tools::ExperienceDBPtr experienceDB)
@@ -143,6 +144,11 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
         const base::GoalState *goalStateClass = dynamic_cast<base::GoalState*>(goal);
         const base::State *goalState = goalStateClass->getState();
 
+        std::cout << "Start State from solve: " << std::endl;
+        si_->printState(startState, std::cout);
+        std::cout << "Goal State from solve: " << std::endl;
+        si_->printState(goalState, std::cout);
+
         // Search for previous solution in database
         int nearestK = 10; // TODO: make this 10 then check candidate solutions for amount of invalidness
         nearestPaths_ = experienceDB_->findNearestStartGoal(nearestK, startState, goalState);
@@ -164,6 +170,7 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
         }
 
         // Convert chosen PlanningData experience to an actual path
+        OMPL_DEBUG("Convert PlanningData to PathGeometric");
         og::PathGeometric *primaryPath = new PathGeometric(si_);
         // Add start
         primaryPath->append(startState);
@@ -203,15 +210,19 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
 
 bool ompl::geometric::RetrieveRepair::findBestPath(const base::State *startState, const base::State *goalState, ob::PlannerDataPtr& chosenPath)
 {
+    // TODO this implemention assumes the plan can go forward or backwards. I forgot the fancy word for that property
+
     // Filter down to just 1 chosen path
     ob::PlannerDataPtr bestPath = nearestPaths_.front();
-    //std::size_t bestPathScore = std::numeric_limits<std::size_t>::infinity(); // we want to find the path with the minimal score
     std::size_t bestPathScore = 2147483647; // above is not working
 
-    for (std::size_t path_id = 0; path_id < nearestPaths_.size(); ++path_id)
+    // Track which path has the shortest distance
+    std::vector<double> distances(nearestPaths_.size(), 0);
+    std::vector<bool> isReversed(nearestPaths_.size());
+
+    for (std::size_t pathID = 0; pathID < nearestPaths_.size(); ++pathID)
     {
-        ob::PlannerDataPtr currentPath = nearestPaths_[path_id];
-        std::size_t invalidCount = 0; // the score
+        ob::PlannerDataPtr currentPath = nearestPaths_[pathID];
 
         // Error check
         if (currentPath->numVertices() < 2) // needs at least a start and a goal
@@ -219,13 +230,41 @@ bool ompl::geometric::RetrieveRepair::findBestPath(const base::State *startState
             OMPL_ERROR("A path was recalled that somehow has less than 2 vertices, which shouldn't happen");
             return false;
         }
+        
+        const ob::State* pathStartState = currentPath->getVertex(0).getState();
+        const ob::State* pathGoalState = currentPath->getVertex(currentPath->numVertices()-1).getState();
+
+        double regularDistance  = si_->distance(startState,pathStartState) + si_->distance(goalState,pathGoalState);
+        double reversedDistance = si_->distance(startState,pathGoalState) + si_->distance(goalState,pathStartState);
+        
+        // Check if path is reversed from normal [start->goal] direction and cache the distance
+        if ( regularDistance > reversedDistance )
+        {
+            // The distance between starts and goals is less when in reverse
+            isReversed[pathID] = true;
+
+            // We won't actually flip it until later to save memory operations and not alter our NN tree in the ExperienceDB
+            distances[pathID] = reversedDistance;
+
+            OMPL_DEBUG("Path is reversed.");
+        }
+        else
+        {
+            isReversed[pathID] = false;
+            distances[pathID] = regularDistance;
+            OMPL_DEBUG("Path is NOT reversed.");
+        }
+
+        std::size_t invalidCount = 0; // the score
 
         // Check the validity between our start location and the path's start
         // TODO: this might bias the score to be worse for the little connecting segment
-        invalidCount += checkMotionScore( startState, currentPath->getVertex(0).getState() );
+        if (!isReversed[pathID])
+            invalidCount += checkMotionScore( startState, pathStartState );
+        else
+            invalidCount += checkMotionScore( startState, pathGoalState );
 
         // Score current path for validity
-        // Check the recalled path
         std::size_t invalidStates = 0;
         for (std::size_t vertex_id = 0; vertex_id < currentPath->numVertices(); ++vertex_id)
         {
@@ -235,16 +274,19 @@ bool ompl::geometric::RetrieveRepair::findBestPath(const base::State *startState
                 invalidStates ++;
             }
         }
-        // Track sperate for debugging
+        // Track separate for debugging
         invalidCount += invalidStates;
 
         // Check the validity between our goal location and the path's goal
         // TODO: this might bias the score to be worse for the little connecting segment
-        invalidCount += checkMotionScore( goalState, currentPath->getVertex(currentPath->numVertices()-1).getState() );
+        if (!isReversed[pathID])
+            invalidCount += checkMotionScore( goalState, pathGoalState );
+        else
+            invalidCount += checkMotionScore( goalState, pathStartState );
 
         // Factor in the distance between start/goal and our new start/goal
-        OMPL_INFORM("Path %d has %d total verticies, of which %d are invalid giving a total score of %d",
-            int(path_id), currentPath->numVertices(), invalidStates, invalidCount );
+        OMPL_INFORM("Path %d | %d verticies | %d invalid | score %d | reversed: %d | distance: %f",
+            int(pathID), currentPath->numVertices(), invalidStates, invalidCount, isReversed[pathID], distances[pathID]);
 
         // Check if this is the best score we've seen so far
         if (invalidCount < bestPathScore)
@@ -252,10 +294,21 @@ bool ompl::geometric::RetrieveRepair::findBestPath(const base::State *startState
             OMPL_DEBUG("This path is the best we've seen so far. Previous best: %d", bestPathScore);
             bestPathScore = invalidCount;
             bestPath = currentPath;
-            nearestPathsChosenID_ = path_id;
+            nearestPathsChosenID_ = pathID;
+        }
+        // if the best score is the same as a previous one we've seen, 
+        // choose the one that has the shortest connecting component
+        else if (invalidCount == bestPathScore && distances[nearestPathsChosenID_] > distances[pathID])
+        {
+            // This new path is a shorter distance
+            OMPL_DEBUG("This path is as good as the best we've seen so far, but its path is shorter. Previous best score: %d from index %d", 
+                bestPathScore, nearestPathsChosenID_);
+            bestPathScore = invalidCount;
+            bestPath = currentPath;
+            nearestPathsChosenID_ = pathID;                
         }
         else
-            OMPL_DEBUG("Best score: %d", bestPathScore);
+            OMPL_DEBUG("Not best. Best score: %d from index %d", bestPathScore, nearestPathsChosenID_);
     }
 
     // Check if we have a solution
@@ -270,8 +323,24 @@ bool ompl::geometric::RetrieveRepair::findBestPath(const base::State *startState
         return false;
     }
 
-    // Set result
-    chosenPath = bestPath;
+    // Reverse the path if necessary
+    if (isReversed[nearestPathsChosenID_])
+    {
+        OMPL_DEBUG("Reversing planner data verticies");
+        ob::PlannerDataPtr newPath(new ob::PlannerData(si_));
+        for (std::size_t i = bestPath->numVertices() - 1; i <= 0; --i)
+        {
+            newPath->addVertex( bestPath->getVertex(i) );
+        }
+        // Set result
+        chosenPath = newPath;
+    }
+    else
+    {
+        // Set result
+        chosenPath = bestPath;
+    }
+
     return true;
 }
 
@@ -481,8 +550,8 @@ void ompl::geometric::RetrieveRepair::getRepairPlannerDatas(std::vector<base::Pl
 std::size_t ompl::geometric::RetrieveRepair::checkMotionScore(const ob::State *s1, const ob::State *s2) const
 {
     int segmentCount = si_->getStateSpace()->validSegmentCount(s1, s2);
-    OMPL_INFORM("Checking motion between two states, segment count is: %d so we will check every %f distance",
-        segmentCount, 1.0/double(segmentCount));
+    //OMPL_INFORM("Checking motion between two states, segment count is: %d so we will check every %f distance",
+    //    segmentCount, 1.0/double(segmentCount));
 
     std::size_t invalidStatesScore = 0; // count number of interpolated states in collision
 

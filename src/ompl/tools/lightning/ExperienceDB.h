@@ -132,7 +132,8 @@ namespace ompl
              * \brief Print info to screen
              */
             void debugVertex(const ob::PlannerDataVertex& vertex);
-
+            void debugState(const ob::State* state);
+    
             /** \brief Get the total number of paths stored in the database */
             std::size_t getExperiencesCount();
             
