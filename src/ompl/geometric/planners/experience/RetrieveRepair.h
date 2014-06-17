@@ -111,7 +111,7 @@ namespace ompl
              * \param oldPath - from experience
              * \return true if no error
              */
-            bool repairPath(og::PathGeometricPtr path); // \todo is this the best way to pass around a path?
+            bool repairPath(og::PathGeometric &path); // \todo is this the best way to pass around a path?
 
             /**
              * \brief Use our secondary planner to find a valid path between start and goal, and return that path
@@ -120,7 +120,7 @@ namespace ompl
              * \param newPathSegment - the solution
              * \return true if path found
              */
-            bool replan(const ob::State* start, const ob::State* goal, og::PathGeometricPtr& newPathSegment);
+            bool replan(const ob::State* start, const ob::State* goal, og::PathGeometric &newPathSegment);
 
             /**
              * \brief Count the number of states along the discretized path that are in collision
