@@ -39,7 +39,7 @@
 
 #include "ompl/geometric/planners/PlannerIncludes.h"
 #include "ompl/geometric/PathGeometric.h"
-//#include ompl/geometric/planners/rrt/TRRT.h>
+#include "ompl/geometric/PathSimplifier.h"
 #include "ompl/datastructures/NearestNeighbors.h"
 #include "ompl/tools/lightning/ExperienceDB.h"
 
@@ -150,6 +150,9 @@ namespace ompl
 
             /** \brief Debug the repair planner by saving its planner data each time it is used */
             std::vector<ob::PlannerDataPtr>                repairPlannerDatas_;
+
+            /** \brief The instance of the path simplifier */
+            og::PathSimplifierPtr                          psk_;
         };
 
     }

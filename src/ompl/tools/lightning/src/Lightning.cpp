@@ -150,7 +150,7 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
         OMPL_INFORM("Lightning Solve: No solution found after %f seconds", planTime_);
 
     // Smooth the result
-    OMPL_INFORM("Simplifying solution (smoothing)...");
+    //OMPL_INFORM("Simplifying solution (smoothing)...");
     //simplifySolution(ptc);
 
     // Get information about the exploration data structure the motion planner used. Used later in visualizing
