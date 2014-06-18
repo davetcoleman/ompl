@@ -36,10 +36,12 @@
 
 
 #include "ompl/tools/lightning/Lightning.h"
+//#include "ompl/util/Console.h"
 #include "ompl/base/goals/GoalSampleableRegion.h"
 #include "ompl/geometric/PathGeometric.h"
 #include "ompl/geometric/SimpleSetup.h" // use their implementation of getDefaultPlanner
 #include "ompl/base/StateSpace.h" // for storing to file
+#include "ompl/tools/lightning/DynamicTimeWarp.h"
 
 ompl::tools::Lightning::Lightning(const base::StateSpacePtr &space) :
     configured_(false),
@@ -108,7 +110,7 @@ void ompl::tools::Lightning::setup(void)
             pp_->addPlanner(rrPlanner_);  // Add the planning from experience planner if desired
 
         // Set the configured flag
-        configured_ = true;       
+        configured_ = true;
     }
 }
 
@@ -162,7 +164,7 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
     // Make sure solution has at least 2 states
     if (solutionPath.getStateCount() < 2)
     {
-        throw Exception("I just want to see if this can happen"); 
+        throw Exception("I just want to see if this can happen");
         OMPL_INFORM("NOT saving to database because solution is less than 2 states long");
     }
     // Do not save if approximate
@@ -250,6 +252,18 @@ ompl::geometric::PathGeometric& ompl::tools::Lightning::getSolutionPath(void) co
     throw Exception("No solution path");
 }
 
+void ompl::tools::Lightning::printResultsInfo(void) const
+{
+    for (std::size_t i = 0; i < pdef_->getSolutionCount(); ++i)
+    {
+        std::cout << OMPL_CONSOLE_COLOR_GREEN << "Solution " << i
+                  << " | Length: " << pdef_->getSolutions()[i].length_
+                  << " | Approximate: " << (pdef_->getSolutions()[i].approximate_ ? "true" : "false")
+                  << " | Planner: " << pdef_->getSolutions()[i].plannerName_
+                  << OMPL_CONSOLE_COLOR_RESET << std::endl;
+    }
+}
+
 bool ompl::tools::Lightning::haveExactSolutionPath(void) const
 {
     return haveSolutionPath() && (!pdef_->hasApproximateSolution() || pdef_->getSolutionDifference() < std::numeric_limits<double>::epsilon());
@@ -259,7 +273,7 @@ void ompl::tools::Lightning::getPlannerData(base::PlannerData &pd) const
 {
     pd.clear();
     if (planner_)
-      planner_->getPlannerData(pd);
+        planner_->getPlannerData(pd);
 }
 
 void ompl::tools::Lightning::print(std::ostream &out) const
@@ -284,7 +298,7 @@ void ompl::tools::Lightning::print(std::ostream &out) const
 }
 
 void ompl::tools::Lightning::enableRecall(bool enable)
-{    
+{
     // Remember state
     recallEnabled_ = enable;
 
@@ -294,10 +308,23 @@ void ompl::tools::Lightning::enableRecall(bool enable)
 
 
 void ompl::tools::Lightning::enableScratch(bool enable)
-{    
+{
     // Remember state
     scratchEnabled_ = enable;
 
     // Flag the planners as possibly misconfigured
     configured_ = false;
+}
+
+double ompl::tools::Lightning::getPathsScore(ob::PlannerDataPtr &path1, ob::PlannerDataPtr &path2)
+{
+
+    // dynamic time warping
+    //ompl::tools::DynamicTimeWarp<ob::PlannerDataPtr> dtw(); //boost::bind(&ompl::tools::ExperienceDB::distanceFunction, experienceDB_, _1, _2));
+    ompl::tools::DynamicTimeWarp dtw;
+
+    // compute the DTW between two vectors:
+    double score = dtw.calcDTWDistance(path1, path2);
+
+    return score;
 }

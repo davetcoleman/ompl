@@ -168,6 +168,9 @@ namespace ompl
             /** \brief Get the best solution path. Throw an exception if no solution is available */
             og::PathGeometric& getSolutionPath(void) const;
 
+            /** \brief Display debug data about potential available solutions */
+            void printResultsInfo(void) const;
+
             /** \brief Get information about the exploration data structure the planning from scratch motion planner used. */
             void getPlannerData(base::PlannerData &pd) const;
 
@@ -352,6 +355,12 @@ namespace ompl
             {
                 return experienceDB_->getExperiencesCount();
             }
+
+            /**
+             * \brief Use dynamic time warping to compare the similarity of two paths
+             * \return score
+             */
+            double getPathsScore(ob::PlannerDataPtr &path1, ob::PlannerDataPtr &path2);
 
         protected:
 

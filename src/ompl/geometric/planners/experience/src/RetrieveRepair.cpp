@@ -40,8 +40,6 @@
 #include "ompl/tools/config/SelfConfig.h"
 
 #include <limits>
-#include <cstddef> // ?
-#include <boost/make_shared.hpp>
 
 ompl::geometric::RetrieveRepair::RetrieveRepair(const base::SpaceInformationPtr &si, ompl::tools::ExperienceDBPtr experienceDB)
     : base::Planner(si, "RetrieveRepair"),
@@ -117,109 +115,96 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
     bool approximate = false;
     double approxdif = std::numeric_limits<double>::infinity();
 
-    bool use_database = true;
-    if (use_database)
+    // Check if the database is empty
+    if (!experienceDB_->getExperiencesCount())
     {
-        OMPL_INFORM("Using database for RetrieveRepair planner.");
-
-        // Check if the database is empty
-        if (!experienceDB_->getExperiencesCount())
-        {
-            OMPL_INFORM("Experience database is empty so unable to run RetrieveRepair algorithm.");
-            return base::PlannerStatus::TIMEOUT; // The planner failed to find a solution     
-        }
-
-        // Get a single start state TODO: more than one
-        const base::State *startState = pis_.nextStart();
-
-        // Get a single goal state TODO: more than one
-        base::Goal *goal   = pdef_->getGoal().get();
-        // Check that we have the correct type of goal
-        if (!goal || !goal->hasType(ompl::base::GOAL_STATE))
-        {
-            OMPL_ERROR("Goal cannot be converted into a goal state");
-            OMPL_ERROR("%s: Unknown type of goal", getName().c_str());
-            return base::PlannerStatus::UNRECOGNIZED_GOAL_TYPE;
-        }
-        const base::GoalState *goalStateClass = dynamic_cast<base::GoalState*>(goal);
-        const base::State *goalState = goalStateClass->getState();
-
-        std::cout << "Start State from solve: " << std::endl;
-        si_->printState(startState, std::cout);
-        std::cout << "Goal State from solve: " << std::endl;
-        si_->printState(goalState, std::cout);
-
-        // Search for previous solution in database
-        int nearestK = 10; // TODO: make this 10 then check candidate solutions for amount of invalidness
-        nearestPaths_ = experienceDB_->findNearestStartGoal(nearestK, startState, goalState);
-        OMPL_INFORM("Found %d similar paths", nearestPaths_.size());
-
-        // Check if there are any solutions
-        if (nearestPaths_.empty())
-        {
-            OMPL_INFORM("No similar path founds in nearest neighbor tree, unable to retrieve repair");
-            return base::PlannerStatus::TIMEOUT; // The planner failed to find a solution
-        }
-
-        ob::PlannerDataPtr chosenPath;
-
-        // Filter top n paths to 1
-        if (!findBestPath(startState, goalState, chosenPath))
-        {
-            return base::PlannerStatus::CRASH;
-        }
-
-        // All saved trajectories should be at least 2 states long
-        assert(chosenPath->numVertices() >= 2);
-
-        // Convert chosen PlanningData experience to an actual path
-        og::PathGeometric *primaryPath = new PathGeometric(si_);
-        // Add start
-        primaryPath->append(startState);
-        // Add old states
-        for (std::size_t i = 0; i < chosenPath->numVertices(); ++i)
-        {
-            primaryPath->append(chosenPath->getVertex(i).getState());
-        }
-        // Add goal
-        primaryPath->append(goalState);
-
-        // All save trajectories should be at least 2 states long, and then we append the start and goal states
-        assert(primaryPath->getStateCount() >= 4);
-
-        // Repair chosen path
-        if (!repairPath(*primaryPath))
-        {
-            return base::PlannerStatus::CRASH;
-        }
-
-        // Finished
-        approxdif = 0; // ??
-        pdef_->addSolutionPath(base::PathPtr(primaryPath), approximate, approxdif, getName());
-        solved = true;
-    }
-    else
-    {
-        OMPL_INFORM("NOT using database for RetrieveRepair planner.");
-
-        while (ptc == false)
-        {
-            // Dummy work
-            usleep(0.1 * 1000000);
-        }
-        OMPL_INFORM("DONE doing dummy work in RetrieveRepair thread");
+        OMPL_INFORM("Experience database is empty so unable to run RetrieveRepair algorithm.");
+        return base::PlannerStatus::TIMEOUT; // The planner failed to find a solution
     }
 
+    // Get a single start state TODO: more than one
+    const base::State *startState = pis_.nextStart();
+
+    // Get a single goal state TODO: more than one
+    base::Goal *goal   = pdef_->getGoal().get();
+    // Check that we have the correct type of goal
+    if (!goal || !goal->hasType(ompl::base::GOAL_STATE))
+    {
+        OMPL_ERROR("Goal cannot be converted into a goal state");
+        OMPL_ERROR("%s: Unknown type of goal", getName().c_str());
+        return base::PlannerStatus::UNRECOGNIZED_GOAL_TYPE;
+    }
+    const base::GoalState *goalStateClass = dynamic_cast<base::GoalState*>(goal);
+    const base::State *goalState = goalStateClass->getState();
+
+    // Search for previous solution in database
+    int nearestK = 10;
+    nearestPaths_ = experienceDB_->findNearestStartGoal(nearestK, startState, goalState);
+
+    // Check if there are any solutions
+    if (nearestPaths_.empty())
+    {
+        OMPL_INFORM("No similar path founds in nearest neighbor tree, unable to retrieve repair");
+        return base::PlannerStatus::TIMEOUT; // The planner failed to find a solution
+    }
+
+    ob::PlannerDataPtr chosenPath;
+
+    // Filter top n paths to 1
+    if (!findBestPath(startState, goalState, chosenPath))
+    {
+        return base::PlannerStatus::CRASH;
+    }
+
+    // All saved trajectories should be at least 2 states long
+    assert(chosenPath->numVertices() >= 2);
+
+    // Convert chosen PlanningData experience to an actual path
+    og::PathGeometric *primaryPath = new PathGeometric(si_);
+    // Add start
+    primaryPath->append(startState);
+    // Add old states
+    for (std::size_t i = 0; i < chosenPath->numVertices(); ++i)
+    {
+        primaryPath->append(chosenPath->getVertex(i).getState());
+    }
+    // Add goal
+    primaryPath->append(goalState);
+
+    // All save trajectories should be at least 2 states long, and then we append the start and goal states
+    assert(primaryPath->getStateCount() >= 4);
+
+    // Repair chosen path
+    if (!repairPath(*primaryPath, ptc))
+    {
+        return base::PlannerStatus::CRASH;
+    }
+
+    // Smooth the result
+    OMPL_INFORM("RetrieveRepair solve: Simplifying solution (smoothing)...");
+    time::point simplifyStart = time::now();
+    std::size_t numStates = primaryPath->getStateCount();
+    psk_->simplify(*primaryPath, ptc);
+    double simplifyTime = time::seconds(time::now() - simplifyStart);
+    OMPL_INFORM("Path simplification took %f seconds and removed %d states", simplifyTime, numStates - primaryPath->getStateCount());
+
+    // Finished
+    approxdif = 0;
+    pdef_->addSolutionPath(base::PathPtr(primaryPath), approximate, approxdif, getName());
+    solved = true;
     return base::PlannerStatus(solved, approximate);
 }
 
 bool ompl::geometric::RetrieveRepair::findBestPath(const base::State *startState, const base::State *goalState, ob::PlannerDataPtr& chosenPath)
 {
     // TODO this implemention assumes the plan can go forward or backwards. I forgot the fancy word for that property
+    std::cout << OMPL_CONSOLE_COLOR_CYAN << std::endl;
+    OMPL_INFORM("Found %d similar paths. Filtering ---------------", nearestPaths_.size());
 
     // Filter down to just 1 chosen path
     ob::PlannerDataPtr bestPath = nearestPaths_.front();
-    std::size_t bestPathScore = 2147483647; // above is not working
+    std::size_t bestPathScore = std::numeric_limits<std::size_t>::max();
+    std::cout << "Best Path Score " << bestPathScore << std::endl;
 
     // Track which path has the shortest distance
     std::vector<double> distances(nearestPaths_.size(), 0);
@@ -237,39 +222,35 @@ bool ompl::geometric::RetrieveRepair::findBestPath(const base::State *startState
             OMPL_ERROR("A path was recalled that somehow has less than 2 vertices, which shouldn't happen");
             return false;
         }
-        
+
         const ob::State* pathStartState = currentPath->getVertex(0).getState();
         const ob::State* pathGoalState = currentPath->getVertex(currentPath->numVertices()-1).getState();
 
         double regularDistance  = si_->distance(startState,pathStartState) + si_->distance(goalState,pathGoalState);
         double reversedDistance = si_->distance(startState,pathGoalState) + si_->distance(goalState,pathStartState);
-        
+
         // Check if path is reversed from normal [start->goal] direction and cache the distance
         if ( regularDistance > reversedDistance )
         {
             // The distance between starts and goals is less when in reverse
             isReversed[pathID] = true;
-
-            // We won't actually flip it until later to save memory operations and not alter our NN tree in the ExperienceDB
             distances[pathID] = reversedDistance;
-
-            OMPL_DEBUG("Path is reversed.");
+            // We won't actually flip it until later to save memory operations and not alter our NN tree in the ExperienceDB
         }
         else
         {
             isReversed[pathID] = false;
             distances[pathID] = regularDistance;
-            OMPL_DEBUG("Path is NOT reversed.");
         }
 
-        std::size_t invalidCount = 0; // the score
+        std::size_t pathScore = 0; // the score
 
         // Check the validity between our start location and the path's start
         // TODO: this might bias the score to be worse for the little connecting segment
         if (!isReversed[pathID])
-            invalidCount += checkMotionScore( startState, pathStartState );
+            pathScore += checkMotionScore( startState, pathStartState );
         else
-            invalidCount += checkMotionScore( startState, pathGoalState );
+            pathScore += checkMotionScore( startState, pathGoalState );
 
         // Score current path for validity
         std::size_t invalidStates = 0;
@@ -282,46 +263,56 @@ bool ompl::geometric::RetrieveRepair::findBestPath(const base::State *startState
             }
         }
         // Track separate for debugging
-        invalidCount += invalidStates;
+        pathScore += invalidStates;
 
         // Check the validity between our goal location and the path's goal
         // TODO: this might bias the score to be worse for the little connecting segment
         if (!isReversed[pathID])
-            invalidCount += checkMotionScore( goalState, pathGoalState );
+            pathScore += checkMotionScore( goalState, pathGoalState );
         else
-            invalidCount += checkMotionScore( goalState, pathStartState );
+            pathScore += checkMotionScore( goalState, pathStartState );
 
         // Factor in the distance between start/goal and our new start/goal
         OMPL_INFORM("Path %d | %d verticies | %d invalid | score %d | reversed: %s | distance: %f",
-            int(pathID), currentPath->numVertices(), invalidStates, invalidCount, isReversed[pathID] ? "true" : "false", distances[pathID]);
+            int(pathID), currentPath->numVertices(), invalidStates, pathScore, isReversed[pathID] ? "true" : "false", distances[pathID]);
+
+        // Check if we have a perfect score (0) and this is the shortest path (the first one)
+        if (pathID == 0 && pathScore == 0)
+        {
+            OMPL_DEBUG(" --> The shortest path (path 0) has a perfect score (0), ending filtering early.");
+            bestPathScore = pathScore;
+            bestPath = currentPath;
+            nearestPathsChosenID_ = pathID;            
+            break; // end the for loop
+        }
 
         // Check if this is the best score we've seen so far
-        if (invalidCount < bestPathScore)
+        if (pathScore < bestPathScore)
         {
-            OMPL_DEBUG("This path is the best we've seen so far. Previous best: %d", bestPathScore);
-            bestPathScore = invalidCount;
+            OMPL_DEBUG(" --> This path is the best we've seen so far. Previous best: %d", bestPathScore);
+            bestPathScore = pathScore;
             bestPath = currentPath;
             nearestPathsChosenID_ = pathID;
         }
-        // if the best score is the same as a previous one we've seen, 
+        // if the best score is the same as a previous one we've seen,
         // choose the one that has the shortest connecting component
-        else if (invalidCount == bestPathScore && distances[nearestPathsChosenID_] > distances[pathID])
+        else if (pathScore == bestPathScore && distances[nearestPathsChosenID_] > distances[pathID])
         {
             // This new path is a shorter distance
-            OMPL_DEBUG("This path is as good as the best we've seen so far, but its path is shorter. Previous best score: %d from index %d", 
+            OMPL_DEBUG(" --> This path is as good as the best we've seen so far, but its path is shorter. Previous best score: %d from index %d",
                 bestPathScore, nearestPathsChosenID_);
-            bestPathScore = invalidCount;
+            bestPathScore = pathScore;
             bestPath = currentPath;
-            nearestPathsChosenID_ = pathID;                
+            nearestPathsChosenID_ = pathID;
         }
         else
-            OMPL_DEBUG("Not best. Best score: %d from index %d", bestPathScore, nearestPathsChosenID_);
+            OMPL_DEBUG(" --> Not best. Best score: %d from index %d", bestPathScore, nearestPathsChosenID_);
     }
 
     // Check if we have a solution
     if (!bestPath)
     {
-        OMPL_ERROR("No best path found");
+        OMPL_ERROR("No best path found from k filtered paths");
         return false;
     }
     else if(!bestPath->numVertices() || bestPath->numVertices() == 1)
@@ -330,14 +321,14 @@ bool ompl::geometric::RetrieveRepair::findBestPath(const base::State *startState
         return false;
     }
 
-    // Reverse the path if necessary
+    // Reverse the path if necessary. We allocate memory for this so that we don't alter the database
     if (isReversed[nearestPathsChosenID_])
     {
         OMPL_DEBUG("Reversing planner data verticies count %d", bestPath->numVertices());
         ob::PlannerDataPtr newPath(new ob::PlannerData(si_));
         for (std::size_t i = bestPath->numVertices(); i > 0; --i) // size_t can't go negative so subtact 1 instead
         {
-            OMPL_INFORM("add vertex %d", i-1 );
+            //OMPL_INFORM("add vertex %d", i-1 );
             newPath->addVertex( bestPath->getVertex(i-1) );
         }
         // Set result
@@ -348,23 +339,26 @@ bool ompl::geometric::RetrieveRepair::findBestPath(const base::State *startState
         // Set result
         chosenPath = bestPath;
     }
+    OMPL_DEBUG("Done Filtering --------------------------------------\n");
+    std::cout << OMPL_CONSOLE_COLOR_RESET;
 
     return true;
 }
 
-bool ompl::geometric::RetrieveRepair::repairPath(og::PathGeometric &primaryPath) // \todo is this the best way to pass around a path?
+bool ompl::geometric::RetrieveRepair::repairPath(og::PathGeometric &primaryPath, const base::PlannerTerminationCondition &ptc)
 {
     // \todo: we could reuse our collision checking from the previous step to make this faster
     //        but that complicates everything and I'm not suppose to be spending too much time
     //        on this prototype - DTC
 
-    OMPL_INFORM("Repairing path");
+    std::cout << OMPL_CONSOLE_COLOR_BROWN << std::endl;
+    OMPL_INFORM("Repairing path ----------------------------------");
 
     // Error check
     if (primaryPath.getStateCount() < 2)
     {
         OMPL_ERROR("Cannot repair a path with less than 2 states");
-        throw Exception("Cannot repair a path with less than 2 states"); // TODO remove this maybe?
+        std::cout << OMPL_CONSOLE_COLOR_RESET;
         return false;
     }
 
@@ -379,20 +373,29 @@ bool ompl::geometric::RetrieveRepair::repairPath(og::PathGeometric &primaryPath)
         ob::State* fromState = primaryPath.getState(fromID);
         ob::State* toState = primaryPath.getState(toID);
 
+        // Check if our planner is out of time
+        if (ptc == true)
+        {
+            OMPL_DEBUG("Repair path function interrupted because termination condition is true.");
+            std::cout << OMPL_CONSOLE_COLOR_RESET;
+            return false;
+        }
+
+        // Check path between states
         if (!si_->checkMotion(fromState, toState))
         {
             // Path between (from, to) states not valid, but perhaps to STATE is
             // Search until next valid STATE is found in existing path
             std::size_t subsearch_id = toID;
             ob::State* new_to;
-            OMPL_DEBUG("Searching for next valid state, because state %d to %d was not valid out a total path length of %d.",
+            OMPL_DEBUG("Searching for next valid state, because state %d to %d was not valid out  %d total states",
                 fromID,toID,primaryPath.getStateCount());
             while (subsearch_id < primaryPath.getStateCount())
             {
                 new_to = primaryPath.getState(subsearch_id);
                 if (si_->isValid(new_to))
                 {
-                    OMPL_DEBUG("State %d was found to valid, we are done searching", subsearch_id);
+                    OMPL_DEBUG("State %d was found to valid, we can now repair between states", subsearch_id);
                     // This future state is valid, we can stop searching
                     toID = subsearch_id;
                     toState = new_to;
@@ -406,6 +409,7 @@ bool ompl::geometric::RetrieveRepair::repairPath(og::PathGeometric &primaryPath)
                 // We never found a valid state to plan to, instead we reached the goal state and it too wasn't valid. This is bad.
                 // I think this is a bug.
                 OMPL_ERROR("No state was found valid in the remainder of the path. Invalid goal state. This should not happen.");
+                std::cout << OMPL_CONSOLE_COLOR_RESET;
                 return false;
             }
 
@@ -416,9 +420,10 @@ bool ompl::geometric::RetrieveRepair::repairPath(og::PathGeometric &primaryPath)
             OMPL_DEBUG("Planning from %d to %d", fromID, toID);
             //si_->printState(fromState, std::cout);
             //si_->printState(toState, std::cout);
-            if (!replan(fromState, toState, newPathSegment))
+            if (!replan(fromState, toState, newPathSegment, ptc))
             {
-                OMPL_ERROR("Unable to repair path between state %d and %d", fromID, toID);
+                OMPL_DEBUG("Unable to repair path between state %d and %d", fromID, toID);
+                std::cout << OMPL_CONSOLE_COLOR_RESET;
                 return false;
             }
 
@@ -446,11 +451,11 @@ bool ompl::geometric::RetrieveRepair::repairPath(og::PathGeometric &primaryPath)
             OMPL_DEBUG("Inserting new %d states into old path. Previous length: %d", newPathSegment.getStateCount()-2, primaryPathStates.size());
 
             // Note: skip first and last states because they should be same as our start and goal state, same as `fromID` and `toID`
-            for (std::size_t i = 1; i < newPathSegment.getStateCount() - 1; ++i)                
+            for (std::size_t i = 1; i < newPathSegment.getStateCount() - 1; ++i)
             {
                 std::size_t insertLocation = toID + i - 1;
                 OMPL_DEBUG("Inserting newPathSegment state %d into old path at position %d", i, insertLocation);
-                primaryPathStates.insert( primaryPathStates.begin() + insertLocation, si_->cloneState(newPathSegment.getStates()[i]) );                    
+                primaryPathStates.insert( primaryPathStates.begin() + insertLocation, si_->cloneState(newPathSegment.getStates()[i]) );
             }
             //primaryPathStates.insert( primaryPathStates.begin() + toID, newPathSegment.getStates().begin(), newPathSegment.getStates().end() );
             OMPL_DEBUG("Inserted new states into old path. New length: %d", primaryPathStates.size());
@@ -463,12 +468,14 @@ bool ompl::geometric::RetrieveRepair::repairPath(og::PathGeometric &primaryPath)
         }
     }
 
-    OMPL_INFORM("Done repairing path");
+    OMPL_INFORM("Done repairing ---------------------------------");
+    std::cout << OMPL_CONSOLE_COLOR_RESET;
 
     return true;
 }
 
-bool ompl::geometric::RetrieveRepair::replan(const ob::State* start, const ob::State* goal, PathGeometric &newPathSegment)
+bool ompl::geometric::RetrieveRepair::replan(const ob::State* start, const ob::State* goal, PathGeometric &newPathSegment, 
+    const base::PlannerTerminationCondition &ptc)
 {
     // Reset problem definition
     repairProblemDef_->clearSolutionPaths();
@@ -489,8 +496,7 @@ bool ompl::geometric::RetrieveRepair::replan(const ob::State* start, const ob::S
     base::PlannerStatus lastStatus = base::PlannerStatus::UNKNOWN;
     time::point startTime = time::now();
 
-    double seconds = 0.2; // TODO move this somewhere
-    base::PlannerTerminationCondition ptc = ob::timedPlannerTerminationCondition( seconds ); // TODO: this does not address pre-empting a planner
+    // TODO: if we use replanner like RRT* the ptc will allow it to run too long and no time will be left for the rest of algorithm
     lastStatus = repairPlanner_->solve(ptc);
 
     // Results
@@ -519,13 +525,13 @@ bool ompl::geometric::RetrieveRepair::replan(const ob::State* start, const ob::S
     newPathSegment = static_cast<og::PathGeometric&>(*p);
 
     // Smooth the result
-    OMPL_INFORM("Simplifying solution (smoothing)...");
+    OMPL_INFORM("Repair: Simplifying solution (smoothing)...");
     time::point simplifyStart = time::now();
     std::size_t numStates = newPathSegment.getStateCount();
     psk_->simplify(newPathSegment, ptc);
     double simplifyTime = time::seconds(time::now() - simplifyStart);
     OMPL_INFORM("Path simplification took %f seconds and removed %d states", simplifyTime, numStates - newPathSegment.getStateCount());
-    
+
     // Save the planner data for debugging purposes
     repairPlannerDatas_.push_back(ob::PlannerDataPtr( new ob::PlannerData(si_) ));
     repairPlanner_->getPlannerData( *repairPlannerDatas_.back() );

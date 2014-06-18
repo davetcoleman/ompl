@@ -228,8 +228,16 @@ void ompl::tools::ExperienceDB::getAllPaths(std::vector<ob::PlannerDataPtr> &pla
 std::vector<ob::PlannerDataPtr> ompl::tools::ExperienceDB::findNearestStartGoal(int nearestK, const base::State* start, const base::State* goal)
 {
     // Fill in our pre-made PlannerData instance with the new start and goal states to be searched for
-    nnSearchKey_->addVertex( ob::PlannerDataVertex(start) );
-    nnSearchKey_->addVertex( ob::PlannerDataVertex(goal) );
+    if (nnSearchKey_->numVertices() == 2)
+    {
+        nnSearchKey_->getVertex( 0 ) = ob::PlannerDataVertex(start);
+        nnSearchKey_->getVertex( 1 ) = ob::PlannerDataVertex(goal);   
+    }
+    else
+    {
+        nnSearchKey_->addVertex( ob::PlannerDataVertex(start) );
+        nnSearchKey_->addVertex( ob::PlannerDataVertex(goal) );
+    }
     assert( nnSearchKey_->numVertices() == 2);
 
     std::vector<ob::PlannerDataPtr> nearest;
