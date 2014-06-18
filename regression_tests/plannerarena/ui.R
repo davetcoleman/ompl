@@ -1,4 +1,10 @@
 library(shiny)
+library(RSQLite)
+
+con <- dbConnect(dbDriver("SQLite"), "www/benchmark.db")
+problems <- dbGetQuery(con, "SELECT DISTINCT name FROM experiments")
+versions <- dbGetQuery(con, "SELECT version FROM experiments")
+planners <- dbGetQuery(con, "SELECT DISTINCT REPLACE(name, 'geometric_', '') AS name FROM plannerConfigs")
 
 shinyUI(fluidPage(
     tags$head(
@@ -14,11 +20,7 @@ shinyUI(fluidPage(
             )
         ),
         selectInput("problem", label = h4("Motion planning problem"),
-            choices = list(
-                "circles",
-                "Cubicles",
-                "Twistycool"
-            )
+            choices = paste(problems$name)
         ),
         conditionalPanel(
             condition = "input.plotType == 1 || input.plotType == 2",
@@ -47,50 +49,31 @@ shinyUI(fluidPage(
             )
         ),
         conditionalPanel(
+            condition = "input.plotType == 1",
+            checkboxGroupInput("versions", label = h4("Selected versions"),
+            choices = paste(versions$version),
+            selected = paste(versions$version))
+        ),
+        conditionalPanel(
             condition = "input.plotType == 2 || input.plotType == 3",
             selectInput("version", label = h4("OMPL version"),
-                choices = list(
-                    "0.9.4",
-                    "0.9.5",
-                    "0.10.0",
-                    "0.10.1",
-                    "0.10.2",
-                    "0.11.0",
-                    "0.11.1",
-                    "0.12.2",
-                    "0.13.0",
-                    "0.14.0",
-                    "0.14.1",
-                    "0.14.2",
-                    "0.15.0"
-                ),
-                selected = "0.15.0"
+                choices = paste(versions$version),
+                # select most recent version by default
+                selected = paste(tail(versions$version, n=1))
             )
         ),
         checkboxGroupInput("planners", label = h4("Selected planners"),
-            choices = list(
-                "BKPIECE" = "BKPIECE1",
-                "EST",
-                "KPIECE" = "KPIECE1",
-                "LazyPRM",
-                "LBKPIECE" = "LBKPIECE1",
-                "LBT-RRT" = "LBTRRT",
-                "PDST",
-                "PRM",
-                "PRM*" = "PRMstar",
-                "RRT",
-                "RRT*" = "RRTstar",
-                "RRTConnect",
-                "SBL",
-                "SPARS",
-                "SPARS2" = "SPARStwo",
-                "STRIDE",
-                "T-RRT" = "TRRT"
-            ),
+            choices = paste(planners$name),
             selected = list("KPIECE1","EST","RRT","PRM")
         )
     ),
-    mainPanel(textOutput("debug"),plotOutput("plot"))
+    mainPanel(
+        tabsetPanel(
+            tabPanel("Plot", span(downloadLink('downloadPlot', 'Download as PDF'), class="btn"), plotOutput("plot")),
+            tabPanel("Benchmark Info", tableOutput("benchmarkInfo")),
+            tabPanel("Planner Configurations", tableOutput("plannerConfigs"))
+        )
+    )
   )
 ))
 
