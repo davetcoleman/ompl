@@ -63,7 +63,7 @@ namespace ompl
            RetrieveRepair is a experienced-based motion planner that recalls from a database of
            previous actions the most similar one to the current planning problem and attempts to repair it
            @par External documentation
-           Berenson, Dmitry, Pieter Abbeel, and Ken Goldberg: A robot path planning framework that learns from experience, in <em>Robotics and Automation (ICRA), 2012 IEEE International Conference on. IEEE</em>, 2012. 
+           Berenson, Dmitry, Pieter Abbeel, and Ken Goldberg: A robot path planning framework that learns from experience, in <em>Robotics and Automation (ICRA), 2012 IEEE International Conference on. IEEE</em>, 2012.
            <a href="http://users.wpi.edu/~dberenson/lightning.pdf">[PDF]</a>
         */
 
@@ -80,12 +80,12 @@ namespace ompl
             /** \brief Get information about the exploration data structure the planning from scratch motion planner used. */
             virtual void getPlannerData(base::PlannerData &data) const;
 
-            /** \brief Get information about the recalled paths 
+            /** \brief Get information about the recalled paths
              *  \param data - vector of PlannerData objects that each hold a single path
              *  \param chosenID - the index of the PlannerData object that was chosen for repair
              */
             void getRecalledPlannerDatas(std::vector<base::PlannerDataPtr> &data, std::size_t &chosenID) const;
-            
+
             /**
              * \brief Get the chosen path used from database for repair
              * \return PlannerData of chosen path
@@ -103,7 +103,7 @@ namespace ompl
 
             /** \brief Set the planner that will be used for repairing invalid paths recalled from experience */
             void setRepairPlanner(const base::PlannerPtr &planner);
-    
+
             virtual void setup(void);
 
             /**
@@ -126,7 +126,7 @@ namespace ompl
              * \param newPathSegment - the solution
              * \return true if path found
              */
-            bool replan(const ob::State* start, const ob::State* goal, og::PathGeometric &newPathSegment, 
+            bool replan(const ob::State* start, const ob::State* goal, og::PathGeometric &newPathSegment,
                 const base::PlannerTerminationCondition &ptc);
 
             /**
@@ -159,7 +159,7 @@ namespace ompl
             std::vector<ob::PlannerDataPtr>                repairPlannerDatas_;
 
             /** \brief The instance of the path simplifier */
-            og::PathSimplifierPtr                          psk_;         
+            og::PathSimplifierPtr                          psk_;
         };
 
     }

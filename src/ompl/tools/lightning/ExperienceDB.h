@@ -35,8 +35,8 @@
 /* Author: Dave Coleman
    Desc:   Implementation of the Lightning Framework for experienced-based planning
 
-   Paper:  Berenson, Dmitry, Pieter Abbeel, and Ken Goldberg. 
-           "A robot path planning framework that learns from experience." 
+   Paper:  Berenson, Dmitry, Pieter Abbeel, and Ken Goldberg.
+           "A robot path planning framework that learns from experience."
            Robotics and Automation (ICRA), 2012 IEEE International Conference on. IEEE, 2012.
 */
 
@@ -77,7 +77,7 @@ namespace ompl
         {
         public:
 
-            /** \brief Constructor needs the state space used for planning. 
+            /** \brief Constructor needs the state space used for planning.
              *  \param space - state space
              */
             ExperienceDB(const base::StateSpacePtr &space);
@@ -95,7 +95,7 @@ namespace ompl
             bool load(const std::string& fileName);
 
             /**
-             * \brief Add a new solution path to our database. Des not actually save to file so 
+             * \brief Add a new solution path to our database. Des not actually save to file so
              *        experience will be lost if save() is not called
              */
             void addPath(og::PathGeometric& solutionPath);
@@ -133,10 +133,10 @@ namespace ompl
              */
             void debugVertex(const ob::PlannerDataVertex& vertex);
             void debugState(const ob::State* state);
-    
+
             /** \brief Get the total number of paths stored in the database */
             std::size_t getExperiencesCount();
-            
+
         protected:
 
             /// The created space information

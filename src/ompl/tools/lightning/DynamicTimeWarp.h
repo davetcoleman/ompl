@@ -39,7 +39,8 @@
 #ifndef OMPL_TOOLS_LIGHTNING_DYNAMIC_TIME_WARP_
 #define OMPL_TOOLS_LIGHTNING_DYNAMIC_TIME_WARP_
 
-#include <ompl/datastructures/NearestNeighbors.h> // distance funciton
+#include <ompl/geometric/PathGeometric.h>
+#include <ompl/baes/SpaceInformation.h>
 
 namespace ompl
 {

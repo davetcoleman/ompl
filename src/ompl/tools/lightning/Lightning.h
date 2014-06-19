@@ -35,8 +35,8 @@
 /* Author: Dave Coleman
    Desc:   Implementation of the Lightning Framework for experienced-based planning
 
-   Paper:  Berenson, Dmitry, Pieter Abbeel, and Ken Goldberg. 
-           "A robot path planning framework that learns from experience." 
+   Paper:  Berenson, Dmitry, Pieter Abbeel, and Ken Goldberg.
+           "A robot path planning framework that learns from experience."
            Robotics and Automation (ICRA), 2012 IEEE International Conference on. IEEE, 2012.
 */
 
@@ -76,7 +76,7 @@ namespace ompl
            previous actions the most similar one to the current planning problem and attempts to repair it,
            while at the same time planning from scratch in a different thread
            @par External documentation
-           Berenson, Dmitry, Pieter Abbeel, and Ken Goldberg: A robot path planning framework that learns from experience, in <em>Robotics and Automation (ICRA), 2012 IEEE International Conference on. IEEE</em>, 2012. 
+           Berenson, Dmitry, Pieter Abbeel, and Ken Goldberg: A robot path planning framework that learns from experience, in <em>Robotics and Automation (ICRA), 2012 IEEE International Conference on. IEEE</em>, 2012.
            <a href="http://users.wpi.edu/~dberenson/lightning.pdf">[PDF]</a>
         */
 
@@ -285,7 +285,7 @@ namespace ompl
 
             /** \brief Run the planner until \e ptc becomes true (at most) */
             virtual base::PlannerStatus solve(const base::PlannerTerminationCondition &ptc);
-            
+
             /** \brief Save the experience database to file */
             bool save();
 
@@ -422,7 +422,7 @@ namespace ompl
 
             /** \brief Tool for comparing two paths and scoring them */
             ot::DynamicTimeWarpPtr        dtw_;
-            
+
         }; // end of class Lightning
 
     } // end of namespace

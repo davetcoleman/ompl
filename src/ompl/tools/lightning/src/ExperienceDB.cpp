@@ -37,7 +37,7 @@
 // OMPL
 #include "ompl/tools/lightning/ExperienceDB.h"
 #include "ompl/base/ScopedState.h"
-#include "ompl/util/Time.h" 
+#include "ompl/util/Time.h"
 #include "ompl/tools/config/SelfConfig.h"
 
 // Boost
@@ -231,7 +231,7 @@ std::vector<ob::PlannerDataPtr> ompl::tools::ExperienceDB::findNearestStartGoal(
     if (nnSearchKey_->numVertices() == 2)
     {
         nnSearchKey_->getVertex( 0 ) = ob::PlannerDataVertex(start);
-        nnSearchKey_->getVertex( 1 ) = ob::PlannerDataVertex(goal);   
+        nnSearchKey_->getVertex( 1 ) = ob::PlannerDataVertex(goal);
     }
     else
     {
@@ -254,13 +254,13 @@ double ompl::tools::ExperienceDB::distanceFunction(const ob::PlannerDataPtr a, c
         si_->distance( a->getVertex(a->numVertices()-1).getState(), b->getVertex(b->numVertices()-1).getState() );
     */
 
-    // Bi-directional implementation - check path b from [start, goal] and [goal, start] 
+    // Bi-directional implementation - check path b from [start, goal] and [goal, start]
     return std::min(
         // [ a.start, b.start] + [a.goal + b.goal]
-        si_->distance( a->getVertex(0).getState(), b->getVertex(0).getState() ) + 
+        si_->distance( a->getVertex(0).getState(), b->getVertex(0).getState() ) +
         si_->distance( a->getVertex(a->numVertices()-1).getState(), b->getVertex(b->numVertices()-1).getState() ),
         // [ a.start, b.goal] + [a.goal + b.start]
-        si_->distance( a->getVertex(0).getState(), b->getVertex(b->numVertices()-1).getState() ) + 
+        si_->distance( a->getVertex(0).getState(), b->getVertex(b->numVertices()-1).getState() ) +
         si_->distance( a->getVertex(a->numVertices()-1).getState(), b->getVertex(0).getState() ) );
 
     /*
@@ -292,7 +292,7 @@ void ompl::tools::ExperienceDB::debugVertex(const ob::PlannerDataVertex& vertex)
 
 void ompl::tools::ExperienceDB::debugState(const ob::State* state)
 {
-    si_->printState(state, std::cout);    
+    si_->printState(state, std::cout);
 }
 
 std::size_t ompl::tools::ExperienceDB::getExperiencesCount()

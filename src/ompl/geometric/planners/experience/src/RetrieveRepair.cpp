@@ -282,7 +282,7 @@ bool ompl::geometric::RetrieveRepair::findBestPath(const base::State *startState
             OMPL_DEBUG(" --> The shortest path (path 0) has a perfect score (0), ending filtering early.");
             bestPathScore = pathScore;
             bestPath = currentPath;
-            nearestPathsChosenID_ = pathID;            
+            nearestPathsChosenID_ = pathID;
             break; // end the for loop
         }
 
@@ -474,7 +474,7 @@ bool ompl::geometric::RetrieveRepair::repairPath(og::PathGeometric &primaryPath,
     return true;
 }
 
-bool ompl::geometric::RetrieveRepair::replan(const ob::State* start, const ob::State* goal, PathGeometric &newPathSegment, 
+bool ompl::geometric::RetrieveRepair::replan(const ob::State* start, const ob::State* goal, PathGeometric &newPathSegment,
     const base::PlannerTerminationCondition &ptc)
 {
     // Reset problem definition
