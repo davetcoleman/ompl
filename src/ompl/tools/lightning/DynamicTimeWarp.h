@@ -40,7 +40,11 @@
 #define OMPL_TOOLS_LIGHTNING_DYNAMIC_TIME_WARP_
 
 #include <ompl/geometric/PathGeometric.h>
-#include <ompl/baes/SpaceInformation.h>
+#include <ompl/base/SpaceInformation.h>
+
+namespace og = ompl::geometric;
+namespace ob = ompl::base;
+//namespace ot = ompl::tools;
 
 namespace ompl
 {
@@ -57,11 +61,7 @@ OMPL_CLASS_FORWARD(DynamicTimeWarp);
 class DynamicTimeWarp
 {
 public:
-    DynamicTimeWarp(base::SpaceInformationPtr &si)
-        : si_(si)
-    {
-        infinity_ = std::numeric_limits<double>::infinity();
-    }
+    DynamicTimeWarp(base::SpaceInformationPtr &si);
 
     /**
      * \brief Use Dynamic Timewarping to score two paths
@@ -69,39 +69,12 @@ public:
      * \param path2
      * \return score
      */
-    double calcDTWDistance(const og::PathGeometric &path1, const og::PathGeometric &path2 )
-    {
-        // Get lengths
-        std::size_t n = path1.getStateCount();
-        std::size_t m = path2.getStateCount();
-
-        // Intialize table to have all values of infinity
-        std::vector<std::vector<double> > table(n,std::vector<double>(m,infinity_)); // TODO reuse this memory by allocating it in the constructor!
-
-        // Set first value to zero
-        table[0][0] = 0;
-
-        // Do calculations
-        double cost;
-        for (std::size_t i = 1; i < n; ++i)
-        {
-            for (std::size_t j = 1; j < m; ++j)
-            {
-                cost = si_->distance(path1.getState(i), path2.getState(j));
-                table[i][j] = cost + min(table[i-1][j], table[i][j-1], table[i-1][j-1]);
-            }
-        }
-
-        return table[n-1][m-1];
-    }
+    double calcDTWDistance(const og::PathGeometric &path1, const og::PathGeometric &path2 );
 
     /**
      * \brief Calculate min for 3 numbers
      */
-    double min(double n1, double n2, double n3)
-    {
-        return std::min(n1, std::min(n2, n3));
-    }
+    double min(double n1, double n2, double n3);
 
     /**
      * \brief If path1 and path2 have a better start/goal match when reverse, then reverse path2
@@ -109,35 +82,9 @@ public:
      * \param path to reverse
      * \return true if reverse was necessary
      */
-    bool reversePathIfNecessary(og::PathGeometric &path1, og::PathGeometric &path2)
-    {
-        // Reverse path2 if it matches better
-        const ob::State* s1 = path1.getState(0);
-        const ob::State* s2 = path2.getState(0);
-        const ob::State* g1 = path1.getState(path1.getStateCount()-1);
-        const ob::State* g2 = path2.getState(path2.getStateCount()-1);
+    bool reversePathIfNecessary(og::PathGeometric &path1, og::PathGeometric &path2);
 
-        double regularDistance  = si_->distance(s1,s2) + si_->distance(g1,g2);
-        double reversedDistance = si_->distance(s1,g2) + si_->distance(s2,g1);
-
-        // Check if path is reversed from normal [start->goal] direction
-        if ( regularDistance > reversedDistance )
-        {
-            // needs to be reversed
-            path2.reverse();
-            return true;
-        }
-
-        return false;
-    }
-
-    double getPathsScoreConst(const og::PathGeometric &path1, const og::PathGeometric &path2)
-    {
-        // Copy the path but not the states
-        og::PathGeometric newPath1 = path1;
-        og::PathGeometric newPath2 = path2;
-        getPathsScoreNonConst(newPath1, newPath2);
-    }
+    double getPathsScoreConst(const og::PathGeometric &path1, const og::PathGeometric &path2);
 
     /**
      * \brief Use dynamic time warping to compare the similarity of two paths
@@ -146,12 +93,7 @@ public:
      * \param path2 - will interpolate
      * \return score
      */
-    double getPathsScoreHalfConst(const og::PathGeometric &path1, og::PathGeometric &path2)
-    {
-        // Copy the path but not the states
-        og::PathGeometric newPath = path1;
-        getPathsScoreNonConst(newPath, path2);
-    }
+    double getPathsScoreHalfConst(const og::PathGeometric &path1, og::PathGeometric &path2);
 
     /**
      * \brief Use dynamic time warping to compare the similarity of two paths
@@ -160,27 +102,7 @@ public:
      * \param path2 - will interpolate
      * \return score
      */
-    double getPathsScoreNonConst(og::PathGeometric &path1, og::PathGeometric &path2)
-    {
-        // Reverse path2 if it matches better
-        reversePathIfNecessary(path1, path2);
-
-        //std::size_t path1Count = path1.getStateCount();
-        //std::size_t path2Count = path2.getStateCount();
-
-        // Interpolate both paths so that we have an even discretization of samples
-        path1.interpolate();
-        path2.interpolate();
-
-        // debug
-        //OMPL_INFORM("Path 1 interpolated with an increase of %ld states", path1.getStateCount() - path1Count);
-        //OMPL_INFORM("Path 2 interpolated with an increase of %ld states", path2.getStateCount() - path2Count);
-
-        // compute the DTW between two vectors and divide by total path length of the longer path
-        double score = calcDTWDistance(path1, path2) / std::max(path1.getStateCount(),path2.getStateCount());
-
-        return score;
-    }
+    double getPathsScoreNonConst(og::PathGeometric &path1, og::PathGeometric &path2);
 
 protected:
 
