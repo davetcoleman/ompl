@@ -46,7 +46,7 @@
 #include <boost/graph/dijkstra_shortest_paths.hpp>
 #include <boost/version.hpp>
 #if BOOST_VERSION < 105100
-//#warning Boost version >=1.51 is needed for ompl::base::PlannerData::printGraphML
+#warning Boost version >=1.51 is needed for ompl::base::PlannerData::printGraphML
 #else
 #include <boost/property_map/function_property_map.hpp>
 #endif
