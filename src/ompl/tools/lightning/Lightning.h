@@ -48,13 +48,17 @@
 #include "ompl/base/ProblemDefinition.h"
 #include "ompl/base/SpaceInformation.h"
 #include "ompl/base/ProblemDefinition.h"
+
 #include "ompl/geometric/PathGeometric.h"
 #include "ompl/geometric/PathSimplifier.h"
+#include "ompl/geometric/planners/experience/RetrieveRepair.h"
+
 #include "ompl/util/Console.h"
 #include "ompl/util/Exception.h"
+
 #include "ompl/tools/multiplan/ParallelPlan.h"
 #include "ompl/tools/lightning/ExperienceDB.h"
-#include "ompl/geometric/planners/experience/RetrieveRepair.h"
+#include "ompl/tools/lightning/DynamicTimeWarp.h"
 
 namespace og = ompl::geometric;
 namespace ob = ompl::base;
@@ -80,11 +84,11 @@ namespace ompl
         OMPL_CLASS_FORWARD(Lightning);
         /// @endcond
 
-        // TODO: move
-        static const std::string OMPL_STORAGE_PATH = "/home/dave/ros/ompl_storage/lightning_database.ompl";
-
         /** \class ompl::geometric::LightningPtr
             \brief A boost shared pointer wrapper for ompl::tools::Lightning */
+
+        // TODO: move
+        static const std::string OMPL_STORAGE_PATH = "/home/dave/ros/ompl_storage/lightning_database.ompl";
 
         /** \brief Built off of SimpleSetup but provides support for planning from experience */
         class Lightning
@@ -357,10 +361,17 @@ namespace ompl
             }
 
             /**
-             * \brief Use dynamic time warping to compare the similarity of two paths
-             * \return score
+             * \brief Convert PlannerData to PathGeometric. Assume ordering of verticies is order of path
+             * \param PlannerData
+             * \param PathGeometric
              */
-            double getPathsScore(ob::PlannerDataPtr &path1, ob::PlannerDataPtr &path2);
+            void convertPlannerData(const ob::PlannerDataPtr plannerData, og::PathGeometric &path);
+
+            /** \brief Tool for comparing two paths and scoring them */
+            ot::DynamicTimeWarpPtr getDynamicTimeWarp()
+            {
+                return dtw_;
+            }
 
         protected:
 
@@ -407,8 +418,11 @@ namespace ompl
             ot::ParallelPlanPtr           pp_;
 
             /** \brief A shared object between all the planners for saving and loading previous experience */
-            ompl::tools::ExperienceDBPtr  experienceDB_;
-          
+            ot::ExperienceDBPtr           experienceDB_;
+
+            /** \brief Tool for comparing two paths and scoring them */
+            ot::DynamicTimeWarpPtr        dtw_;
+            
         }; // end of class Lightning
 
     } // end of namespace

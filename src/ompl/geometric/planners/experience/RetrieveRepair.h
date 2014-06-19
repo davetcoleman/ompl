@@ -85,6 +85,12 @@ namespace ompl
              *  \param chosenID - the index of the PlannerData object that was chosen for repair
              */
             void getRecalledPlannerDatas(std::vector<base::PlannerDataPtr> &data, std::size_t &chosenID) const;
+            
+            /**
+             * \brief Get the chosen path used from database for repair
+             * \return PlannerData of chosen path
+             */
+            ob::PlannerDataPtr getChosenRecallPath() const;
 
             /** \brief Get information about the exploration data structure the repair motion planner used each call. */
             void getRepairPlannerDatas(std::vector<base::PlannerDataPtr> &data) const;

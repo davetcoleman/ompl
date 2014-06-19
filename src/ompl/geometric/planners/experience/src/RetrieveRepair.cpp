@@ -567,6 +567,11 @@ void ompl::geometric::RetrieveRepair::getRecalledPlannerDatas(std::vector<base::
     chosenID = nearestPathsChosenID_;
 }
 
+ob::PlannerDataPtr ompl::geometric::RetrieveRepair::getChosenRecallPath() const
+{
+    return nearestPaths_[nearestPathsChosenID_];
+}
+
 void ompl::geometric::RetrieveRepair::getRepairPlannerDatas(std::vector<base::PlannerDataPtr> &data) const
 {
     data = repairPlannerDatas_;

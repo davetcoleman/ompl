@@ -36,12 +36,10 @@
 
 
 #include "ompl/tools/lightning/Lightning.h"
-//#include "ompl/util/Console.h"
 #include "ompl/base/goals/GoalSampleableRegion.h"
 #include "ompl/geometric/PathGeometric.h"
 #include "ompl/geometric/SimpleSetup.h" // use their implementation of getDefaultPlanner
 #include "ompl/base/StateSpace.h" // for storing to file
-#include "ompl/tools/lightning/DynamicTimeWarp.h"
 
 ompl::tools::Lightning::Lightning(const base::StateSpacePtr &space) :
     configured_(false),
@@ -53,6 +51,7 @@ ompl::tools::Lightning::Lightning(const base::StateSpacePtr &space) :
     si_.reset(new base::SpaceInformation(space));
     pdef_.reset(new base::ProblemDefinition(si_));
     psk_.reset(new og::PathSimplifier(si_));
+    dtw_.reset(new ot::DynamicTimeWarp(si_));
     params_.include(si_->params());
 
     // Load the experience database
@@ -161,10 +160,11 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
     OMPL_INFORM("Solution path has %d states and was generated from planner %s", solutionPath.getStateCount(), getSolutionPlannerName().c_str());
     //solutionPath.print(std::cout);
 
+    std::cout << OMPL_CONSOLE_COLOR_CYAN << std::endl;
+
     // Make sure solution has at least 2 states
     if (solutionPath.getStateCount() < 2)
     {
-        throw Exception("I just want to see if this can happen");
         OMPL_INFORM("NOT saving to database because solution is less than 2 states long");
     }
     // Do not save if approximate
@@ -172,16 +172,34 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
     {
         OMPL_INFORM("NOT saving to database because the solution is APPROXIMATE");
     }
-    // Save to database if the solution is not from the experience database
+    // Use dynamic time warping to see if the repaired path is too similar to the original
     else if (getSolutionPlannerName() == rrPlanner_->getName())
     {
-        OMPL_INFORM("NOT saving to database because best solution was not from database");
+        // Convert the original recalled path to PathGeometric
+        ob::PlannerDataPtr chosenRecallPathData = getRetrieveRepairPlanner().getChosenRecallPath();
+        og::PathGeometric chosenRecallPath(si_);
+        convertPlannerData(chosenRecallPathData, chosenRecallPath);
+
+        double score = dtw_->getPathsScoreHalfConst( solutionPath, chosenRecallPath );
+
+        if (score < 10)
+        {
+            OMPL_INFORM("NOT saving to database because best solution was not from database and is too similar (score %f)", score);
+        }
+        else
+        {
+            OMPL_INFORM("SAVING to database because repaired path is different enough from original recalled path (score %f)", score);
+            // Save to database
+            experienceDB_->addPath(solutionPath);
+        }
     }
     else
     {
-        OMPL_INFORM("Adding to database because best solution was not from database");
+        OMPL_INFORM("SAVING to database because best solution was not from database");
+        // Save to database
         experienceDB_->addPath(solutionPath);
     }
+    std::cout << OMPL_CONSOLE_COLOR_RESET;
 
     return lastStatus_;
 }
@@ -316,15 +334,9 @@ void ompl::tools::Lightning::enableScratch(bool enable)
     configured_ = false;
 }
 
-double ompl::tools::Lightning::getPathsScore(ob::PlannerDataPtr &path1, ob::PlannerDataPtr &path2)
+void ompl::tools::Lightning::convertPlannerData(const ob::PlannerDataPtr plannerData, og::PathGeometric &path)
 {
-
-    // dynamic time warping
-    //ompl::tools::DynamicTimeWarp<ob::PlannerDataPtr> dtw(); //boost::bind(&ompl::tools::ExperienceDB::distanceFunction, experienceDB_, _1, _2));
-    ompl::tools::DynamicTimeWarp dtw;
-
-    // compute the DTW between two vectors:
-    double score = dtw.calcDTWDistance(path1, path2);
-
-    return score;
+    // Convert the planner data verticies into a vector of states
+    for (std::size_t i = 0; i < plannerData->numVertices(); ++i)
+        path.append(plannerData->getVertex(i).getState());
 }
