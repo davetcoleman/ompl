@@ -95,8 +95,6 @@ namespace ompl
 
             virtual double getMaximumExtent() const;
 
-            virtual double getMeasure() const;
-
             /** \brief Normalize the value of the state to the interval (-Pi, Pi] */
             virtual void enforceBounds(State *state) const;
 

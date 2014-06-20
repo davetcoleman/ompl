@@ -95,8 +95,6 @@ namespace ompl
 
             virtual double getMaximumExtent() const;
 
-            virtual double getMeasure() const;
-
             /** \brief Set the minimum and maximum time bounds. This
                 will make the state space switch into bounded time
                 mode. If this function is not called, sampling time
