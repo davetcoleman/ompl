@@ -90,7 +90,7 @@ namespace ompl
              * \brief Get the chosen path used from database for repair
              * \return PlannerData of chosen path
              */
-            ob::PlannerDataPtr getChosenRecallPath() const;
+            ompl::base::PlannerDataPtr getChosenRecallPath() const;
 
             /** \brief Get information about the exploration data structure the repair motion planner used each call. */
             void getRepairPlannerDatas(std::vector<base::PlannerDataPtr> &data) const;
@@ -110,14 +110,14 @@ namespace ompl
              * \brief Filters the top n paths in nearestPaths_ to the top 1, based on state validity with current environment
              * \return true if no error
              */
-            bool findBestPath(const base::State *startState, const base::State *goalState, ob::PlannerDataPtr& chosenPath);
+            bool findBestPath(const base::State *startState, const base::State *goalState, ompl::base::PlannerDataPtr& chosenPath);
 
             /**
              * \brief Repairs a path to be valid in the current planning environment
              * \param oldPath - from experience
              * \return true if no error
              */
-            bool repairPath(og::PathGeometric &path, const base::PlannerTerminationCondition &ptc);
+            bool repairPath(ompl::geometric::PathGeometric &path, const base::PlannerTerminationCondition &ptc);
 
             /**
              * \brief Use our secondary planner to find a valid path between start and goal, and return that path
@@ -126,14 +126,14 @@ namespace ompl
              * \param newPathSegment - the solution
              * \return true if path found
              */
-            bool replan(const ob::State* start, const ob::State* goal, og::PathGeometric &newPathSegment,
+            bool replan(const ompl::base::State* start, const ompl::base::State* goal, ompl::geometric::PathGeometric &newPathSegment,
                 const base::PlannerTerminationCondition &ptc);
 
             /**
              * \brief Count the number of states along the discretized path that are in collision
              * // TODO: move this into DiscreteMotionValidator??
              */
-            std::size_t checkMotionScore(const ob::State *s1, const ob::State *s2) const;
+            std::size_t checkMotionScore(const ompl::base::State *s1, const ompl::base::State *s2) const;
 
         protected:
 
@@ -144,22 +144,22 @@ namespace ompl
             ompl::tools::ExperienceDBPtr                   experienceDB_;
 
             /** \brief Recall the nearest paths and store this in planner data for introspection later */
-            std::vector<ob::PlannerDataPtr>                nearestPaths_;
+            std::vector<ompl::base::PlannerDataPtr>                nearestPaths_;
 
             /** \brief the ID within nearestPaths_ of the path that was chosen for repair */
             std::size_t                                    nearestPathsChosenID_;
 
             /** \brief A secondary planner for replanning */
-            ob::PlannerPtr                                 repairPlanner_;
+            ompl::base::PlannerPtr                                 repairPlanner_;
 
             /** \brief A secondary problem definition for the repair planner to use */
-            ob::ProblemDefinitionPtr                       repairProblemDef_;
+            ompl::base::ProblemDefinitionPtr                       repairProblemDef_;
 
             /** \brief Debug the repair planner by saving its planner data each time it is used */
-            std::vector<ob::PlannerDataPtr>                repairPlannerDatas_;
+            std::vector<ompl::base::PlannerDataPtr>                repairPlannerDatas_;
 
             /** \brief The instance of the path simplifier */
-            og::PathSimplifierPtr                          psk_;
+            ompl::geometric::PathSimplifierPtr                          psk_;
         };
 
     }

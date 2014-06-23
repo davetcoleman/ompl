@@ -51,9 +51,6 @@
 #include "ompl/base/SpaceInformation.h"
 #include "ompl/datastructures/NearestNeighbors.h"
 
-namespace og = ompl::geometric;
-namespace ob = ompl::base;
-
 namespace ompl
 {
 
@@ -98,7 +95,7 @@ namespace ompl
              * \brief Add a new solution path to our database. Des not actually save to file so
              *        experience will be lost if save() is not called
              */
-            void addPath(og::PathGeometric& solutionPath);
+            void addPath(ompl::geometric::PathGeometric& solutionPath);
 
             /**
              * \brief Save loaded database to file, except skips saving if no paths have been added
@@ -117,22 +114,22 @@ namespace ompl
             /**
              * \brief Get a vector of all the paths in the nearest neighbor tree
              */
-            void getAllPaths(std::vector<ob::PlannerDataPtr> &plannerDatas);
+            void getAllPaths(std::vector<ompl::base::PlannerDataPtr> &plannerDatas);
 
             /**
              * \brief Find the k nearest paths to our queries one
              */
-            std::vector<ob::PlannerDataPtr> findNearestStartGoal(int nearestK, const base::State* start, const base::State* goal);
+            std::vector<ompl::base::PlannerDataPtr> findNearestStartGoal(int nearestK, const base::State* start, const base::State* goal);
 
             /** \brief Add the distance between both path's starts and the distance between both path's ends together
              */
-            double distanceFunction(const ob::PlannerDataPtr a, const ob::PlannerDataPtr b) const;
+            double distanceFunction(const ompl::base::PlannerDataPtr a, const ompl::base::PlannerDataPtr b) const;
 
             /**
              * \brief Print info to screen
              */
-            void debugVertex(const ob::PlannerDataVertex& vertex);
-            void debugState(const ob::State* state);
+            void debugVertex(const ompl::base::PlannerDataVertex& vertex);
+            void debugState(const ompl::base::State* state);
 
             /** \brief Get the total number of paths stored in the database */
             std::size_t getExperiencesCount();
@@ -143,13 +140,13 @@ namespace ompl
             base::SpaceInformationPtr     si_; // TODO: is this even necessary?
 
             /// Helper class for storing each plannerData instance
-            ob::PlannerDataStorage plannerDataStorage_;
+            ompl::base::PlannerDataStorage plannerDataStorage_;
 
             // A nearest-neighbors datastructure containing the tree of start/goal states combined
-            boost::shared_ptr< NearestNeighbors<ob::PlannerDataPtr> > nn_;
+            boost::shared_ptr< NearestNeighbors<ompl::base::PlannerDataPtr> > nn_;
 
             // Reusable plannerData instance for filling in start and goal and performing searches on the tree
-            ob::PlannerDataPtr nnSearchKey_;
+            ompl::base::PlannerDataPtr nnSearchKey_;
 
             // Flag to determine if a save is required
             bool saveRequired_;

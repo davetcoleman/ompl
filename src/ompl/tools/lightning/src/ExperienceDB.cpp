@@ -49,14 +49,14 @@ ompl::tools::ExperienceDB::ExperienceDB(const base::StateSpacePtr &space)
     si_.reset(new base::SpaceInformation(space));
 
     // Set nearest neighbor type
-    //nn_.reset(tools::SelfConfig::getDefaultNearestNeighbors<ob::PlannerDataPtr>(si_->getStateSpace()));
-    nn_.reset(new ompl::NearestNeighborsSqrtApprox<ob::PlannerDataPtr>());
+    //nn_.reset(tools::SelfConfig::getDefaultNearestNeighbors<ompl::base::PlannerDataPtr>(si_->getStateSpace()));
+    nn_.reset(new ompl::NearestNeighborsSqrtApprox<ompl::base::PlannerDataPtr>());
 
     // Use our custom distance function for nearest neighbor tree
     nn_->setDistanceFunction(boost::bind(&ompl::tools::ExperienceDB::distanceFunction, this, _1, _2));
 
     // Load the PlannerData instance to be used for searching
-    nnSearchKey_.reset(new ob::PlannerData(si_));
+    nnSearchKey_.reset(new ompl::base::PlannerData(si_));
 }
 
 ompl::tools::ExperienceDB::~ExperienceDB(void)
@@ -102,7 +102,7 @@ bool ompl::tools::ExperienceDB::load(const std::string& fileName)
     for (std::size_t i = 0; i < numPaths; ++i)
     {
         // Create a new planner data instance
-        ob::PlannerDataPtr plannerData(new ob::PlannerData(si_));
+        ompl::base::PlannerDataPtr plannerData(new ompl::base::PlannerData(si_));
 
         // Note: the StateStorage class checks if the states match for us
         plannerDataStorage_.load(iStream, *plannerData.get());
@@ -121,17 +121,17 @@ bool ompl::tools::ExperienceDB::load(const std::string& fileName)
     return true;
 }
 
-void ompl::tools::ExperienceDB::addPath(og::PathGeometric& solutionPath)
+void ompl::tools::ExperienceDB::addPath(ompl::geometric::PathGeometric& solutionPath)
 {
     OMPL_INFORM("Adding path to Experience Database");
 
     // Create a new planner data instance
-    ob::PlannerDataPtr plannerData(new ob::PlannerData(si_));
+    ompl::base::PlannerDataPtr plannerData(new ompl::base::PlannerData(si_));
 
     // Add the states to one nodes files
     for (std::size_t i = 0; i < solutionPath.getStates().size(); ++i)
     {
-        ob::PlannerDataVertex vert( solutionPath.getStates()[i] ); // TODO tag?
+        ompl::base::PlannerDataVertex vert( solutionPath.getStates()[i] ); // TODO tag?
 
         //OMPL_INFORM("Vertex %d:", i);
         //debugVertex(vert);
@@ -176,7 +176,7 @@ bool ompl::tools::ExperienceDB::save(const std::string& fileName)
     std::ofstream outStream(fileName.c_str(), std::ios::binary);
 
     // Convert the NN tree to a vector
-    std::vector<ob::PlannerDataPtr> plannerDatas;
+    std::vector<ompl::base::PlannerDataPtr> plannerDatas;
     nn_->list(plannerDatas);
 
     // Write the number of paths we will be saving
@@ -186,7 +186,7 @@ bool ompl::tools::ExperienceDB::save(const std::string& fileName)
     // Start saving each planner data object
     for (std::size_t i = 0; i < numPaths; ++i)
     {
-        ob::PlannerData &pd = *plannerDatas[i].get();
+        ompl::base::PlannerData &pd = *plannerDatas[i].get();
 
         //OMPL_INFORM("Saving experience %d with %d verticies and %d edges", i, pd.numVertices(), pd.numEdges());
 
@@ -215,7 +215,7 @@ bool ompl::tools::ExperienceDB::save(const std::string& fileName)
     return true;
 }
 
-void ompl::tools::ExperienceDB::getAllPaths(std::vector<ob::PlannerDataPtr> &plannerDatas)
+void ompl::tools::ExperienceDB::getAllPaths(std::vector<ompl::base::PlannerDataPtr> &plannerDatas)
 {
     OMPL_DEBUG("ExperienceDB: getAllPaths");
 
@@ -225,28 +225,28 @@ void ompl::tools::ExperienceDB::getAllPaths(std::vector<ob::PlannerDataPtr> &pla
     OMPL_DEBUG("Number of paths found: %d", plannerDatas.size());
 }
 
-std::vector<ob::PlannerDataPtr> ompl::tools::ExperienceDB::findNearestStartGoal(int nearestK, const base::State* start, const base::State* goal)
+std::vector<ompl::base::PlannerDataPtr> ompl::tools::ExperienceDB::findNearestStartGoal(int nearestK, const base::State* start, const base::State* goal)
 {
     // Fill in our pre-made PlannerData instance with the new start and goal states to be searched for
     if (nnSearchKey_->numVertices() == 2)
     {
-        nnSearchKey_->getVertex( 0 ) = ob::PlannerDataVertex(start);
-        nnSearchKey_->getVertex( 1 ) = ob::PlannerDataVertex(goal);
+        nnSearchKey_->getVertex( 0 ) = ompl::base::PlannerDataVertex(start);
+        nnSearchKey_->getVertex( 1 ) = ompl::base::PlannerDataVertex(goal);
     }
     else
     {
-        nnSearchKey_->addVertex( ob::PlannerDataVertex(start) );
-        nnSearchKey_->addVertex( ob::PlannerDataVertex(goal) );
+        nnSearchKey_->addVertex( ompl::base::PlannerDataVertex(start) );
+        nnSearchKey_->addVertex( ompl::base::PlannerDataVertex(goal) );
     }
     assert( nnSearchKey_->numVertices() == 2);
 
-    std::vector<ob::PlannerDataPtr> nearest;
+    std::vector<ompl::base::PlannerDataPtr> nearest;
     nn_->nearestK(nnSearchKey_, nearestK, nearest);
 
     return nearest;
 }
 
-double ompl::tools::ExperienceDB::distanceFunction(const ob::PlannerDataPtr a, const ob::PlannerDataPtr b) const
+double ompl::tools::ExperienceDB::distanceFunction(const ompl::base::PlannerDataPtr a, const ompl::base::PlannerDataPtr b) const
 {
     // Basic implementation
     /*
@@ -285,12 +285,12 @@ double ompl::tools::ExperienceDB::distanceFunction(const ob::PlannerDataPtr a, c
     */
 }
 
-void ompl::tools::ExperienceDB::debugVertex(const ob::PlannerDataVertex& vertex)
+void ompl::tools::ExperienceDB::debugVertex(const ompl::base::PlannerDataVertex& vertex)
 {
     debugState(vertex.getState());
 }
 
-void ompl::tools::ExperienceDB::debugState(const ob::State* state)
+void ompl::tools::ExperienceDB::debugState(const ompl::base::State* state)
 {
     si_->printState(state, std::cout);
 }

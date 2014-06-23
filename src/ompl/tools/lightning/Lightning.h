@@ -60,15 +60,16 @@
 #include "ompl/tools/lightning/ExperienceDB.h"
 #include "ompl/tools/lightning/DynamicTimeWarp.h"
 
-namespace og = ompl::geometric;
-namespace ob = ompl::base;
-namespace ot = ompl::tools;
-
 namespace ompl
 {
 
     namespace tools
     {
+        namespace og = ompl::geometric;
+        namespace ob = ompl::base;
+        namespace ot = ompl::tools;
+
+
         /**
            @anchor Lightning
            @par Short description
