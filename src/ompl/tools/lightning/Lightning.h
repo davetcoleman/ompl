@@ -88,17 +88,19 @@ namespace ompl
         /** \class ompl::geometric::LightningPtr
             \brief A boost shared pointer wrapper for ompl::tools::Lightning */
 
-        // TODO: move
-        static const std::string OMPL_STORAGE_PATH = "/home/dave/ros/ompl_storage/lightning_database.ompl";
-
         /** \brief Built off of SimpleSetup but provides support for planning from experience */
         class Lightning
         {
         public:
 
-            /** \brief Constructor needs the state space used for planning. */
+            /** \brief Constructor needs the state space used for planning.
+             *  \param space - the state space to plan in
+             *  \param planningGroupName - used to name the database file, should be something like 'left_arm' or 'whole_body'
+             *  \param databaseDirecotry - the directory to save the database to, relative to the user directory $HOME
+             */
             explicit
-            Lightning(const base::StateSpacePtr &space);
+            Lightning(const base::StateSpacePtr &space, const std::string &planningGroupName = "lighning_default_group",
+                      const std::string &databaseDirectory = "ompl_storage");
 
             virtual ~Lightning(void)
             {
@@ -331,6 +333,11 @@ namespace ompl
                 function automatically. */
             virtual void setup(void);
 
+          /**
+           * \brief Convert the planning group name and database directory into a file path to open and save to
+           */
+            bool getFilePath(const std::string &planningGroupName, const std::string &databaseDirectory);
+
             /** \brief Get the parameters for this planning context */
             base::ParamSet& params(void)
             {
@@ -373,6 +380,11 @@ namespace ompl
             {
                 return dtw_;
             }
+
+          const std::string& getFilePath()
+          {
+            return filePath_;
+          }
 
         protected:
 
@@ -423,6 +435,9 @@ namespace ompl
 
             /** \brief Tool for comparing two paths and scoring them */
             ot::DynamicTimeWarpPtr        dtw_;
+
+            /** \brief File location of database */
+            std::string                   filePath_;
 
         }; // end of class Lightning
 

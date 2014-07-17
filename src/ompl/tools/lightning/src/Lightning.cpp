@@ -41,13 +41,24 @@
 #include "ompl/geometric/SimpleSetup.h" // use their implementation of getDefaultPlanner
 #include "ompl/base/StateSpace.h" // for storing to file
 
-ompl::tools::Lightning::Lightning(const base::StateSpacePtr &space) :
+// Boost
+#include <boost/filesystem.hpp>
+
+ompl::tools::Lightning::Lightning(const base::StateSpacePtr &space, const std::string &planningGroupName, const std::string &databaseDirectory) :
     configured_(false),
     recallEnabled_(true),
     simplifyTime_(0.0),
     planTime_(0.0),
-    lastStatus_(base::PlannerStatus::UNKNOWN)
+    lastStatus_(base::PlannerStatus::UNKNOWN),
+    filePath_("unknown")
 {
+    // Debug output
+    std::cout << OMPL_CONSOLE_COLOR_CYAN << std::endl;
+    std::cout << "------------------------- " << std::endl;
+    std::cout << "LIGHTNING BEING CONSTRUCTED " << std::endl;
+    std::cout << "------------------------- " << std::endl;
+    std::cout << OMPL_CONSOLE_COLOR_RESET << std::endl;
+
     si_.reset(new base::SpaceInformation(space));
     pdef_.reset(new base::ProblemDefinition(si_));
     psk_.reset(new og::PathSimplifier(si_));
@@ -56,7 +67,8 @@ ompl::tools::Lightning::Lightning(const base::StateSpacePtr &space) :
 
     // Load the experience database
     experienceDB_.reset(new ompl::tools::ExperienceDB(si_->getStateSpace()));
-    experienceDB_->load(OMPL_STORAGE_PATH); // load from file
+    getFilePath(planningGroupName, databaseDirectory);
+    experienceDB_->load(filePath_); // load from file
 
     // Load the Retrieve repair database. We do it here so that setRepairPlanner() works
     rrPlanner_ = ob::PlannerPtr(new og::RetrieveRepair(si_, experienceDB_));
@@ -112,6 +124,32 @@ void ompl::tools::Lightning::setup(void)
         // Set the configured flag
         configured_ = true;
     }
+}
+
+bool ompl::tools::Lightning::getFilePath(const std::string &planningGroupName, const std::string &databaseDirectory)
+{
+  namespace fs = boost::filesystem;
+
+  // Check that the directory exists, if not, create it
+  fs::path rootPath = fs::path(getenv("HOME"));
+  rootPath = rootPath / fs::path(databaseDirectory);
+
+  boost::system::error_code returnedError;
+  fs::create_directories( rootPath, returnedError );
+
+  if ( returnedError )
+  {
+    //did not successfully create directories
+    OMPL_ERROR("Unable to create directory %s", databaseDirectory.c_str());
+    return false;
+  }
+
+  //directories successfully created, append the group name as the file name
+  rootPath = rootPath / fs::path(planningGroupName + ".ompl");
+  filePath_ = rootPath.string();
+  OMPL_INFORM("Loading database from %s", filePath_.c_str());
+
+  return true;
 }
 
 void ompl::tools::Lightning::clear(void)
@@ -213,12 +251,12 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(double time)
 
 bool ompl::tools::Lightning::save()
 {
-    return experienceDB_->save(OMPL_STORAGE_PATH);
+    return experienceDB_->save(filePath_);
 }
 
 bool ompl::tools::Lightning::saveIfChanged()
 {
-    return experienceDB_->saveIfChanged(OMPL_STORAGE_PATH);
+    return experienceDB_->saveIfChanged(filePath_);
 }
 
 void ompl::tools::Lightning::simplifySolution(const base::PlannerTerminationCondition &ptc)

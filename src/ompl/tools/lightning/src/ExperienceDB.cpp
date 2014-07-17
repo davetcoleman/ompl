@@ -155,6 +155,8 @@ bool ompl::tools::ExperienceDB::saveIfChanged(const std::string& fileName)
 {
     if (saveRequired_)
         return save(fileName);
+    else
+        OMPL_INFORM("Not saving because database has not changed");
     return true;
 }
 

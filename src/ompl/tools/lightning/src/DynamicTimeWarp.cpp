@@ -101,14 +101,14 @@ double ompl::tools::DynamicTimeWarp::getPathsScoreConst(const og::PathGeometric 
     // Copy the path but not the states
     og::PathGeometric newPath1 = path1;
     og::PathGeometric newPath2 = path2;
-    getPathsScoreNonConst(newPath1, newPath2);
+    return getPathsScoreNonConst(newPath1, newPath2);
 }
 
 double ompl::tools::DynamicTimeWarp::getPathsScoreHalfConst(const og::PathGeometric &path1, og::PathGeometric &path2)
 {
     // Copy the path but not the states
     og::PathGeometric newPath = path1;
-    getPathsScoreNonConst(newPath, path2);
+    return getPathsScoreNonConst(newPath, path2);
 }
 
 double ompl::tools::DynamicTimeWarp::getPathsScoreNonConst(og::PathGeometric &path1, og::PathGeometric &path2)

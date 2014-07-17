@@ -135,7 +135,7 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
 
     // Get a single goal state TODO: more than one
     base::Goal *goal   = pdef_->getGoal().get();
-    base::State *goalState;
+    const base::State *goalState;
     // Check that we have the correct type of goal
     if (!goal)
     {
@@ -153,7 +153,9 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
     else
     {
         std::cout << "starting goal sampleable region " << std::endl;
+        goalState = pis_.nextGoal(ptc);
 
+        /*
         // Just sample a single goal and use it going forward
         base::GoalSampleableRegion *goal_s = dynamic_cast<base::GoalSampleableRegion*>(goal);
         if (!goal_s)
@@ -168,6 +170,7 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
           return base::PlannerStatus::INVALID_GOAL;
         }
         goal_s->sampleGoal(goalState);
+        */
     }
 
     // Search for previous solution in database
