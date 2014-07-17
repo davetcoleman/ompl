@@ -77,8 +77,9 @@ void ompl::tools::Lightning::setup(void)
                 planner_ = pa_(si_);
             if (!planner_)
             {
-                OMPL_INFORM("No planner specified. Using default.");
-                planner_ = ompl::geometric::getDefaultPlanner(getGoal());
+                planner_ = ompl::geometric::getDefaultPlanner(pdef_->getGoal()); // we could use the repairProblemDef_ here but that isn't setup yet
+
+                OMPL_INFORM("No planner specified. Using default: %s", planner_->getName().c_str() );
             }
         }
         planner_->setProblemDefinition(pdef_);
@@ -188,14 +189,14 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
         }
         else
         {
-            OMPL_INFORM("SAVING to database because repaired path is different enough from original recalled path (score %f)", score);
+            OMPL_INFORM("Adding path to database because repaired path is different enough from original recalled path (score %f)", score);
             // Save to database
             experienceDB_->addPath(solutionPath);
         }
     }
     else
     {
-        OMPL_INFORM("SAVING to database because best solution was not from database");
+        OMPL_INFORM("Adding path to database because best solution was not from database");
         // Save to database
         experienceDB_->addPath(solutionPath);
     }

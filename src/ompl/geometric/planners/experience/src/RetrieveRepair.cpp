@@ -35,8 +35,9 @@
 /* Author: Dave Coleman */
 
 #include "ompl/geometric/planners/experience/RetrieveRepair.h"
-#include "ompl/geometric/SimpleSetup.h" // use their implementation of getDefaultPlanner
+#include "ompl/geometric/planners/rrt/RRTConnect.h"
 #include "ompl/base/goals/GoalState.h"
+#include "ompl/base/goals/GoalSampleableRegion.h"
 #include "ompl/tools/config/SelfConfig.h"
 
 #include <limits>
@@ -90,8 +91,12 @@ void ompl::geometric::RetrieveRepair::setup(void)
     // Note: does not use the same pdef as the main planner in this class
     if (!repairPlanner_)
     {
-        OMPL_INFORM("No repairing planner specified. Using default.");
-        repairPlanner_ = ompl::geometric::getDefaultPlanner(pdef_->getGoal()); // we could use the repairProblemDef_ here but that isn't setup yet
+      // Set the repair planner
+      boost::shared_ptr<ompl::geometric::RRTConnect> repair_planner( new ompl::geometric::RRTConnect( si_ ) );
+      //repair_planner->setGoalBias(0.2);
+
+      OMPL_INFORM("No repairing planner specified. Using default: %s", repair_planner->getName().c_str() );
+      repairPlanner_ = repair_planner; //ompl::geometric::Planner( repair_planer );
     }
     // Setup the problem definition for the repair planner
     repairProblemDef_->setOptimizationObjective(pdef_->getOptimizationObjective()); // copy primary problem def
@@ -122,20 +127,48 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
         return base::PlannerStatus::TIMEOUT; // The planner failed to find a solution
     }
 
+    std::cout << "debug " << std::endl;
+
     // Get a single start state TODO: more than one
     const base::State *startState = pis_.nextStart();
 
+
     // Get a single goal state TODO: more than one
     base::Goal *goal   = pdef_->getGoal().get();
+    base::State *goalState;
     // Check that we have the correct type of goal
-    if (!goal || !goal->hasType(ompl::base::GOAL_STATE))
+    if (!goal)
     {
         OMPL_ERROR("Goal cannot be converted into a goal state");
-        OMPL_ERROR("%s: Unknown type of goal", getName().c_str());
         return base::PlannerStatus::UNRECOGNIZED_GOAL_TYPE;
     }
-    const base::GoalState *goalStateClass = dynamic_cast<base::GoalState*>(goal);
-    const base::State *goalState = goalStateClass->getState();
+    // Decide if to use a goal sampleable region or not
+    if (goal->hasType(ompl::base::GOAL_STATE))
+    {
+        //OMPL_ERROR("%s: Unknown type of goal", getName().c_str());
+        //return base::PlannerStatus::UNRECOGNIZED_GOAL_TYPE;
+        base::GoalState *goalStateClass = dynamic_cast<base::GoalState*>(goal);
+        goalState = goalStateClass->getState();
+    }
+    else
+    {
+        std::cout << "starting goal sampleable region " << std::endl;
+
+        // Just sample a single goal and use it going forward
+        base::GoalSampleableRegion *goal_s = dynamic_cast<base::GoalSampleableRegion*>(goal);
+        if (!goal_s)
+        {
+          OMPL_ERROR("%s: Unknown type of goal", getName().c_str());
+          return base::PlannerStatus::UNRECOGNIZED_GOAL_TYPE;
+        }
+
+        if (!goal_s->couldSample())
+        {
+          OMPL_ERROR("%s: Insufficient states in sampleable goal region", getName().c_str());
+          return base::PlannerStatus::INVALID_GOAL;
+        }
+        goal_s->sampleGoal(goalState);
+    }
 
     // Search for previous solution in database
     int nearestK = 10;
