@@ -39,6 +39,7 @@
 #include "ompl/base/goals/GoalState.h"
 #include "ompl/base/goals/GoalSampleableRegion.h"
 #include "ompl/tools/config/SelfConfig.h"
+#include "ompl/tools/lightning/ExperienceDB.h"
 
 #include <limits>
 
@@ -95,7 +96,7 @@ void ompl::geometric::RetrieveRepair::setup(void)
       boost::shared_ptr<ompl::geometric::RRTConnect> repair_planner( new ompl::geometric::RRTConnect( si_ ) );
       //repair_planner->setGoalBias(0.2);
 
-      OMPL_INFORM("No repairing planner specified. Using default: %s", repair_planner->getName().c_str() );
+      OMPL_DEBUG("No repairing planner specified. Using default: %s", repair_planner->getName().c_str() );
       repairPlanner_ = repair_planner; //ompl::geometric::Planner( repair_planer );
     }
     // Setup the problem definition for the repair planner

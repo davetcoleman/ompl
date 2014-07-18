@@ -114,7 +114,7 @@ namespace ompl
             /**
              * \brief Get a vector of all the paths in the nearest neighbor tree
              */
-            void getAllPaths(std::vector<ompl::base::PlannerDataPtr> &plannerDatas);
+            void getAllPaths(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const;
 
             /**
              * \brief Find the k nearest paths to our queries one

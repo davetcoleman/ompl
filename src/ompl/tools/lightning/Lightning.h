@@ -57,7 +57,7 @@
 #include "ompl/util/Exception.h"
 
 #include "ompl/tools/multiplan/ParallelPlan.h"
-#include "ompl/tools/lightning/ExperienceDB.h"
+//#include "ompl/tools/lightning/ExperienceDB.h"
 #include "ompl/tools/lightning/DynamicTimeWarp.h"
 
 namespace ompl
@@ -69,6 +69,7 @@ namespace ompl
         namespace ob = ompl::base;
         namespace ot = ompl::tools;
 
+        class ExperienceDB; // forward declaration
 
         /**
            @anchor Lightning
@@ -99,7 +100,7 @@ namespace ompl
              *  \param databaseDirecotry - the directory to save the database to, relative to the user directory $HOME
              */
             explicit
-            Lightning(const base::StateSpacePtr &space, const std::string &planningGroupName = "lighning_default_group",
+            Lightning(const base::StateSpacePtr &space, const std::string &planningGroupName = "lightning_default_group",
                       const std::string &databaseDirectory = "ompl_storage");
 
             virtual ~Lightning(void)
@@ -336,7 +337,7 @@ namespace ompl
           /**
            * \brief Convert the planning group name and database directory into a file path to open and save to
            */
-            bool getFilePath(const std::string &planningGroupName, const std::string &databaseDirectory);
+          bool getFilePath(const std::string &planningGroupName, const std::string &databaseDirectory);
 
             /** \brief Get the parameters for this planning context */
             base::ParamSet& params(void)
@@ -357,16 +358,10 @@ namespace ompl
             void enableScratch(bool enable);
 
             /** \brief Get a vector of all the paths in the database */
-            void getAllPaths(std::vector<ob::PlannerDataPtr> &plannerDatas)
-            {
-                experienceDB_->getAllPaths(plannerDatas);
-            };
+            void getAllPaths(std::vector<ob::PlannerDataPtr> &plannerDatas) const;
 
             /** \brief Get the total number of paths stored in the database */
-            std::size_t getExperiencesCount() const
-            {
-                return experienceDB_->getExperiencesCount();
-            }
+            std::size_t getExperiencesCount() const;
 
             /**
              * \brief Convert PlannerData to PathGeometric. Assume ordering of verticies is order of path
@@ -381,7 +376,7 @@ namespace ompl
                 return dtw_;
             }
 
-          const std::string& getFilePath()
+          const std::string& getFilePath() const
           {
             return filePath_;
           }
@@ -440,6 +435,7 @@ namespace ompl
             std::string                   filePath_;
 
         }; // end of class Lightning
+
 
     } // end of namespace
 

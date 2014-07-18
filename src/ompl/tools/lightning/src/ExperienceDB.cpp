@@ -39,6 +39,7 @@
 #include "ompl/base/ScopedState.h"
 #include "ompl/util/Time.h"
 #include "ompl/tools/config/SelfConfig.h"
+#include "ompl/base/PlannerDataStorage.h"
 
 // Boost
 #include <boost/filesystem.hpp>
@@ -217,7 +218,7 @@ bool ompl::tools::ExperienceDB::save(const std::string& fileName)
     return true;
 }
 
-void ompl::tools::ExperienceDB::getAllPaths(std::vector<ompl::base::PlannerDataPtr> &plannerDatas)
+void ompl::tools::ExperienceDB::getAllPaths(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const
 {
     OMPL_DEBUG("ExperienceDB: getAllPaths");
 

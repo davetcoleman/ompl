@@ -40,6 +40,7 @@
 #include "ompl/geometric/PathGeometric.h"
 #include "ompl/geometric/SimpleSetup.h" // use their implementation of getDefaultPlanner
 #include "ompl/base/StateSpace.h" // for storing to file
+#include "ompl/tools/lightning/ExperienceDB.h"
 
 // Boost
 #include <boost/filesystem.hpp>
@@ -371,6 +372,16 @@ void ompl::tools::Lightning::enableScratch(bool enable)
 
     // Flag the planners as possibly misconfigured
     configured_ = false;
+}
+
+std::size_t ompl::tools::Lightning::getExperiencesCount() const
+{
+  return experienceDB_->getExperiencesCount();
+}
+
+void ompl::tools::Lightning::getAllPaths(std::vector<ob::PlannerDataPtr> &plannerDatas) const
+{
+  experienceDB_->getAllPaths(plannerDatas);
 }
 
 void ompl::tools::Lightning::convertPlannerData(const ob::PlannerDataPtr plannerData, og::PathGeometric &path)

@@ -41,10 +41,14 @@
 #include "ompl/geometric/PathGeometric.h"
 #include "ompl/geometric/PathSimplifier.h"
 #include "ompl/datastructures/NearestNeighbors.h"
-#include "ompl/tools/lightning/ExperienceDB.h"
 
 namespace ompl
 {
+    namespace tools
+    {
+        class ExperienceDB;
+        typedef boost::shared_ptr<ExperienceDB> ExperienceDBPtr;
+    }
 
     namespace geometric
     {
