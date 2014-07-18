@@ -45,6 +45,21 @@
 // Boost
 #include <boost/filesystem.hpp>
 
+ompl::tools::Lightning::Lightning(const base::SpaceInformationPtr &si) :
+    ompl::geometric::SimpleSetup(si),
+    recallEnabled_(true),
+    filePath_("unloaded")
+{
+    // Load dynamic time warp
+    dtw_.reset(new ot::DynamicTimeWarp(si_));
+
+    // Load the experience database
+    experienceDB_.reset(new ompl::tools::ExperienceDB(si_->getStateSpace()));
+
+    // Load the Retrieve repair database. We do it here so that setRepairPlanner() works
+    rrPlanner_ = ob::PlannerPtr(new og::RetrieveRepair(si_, experienceDB_));
+}   
+
 ompl::tools::Lightning::Lightning(const base::StateSpacePtr &space) :
     ompl::geometric::SimpleSetup(space),
     recallEnabled_(true),
