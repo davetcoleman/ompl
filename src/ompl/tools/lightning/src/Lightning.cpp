@@ -45,34 +45,25 @@
 // Boost
 #include <boost/filesystem.hpp>
 
-ompl::tools::Lightning::Lightning(const base::StateSpacePtr &space, const std::string &planningGroupName, const std::string &databaseDirectory) :
-    configured_(false),
+ompl::tools::Lightning::Lightning(const base::StateSpacePtr &space) :
+    ompl::geometric::SimpleSetup(space),
     recallEnabled_(true),
-    simplifyTime_(0.0),
-    planTime_(0.0),
-    lastStatus_(base::PlannerStatus::UNKNOWN),
-    filePath_("unknown")
+    filePath_("unloaded")
 {
-    // Debug output
-    std::cout << OMPL_CONSOLE_COLOR_CYAN << std::endl;
-    std::cout << "------------------------- " << std::endl;
-    std::cout << "LIGHTNING BEING CONSTRUCTED " << std::endl;
-    std::cout << "------------------------- " << std::endl;
-    std::cout << OMPL_CONSOLE_COLOR_RESET << std::endl;
-
-    si_.reset(new base::SpaceInformation(space));
-    pdef_.reset(new base::ProblemDefinition(si_));
-    psk_.reset(new og::PathSimplifier(si_));
+    // Load dynamic time warp
     dtw_.reset(new ot::DynamicTimeWarp(si_));
-    params_.include(si_->params());
 
     // Load the experience database
     experienceDB_.reset(new ompl::tools::ExperienceDB(si_->getStateSpace()));
-    getFilePath(planningGroupName, databaseDirectory);
-    experienceDB_->load(filePath_); // load from file
 
     // Load the Retrieve repair database. We do it here so that setRepairPlanner() works
     rrPlanner_ = ob::PlannerPtr(new og::RetrieveRepair(si_, experienceDB_));
+}
+
+bool ompl::tools::Lightning::load(const std::string &planningGroupName, const std::string &databaseDirectory)
+{
+    getFilePath(planningGroupName, databaseDirectory);
+    return experienceDB_->load(filePath_); // load from file
 }
 
 void ompl::tools::Lightning::setup(void)
@@ -129,28 +120,28 @@ void ompl::tools::Lightning::setup(void)
 
 bool ompl::tools::Lightning::getFilePath(const std::string &planningGroupName, const std::string &databaseDirectory)
 {
-  namespace fs = boost::filesystem;
+    namespace fs = boost::filesystem;
 
-  // Check that the directory exists, if not, create it
-  fs::path rootPath = fs::path(getenv("HOME"));
-  rootPath = rootPath / fs::path(databaseDirectory);
+    // Check that the directory exists, if not, create it
+    fs::path rootPath = fs::path(getenv("HOME"));
+    rootPath = rootPath / fs::path(databaseDirectory);
 
-  boost::system::error_code returnedError;
-  fs::create_directories( rootPath, returnedError );
+    boost::system::error_code returnedError;
+    fs::create_directories( rootPath, returnedError );
 
-  if ( returnedError )
-  {
-    //did not successfully create directories
-    OMPL_ERROR("Unable to create directory %s", databaseDirectory.c_str());
-    return false;
-  }
+    if ( returnedError )
+    {
+        //did not successfully create directories
+        OMPL_ERROR("Unable to create directory %s", databaseDirectory.c_str());
+        return false;
+    }
 
-  //directories successfully created, append the group name as the file name
-  rootPath = rootPath / fs::path(planningGroupName + ".ompl");
-  filePath_ = rootPath.string();
-  OMPL_INFORM("Loading database from %s", filePath_.c_str());
+    //directories successfully created, append the group name as the file name
+    rootPath = rootPath / fs::path(planningGroupName + ".ompl");
+    filePath_ = rootPath.string();
+    OMPL_INFORM("Loading database from %s", filePath_.c_str());
 
-  return true;
+    return true;
 }
 
 void ompl::tools::Lightning::clear(void)
@@ -260,56 +251,6 @@ bool ompl::tools::Lightning::saveIfChanged()
     return experienceDB_->saveIfChanged(filePath_);
 }
 
-void ompl::tools::Lightning::simplifySolution(const base::PlannerTerminationCondition &ptc)
-{
-    if (pdef_)
-    {
-        const base::PathPtr &p = pdef_->getSolutionPath();
-        if (p)
-        {
-            time::point start = time::now();
-            og::PathGeometric &path = static_cast<og::PathGeometric&>(*p);
-            std::size_t numStates = path.getStateCount();
-            psk_->simplify(path, ptc);
-            simplifyTime_ = time::seconds(time::now() - start);
-            OMPL_INFORM("Path simplification took %f seconds and removed %d states", simplifyTime_, numStates - path.getStateCount());
-            return;
-        }
-    }
-    OMPL_WARN("No solution to simplify");
-}
-
-void ompl::tools::Lightning::simplifySolution(double duration)
-{
-    ob::PlannerTerminationCondition ptc = ob::timedPlannerTerminationCondition( duration );
-    simplifySolution(ptc);
-}
-
-const std::string ompl::tools::Lightning::getSolutionPlannerName(void) const
-{
-    if (pdef_)
-    {
-        ob::PathPtr path(new og::PathGeometric(si_)); // convert to a generic path ptr
-        ob::PlannerSolution solution(path); // a dummy solution
-
-        // Get our desired solution
-        pdef_->getSolution(solution);
-        return solution.plannerName_;
-    }
-    throw Exception("No problem definition found");
-}
-
-ompl::geometric::PathGeometric& ompl::tools::Lightning::getSolutionPath(void) const
-{
-    if (pdef_)
-    {
-        const base::PathPtr &p = pdef_->getSolutionPath();
-        if (p)
-            return static_cast<og::PathGeometric&>(*p);
-    }
-    throw Exception("No solution path");
-}
-
 void ompl::tools::Lightning::printResultsInfo(void) const
 {
     for (std::size_t i = 0; i < pdef_->getSolutionCount(); ++i)
@@ -320,18 +261,6 @@ void ompl::tools::Lightning::printResultsInfo(void) const
                   << " | Planner: " << pdef_->getSolutions()[i].plannerName_
                   << OMPL_CONSOLE_COLOR_RESET << std::endl;
     }
-}
-
-bool ompl::tools::Lightning::haveExactSolutionPath(void) const
-{
-    return haveSolutionPath() && (!pdef_->hasApproximateSolution() || pdef_->getSolutionDifference() < std::numeric_limits<double>::epsilon());
-}
-
-void ompl::tools::Lightning::getPlannerData(base::PlannerData &pd) const
-{
-    pd.clear();
-    if (planner_)
-        planner_->getPlannerData(pd);
 }
 
 void ompl::tools::Lightning::print(std::ostream &out) const
@@ -376,12 +305,12 @@ void ompl::tools::Lightning::enableScratch(bool enable)
 
 std::size_t ompl::tools::Lightning::getExperiencesCount() const
 {
-  return experienceDB_->getExperiencesCount();
+    return experienceDB_->getExperiencesCount();
 }
 
 void ompl::tools::Lightning::getAllPaths(std::vector<ob::PlannerDataPtr> &plannerDatas) const
 {
-  experienceDB_->getAllPaths(plannerDatas);
+    experienceDB_->getAllPaths(plannerDatas);
 }
 
 void ompl::tools::Lightning::convertPlannerData(const ob::PlannerDataPtr plannerData, og::PathGeometric &path)

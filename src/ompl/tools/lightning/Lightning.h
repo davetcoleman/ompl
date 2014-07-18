@@ -43,6 +43,7 @@
 #ifndef OMPL_TOOLS_LIGHTNING_LIGHTNING_
 #define OMPL_TOOLS_LIGHTNING_LIGHTNING_
 
+#include "ompl/geometric/SimpleSetup.h"
 #include "ompl/base/Planner.h"
 #include "ompl/base/PlannerData.h"
 #include "ompl/base/ProblemDefinition.h"
@@ -57,7 +58,6 @@
 #include "ompl/util/Exception.h"
 
 #include "ompl/tools/multiplan/ParallelPlan.h"
-//#include "ompl/tools/lightning/ExperienceDB.h"
 #include "ompl/tools/lightning/DynamicTimeWarp.h"
 
 namespace ompl
@@ -90,7 +90,7 @@ namespace ompl
             \brief A boost shared pointer wrapper for ompl::tools::Lightning */
 
         /** \brief Built off of SimpleSetup but provides support for planning from experience */
-        class Lightning
+        class Lightning : public ompl::geometric::SimpleSetup
         {
         public:
 
@@ -100,87 +100,13 @@ namespace ompl
              *  \param databaseDirecotry - the directory to save the database to, relative to the user directory $HOME
              */
             explicit
-            Lightning(const base::StateSpacePtr &space, const std::string &planningGroupName = "lightning_default_group",
-                      const std::string &databaseDirectory = "ompl_storage");
+            Lightning(const base::StateSpacePtr &space);
 
-            virtual ~Lightning(void)
-            {
-            }
-
-            /** \brief Get the current instance of the space information */
-            const base::SpaceInformationPtr& getSpaceInformation(void) const
-            {
-                return si_;
-            }
-
-            /** \brief Get the current instance of the problem definition */
-            const base::ProblemDefinitionPtr& getProblemDefinition(void) const
-            {
-                return pdef_;
-            }
-
-            /** \brief Get the current instance of the state space */
-            const base::StateSpacePtr& getStateSpace(void) const
-            {
-                return si_->getStateSpace();
-            }
-
-            /** \brief Get the current instance of the state validity checker */
-            const base::StateValidityCheckerPtr& getStateValidityChecker(void) const
-            {
-                return si_->getStateValidityChecker();
-            }
-
-            /** \brief Get the current goal definition */
-            const base::GoalPtr& getGoal(void) const
-            {
-                return pdef_->getGoal();
-            }
-
-            /** \brief Get the current planner */
-            const base::PlannerPtr& getPlanner(void) const
-            {
-                return planner_;
-            }
-
-            /** \brief Get the planner allocator */
-            const base::PlannerAllocator& getPlannerAllocator(void) const
-            {
-                return pa_;
-            }
-
-            /** \brief Get the path simplifier */
-            const og::PathSimplifierPtr& getPathSimplifier(void) const
-            {
-                return psk_;
-            }
-
-            /** \brief Get the path simplifier */
-            og::PathSimplifierPtr& getPathSimplifier(void)
-            {
-                return psk_;
-            }
-
-            /** \brief Return true if a solution path is available (previous call to solve() was successful) and the solution is exact (not approximate) */
-            bool haveExactSolutionPath(void) const;
-
-            /** \brief Return true if a solution path is available (previous call to solve() was successful). The solution may be approximate. */
-            bool haveSolutionPath(void) const
-            {
-                return pdef_->getSolutionPath().get();
-            }
-
-            /** \brief Get the best solution's planer name. Throw an exception if no solution is available */
-            const std::string getSolutionPlannerName(void) const;
-
-            /** \brief Get the best solution path. Throw an exception if no solution is available */
-            og::PathGeometric& getSolutionPath(void) const;
+            /** \brief Load the experience database from file */
+            bool load(const std::string &planningGroupName = "lightning_default_group", const std::string &databaseDirectory = "ompl_storage");
 
             /** \brief Display debug data about potential available solutions */
             void printResultsInfo(void) const;
-
-            /** \brief Get information about the exploration data structure the planning from scratch motion planner used. */
-            void getPlannerData(base::PlannerData &pd) const;
 
             /**
              * \brief Get a pointer to the retrieve repair planner
@@ -190,76 +116,6 @@ namespace ompl
                 if (!rrPlanner_)
                     throw Exception("RetrieveRepair planner not loaded yet");
                 return static_cast<og::RetrieveRepair&>(*rrPlanner_);
-            }
-
-            /** \brief Set the state validity checker to use */
-            void setStateValidityChecker(const base::StateValidityCheckerPtr &svc)
-            {
-                si_->setStateValidityChecker(svc);
-            }
-
-            /** \brief Set the state validity checker to use */
-            void setStateValidityChecker(const base::StateValidityCheckerFn &svc)
-            {
-                si_->setStateValidityChecker(svc);
-            }
-
-            /** \brief Set the state validity checker to use */
-            void setOptimizationObjective(const base::OptimizationObjectivePtr &optimizationObjective)
-            {
-                pdef_->setOptimizationObjective(optimizationObjective);
-            }
-
-            /** \brief Set the start and goal states to use. */
-            void setStartAndGoalStates(const base::ScopedState<> &start, const base::ScopedState<> &goal,
-                                       const double threshold = std::numeric_limits<double>::epsilon())
-            {
-                pdef_->setStartAndGoalStates(start, goal, threshold);
-            }
-
-            /** \brief Add a starting state for planning. This call is not
-                needed if setStartAndGoalStates() has been called. */
-            void addStartState(const base::ScopedState<> &state)
-            {
-                pdef_->addStartState(state);
-            }
-
-            /** \brief Clear the currently set starting states */
-            void clearStartStates(void)
-            {
-                pdef_->clearStartStates();
-            }
-
-            /** \brief Clear the currently set starting states and add \e state as the starting state */
-            void setStartState(const base::ScopedState<> &state)
-            {
-                clearStartStates();
-                addStartState(state);
-            }
-
-            /** \brief A simple form of setGoal(). The goal will be an instance of ompl::base::GoalState */
-            void setGoalState(const base::ScopedState<> &goal, const double threshold = std::numeric_limits<double>::epsilon())
-            {
-                pdef_->setGoalState(goal, threshold);
-            }
-
-            /** \brief Set the goal for planning. This call is not
-                needed if setStartAndGoalStates() has been called. */
-            void setGoal(const base::GoalPtr &goal)
-            {
-                pdef_->setGoal(goal);
-            }
-
-            /** \brief Set the planner to use. If the planner is not
-                set, an attempt is made to use the planner
-                allocator. If no planner allocator is available
-                either, a default planner is set. */
-            void setPlanner(const base::PlannerPtr &planner)
-            {
-                if (planner && planner->getSpaceInformation().get() != si_.get())
-                    throw Exception("Planner instance does not match space information");
-                planner_ = planner;
-                configured_ = false;
             }
 
             /** \brief Set the planner to use for repairing experience paths
@@ -296,24 +152,6 @@ namespace ompl
             /** \brief Save the experience database to file if there has been a change */
             bool saveIfChanged();
 
-            /** \brief Return the status of the last planning attempt */
-            base::PlannerStatus getLastPlannerStatus(void) const
-            {
-                return lastStatus_;
-            }
-
-            /** \brief Get the amount of time (in seconds) spent during the last planning step */
-            double getLastPlanComputationTime(void) const
-            {
-                return planTime_;
-            }
-
-            /** \brief Get the amount of time (in seconds) spend during the last path simplification step */
-            double getLastSimplificationTime(void) const
-            {
-                return simplifyTime_;
-            }
-
             /** \brief Attempt to simplify the current solution path. Spent at most \e duration seconds in the simplification process.
                 If \e duration is 0 (the default), a default simplification procedure is executed. */
             void simplifySolution(double duration = 0.0);
@@ -334,22 +172,10 @@ namespace ompl
                 function automatically. */
             virtual void setup(void);
 
-          /**
-           * \brief Convert the planning group name and database directory into a file path to open and save to
-           */
-          bool getFilePath(const std::string &planningGroupName, const std::string &databaseDirectory);
-
-            /** \brief Get the parameters for this planning context */
-            base::ParamSet& params(void)
-            {
-                return params_;
-            }
-
-            /** \brief Get the parameters for this planning context */
-            const base::ParamSet& params(void) const
-            {
-                return params_;
-            }
+            /**
+             * \brief Convert the planning group name and database directory into a file path to open and save to
+             */
+            bool getFilePath(const std::string &planningGroupName, const std::string &databaseDirectory);
 
             /** \brief Optionally disable the ability to use previous plans in solutions (but will still save them) */
             void enableRecall(bool enable);
@@ -376,51 +202,22 @@ namespace ompl
                 return dtw_;
             }
 
-          const std::string& getFilePath() const
-          {
-            return filePath_;
-          }
+            /** \brief After load() is called, access the generated file path for loading and saving the experience database */
+            const std::string& getFilePath() const
+            {
+                return filePath_;
+            }
 
         protected:
 
-            /// The created space information
-            base::SpaceInformationPtr     si_;
-
-            /// The created problem definition
-            base::ProblemDefinitionPtr    pdef_;
-
-            /// The maintained from-scratch planner instance
-            base::PlannerPtr              planner_;
-
             /// The maintained experience planner instance
             base::PlannerPtr              rrPlanner_;
-
-            /// The optional planner allocator
-            base::PlannerAllocator        pa_;
-
-            /// The instance of the path simplifier
-            og::PathSimplifierPtr         psk_;
-
-            /// Flag indicating whether the classes needed for planning are set up
-            bool                          configured_;
 
             /// Flag indicating whether recalled plans should be used to find solutions. Enabled by default.
             bool                          recallEnabled_;
 
             /// Flag indicating whether planning from scratch should be used to find solutions. Enabled by default.
             bool                          scratchEnabled_;
-
-            /// The amount of time the last path simplification step took
-            double                        simplifyTime_;
-
-            /// The amount of time the last planning step took
-            double                        planTime_;
-
-            /// The status of the last planning request
-            base::PlannerStatus           lastStatus_;
-
-            /// The parameters that describe the planning context
-            base::ParamSet                params_;
 
             /** \brief Instance of parallel planning to use for computing solutions in parallel */
             ot::ParallelPlanPtr           pp_;
@@ -435,7 +232,6 @@ namespace ompl
             std::string                   filePath_;
 
         }; // end of class Lightning
-
 
     } // end of namespace
 
