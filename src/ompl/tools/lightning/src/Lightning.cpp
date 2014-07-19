@@ -41,6 +41,7 @@
 #include "ompl/geometric/SimpleSetup.h" // use their implementation of getDefaultPlanner
 #include "ompl/base/StateSpace.h" // for storing to file
 #include "ompl/tools/lightning/ExperienceDB.h"
+#include "ompl/tools/multiplan/ParallelPlan.h"
 
 // Boost
 #include <boost/filesystem.hpp>

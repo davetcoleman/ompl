@@ -57,7 +57,6 @@
 #include "ompl/util/Console.h"
 #include "ompl/util/Exception.h"
 
-#include "ompl/tools/multiplan/ParallelPlan.h"
 #include "ompl/tools/lightning/DynamicTimeWarp.h"
 
 namespace ompl
@@ -69,7 +68,9 @@ namespace ompl
         namespace ob = ompl::base;
         namespace ot = ompl::tools;
 
-        class ExperienceDB; // forward declaration
+        //class ExperienceDB; // forward declaration
+        OMPL_CLASS_FORWARD(ExperienceDB);
+        OMPL_CLASS_FORWARD(ParallelPlan);
 
         /**
            @anchor Lightning
