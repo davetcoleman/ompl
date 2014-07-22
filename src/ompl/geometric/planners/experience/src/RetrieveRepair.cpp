@@ -128,8 +128,6 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
         return base::PlannerStatus::TIMEOUT; // The planner failed to find a solution
     }
 
-    std::cout << "debug " << std::endl;
-
     // Get a single start state TODO: more than one
     const base::State *startState = pis_.nextStart();
 
