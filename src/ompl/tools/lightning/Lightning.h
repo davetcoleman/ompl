@@ -79,7 +79,8 @@ namespace ompl
            previous actions the most similar one to the current planning problem and attempts to repair it,
            while at the same time planning from scratch in a different thread
            @par External documentation
-           Berenson, Dmitry, Pieter Abbeel, and Ken Goldberg: A robot path planning framework that learns from experience, in <em>Robotics and Automation (ICRA), 2012 IEEE International Conference on. IEEE</em>, 2012.
+           Berenson, Dmitry, Pieter Abbeel, and Ken Goldberg: A robot path planning framework that learns from experience, 
+           in <em>Robotics and Automation (ICRA), 2012 IEEE International Conference on. IEEE</em>, 2012.
            <a href="http://users.wpi.edu/~dberenson/lightning.pdf">[PDF]</a>
         */
 

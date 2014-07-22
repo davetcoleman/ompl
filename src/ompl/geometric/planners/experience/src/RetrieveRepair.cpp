@@ -399,8 +399,8 @@ bool ompl::geometric::RetrieveRepair::repairPath(ompl::geometric::PathGeometric 
         return false;
     }
 
-    OMPL_DEBUG("Initial primary path before modification (includes start and goal attached):");
-    primaryPath.print(std::cout);
+    //OMPL_DEBUG("Initial primary path before modification (includes start and goal attached):");
+    //primaryPath.print(std::cout);
 
     // Loop through every pair of states and make sure path is valid.
     // If not, replan between those states
