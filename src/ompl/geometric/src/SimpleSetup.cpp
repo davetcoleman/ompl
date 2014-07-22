@@ -198,7 +198,7 @@ const std::string ompl::geometric::SimpleSetup::getSolutionPlannerName(void) con
 {
     if (pdef_)
     {
-        ompl::base::PathPtr path( base::PathPtr() ); // convert to a generic path ptr
+        const ompl::base::PathPtr path; // convert to a generic path ptr
         ompl::base::PlannerSolution solution(path); // a dummy solution
 
         // Get our desired solution
