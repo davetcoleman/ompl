@@ -40,7 +40,6 @@
 ompl::tools::DynamicTimeWarp::DynamicTimeWarp(base::SpaceInformationPtr &si)
     : si_(si)
 {
-    infinity_ = std::numeric_limits<double>::infinity();
 }
 
 double ompl::tools::DynamicTimeWarp::calcDTWDistance(const og::PathGeometric &path1, const og::PathGeometric &path2 )
@@ -50,7 +49,8 @@ double ompl::tools::DynamicTimeWarp::calcDTWDistance(const og::PathGeometric &pa
     std::size_t m = path2.getStateCount();
 
     // Intialize table to have all values of infinity
-    std::vector<std::vector<double> > table(n,std::vector<double>(m,infinity_)); // TODO reuse this memory by allocating it in the constructor!
+    // TODO reuse this memory by allocating it in the constructor!
+    std::vector<std::vector<double> > table(n,std::vector<double>(m, std::numeric_limits<double>::infinity()));     
 
     // Set first value to zero
     table[0][0] = 0;

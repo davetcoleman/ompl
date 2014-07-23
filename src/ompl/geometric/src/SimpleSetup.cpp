@@ -198,6 +198,7 @@ const std::string ompl::geometric::SimpleSetup::getSolutionPlannerName(void) con
 {
     if (pdef_)
     {
+        // TODO resolve with Ioan
         //const ompl::base::PathPtr path(base::PathPtr()); // convert to a generic path ptr
         ompl::base::PathPtr path(new PathGeometric(si_)); // convert to a generic path ptr
         ompl::base::PlannerSolution solution(path); // a dummy solution

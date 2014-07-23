@@ -46,8 +46,7 @@ namespace ompl
 {
     namespace tools
     {
-        class ExperienceDB;
-        typedef boost::shared_ptr<ExperienceDB> ExperienceDBPtr;
+        OMPL_CLASS_FORWARD(ExperienceDB);
     }
 
     namespace geometric
@@ -77,7 +76,7 @@ namespace ompl
         public:
 
             /** \brief Constructor */
-            RetrieveRepair(const base::SpaceInformationPtr &si, ompl::tools::ExperienceDBPtr experienceDB);
+            RetrieveRepair(const base::SpaceInformationPtr &si, const ompl::tools::ExperienceDBPtr &experienceDB);
 
             virtual ~RetrieveRepair(void);
 
@@ -111,12 +110,6 @@ namespace ompl
             virtual void setup(void);
 
             /**
-             * \brief Filters the top n paths in nearestPaths_ to the top 1, based on state validity with current environment
-             * \return true if no error
-             */
-            bool findBestPath(const base::State *startState, const base::State *goalState, ompl::base::PlannerDataPtr& chosenPath);
-
-            /**
              * \brief Repairs a path to be valid in the current planning environment
              * \param oldPath - from experience
              * \return true if no error
@@ -131,27 +124,51 @@ namespace ompl
              * \return true if path found
              */
             bool replan(const ompl::base::State* start, const ompl::base::State* goal, ompl::geometric::PathGeometric &newPathSegment,
-                const base::PlannerTerminationCondition &ptc);
+                        const base::PlannerTerminationCondition &ptc);
+          
+            /**
+             * \brief Getter for number of 'k' close solutions to choose from database for further filtering 
+             */ 
+            int getNearestK()
+            {
+              return nearestK_;
+            }
+
+            /**
+             * \brief Setter for number of 'k' close solutions to choose from database for further filtering
+             */
+            void setNearestK(int nearestK)
+            {
+              nearestK_ = nearestK;
+            }
+                    
+        protected:
 
             /**
              * \brief Count the number of states along the discretized path that are in collision
-             * // TODO: move this into DiscreteMotionValidator??
+             *        Note: This is kind of an ill-defined score though. It depends on the resolution of collision checking. 
+             *        I am more inclined to try to compute the percent of the length of the motion that is valid. 
+             *        That could go in SpaceInformation, as a utility function.
              */
             std::size_t checkMotionScore(const ompl::base::State *s1, const ompl::base::State *s2) const;
 
-        protected:
+            /**
+             * \brief Filters the top n paths in nearestPaths_ to the top 1, based on state validity with current environment
+             * \return true if no error
+             */
+            bool findBestPath(const base::State *startState, const base::State *goalState, ompl::base::PlannerDataPtr& chosenPath);
 
             /** \brief Free the memory allocated by this planner */
             void freeMemory(void);
 
             /** \brief The database of motions to search through */
-            ompl::tools::ExperienceDBPtr                   experienceDB_;
+            ompl::tools::ExperienceDBPtr                           experienceDB_;
 
             /** \brief Recall the nearest paths and store this in planner data for introspection later */
             std::vector<ompl::base::PlannerDataPtr>                nearestPaths_;
 
             /** \brief the ID within nearestPaths_ of the path that was chosen for repair */
-            std::size_t                                    nearestPathsChosenID_;
+            std::size_t                                            nearestPathsChosenID_;
 
             /** \brief A secondary planner for replanning */
             ompl::base::PlannerPtr                                 repairPlanner_;
@@ -163,7 +180,10 @@ namespace ompl
             std::vector<ompl::base::PlannerDataPtr>                repairPlannerDatas_;
 
             /** \brief The instance of the path simplifier */
-            ompl::geometric::PathSimplifierPtr                          psk_;
+            ompl::geometric::PathSimplifierPtr                     psk_;
+
+            /** \brief Number of 'k' close solutions to choose from database for further filtering */
+            int                                                    nearestK_;
         };
 
     }

@@ -43,9 +43,10 @@
 
 #include <limits>
 
-ompl::geometric::RetrieveRepair::RetrieveRepair(const base::SpaceInformationPtr &si, ompl::tools::ExperienceDBPtr experienceDB)
+ompl::geometric::RetrieveRepair::RetrieveRepair(const base::SpaceInformationPtr &si, const ompl::tools::ExperienceDBPtr &experienceDB)
     : base::Planner(si, "RetrieveRepair"),
-      experienceDB_(experienceDB)
+      experienceDB_(experienceDB),
+      nearestK_(10) // default value
 {
     specs_.approximateSolutions = true;
     specs_.directed = true;
@@ -81,7 +82,7 @@ void ompl::geometric::RetrieveRepair::setRepairPlanner(const base::PlannerPtr &p
     if (planner && planner->getSpaceInformation().get() != si_.get())
         throw Exception("Repair planner instance does not match space information");
     repairPlanner_ = planner;
-    setup_ = false; // Not sure if this is necessary
+    setup_ = false;
 }
 
 void ompl::geometric::RetrieveRepair::setup(void)
@@ -112,7 +113,6 @@ void ompl::geometric::RetrieveRepair::setup(void)
 
 void ompl::geometric::RetrieveRepair::freeMemory(void)
 {
-
 }
 
 ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::PlannerTerminationCondition &ptc)
@@ -134,47 +134,18 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
 
     // Get a single goal state TODO: more than one
     base::Goal *goal   = pdef_->getGoal().get();
-    const base::State *goalState;
+
     // Check that we have the correct type of goal
     if (!goal)
     {
         OMPL_ERROR("Goal cannot be converted into a goal state");
         return base::PlannerStatus::UNRECOGNIZED_GOAL_TYPE;
     }
-    // Decide if to use a goal sampleable region or not
-    if (goal->hasType(ompl::base::GOAL_STATE))
-    {
-        //OMPL_ERROR("%s: Unknown type of goal", getName().c_str());
-        //return base::PlannerStatus::UNRECOGNIZED_GOAL_TYPE;
-        base::GoalState *goalStateClass = dynamic_cast<base::GoalState*>(goal);
-        goalState = goalStateClass->getState();
-    }
-    else
-    {
-        std::cout << "starting goal sampleable region " << std::endl;
-        goalState = pis_.nextGoal(ptc);
 
-        /*
-        // Just sample a single goal and use it going forward
-        base::GoalSampleableRegion *goal_s = dynamic_cast<base::GoalSampleableRegion*>(goal);
-        if (!goal_s)
-        {
-          OMPL_ERROR("%s: Unknown type of goal", getName().c_str());
-          return base::PlannerStatus::UNRECOGNIZED_GOAL_TYPE;
-        }
-
-        if (!goal_s->couldSample())
-        {
-          OMPL_ERROR("%s: Insufficient states in sampleable goal region", getName().c_str());
-          return base::PlannerStatus::INVALID_GOAL;
-        }
-        goal_s->sampleGoal(goalState);
-        */
-    }
+    const base::State *goalState = pis_.nextGoal(ptc);
 
     // Search for previous solution in database
-    int nearestK = 10;
-    nearestPaths_ = experienceDB_->findNearestStartGoal(nearestK, startState, goalState);
+    nearestPaths_ = experienceDB_->findNearestStartGoal(nearestK_, startState, goalState);
 
     // Check if there are any solutions
     if (nearestPaths_.empty())
@@ -186,6 +157,7 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
     ompl::base::PlannerDataPtr chosenPath;
 
     // Filter top n paths to 1
+    // TODO Rather than selecting 1 best path, you could also spawn n (n<=k) threads and repair the top n paths.
     if (!findBestPath(startState, goalState, chosenPath))
     {
         return base::PlannerStatus::CRASH;

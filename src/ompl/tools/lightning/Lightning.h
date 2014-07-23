@@ -81,6 +81,7 @@ namespace ompl
            @par External documentation
            Berenson, Dmitry, Pieter Abbeel, and Ken Goldberg: A robot path planning framework that learns from experience, 
            in <em>Robotics and Automation (ICRA), 2012 IEEE International Conference on. IEEE</em>, 2012.
+           DOI: <a href="http://dx.doi.org/10.1109/ICRA.2012.6224742">10.1109/ICRA.2012.6224742</a><br>
            <a href="http://users.wpi.edu/~dberenson/lightning.pdf">[PDF]</a>
         */
 
@@ -180,7 +181,9 @@ namespace ompl
             /** \brief Optionally disable the ability to use previous plans in solutions (but will still save them) */
             void enableRecall(bool enable);
 
-            /** \brief Optionally disable the ability to plan from scratch (but will still save them) */
+            /** \brief Optionally disable the ability to plan from scratch 
+             *         Note: Lightning can still save modified experiences if they are different enough
+             */
             void enableScratch(bool enable);
 
             /** \brief Get a vector of all the paths in the database */

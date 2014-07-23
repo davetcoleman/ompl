@@ -74,7 +74,7 @@ public:
     /**
      * \brief Calculate min for 3 numbers
      */
-    double min(double n1, double n2, double n3);
+    inline double min(double n1, double n2, double n3);
 
     /**
      * \brief If path1 and path2 have a better start/goal match when reverse, then reverse path2
@@ -84,6 +84,13 @@ public:
      */
     bool reversePathIfNecessary(og::PathGeometric &path1, og::PathGeometric &path2);
 
+    /**
+     * \brief Use dynamic time warping to compare the similarity of two paths
+     *        Note: this will not interpolate either of the paths
+     * \param path1 - const, will not interpolate
+     * \param path2 - const, will not interpolate
+     * \return score
+     */
     double getPathsScoreConst(const og::PathGeometric &path1, const og::PathGeometric &path2);
 
     /**
@@ -105,8 +112,6 @@ public:
     double getPathsScoreNonConst(og::PathGeometric &path1, og::PathGeometric &path2);
 
 protected:
-
-    double infinity_;
 
     /** \brief The created space information */
     base::SpaceInformationPtr     si_;
