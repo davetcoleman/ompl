@@ -64,10 +64,6 @@ namespace ompl
 
     namespace tools
     {
-        namespace og = ompl::geometric;
-        namespace ob = ompl::base;
-        namespace ot = ompl::tools;
-
         //class ExperienceDB; // forward declaration
         OMPL_CLASS_FORWARD(ExperienceDB);
         OMPL_CLASS_FORWARD(ParallelPlan);
@@ -107,23 +103,29 @@ namespace ompl
             explicit
             Lightning(const base::StateSpacePtr &space);
 
+        private:
+
+            /**
+             * \brief Shared constructor functions
+             */
+            void initialize();
+
+        public:
             /** \brief Load the experience database from file
-             *  \param planningGroupName - used to name the database file, should be something like 'left_arm' or 'whole_body'
+             *  \param databaseName - used to name the database file, should be something like 'left_arm' or 'whole_body'
              *  \param databaseDirecotry - the directory to save the database to, relative to the user directory $HOME
              */
-            bool load(const std::string &planningGroupName = "lightning_default_group", const std::string &databaseDirectory = "ompl_storage");
+            bool load(const std::string &databaseName = "lightning_default_group", const std::string &databaseDirectory = "ompl_storage");
 
             /** \brief Display debug data about potential available solutions */
-            void printResultsInfo(void) const;
+            void printResultsInfo(std::ostream &out = std::cout) const;
 
             /**
              * \brief Get a pointer to the retrieve repair planner
              */
-            og::RetrieveRepair& getRetrieveRepairPlanner()
+            ompl::geometric::RetrieveRepair& getRetrieveRepairPlanner() const
             {
-                if (!rrPlanner_)
-                    throw Exception("RetrieveRepair planner not loaded yet");
-                return static_cast<og::RetrieveRepair&>(*rrPlanner_);
+                return static_cast<ompl::geometric::RetrieveRepair&>(*rrPlanner_);
             }
 
             /** \brief Set the planner to use for repairing experience paths
@@ -131,9 +133,6 @@ namespace ompl
                 set, a default planner is set. */
             void setRepairPlanner(const base::PlannerPtr &planner)
             {
-                if (!rrPlanner_)
-                    throw Exception("Retrieve repair planner has not been initialized yet");
-
                 static_cast<og::RetrieveRepair&>(*rrPlanner_).setRepairPlanner(planner);
             }
 
@@ -173,21 +172,16 @@ namespace ompl
                 function automatically. */
             virtual void setup(void);
 
-            /**
-             * \brief Convert the planning group name and database directory into a file path to open and save to
-             */
-            bool getFilePath(const std::string &planningGroupName, const std::string &databaseDirectory);
-
             /** \brief Optionally disable the ability to use previous plans in solutions (but will still save them) */
-            void enableRecall(bool enable);
+            void enablePlanningFromRecall(bool enable);
 
             /** \brief Optionally disable the ability to plan from scratch 
              *         Note: Lightning can still save modified experiences if they are different enough
              */
-            void enableScratch(bool enable);
+            void enablePlanningFromScratch(bool enable);
 
             /** \brief Get a vector of all the paths in the database */
-            void getAllPaths(std::vector<ob::PlannerDataPtr> &plannerDatas) const;
+            void getAllPaths(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const;
 
             /** \brief Get the total number of paths stored in the database */
             std::size_t getExperiencesCount() const;
@@ -197,10 +191,10 @@ namespace ompl
              * \param PlannerData
              * \param PathGeometric
              */
-            void convertPlannerData(const ob::PlannerDataPtr plannerData, og::PathGeometric &path);
+            void convertPlannerData(const ompl::base::PlannerDataPtr plannerData, ompl::geometric::PathGeometric &path);
 
             /** \brief Tool for comparing two paths and scoring them */
-            ot::DynamicTimeWarpPtr getDynamicTimeWarp()
+            const ompl::tools::DynamicTimeWarpPtr& getDynamicTimeWarp() const
             {
                 return dtw_;
             }
@@ -211,28 +205,41 @@ namespace ompl
                 return filePath_;
             }
 
+          /**
+           * \brief If path1 and path2 have a better start/goal match when reverse, then reverse path2
+           * \param path to test against
+           * \param path to reverse
+           * \return true if reverse was necessary
+           */
+          bool reversePathIfNecessary(ompl::geometric::PathGeometric &path1, ompl::geometric::PathGeometric &path2);
+
         protected:
 
+            /**
+             * \brief Convert the planning group name and database directory into a file path to open and save to
+             */
+            bool getFilePath(const std::string &databaseName, const std::string &databaseDirectory);
+
             /// The maintained experience planner instance
-            base::PlannerPtr              rrPlanner_;
+            base::PlannerPtr                  rrPlanner_;
 
             /// Flag indicating whether recalled plans should be used to find solutions. Enabled by default.
-            bool                          recallEnabled_;
+            bool                              recallEnabled_;
 
             /// Flag indicating whether planning from scratch should be used to find solutions. Enabled by default.
-            bool                          scratchEnabled_;
+            bool                              scratchEnabled_;
 
             /** \brief Instance of parallel planning to use for computing solutions in parallel */
-            ot::ParallelPlanPtr           pp_;
+            ompl::tools::ParallelPlanPtr      pp_;
 
             /** \brief A shared object between all the planners for saving and loading previous experience */
-            ot::ExperienceDBPtr           experienceDB_;
+            ompl::tools::ExperienceDBPtr      experienceDB_;
 
             /** \brief Tool for comparing two paths and scoring them */
-            ot::DynamicTimeWarpPtr        dtw_;
+            ompl::tools::DynamicTimeWarpPtr   dtw_;
 
             /** \brief File location of database */
-            std::string                   filePath_;
+            std::string                       filePath_;
 
         }; // end of class Lightning
 

@@ -46,26 +46,27 @@
 // Boost
 #include <boost/filesystem.hpp>
 
+namespace og = ompl::geometric;
+namespace ob = ompl::base;
+namespace ot = ompl::tools;
+
 ompl::tools::Lightning::Lightning(const base::SpaceInformationPtr &si) :
-    ompl::geometric::SimpleSetup(si),
-    recallEnabled_(true),
-    filePath_("unloaded")
+    ompl::geometric::SimpleSetup(si)
 {
-    // Load dynamic time warp
-    dtw_.reset(new ot::DynamicTimeWarp(si_));
-
-    // Load the experience database
-    experienceDB_.reset(new ompl::tools::ExperienceDB(si_->getStateSpace()));
-
-    // Load the Retrieve repair database. We do it here so that setRepairPlanner() works
-    rrPlanner_ = ob::PlannerPtr(new og::RetrieveRepair(si_, experienceDB_));
-}   
+    initialize();
+}
 
 ompl::tools::Lightning::Lightning(const base::StateSpacePtr &space) :
-    ompl::geometric::SimpleSetup(space),
-    recallEnabled_(true),
-    filePath_("unloaded")
+    ompl::geometric::SimpleSetup(space)
 {
+    initialize();
+}
+
+void ompl::tools::Lightning::initialize()
+{
+    recallEnabled_ = true;
+    filePath_ = "unloaded";
+
     // Load dynamic time warp
     dtw_.reset(new ot::DynamicTimeWarp(si_));
 
@@ -76,9 +77,9 @@ ompl::tools::Lightning::Lightning(const base::StateSpacePtr &space) :
     rrPlanner_ = ob::PlannerPtr(new og::RetrieveRepair(si_, experienceDB_));
 }
 
-bool ompl::tools::Lightning::load(const std::string &planningGroupName, const std::string &databaseDirectory)
+bool ompl::tools::Lightning::load(const std::string &databaseName, const std::string &databaseDirectory)
 {
-    getFilePath(planningGroupName, databaseDirectory);
+    getFilePath(databaseName, databaseDirectory);
     return experienceDB_->load(filePath_); // load from file
 }
 
@@ -134,7 +135,7 @@ void ompl::tools::Lightning::setup(void)
     }
 }
 
-bool ompl::tools::Lightning::getFilePath(const std::string &planningGroupName, const std::string &databaseDirectory)
+bool ompl::tools::Lightning::getFilePath(const std::string &databaseName, const std::string &databaseDirectory)
 {
     namespace fs = boost::filesystem;
 
@@ -153,7 +154,7 @@ bool ompl::tools::Lightning::getFilePath(const std::string &planningGroupName, c
     }
 
     //directories successfully created, append the group name as the file name
-    rootPath = rootPath / fs::path(planningGroupName + ".ompl");
+    rootPath = rootPath / fs::path(databaseName + ".ompl");
     filePath_ = rootPath.string();
     OMPL_INFORM("Loading database from %s", filePath_.c_str());
 
@@ -227,8 +228,12 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
         og::PathGeometric chosenRecallPath(si_);
         convertPlannerData(chosenRecallPathData, chosenRecallPath);
 
+        // Reverse path2 if necessary so that it matches path1 better
+        reversePathIfNecessary(solutionPath, chosenRecallPath);
+
         double score = dtw_->getPathsScoreHalfConst( solutionPath, chosenRecallPath );
 
+        //  TODO: It would be nice if we switch to percentages of path length for score, and maybe define this var in the magic namespace.
         if (score < 10)
         {
             OMPL_INFORM("NOT saving to database because best solution was not from database and is too similar (score %f)", score);
@@ -267,15 +272,15 @@ bool ompl::tools::Lightning::saveIfChanged()
     return experienceDB_->saveIfChanged(filePath_);
 }
 
-void ompl::tools::Lightning::printResultsInfo(void) const
+void ompl::tools::Lightning::printResultsInfo(std::ostream &out) const
 {
     for (std::size_t i = 0; i < pdef_->getSolutionCount(); ++i)
     {
-        std::cout << OMPL_CONSOLE_COLOR_GREEN << "Solution " << i
-                  << " | Length: " << pdef_->getSolutions()[i].length_
-                  << " | Approximate: " << (pdef_->getSolutions()[i].approximate_ ? "true" : "false")
-                  << " | Planner: " << pdef_->getSolutions()[i].plannerName_
-                  << OMPL_CONSOLE_COLOR_RESET << std::endl;
+        out << OMPL_CONSOLE_COLOR_GREEN << "Solution " << i
+            << " | Length: " << pdef_->getSolutions()[i].length_
+            << " | Approximate: " << (pdef_->getSolutions()[i].approximate_ ? "true" : "false")
+            << " | Planner: " << pdef_->getSolutions()[i].plannerName_
+            << OMPL_CONSOLE_COLOR_RESET << std::endl;
     }
 }
 
@@ -300,7 +305,7 @@ void ompl::tools::Lightning::print(std::ostream &out) const
         pdef_->print(out);
 }
 
-void ompl::tools::Lightning::enableRecall(bool enable)
+void ompl::tools::Lightning::enablePlanningFromRecall(bool enable)
 {
     // Remember state
     recallEnabled_ = enable;
@@ -310,7 +315,7 @@ void ompl::tools::Lightning::enableRecall(bool enable)
 }
 
 
-void ompl::tools::Lightning::enableScratch(bool enable)
+void ompl::tools::Lightning::enablePlanningFromScratch(bool enable)
 {
     // Remember state
     scratchEnabled_ = enable;
@@ -335,3 +340,26 @@ void ompl::tools::Lightning::convertPlannerData(const ob::PlannerDataPtr planner
     for (std::size_t i = 0; i < plannerData->numVertices(); ++i)
         path.append(plannerData->getVertex(i).getState());
 }
+
+bool ompl::tools::Lightning::reversePathIfNecessary(og::PathGeometric &path1, og::PathGeometric &path2)
+{
+    // Reverse path2 if it matches better
+    const ob::State* s1 = path1.getState(0);
+    const ob::State* s2 = path2.getState(0);
+    const ob::State* g1 = path1.getState(path1.getStateCount()-1);
+    const ob::State* g2 = path2.getState(path2.getStateCount()-1);
+
+    double regularDistance  = si_->distance(s1,s2) + si_->distance(g1,g2);
+    double reversedDistance = si_->distance(s1,g2) + si_->distance(s2,g1);
+
+    // Check if path is reversed from normal [start->goal] direction
+    if ( regularDistance > reversedDistance )
+    {
+        // needs to be reversed
+        path2.reverse();
+        return true;
+    }
+
+    return false;
+}
+

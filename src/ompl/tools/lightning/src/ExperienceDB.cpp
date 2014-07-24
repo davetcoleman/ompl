@@ -137,7 +137,7 @@ void ompl::tools::ExperienceDB::addPath(ompl::geometric::PathGeometric& solution
         //OMPL_INFORM("Vertex %d:", i);
         //debugVertex(vert);
 
-        plannerData->addVertex( vert );
+        plannerData->addVertex(vert);
     }
 
     // TODO: Add the edges to a edges file
@@ -265,27 +265,6 @@ double ompl::tools::ExperienceDB::distanceFunction(const ompl::base::PlannerData
         // [ a.start, b.goal] + [a.goal + b.start]
         si_->distance( a->getVertex(0).getState(), b->getVertex(b->numVertices()-1).getState() ) +
         si_->distance( a->getVertex(a->numVertices()-1).getState(), b->getVertex(0).getState() ) );
-
-    /*
-    // [ a.start, b.start] + [a.goal + b.goal]
-    double n1 = si_->distance( a->getVertex(0).getState(), b->getVertex(0).getState() );
-    double n2 = si_->distance( a->getVertex(a->numVertices()-1).getState(), b->getVertex(b->numVertices()-1).getState() );
-
-    // [ a.start, b.goal] + [a.goal + b.start]
-    double w1 = si_->distance( a->getVertex(0).getState(), b->getVertex(b->numVertices()-1).getState() );
-    double w2 = si_->distance( a->getVertex(a->numVertices()-1).getState(), b->getVertex(0).getState() );
-
-    double dist = std::min(n1 + n2, w1 + w2);
-
-    std::cout << "a count " << a->numVertices() << " b count " << b->numVertices() << std::endl;
-
-    if (n1 + n2 <= w1 + w2)
-        std::cout << "Dist normal " << dist << " | n1: " << n1 << " | n2: " << n2 << std::endl;
-    else
-        std::cout << "Dist weird  " << dist << " | w1: " << w1 << " | w2: " << w2 << std::endl;
-
-    return dist;
-    */
 }
 
 void ompl::tools::ExperienceDB::debugVertex(const ompl::base::PlannerDataVertex& vertex)
@@ -298,7 +277,7 @@ void ompl::tools::ExperienceDB::debugState(const ompl::base::State* state)
     si_->printState(state, std::cout);
 }
 
-std::size_t ompl::tools::ExperienceDB::getExperiencesCount()
+std::size_t ompl::tools::ExperienceDB::getExperiencesCount() const
 {
     return nn_->size();
 }

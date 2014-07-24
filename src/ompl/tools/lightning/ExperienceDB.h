@@ -121,10 +121,6 @@ namespace ompl
              */
             std::vector<ompl::base::PlannerDataPtr> findNearestStartGoal(int nearestK, const base::State* start, const base::State* goal);
 
-            /** \brief Add the distance between both path's starts and the distance between both path's ends together
-             */
-            double distanceFunction(const ompl::base::PlannerDataPtr a, const ompl::base::PlannerDataPtr b) const;
-
             /**
              * \brief Print info to screen
              */
@@ -132,7 +128,14 @@ namespace ompl
             void debugState(const ompl::base::State* state);
 
             /** \brief Get the total number of paths stored in the database */
-            std::size_t getExperiencesCount();
+            std::size_t getExperiencesCount() const;
+
+        private:
+
+            /** 
+             * \brief Add the distance between both path's starts and the distance between both path's ends together
+             */
+            double distanceFunction(const ompl::base::PlannerDataPtr a, const ompl::base::PlannerDataPtr b) const;
 
         protected:
 

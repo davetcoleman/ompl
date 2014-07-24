@@ -37,12 +37,23 @@
 
 #include <ompl/tools/lightning/DynamicTimeWarp.h>
 
-ompl::tools::DynamicTimeWarp::DynamicTimeWarp(base::SpaceInformationPtr &si)
+namespace // anonymous
+{
+    /**
+     * \brief Calculate min for 3 numbers
+     */
+    inline double min(double n1, double n2, double n3)
+    {
+        return std::min(n1, std::min(n2, n3));
+    }
+}
+
+ompl::tools::DynamicTimeWarp::DynamicTimeWarp(const base::SpaceInformationPtr &si)
     : si_(si)
 {
 }
 
-double ompl::tools::DynamicTimeWarp::calcDTWDistance(const og::PathGeometric &path1, const og::PathGeometric &path2 )
+double ompl::tools::DynamicTimeWarp::calcDTWDistance(const og::PathGeometric &path1, const og::PathGeometric &path2 ) const
 {
     // Get lengths
     std::size_t n = path1.getStateCount();
@@ -69,33 +80,6 @@ double ompl::tools::DynamicTimeWarp::calcDTWDistance(const og::PathGeometric &pa
     return table[n-1][m-1];
 }
 
-double ompl::tools::DynamicTimeWarp::min(double n1, double n2, double n3)
-{
-    return std::min(n1, std::min(n2, n3));
-}
-
-bool ompl::tools::DynamicTimeWarp::reversePathIfNecessary(og::PathGeometric &path1, og::PathGeometric &path2)
-{
-    // Reverse path2 if it matches better
-    const ob::State* s1 = path1.getState(0);
-    const ob::State* s2 = path2.getState(0);
-    const ob::State* g1 = path1.getState(path1.getStateCount()-1);
-    const ob::State* g2 = path2.getState(path2.getStateCount()-1);
-
-    double regularDistance  = si_->distance(s1,s2) + si_->distance(g1,g2);
-    double reversedDistance = si_->distance(s1,g2) + si_->distance(s2,g1);
-
-    // Check if path is reversed from normal [start->goal] direction
-    if ( regularDistance > reversedDistance )
-    {
-        // needs to be reversed
-        path2.reverse();
-        return true;
-    }
-
-    return false;
-}
-
 double ompl::tools::DynamicTimeWarp::getPathsScoreConst(const og::PathGeometric &path1, const og::PathGeometric &path2)
 {
     // Copy the path but not the states
@@ -113,9 +97,7 @@ double ompl::tools::DynamicTimeWarp::getPathsScoreHalfConst(const og::PathGeomet
 
 double ompl::tools::DynamicTimeWarp::getPathsScoreNonConst(og::PathGeometric &path1, og::PathGeometric &path2)
 {
-    // Reverse path2 if it matches better
-    reversePathIfNecessary(path1, path2);
-
+    // Debug
     //std::size_t path1Count = path1.getStateCount();
     //std::size_t path2Count = path2.getStateCount();
 

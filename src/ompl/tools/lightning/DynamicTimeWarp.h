@@ -61,7 +61,7 @@ OMPL_CLASS_FORWARD(DynamicTimeWarp);
 class DynamicTimeWarp
 {
 public:
-    DynamicTimeWarp(base::SpaceInformationPtr &si);
+    explicit DynamicTimeWarp(const base::SpaceInformationPtr &si);
 
     /**
      * \brief Use Dynamic Timewarping to score two paths
@@ -69,24 +69,13 @@ public:
      * \param path2
      * \return score
      */
-    double calcDTWDistance(const og::PathGeometric &path1, const og::PathGeometric &path2 );
-
-    /**
-     * \brief Calculate min for 3 numbers
-     */
-    inline double min(double n1, double n2, double n3);
-
-    /**
-     * \brief If path1 and path2 have a better start/goal match when reverse, then reverse path2
-     * \param path to test against
-     * \param path to reverse
-     * \return true if reverse was necessary
-     */
-    bool reversePathIfNecessary(og::PathGeometric &path1, og::PathGeometric &path2);
+    double calcDTWDistance(const og::PathGeometric &path1, const og::PathGeometric &path2 ) const;
 
     /**
      * \brief Use dynamic time warping to compare the similarity of two paths
      *        Note: this will not interpolate either of the paths
+     *        Note: before calling this function you might want to reverse one of the paths so that their
+     *        start and goals are property aligned (and match better)
      * \param path1 - const, will not interpolate
      * \param path2 - const, will not interpolate
      * \return score
@@ -96,6 +85,8 @@ public:
     /**
      * \brief Use dynamic time warping to compare the similarity of two paths
      *        Note: this will interpolate the second path and it returns the change by reference
+     *        Note: before calling this function you might want to reverse one of the paths so that their
+     *        start and goals are property aligned (and match better)
      * \param path1 - const, will not interpolate
      * \param path2 - will interpolate
      * \return score
@@ -105,13 +96,15 @@ public:
     /**
      * \brief Use dynamic time warping to compare the similarity of two paths
      *        Note: this will interpolate both of the paths and it returns the change by reference
+     *        Note: before calling this function you might want to reverse one of the paths so that their
+     *        start and goals are property aligned (and match better)
      * \param path1 - will interpolate
      * \param path2 - will interpolate
      * \return score
      */
     double getPathsScoreNonConst(og::PathGeometric &path1, og::PathGeometric &path2);
 
-protected:
+private:
 
     /** \brief The created space information */
     base::SpaceInformationPtr     si_;
