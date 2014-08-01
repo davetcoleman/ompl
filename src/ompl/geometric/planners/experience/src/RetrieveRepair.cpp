@@ -125,7 +125,10 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
     if (!experienceDB_->getExperiencesCount())
     {
         OMPL_INFORM("Experience database is empty so unable to run RetrieveRepair algorithm.");
-        return base::PlannerStatus::TIMEOUT; // The planner failed to find a solution
+
+        // TODO: it seems TIMEOUT causes the wrong behavior in parallel plan
+        return base::PlannerStatus::CRASH;
+        //return base::PlannerStatus::TIMEOUT; // The planner failed to find a solution
     }
 
     // Get a single start state TODO: more than one
@@ -567,11 +570,14 @@ void ompl::geometric::RetrieveRepair::getPlannerData(base::PlannerData &data) co
     }
 }
 
-
-void ompl::geometric::RetrieveRepair::getRecalledPlannerDatas(std::vector<base::PlannerDataPtr> &data, std::size_t &chosenID) const
+const std::vector<ompl::base::PlannerDataPtr>& ompl::geometric::RetrieveRepair::getLastRecalledNearestPaths() const
 {
-    data = nearestPaths_; // list of candidate paths
-    chosenID = nearestPathsChosenID_;
+    return nearestPaths_; // list of candidate paths
+}
+
+const std::size_t& ompl::geometric::RetrieveRepair::getLastRecalledNearestPathChosen() const
+{
+    return nearestPathsChosenID_; // of the candidate paths list, the one we chose
 }
 
 ompl::base::PlannerDataPtr ompl::geometric::RetrieveRepair::getChosenRecallPath() const

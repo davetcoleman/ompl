@@ -75,7 +75,7 @@ namespace ompl
            previous actions the most similar one to the current planning problem and attempts to repair it,
            while at the same time planning from scratch in a different thread
            @par External documentation
-           Berenson, Dmitry, Pieter Abbeel, and Ken Goldberg: A robot path planning framework that learns from experience, 
+           Berenson, Dmitry, Pieter Abbeel, and Ken Goldberg: A robot path planning framework that learns from experience,
            in <em>Robotics and Automation (ICRA), 2012 IEEE International Conference on. IEEE</em>, 2012.
            DOI: <a href="http://dx.doi.org/10.1109/ICRA.2012.6224742">10.1109/ICRA.2012.6224742</a><br>
            <a href="http://users.wpi.edu/~dberenson/lightning.pdf">[PDF]</a>
@@ -92,6 +92,33 @@ namespace ompl
         class Lightning : public ompl::geometric::SimpleSetup
         {
         public:
+            /**
+             * \brief Simple logging functionality encapsled in a struct
+             */
+            struct LightningLogs
+            {
+                LightningLogs()
+                    : numSolutionsFromRecall_(0)
+                    , numSolutionsFromRecallSaved_(0)
+                    , numSolutionsFromScratch_(0)
+                    , numSolutionsFailed_(0)
+                    , numSolutionsTooShort_(0)
+                    , numProblems_(0)
+                    , totalPlanningTime_(0)
+                {}
+                double getAveragePlanningTime() const
+                {
+                    return totalPlanningTime_ / numProblems_;
+                }
+
+                double numSolutionsFromRecall_;
+                double numSolutionsFromRecallSaved_;
+                double numSolutionsFromScratch_;
+                double numSolutionsFailed_; // or approximate solution
+                double numSolutionsTooShort_; // less than 3 states
+                double numProblems_; // input requests
+                double totalPlanningTime_; // of all input requests, used for averaging
+            };
 
             /** \brief Constructor needs the state space used for planning. */
             explicit
@@ -119,6 +146,9 @@ namespace ompl
 
             /** \brief Display debug data about potential available solutions */
             void printResultsInfo(std::ostream &out = std::cout) const;
+
+            /** \brief Display debug data about overall results from Lightning since being loaded */
+            void printLogs(std::ostream &out = std::cout) const;
 
             /**
              * \brief Get a pointer to the retrieve repair planner
@@ -175,7 +205,7 @@ namespace ompl
             /** \brief Optionally disable the ability to use previous plans in solutions (but will still save them) */
             void enablePlanningFromRecall(bool enable);
 
-            /** \brief Optionally disable the ability to plan from scratch 
+            /** \brief Optionally disable the ability to plan from scratch
              *         Note: Lightning can still save modified experiences if they are different enough
              */
             void enablePlanningFromScratch(bool enable);
@@ -213,6 +243,14 @@ namespace ompl
            */
           bool reversePathIfNecessary(ompl::geometric::PathGeometric &path1, ompl::geometric::PathGeometric &path2);
 
+          /**
+           * \brief Getter for logging data
+           */
+          const LightningLogs& getLogs() const
+          {
+              return logs_;
+          }
+
         protected:
 
             /**
@@ -240,6 +278,9 @@ namespace ompl
 
             /** \brief File location of database */
             std::string                       filePath_;
+
+            /** \brief Logging data for debugging  */
+            LightningLogs                     logs_;
 
         }; // end of class Lightning
 

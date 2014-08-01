@@ -130,6 +130,12 @@ namespace ompl
             /** \brief Get the total number of paths stored in the database */
             std::size_t getExperiencesCount() const;
 
+            /** \brief Get number of unsaved paths */
+            int getNumUnsavedPaths() const
+            {
+                return numUnsavedPaths_;
+            }
+
         private:
 
             /** 
@@ -151,8 +157,8 @@ namespace ompl
             // Reusable plannerData instance for filling in start and goal and performing searches on the tree
             ompl::base::PlannerDataPtr nnSearchKey_;
 
-            // Flag to determine if a save is required
-            bool saveRequired_;
+            // Track unsaved paths to determine if a save is required
+            int numUnsavedPaths_;
 
         }; // end of class ExperienceDB
 

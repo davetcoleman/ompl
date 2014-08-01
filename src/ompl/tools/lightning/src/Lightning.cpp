@@ -64,6 +64,11 @@ ompl::tools::Lightning::Lightning(const base::StateSpacePtr &space) :
 
 void ompl::tools::Lightning::initialize()
 {
+    std::cout << OMPL_CONSOLE_COLOR_CYAN << std::endl;
+    std::cout << std::endl;
+    std::cout << "Initializing Lightning Framework ///////////////////////////////////////" << std::endl;
+    std::cout << OMPL_CONSOLE_COLOR_RESET;
+
     recallEnabled_ = true;
     filePath_ = "unloaded";
 
@@ -140,7 +145,17 @@ bool ompl::tools::Lightning::getFilePath(const std::string &databaseName, const 
     namespace fs = boost::filesystem;
 
     // Check that the directory exists, if not, create it
-    fs::path rootPath = fs::path(getenv("HOME"));
+    fs::path rootPath;
+    if (!std::string(getenv("HOME")).empty())
+        rootPath = fs::path(getenv("HOME")); // Support Linux/Mac
+    else if (!std::string(getenv("HOMEPATH")).empty())
+        rootPath = fs::path(getenv("HOMEPATH")); // Support Windows
+    else
+    {
+        OMPL_WARN("Unable to find a home path for this computer");
+        rootPath = fs::path("");
+    }
+
     rootPath = rootPath / fs::path(databaseDirectory);
 
     boost::system::error_code returnedError;
@@ -190,13 +205,22 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
     // Start both threads
     bool hybridize = false;
     lastStatus_ = pp_->solve(ptc, hybridize);
+    bool tempTracker = false;
+
+    // Planning time
+    planTime_ = time::seconds(time::now() - start);
+    logs_.totalPlanningTime_ += planTime_; // used for averaging
+    logs_.numProblems_++; // used for averaging
 
     // Results
-    planTime_ = time::seconds(time::now() - start);
     if (lastStatus_)
         OMPL_INFORM("Lightning Solve: solution found in %f seconds", planTime_);
     else
+    {
         OMPL_INFORM("Lightning Solve: No solution found after %f seconds", planTime_);
+        logs_.numSolutionsFailed_++;
+        tempTracker = true;
+    }
 
     // Smooth the result
     //OMPL_INFORM("Simplifying solution (smoothing)...");
@@ -208,50 +232,90 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
     OMPL_INFORM("Solution path has %d states and was generated from planner %s", solutionPath.getStateCount(), getSolutionPlannerName().c_str());
     //solutionPath.print(std::cout);
 
-    std::cout << OMPL_CONSOLE_COLOR_CYAN << std::endl;
+    std::cout << OMPL_CONSOLE_COLOR_CYAN << "LIGHTNING RESULTS:" << OMPL_CONSOLE_COLOR_RESET << std::endl;
 
-    // Make sure solution has at least 2 states
-    if (solutionPath.getStateCount() < 2)
-    {
-        OMPL_INFORM("NOT saving to database because solution is less than 2 states long");
-    }
     // Do not save if approximate
-    else if (!haveExactSolutionPath())
+    if (!haveExactSolutionPath())
     {
+        if (tempTracker)
+            OMPL_ERROR("STATUS FAILED AND NO EXACT SOLUTION");
+        else
+            OMPL_ERROR("STATUS DID NOT FAIL AND EXACT SOLUTION");
+        std::cout << std::endl;
+        std::cout << std::endl;
+        std::cout << std::endl;
+        std::cout << std::endl;
+        std::cout << std::endl;
+        sleep(5);
+
         OMPL_INFORM("NOT saving to database because the solution is APPROXIMATE");
     }
     // Use dynamic time warping to see if the repaired path is too similar to the original
     else if (getSolutionPlannerName() == rrPlanner_->getName())
     {
-        // Convert the original recalled path to PathGeometric
-        ob::PlannerDataPtr chosenRecallPathData = getRetrieveRepairPlanner().getChosenRecallPath();
-        og::PathGeometric chosenRecallPath(si_);
-        convertPlannerData(chosenRecallPathData, chosenRecallPath);
+        OMPL_INFORM("Solution from Recall");
 
-        // Reverse path2 if necessary so that it matches path1 better
-        reversePathIfNecessary(solutionPath, chosenRecallPath);
+        // Logging
+        logs_.numSolutionsFromRecall_++;
 
-        double score = dtw_->getPathsScoreHalfConst( solutionPath, chosenRecallPath );
-
-        //  TODO: It would be nice if we switch to percentages of path length for score, and maybe define this var in the magic namespace.
-        if (score < 10)
+        // Make sure solution has at least 2 states
+        if (solutionPath.getStateCount() < 2)
         {
-            OMPL_INFORM("NOT saving to database because best solution was not from database and is too similar (score %f)", score);
+            OMPL_INFORM("NOT saving to database because solution is less than 2 states long");
+            logs_.numSolutionsTooShort_++;
         }
         else
         {
-            OMPL_INFORM("Adding path to database because repaired path is different enough from original recalled path (score %f)", score);
-            // Save to database
-            experienceDB_->addPath(solutionPath);
+            // Convert the original recalled path to PathGeometric
+            ob::PlannerDataPtr chosenRecallPathData = getRetrieveRepairPlanner().getChosenRecallPath();
+            og::PathGeometric chosenRecallPath(si_);
+            convertPlannerData(chosenRecallPathData, chosenRecallPath);
+
+            // Reverse path2 if necessary so that it matches path1 better
+            reversePathIfNecessary(solutionPath, chosenRecallPath);
+
+            double score = dtw_->getPathsScoreHalfConst( solutionPath, chosenRecallPath );
+
+            //  TODO: It would be nice if we switch to percentages of path length for score, and maybe define this var in the magic namespace.
+            if (score < 10)
+            {
+                OMPL_INFORM("NOT saving to database because best solution was not from database and is too similar (score %f)", score);
+            }
+            else
+            {
+                OMPL_INFORM("Adding path to database because repaired path is different enough from original recalled path (score %f)", score);
+
+                // Logging
+                logs_.numSolutionsFromRecallSaved_++;
+
+                // Save to database
+                experienceDB_->addPath(solutionPath);
+            }
         }
     }
     else
     {
-        OMPL_INFORM("Adding path to database because best solution was not from database");
-        // Save to database
-        experienceDB_->addPath(solutionPath);
+        OMPL_INFORM("Solution from Scratch");
+
+        // Logging
+        logs_.numSolutionsFromScratch_++;
+
+        // Make sure solution has at least 2 states
+        if (solutionPath.getStateCount() < 2)
+        {
+            OMPL_INFORM("NOT saving to database because solution is less than 2 states long");
+            logs_.numSolutionsTooShort_++;
+        }
+        else
+        {
+            OMPL_INFORM("Adding path to database because best solution was not from database");
+
+            // TODO: maybe test this path for validity also?
+
+            // Save to database
+            experienceDB_->addPath(solutionPath);
+        }
     }
-    std::cout << OMPL_CONSOLE_COLOR_RESET;
 
     return lastStatus_;
 }
@@ -303,6 +367,21 @@ void ompl::tools::Lightning::print(std::ostream &out) const
     }
     if (pdef_)
         pdef_->print(out);
+}
+
+void ompl::tools::Lightning::printLogs(std::ostream &out) const
+{
+    out << "Lightning Framework Logging Results" << std::endl;
+    out << "  Solutions" << std::endl;
+    out << "     Solved from scratch:              " << logs_.numSolutionsFromScratch_ << std::endl;
+    out << "     Solved from recall:               " << logs_.numSolutionsFromRecall_ << std::endl;
+    out << "        That were saved:               " << logs_.numSolutionsFromRecallSaved_ << std::endl;
+    out << "        That were discarded:           " << logs_.numSolutionsFromRecall_ - logs_.numSolutionsFromRecallSaved_ << std::endl;
+    out << "     Failed/approximate results:       " << logs_.numSolutionsFailed_ << std::endl;
+    out << "     Less than 3 states:               " << logs_.numSolutionsTooShort_ << std::endl;
+    out << "  Total solutions in database:         " << experienceDB_->getExperiencesCount() << std::endl;
+    out << "     Unsaved solutions:                " << experienceDB_->getNumUnsavedPaths() << std::endl;
+    out << "  Average planning time:               " << logs_.getAveragePlanningTime() << std::endl;
 }
 
 void ompl::tools::Lightning::enablePlanningFromRecall(bool enable)
@@ -362,4 +441,3 @@ bool ompl::tools::Lightning::reversePathIfNecessary(og::PathGeometric &path1, og
 
     return false;
 }
-

@@ -45,7 +45,7 @@
 #include <boost/filesystem.hpp>
 
 ompl::tools::ExperienceDB::ExperienceDB(const base::StateSpacePtr &space)
-    : saveRequired_(false)
+    : numUnsavedPaths_(0)
 {
     si_.reset(new base::SpaceInformation(space));
 
@@ -62,7 +62,7 @@ ompl::tools::ExperienceDB::ExperienceDB(const base::StateSpacePtr &space)
 
 ompl::tools::ExperienceDB::~ExperienceDB(void)
 {
-    if (saveRequired_)
+    if (numUnsavedPaths_)
         OMPL_WARN("The database is being unloaded with unsaved experiences");
 }
 
@@ -124,8 +124,6 @@ bool ompl::tools::ExperienceDB::load(const std::string& fileName)
 
 void ompl::tools::ExperienceDB::addPath(ompl::geometric::PathGeometric& solutionPath)
 {
-    OMPL_INFORM("Adding path to Experience Database");
-
     // Create a new planner data instance
     ompl::base::PlannerDataPtr plannerData(new ompl::base::PlannerData(si_));
 
@@ -149,12 +147,12 @@ void ompl::tools::ExperienceDB::addPath(ompl::geometric::PathGeometric& solution
     // Add to nearest neighbor tree
     nn_->add(plannerData);
 
-    saveRequired_ = true;
+    numUnsavedPaths_++;
 }
 
 bool ompl::tools::ExperienceDB::saveIfChanged(const std::string& fileName)
 {
-    if (saveRequired_)
+    if (numUnsavedPaths_)
         return save(fileName);
     else
         OMPL_INFORM("Not saving because database has not changed");
@@ -213,7 +211,7 @@ bool ompl::tools::ExperienceDB::save(const std::string& fileName)
     double loadTime = time::seconds(time::now() - start);
     OMPL_INFORM("Saved database to file in %f sec with %d paths", loadTime, plannerDatas.size());
 
-    saveRequired_ = false;
+    numUnsavedPaths_ = 0;
 
     return true;
 }

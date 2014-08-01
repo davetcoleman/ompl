@@ -87,7 +87,19 @@ namespace ompl
              *  \param data - vector of PlannerData objects that each hold a single path
              *  \param chosenID - the index of the PlannerData object that was chosen for repair
              */
-            void getRecalledPlannerDatas(std::vector<base::PlannerDataPtr> &data, std::size_t &chosenID) const;
+            //void getRecalledPlannerDatas(std::vector<base::PlannerDataPtr> &data, std::size_t &chosenID) const;
+
+            /**
+             *  \brief Get debug information about the top recalled paths that were chosen for further filtering
+             *  \return data - vector of PlannerData objects that each hold a single path
+             */
+            const std::vector<base::PlannerDataPtr>& getLastRecalledNearestPaths() const;
+
+            /**
+             *  \brief Get debug information about the top recalled paths that were chosen for further filtering
+             *  \return chosenID - the index of the PlannerData object that was chosen for repair
+             */
+            const std::size_t& getLastRecalledNearestPathChosen() const;
 
             /**
              * \brief Get the chosen path used from database for repair
@@ -102,6 +114,9 @@ namespace ompl
 
             virtual void clear(void);
 
+            /**
+             * \brief Pass a pointer of the database from the lightning framework
+             */
             void setExperienceDB(ompl::tools::ExperienceDBPtr experienceDB);
 
             /** \brief Set the planner that will be used for repairing invalid paths recalled from experience */
