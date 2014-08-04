@@ -105,7 +105,12 @@ namespace ompl
                     , numSolutionsTooShort_(0)
                     , numProblems_(0)
                     , totalPlanningTime_(0)
-                {}
+                {
+                    // Header of CSV file
+                    csvDataLogStream_ << "time,states,planner,result,is_saved,score,total_scratch,total_recall,total_recall_saved,"
+                                      << "total_recall_discarded,total_failed,total_too_short,total_experiences,avg_planning_time" << std::endl;
+                }
+
                 double getAveragePlanningTime() const
                 {
                     return totalPlanningTime_ / numProblems_;
@@ -118,6 +123,7 @@ namespace ompl
                 double numSolutionsTooShort_; // less than 3 states
                 double numProblems_; // input requests
                 double totalPlanningTime_; // of all input requests, used for averaging
+                std::stringstream csvDataLogStream_; // output data to file to analyze performance externally
             };
 
             /** \brief Constructor needs the state space used for planning. */
@@ -149,6 +155,9 @@ namespace ompl
 
             /** \brief Display debug data about overall results from Lightning since being loaded */
             void printLogs(std::ostream &out = std::cout) const;
+
+            /** \brief Save debug data about overall results from Lightning since being loaded */
+            void saveDataLog(std::ostream &out = std::cout);
 
             /**
              * \brief Get a pointer to the retrieve repair planner

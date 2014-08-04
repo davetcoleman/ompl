@@ -70,6 +70,7 @@ void ompl::tools::Lightning::initialize()
     std::cout << OMPL_CONSOLE_COLOR_RESET;
 
     recallEnabled_ = true;
+    scratchEnabled_ = true;
     filePath_ = "unloaded";
 
     // Load dynamic time warp
@@ -80,6 +81,10 @@ void ompl::tools::Lightning::initialize()
 
     // Load the Retrieve repair database. We do it here so that setRepairPlanner() works
     rrPlanner_ = ob::PlannerPtr(new og::RetrieveRepair(si_, experienceDB_));
+
+    OMPL_INFORM("Lightning Framework initialized.");
+    std::cout << std::endl;
+    std::cout << std::endl;
 }
 
 bool ompl::tools::Lightning::load(const std::string &databaseName, const std::string &databaseDirectory)
@@ -211,6 +216,7 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
     planTime_ = time::seconds(time::now() - start);
     logs_.totalPlanningTime_ += planTime_; // used for averaging
     logs_.numProblems_++; // used for averaging
+    logs_.csvDataLogStream_ << planTime_ << ",";
 
     // Results
     if (lastStatus_)
@@ -227,9 +233,11 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
     //simplifySolution(ptc);
 
     // Get information about the exploration data structure the motion planner used. Used later in visualizing
-    og::PathGeometric solutionPath = getSolutionPath();
+    og::PathGeometric solutionPath = getSolutionPath(); // copied so that it is non-const
 
     OMPL_INFORM("Solution path has %d states and was generated from planner %s", solutionPath.getStateCount(), getSolutionPlannerName().c_str());
+    logs_.csvDataLogStream_ << solutionPath.getStateCount() << "," << getSolutionPlannerName() << ",";
+
     //solutionPath.print(std::cout);
 
     std::cout << OMPL_CONSOLE_COLOR_CYAN << "LIGHTNING RESULTS:" << OMPL_CONSOLE_COLOR_RESET << std::endl;
@@ -237,6 +245,8 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
     // Do not save if approximate
     if (!haveExactSolutionPath())
     {
+        logs_.csvDataLogStream_ << "not_exact_solution_path,not_saved,0,";
+
         if (tempTracker)
             OMPL_ERROR("STATUS FAILED AND NO EXACT SOLUTION");
         else
@@ -246,9 +256,11 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
         std::cout << std::endl;
         std::cout << std::endl;
         std::cout << std::endl;
-        sleep(5);
 
         OMPL_INFORM("NOT saving to database because the solution is APPROXIMATE");
+
+        throw;
+        exit(-1);
     }
     // Use dynamic time warping to see if the repaired path is too similar to the original
     else if (getSolutionPlannerName() == rrPlanner_->getName())
@@ -263,6 +275,7 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
         {
             OMPL_INFORM("NOT saving to database because solution is less than 2 states long");
             logs_.numSolutionsTooShort_++;
+            logs_.csvDataLogStream_ << "from_recall,less_2_states,0,";
         }
         else
         {
@@ -280,10 +293,12 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
             if (score < 10)
             {
                 OMPL_INFORM("NOT saving to database because best solution was not from database and is too similar (score %f)", score);
+                logs_.csvDataLogStream_ << "from_recall,score_too_similar," << score << ",";
             }
             else
             {
                 OMPL_INFORM("Adding path to database because repaired path is different enough from original recalled path (score %f)", score);
+                logs_.csvDataLogStream_ << "from_recall,score_different_enough," << score << ",";
 
                 // Logging
                 logs_.numSolutionsFromRecallSaved_++;
@@ -304,11 +319,13 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
         if (solutionPath.getStateCount() < 2)
         {
             OMPL_INFORM("NOT saving to database because solution is less than 2 states long");
+            logs_.csvDataLogStream_ << "from_scratch,less_2_states,0,";
             logs_.numSolutionsTooShort_++;
         }
         else
         {
             OMPL_INFORM("Adding path to database because best solution was not from database");
+            logs_.csvDataLogStream_ << "from_scratch,saving,0,";
 
             // TODO: maybe test this path for validity also?
 
@@ -316,6 +333,17 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
             experienceDB_->addPath(solutionPath);
         }
     }
+
+    // End this log entry with remaining stats
+    logs_.csvDataLogStream_
+        << logs_.numSolutionsFromScratch_ << ","
+        << logs_.numSolutionsFromRecall_ << ","
+        << logs_.numSolutionsFromRecallSaved_ << ","
+        << logs_.numSolutionsFromRecall_ - logs_.numSolutionsFromRecallSaved_ << ","
+        << logs_.numSolutionsFailed_ << ","
+        << logs_.numSolutionsTooShort_ << ","
+        << experienceDB_->getExperiencesCount() << ","
+        << logs_.getAveragePlanningTime() << std::endl;
 
     return lastStatus_;
 }
@@ -378,10 +406,17 @@ void ompl::tools::Lightning::printLogs(std::ostream &out) const
     out << "        That were saved:               " << logs_.numSolutionsFromRecallSaved_ << std::endl;
     out << "        That were discarded:           " << logs_.numSolutionsFromRecall_ - logs_.numSolutionsFromRecallSaved_ << std::endl;
     out << "     Failed/approximate results:       " << logs_.numSolutionsFailed_ << std::endl;
-    out << "     Less than 3 states:               " << logs_.numSolutionsTooShort_ << std::endl;
+    out << "     Less than 2 states:               " << logs_.numSolutionsTooShort_ << std::endl;
     out << "  Total solutions in database:         " << experienceDB_->getExperiencesCount() << std::endl;
     out << "     Unsaved solutions:                " << experienceDB_->getNumUnsavedPaths() << std::endl;
     out << "  Average planning time:               " << logs_.getAveragePlanningTime() << std::endl;
+}
+
+void ompl::tools::Lightning::saveDataLog(std::ostream &out)
+{
+    // Export to file and clear the stream
+    out << logs_.csvDataLogStream_.str();
+    logs_.csvDataLogStream_.str("");
 }
 
 void ompl::tools::Lightning::enablePlanningFromRecall(bool enable)
