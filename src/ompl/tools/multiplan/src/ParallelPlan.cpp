@@ -111,6 +111,7 @@ ompl::base::PlannerStatus ompl::tools::ParallelPlan::solve(const base::PlannerTe
         threads[i]->join();
         delete threads[i];
     }
+    std::cout << "threads are all joined " << std::endl;
 
     if (hybridize)
     {
@@ -130,11 +131,14 @@ ompl::base::PlannerStatus ompl::tools::ParallelPlan::solve(const base::PlannerTe
 }
 
 void ompl::tools::ParallelPlan::solveOne(base::Planner *planner, std::size_t minSolCount, const base::PlannerTerminationCondition *ptc)
-{
-    OMPL_DEBUG("ParallelPlan starting planner %s", planner->getName().c_str());
+{    
+    OMPL_DEBUG("ParallelPlan solveOne starting planner %s", planner->getName().c_str());
     time::point start = time::now();
     if (planner->solve(*ptc))
     {
+        std::cout << std::endl;
+        std::cout << "ParallelPlan solve returned on planner " << planner->getName().c_str() << std::endl;
+        std::cout << std::endl;
         double duration = time::seconds(time::now() - start);
         foundSolCountLock_.lock();
         unsigned int nrSol = ++foundSolCount_;
@@ -148,9 +152,12 @@ void ompl::tools::ParallelPlan::solveOne(base::Planner *planner, std::size_t min
 void ompl::tools::ParallelPlan::solveMore(base::Planner *planner, std::size_t minSolCount, std::size_t maxSolCount, 
   const base::PlannerTerminationCondition *ptc)
 {
+    OMPL_DEBUG("ParallelPlan solveMore starting planner %s", planner->getName().c_str());
+
     time::point start = time::now();
     if (planner->solve(*ptc))
     {
+        std::cout << "ParallelPlan solve returned on planner " << planner->getName().c_str() << std::endl;
         double duration = time::seconds(time::now() - start);
         foundSolCountLock_.lock();
         unsigned int nrSol = ++foundSolCount_;
