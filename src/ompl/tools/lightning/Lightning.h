@@ -102,13 +102,15 @@ namespace ompl
                     , numSolutionsFromRecallSaved_(0)
                     , numSolutionsFromScratch_(0)
                     , numSolutionsFailed_(0)
+                    , numSolutionsApproximate_(0)
                     , numSolutionsTooShort_(0)
                     , numProblems_(0)
                     , totalPlanningTime_(0)
                 {
                     // Header of CSV file
                     csvDataLogStream_ << "time,states,planner,result,is_saved,score,total_scratch,total_recall,total_recall_saved,"
-                                      << "total_recall_discarded,total_failed,total_too_short,total_experiences,avg_planning_time" << std::endl;
+                                      << "total_recall_discarded,total_failed,total_approximate,total_too_short,total_experiences,"
+                                      << "avg_planning_time" << std::endl;
                 }
 
                 double getAveragePlanningTime() const
@@ -119,7 +121,8 @@ namespace ompl
                 double numSolutionsFromRecall_;
                 double numSolutionsFromRecallSaved_;
                 double numSolutionsFromScratch_;
-                double numSolutionsFailed_; // or approximate solution
+                double numSolutionsFailed_;
+                double numSolutionsApproximate_;
                 double numSolutionsTooShort_; // less than 3 states
                 double numProblems_; // input requests
                 double totalPlanningTime_; // of all input requests, used for averaging

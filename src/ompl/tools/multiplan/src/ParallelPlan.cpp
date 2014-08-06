@@ -125,8 +125,11 @@ ompl::base::PlannerStatus ompl::tools::ParallelPlan::solve(const base::PlannerTe
             }
     }
 
-    OMPL_INFORM("ParallelPlan Solve: Solution found by one or more of the threads in %f seconds", time::seconds(time::now() - start));
-
+    if (pdef_->hasSolution())
+        OMPL_INFORM("ParallelPlan Solve: Solution found by one or more of the threads in %f seconds", time::seconds(time::now() - start));
+    else
+        OMPL_WARN("ParallelPlan Solve: Unable to find solution by any of the threads in %f seconds", time::seconds(time::now() - start));
+    
     return base::PlannerStatus(pdef_->hasSolution(), pdef_->hasApproximateSolution());
 }
 

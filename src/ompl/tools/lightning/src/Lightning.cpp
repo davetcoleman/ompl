@@ -210,7 +210,6 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
     // Start both threads
     bool hybridize = false;
     lastStatus_ = pp_->solve(ptc, hybridize);
-    bool tempTracker = false;
 
     // Planning time
     planTime_ = time::seconds(time::now() - start);
@@ -218,119 +217,114 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
     logs_.numProblems_++; // used for averaging
     logs_.csvDataLogStream_ << planTime_ << ",";
 
-    // Results
-    if (lastStatus_)
-        OMPL_INFORM("Lightning Solve: solution found in %f seconds", planTime_);
+    // Skip further processing if absolutely no path is available
+    if (!lastStatus_)
+    {
+        OMPL_ERROR("Lightning Solve: No solution found after %f seconds", planTime_);
+        logs_.numSolutionsFailed_++;
+
+        logs_.csvDataLogStream_ << "0,neither_planner,failed,not_saved,0,";
+    }
     else
     {
-        OMPL_INFORM("Lightning Solve: No solution found after %f seconds", planTime_);
-        logs_.numSolutionsFailed_++;
-        tempTracker = true;
-    }
+        OMPL_INFORM("Lightning Solve: Possible solution found in %f seconds", planTime_);
 
-    // Smooth the result
-    //OMPL_INFORM("Simplifying solution (smoothing)...");
-    //simplifySolution(ptc);
 
-    // Get information about the exploration data structure the motion planner used. Used later in visualizing
-    og::PathGeometric solutionPath = getSolutionPath(); // copied so that it is non-const
+        // Smooth the result
+        //OMPL_INFORM("Simplifying solution (smoothing)...");
+        //simplifySolution(ptc);
 
-    OMPL_INFORM("Solution path has %d states and was generated from planner %s", solutionPath.getStateCount(), getSolutionPlannerName().c_str());
-    logs_.csvDataLogStream_ << solutionPath.getStateCount() << "," << getSolutionPlannerName() << ",";
+        std::cout << "before get solution path " << std::endl;
+        // Get information about the exploration data structure the motion planner used. Used later in visualizing
+        og::PathGeometric solutionPath = getSolutionPath(); // copied so that it is non-const
+        std::cout << "after get solution path " << std::endl;
+        OMPL_INFORM("Solution path has %d states and was generated from planner %s", solutionPath.getStateCount(), getSolutionPlannerName().c_str());
+        logs_.csvDataLogStream_ << solutionPath.getStateCount() << "," << getSolutionPlannerName() << ",";
 
-    //solutionPath.print(std::cout);
+        //solutionPath.print(std::cout);
 
-    std::cout << OMPL_CONSOLE_COLOR_CYAN << "LIGHTNING RESULTS:" << OMPL_CONSOLE_COLOR_RESET << std::endl;
+        std::cout << OMPL_CONSOLE_COLOR_CYAN << "LIGHTNING RESULTS:" << OMPL_CONSOLE_COLOR_RESET << std::endl;
 
-    // Do not save if approximate
-    if (!haveExactSolutionPath())
-    {
-        logs_.csvDataLogStream_ << "not_exact_solution_path,not_saved,0,";
-
-        if (tempTracker)
-            OMPL_ERROR("STATUS FAILED AND NO EXACT SOLUTION");
-        else
-            OMPL_ERROR("STATUS DID NOT FAIL AND EXACT SOLUTION");
-        std::cout << std::endl;
-        std::cout << std::endl;
-        std::cout << std::endl;
-        std::cout << std::endl;
-        std::cout << std::endl;
-
-        OMPL_INFORM("NOT saving to database because the solution is APPROXIMATE");
-
-        throw;
-        exit(-1);
-    }
-    // Use dynamic time warping to see if the repaired path is too similar to the original
-    else if (getSolutionPlannerName() == rrPlanner_->getName())
-    {
-        OMPL_INFORM("Solution from Recall");
-
-        // Logging
-        logs_.numSolutionsFromRecall_++;
-
-        // Make sure solution has at least 2 states
-        if (solutionPath.getStateCount() < 2)
+        // Do not save if approximate
+        if (!haveExactSolutionPath())
         {
-            OMPL_INFORM("NOT saving to database because solution is less than 2 states long");
-            logs_.numSolutionsTooShort_++;
-            logs_.csvDataLogStream_ << "from_recall,less_2_states,0,";
+            logs_.csvDataLogStream_ << "not_exact_solution_path,not_saved,0,";
+            logs_.numSolutionsApproximate_++;
+
+            // TODO not sure what to do here, use case not tested
+            OMPL_WARN("NOT saving to database because the solution is APPROXIMATE");
         }
-        else
+        // Use dynamic time warping to see if the repaired path is too similar to the original
+        else if (getSolutionPlannerName() == rrPlanner_->getName())
         {
-            // Convert the original recalled path to PathGeometric
-            ob::PlannerDataPtr chosenRecallPathData = getRetrieveRepairPlanner().getChosenRecallPath();
-            og::PathGeometric chosenRecallPath(si_);
-            convertPlannerData(chosenRecallPathData, chosenRecallPath);
+            OMPL_INFORM("Solution from Recall");
 
-            // Reverse path2 if necessary so that it matches path1 better
-            reversePathIfNecessary(solutionPath, chosenRecallPath);
+            // Logging
+            logs_.numSolutionsFromRecall_++;
 
-            double score = dtw_->getPathsScoreHalfConst( solutionPath, chosenRecallPath );
-
-            //  TODO: It would be nice if we switch to percentages of path length for score, and maybe define this var in the magic namespace.
-            if (score < 10)
+            // Make sure solution has at least 2 states
+            if (solutionPath.getStateCount() < 2)
             {
-                OMPL_INFORM("NOT saving to database because best solution was not from database and is too similar (score %f)", score);
-                logs_.csvDataLogStream_ << "from_recall,score_too_similar," << score << ",";
+                OMPL_INFORM("NOT saving to database because solution is less than 2 states long");
+                logs_.numSolutionsTooShort_++;
+                logs_.csvDataLogStream_ << "from_recall,less_2_states,0,";
             }
             else
             {
-                OMPL_INFORM("Adding path to database because repaired path is different enough from original recalled path (score %f)", score);
-                logs_.csvDataLogStream_ << "from_recall,score_different_enough," << score << ",";
+                // Convert the original recalled path to PathGeometric
+                ob::PlannerDataPtr chosenRecallPathData = getRetrieveRepairPlanner().getChosenRecallPath();
+                og::PathGeometric chosenRecallPath(si_);
+                convertPlannerData(chosenRecallPathData, chosenRecallPath);
 
-                // Logging
-                logs_.numSolutionsFromRecallSaved_++;
+                // Reverse path2 if necessary so that it matches path1 better
+                reversePathIfNecessary(solutionPath, chosenRecallPath);
+
+                double score = dtw_->getPathsScoreHalfConst( solutionPath, chosenRecallPath );
+
+                //  TODO: From Ioan: It would be nice if we switch to percentages of path length for score, and maybe define this var in the magic namespace.
+                //  From Dave: Actually I think I already made the getPathsScore function length-invariant by dividing the score by the path
+                if (score < 4) //10)
+                {
+                    OMPL_ERROR("NOT saving to database because best solution was from database and is too similar (score %f)", score);
+                    logs_.csvDataLogStream_ << "from_recall,score_too_similar," << score << ",";
+                }
+                else
+                {
+                    OMPL_INFORM("Adding path to database because repaired path is different enough from original recalled path (score %f)", score);
+                    logs_.csvDataLogStream_ << "from_recall,score_different_enough," << score << ",";
+
+                    // Logging
+                    logs_.numSolutionsFromRecallSaved_++;
+
+                    // Save to database
+                    experienceDB_->addPath(solutionPath);
+                }
+            }
+        }
+        else
+        {
+            OMPL_INFORM("Solution from Scratch");
+
+            // Logging
+            logs_.numSolutionsFromScratch_++;
+
+            // Make sure solution has at least 2 states
+            if (solutionPath.getStateCount() < 2)
+            {
+                OMPL_INFORM("NOT saving to database because solution is less than 2 states long");
+                logs_.csvDataLogStream_ << "from_scratch,less_2_states,0,";
+                logs_.numSolutionsTooShort_++;
+            }
+            else
+            {
+                OMPL_INFORM("Adding path to database because best solution was not from database");
+                logs_.csvDataLogStream_ << "from_scratch,saving,0,";
+
+                // TODO: maybe test this path for validity also?
 
                 // Save to database
                 experienceDB_->addPath(solutionPath);
             }
-        }
-    }
-    else
-    {
-        OMPL_INFORM("Solution from Scratch");
-
-        // Logging
-        logs_.numSolutionsFromScratch_++;
-
-        // Make sure solution has at least 2 states
-        if (solutionPath.getStateCount() < 2)
-        {
-            OMPL_INFORM("NOT saving to database because solution is less than 2 states long");
-            logs_.csvDataLogStream_ << "from_scratch,less_2_states,0,";
-            logs_.numSolutionsTooShort_++;
-        }
-        else
-        {
-            OMPL_INFORM("Adding path to database because best solution was not from database");
-            logs_.csvDataLogStream_ << "from_scratch,saving,0,";
-
-            // TODO: maybe test this path for validity also?
-
-            // Save to database
-            experienceDB_->addPath(solutionPath);
         }
     }
 
@@ -341,10 +335,12 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
         << logs_.numSolutionsFromRecallSaved_ << ","
         << logs_.numSolutionsFromRecall_ - logs_.numSolutionsFromRecallSaved_ << ","
         << logs_.numSolutionsFailed_ << ","
+        << logs_.numSolutionsApproximate_ << ","
         << logs_.numSolutionsTooShort_ << ","
         << experienceDB_->getExperiencesCount() << ","
         << logs_.getAveragePlanningTime() << std::endl;
 
+    std::cout << "Leaving Lightning::solve() fn " << std::endl;
     return lastStatus_;
 }
 
@@ -400,13 +396,14 @@ void ompl::tools::Lightning::print(std::ostream &out) const
 void ompl::tools::Lightning::printLogs(std::ostream &out) const
 {
     out << "Lightning Framework Logging Results" << std::endl;
-    out << "  Solutions" << std::endl;
+    out << "  Solutions Attempted:                 " << logs_.numProblems_ << std::endl;
     out << "     Solved from scratch:              " << logs_.numSolutionsFromScratch_ << std::endl;
     out << "     Solved from recall:               " << logs_.numSolutionsFromRecall_ << std::endl;
     out << "        That were saved:               " << logs_.numSolutionsFromRecallSaved_ << std::endl;
     out << "        That were discarded:           " << logs_.numSolutionsFromRecall_ - logs_.numSolutionsFromRecallSaved_ << std::endl;
-    out << "     Failed/approximate results:       " << logs_.numSolutionsFailed_ << std::endl;
-    out << "     Less than 2 states:               " << logs_.numSolutionsTooShort_ << std::endl;
+    out << "        Less than 2 states:            " << logs_.numSolutionsTooShort_ << std::endl;
+    out << "     Failed:                           " << logs_.numSolutionsFailed_ << std::endl;
+    out << "     Approximate:                      " << logs_.numSolutionsApproximate_ << std::endl;
     out << "  Total solutions in database:         " << experienceDB_->getExperiencesCount() << std::endl;
     out << "     Unsaved solutions:                " << experienceDB_->getNumUnsavedPaths() << std::endl;
     out << "  Average planning time:               " << logs_.getAveragePlanningTime() << std::endl;
