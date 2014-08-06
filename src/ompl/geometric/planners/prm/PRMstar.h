@@ -61,7 +61,7 @@ namespace ompl
            Algorithms for Optimal Motion Planning, International Journal of Robotics
            Research, vol. 30, no.7, pp. 846-894, 2011.
            DOI: <a href="http://dx.doi.org/10.1177/0278364911406761">10.1177/0278364911406761</a><br>
-           <a href="http://www.kavrakilab.org/robotics/lazyprm.html">[more]</a>
+           <a href="http://www.kavrakilab.org/robotics/prm.html">[more]</a>
         */
 
         /** \brief PRM* planner */
