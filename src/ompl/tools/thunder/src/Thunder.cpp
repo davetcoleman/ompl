@@ -89,6 +89,8 @@ void ompl::tools::Thunder::initialize()
 
 bool ompl::tools::Thunder::load(const std::string &databaseName, const std::string &databaseDirectory)
 {
+    setup();  // ensure the PRM db has been loaded to the Experience DB
+
     getFilePath(databaseName, databaseDirectory);
 
     return experienceDB_->load(filePath_); // load from file
@@ -140,6 +142,22 @@ void ompl::tools::Thunder::setup(void)
             pp_->addPlanner(planner_);   // Add the planning from scratch planner if desired
         if (recallEnabled_)
             pp_->addPlanner(rrPlanner_);  // Add the planning from experience planner if desired
+
+
+        // Setup the PRM for the experience DB 
+        // TODO: make this the same one as the repair planner?
+        if (!experienceDB_->getPRM())
+        {
+            bool starStrategry = true;
+            boost::shared_ptr<ompl::geometric::PRM> prm;
+            prm.reset(new ompl::geometric::PRM(si_, starStrategry));
+            prm->setProblemDefinition(pdef_);
+
+            if (!prm->isSetup())
+                prm->setup();
+
+            experienceDB_->setPRM(prm);
+        }
 
         // Set the configured flag
         configured_ = true;
@@ -203,7 +221,7 @@ ompl::base::PlannerStatus ompl::tools::Thunder::solve(const base::PlannerTermina
     OMPL_INFORM("Thunder Framework: Starting solve()");
 
     // Setup again in case it has not been done yet
-    setup();
+    setup(); 
 
     lastStatus_ = base::PlannerStatus::UNKNOWN;
     time::point start = time::now();
@@ -235,10 +253,8 @@ ompl::base::PlannerStatus ompl::tools::Thunder::solve(const base::PlannerTermina
         //OMPL_INFORM("Simplifying solution (smoothing)...");
         //simplifySolution(ptc);
 
-        std::cout << "before get solution path " << std::endl;
         // Get information about the exploration data structure the motion planner used. Used later in visualizing
         og::PathGeometric solutionPath = getSolutionPath(); // copied so that it is non-const
-        std::cout << "after get solution path " << std::endl;
         OMPL_INFORM("Solution path has %d states and was generated from planner %s", solutionPath.getStateCount(), getSolutionPlannerName().c_str());
         logs_.csvDataLogStream_ << solutionPath.getStateCount() << "," << getSolutionPlannerName() << ",";
 
@@ -324,9 +340,10 @@ ompl::base::PlannerStatus ompl::tools::Thunder::solve(const base::PlannerTermina
                 // TODO: maybe test this path for validity also?
 
                 // Save to database
-                OMPL_WARN("Temp not adding path but instead whole planner data");
+                
 
                 /*
+                OMPL_WARN("Temp not adding path but instead whole planner data");
                 base::PlannerData pd( si_ );
                 getPlannerData(pd);
                 experienceDB_->addPlannerData(pd);
@@ -360,11 +377,13 @@ ompl::base::PlannerStatus ompl::tools::Thunder::solve(double time)
 
 bool ompl::tools::Thunder::save()
 {
+    setup(); // ensure the PRM db has been loaded to the Experience DB
     return experienceDB_->save(filePath_);
 }
 
 bool ompl::tools::Thunder::saveIfChanged()
 {
+    setup(); // ensure the PRM db has been loaded to the Experience DB
     return experienceDB_->saveIfChanged(filePath_);
 }
 

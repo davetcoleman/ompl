@@ -49,26 +49,6 @@ ompl::tools::ExperienceDB2::ExperienceDB2(const base::StateSpacePtr &space)
 {
     // Set space information
     si_.reset(new base::SpaceInformation(space));
-
-    prmProblemDef_.reset(new base::ProblemDefinition(si_));
-
-    // Load PRM
-    std::cout << "Loading PRM " << std::endl;
-    bool starStrategry = true;
-    prm_.reset(new ompl::geometric::PRM(si_, starStrategry));
-    prm_->setProblemDefinition(prmProblemDef_);
-    std::cout << "Before PRM setup " << std::endl;
-    prm_->setup();
-    std::cout << "Done loading PRM " << std::endl;
-
-    // Set nearest neighbor type
-    //nn_.reset(new ompl::NearestNeighborsSqrtApprox<ompl::base::PlannerDataPtr>());
-
-    // Use our custom distance function for nearest neighbor tree
-    //nn_->setDistanceFunction(boost::bind(&ompl::tools::ExperienceDB2::distanceFunction, this, _1, _2));
-
-    // Load the PlannerData instance to be used for searching
-    //nnSearchKey_.reset(new ompl::base::PlannerData(si_));
 }
 
 ompl::tools::ExperienceDB2::~ExperienceDB2(void)
@@ -90,7 +70,12 @@ bool ompl::tools::ExperienceDB2::load(const std::string& fileName)
         OMPL_WARN("Database file does not exist: %s", fileName.c_str());
         return false;
     }
-
+    if (!prm_)
+    {
+        OMPL_ERROR("PRM planner has not been passed into the ExperienceDB2 yet");
+        return false;
+    }
+    
     // Load database from file, track loading time
     time::point start = time::now();
 
@@ -146,6 +131,12 @@ bool ompl::tools::ExperienceDB2::load(const std::string& fileName)
 // TODO this is a temp debug function
 void ompl::tools::ExperienceDB2::addPlannerData(const ompl::base::PlannerData &data)
 {
+    if (!prm_)
+    {
+        OMPL_ERROR("PRM planner has not been passed into the ExperienceDB2 yet");
+        return;
+    }
+
     prm_->setPlannerData(data);
 
     std::cout << "PRM now has " << prm_->milestoneCount() << " states" << std::endl;
@@ -155,6 +146,16 @@ void ompl::tools::ExperienceDB2::addPlannerData(const ompl::base::PlannerData &d
 
 void ompl::tools::ExperienceDB2::addPath(ompl::geometric::PathGeometric& solutionPath)
 {
+    if (!prm_)
+    {
+        OMPL_ERROR("PRM planner has not been passed into the ExperienceDB2 yet");
+        return;
+    }
+
+    std::cout << "-------------------------------------------------------" << std::endl;
+    std::cout << "-------------------------------------------------------" << std::endl;    
+    std::cout << "before addPath PRM has " << prm_->milestoneCount() << " states" << std::endl;
+
     std::cout << "ADD PATH ------------------- " << std::endl;
     // Deep copy the states in the vertices so that when the planner goes out of scope, all data remains intact
     //plannerData->decoupleFromPlanner();
@@ -212,6 +213,11 @@ bool ompl::tools::ExperienceDB2::save(const std::string& fileName)
         OMPL_ERROR("Empty filename passed to save function");
         return false;
     }
+    if (!prm_)
+    {
+        OMPL_ERROR("PRM planner has not been passed into the ExperienceDB2 yet");
+        return false;
+    }
 
     // Save database from file, track saving time
     time::point start = time::now();
@@ -267,8 +273,27 @@ bool ompl::tools::ExperienceDB2::save(const std::string& fileName)
     return true;
 }
 
+void ompl::tools::ExperienceDB2::setPRM(ompl::tools::PRMPtr &prm)
+{
+    std::cout << "-------------------------------------------------------" << std::endl;
+    std::cout << "setPRM " << std::endl;
+    std::cout << "-------------------------------------------------------" << std::endl;
+    prm_ = prm;
+}
+
+ompl::tools::PRMPtr& ompl::tools::ExperienceDB2::getPRM()
+{
+    return prm_;
+}
+
 void ompl::tools::ExperienceDB2::getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const
 {
+    if (!prm_)
+    {
+        OMPL_ERROR("PRM planner has not been passed into the ExperienceDB2 yet");
+        return;
+    }
+
     OMPL_DEBUG("ExperienceDB2: getAllPlannerDatas");
 
     if (getExperiencesCount() == 0)
@@ -278,14 +303,10 @@ void ompl::tools::ExperienceDB2::getAllPlannerDatas(std::vector<ompl::base::Plan
     }
 
     base::PlannerDataPtr data(new base::PlannerData(si_));
-    std::cout << "Vertices: " << data->numVertices() << std::endl;
-    
     prm_->getPlannerData(*data);
-    std::cout << "Vertices after call prm: " << data->numVertices() << std::endl;
-
     plannerDatas.push_back(data);
 
-    OMPL_DEBUG("Number of paths found: %d", plannerDatas.size());
+    OMPL_DEBUG("ExperienceDB2::getAllPlannerDatas: Number of paths found: %d", plannerDatas.size());
 }
 
 std::vector<ompl::base::PlannerDataPtr> ompl::tools::ExperienceDB2::findNearestStartGoal(int nearestK, const base::State* start, const base::State* goal)
@@ -341,5 +362,10 @@ void ompl::tools::ExperienceDB2::debugState(const ompl::base::State* state)
 
 std::size_t ompl::tools::ExperienceDB2::getExperiencesCount() const
 {
+    if (!prm_)
+    {
+        OMPL_ERROR("PRM planner has not been passed into the ExperienceDB2 yet");
+        return 0;
+    }
     return prm_->milestoneCount(); // Get the number of milestones in the graph
 }

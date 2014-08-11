@@ -586,27 +586,26 @@ void ompl::geometric::PRM::getPlannerData(base::PlannerData &data) const
 void ompl::geometric::PRM::setPlannerData(const base::PlannerData &data)
 {
     // Add all vertices
-    std::cout << "setPlannerData: num vertices: " << data.numVertices() << std::endl;
+    std::cout << "PRM::setPlannerData: numVertices=" << data.numVertices() << std::endl;
     std::vector<Vertex> idToVertex;
 
+    std::cout << "Adding vertex ";
     for (std::size_t vertexID = 0; vertexID < data.numVertices(); ++vertexID)
     {
         // Get the state from loaded planner data
-        //base::State *state = data.getVertex(vertexID).getState();
         const base::State *oldState = data.getVertex(vertexID).getState();
         base::State *state = si_->cloneState(oldState);
         
-        // Add the state to the graph
-        std::cout << "Adding vertex " << state << std::endl;
+        // Add the state to the graph and remember its ID
+        std::cout << "  " << vertexID;
         idToVertex.push_back(addVertex(state));
     }
+    std::cout << std::endl;
 
-    //OMPL_ERROR("loading edges not implemented yet");
+    // Add the corresponding edges to the graph ------------------------------------
 
     std::vector<unsigned int> edgeList;
     unsigned int numEdges;
-
-    // Add the corresponding edges to the graph
     for (std::size_t fromVertex = 0; fromVertex < data.numVertices(); ++fromVertex)
     {
         edgeList.clear();
@@ -624,7 +623,7 @@ void ompl::geometric::PRM::setPlannerData(const base::PlannerData &data)
                     
             // Add the edge to the graph
             const base::Cost weight(0);
-            std::cout << "Adding edge from vertex " << fromVertex << " to " <<  toVertex << " into edgeList" << std::endl;
+            std::cout << "   Adding edge from vertex " << fromVertex << " to " <<  toVertex << " into edgeList" << std::endl;
             addEdge(m, n, weight);
         }
     }

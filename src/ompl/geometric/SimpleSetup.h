@@ -177,6 +177,9 @@ namespace ompl
             void setStartAndGoalStates(const base::ScopedState<> &start, const base::ScopedState<> &goal,
                                        const double threshold = std::numeric_limits<double>::epsilon())
             {
+                // Clear past solutions if there are any
+                pdef_->clearSolutionPaths();
+
                 pdef_->setStartAndGoalStates(start, goal, threshold);
             }
 

@@ -67,6 +67,8 @@ namespace ompl
         OMPL_CLASS_FORWARD(ExperienceDB2);
         /// @endcond
 
+        typedef boost::shared_ptr<ompl::geometric::PRM> PRMPtr;
+    
         /** \class ompl::geometric::ExperienceDB2Ptr
             \brief A boost shared pointer wrapper for ompl::tools::ExperienceDB2 */
 
@@ -119,6 +121,18 @@ namespace ompl
             void getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const;
 
             /**
+             * \brief 
+             * \param input - description
+             */
+            void setPRM(ompl::tools::PRMPtr &prm);
+
+            /**
+             * \brief 
+             * \return 
+             */
+            ompl::tools::PRMPtr& getPRM();
+
+            /**
              * \brief Find the k nearest paths to our queries one
              */
             std::vector<ompl::base::PlannerDataPtr> findNearestStartGoal(int nearestK, const base::State* start, const base::State* goal);
@@ -163,10 +177,7 @@ namespace ompl
             int numUnsavedPaths_;
 
             // Use PRM's graph datastructure to store experience
-            boost::shared_ptr<ompl::geometric::PRM> prm_;
-
-            /** \brief A secondary problem definition for the prm planner to use */
-            ompl::base::ProblemDefinitionPtr                       prmProblemDef_;
+            ompl::tools::PRMPtr prm_;
 
         }; // end of class ExperienceDB2
 
