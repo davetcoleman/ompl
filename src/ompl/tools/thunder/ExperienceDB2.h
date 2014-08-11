@@ -92,6 +92,7 @@ namespace ompl
              */
             bool load(const std::string& fileName);
 
+            void addPlannerData(const ompl::base::PlannerData &data);
             /**
              * \brief Add a new solution path to our database. Des not actually save to file so
              *        experience will be lost if save() is not called
@@ -113,9 +114,9 @@ namespace ompl
             bool save(const std::string& fileName);
 
             /**
-             * \brief Get a vector of all the paths in the nearest neighbor tree
+             * \brief Get a vector of all the planner datas in the database
              */
-            void getAllPaths(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const;
+            void getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const;
 
             /**
              * \brief Find the k nearest paths to our queries one

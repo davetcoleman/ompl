@@ -91,12 +91,6 @@ bool ompl::tools::Thunder::load(const std::string &databaseName, const std::stri
 {
     getFilePath(databaseName, databaseDirectory);
 
-    /*if (!experienceDB_)
-    {
-        OMPL_WARN("ExperienceDB2 is not finished yet and will not load");
-        return false;
-        }*/
-
     return experienceDB_->load(filePath_); // load from file
 }
 
@@ -330,6 +324,13 @@ ompl::base::PlannerStatus ompl::tools::Thunder::solve(const base::PlannerTermina
                 // TODO: maybe test this path for validity also?
 
                 // Save to database
+                OMPL_WARN("Temp not adding path but instead whole planner data");
+
+                /*
+                base::PlannerData pd( si_ );
+                getPlannerData(pd);
+                experienceDB_->addPlannerData(pd);
+                */
                 experienceDB_->addPath(solutionPath);
             }
         }
@@ -447,9 +448,9 @@ std::size_t ompl::tools::Thunder::getExperiencesCount() const
     return experienceDB_->getExperiencesCount();
 }
 
-void ompl::tools::Thunder::getAllPaths(std::vector<ob::PlannerDataPtr> &plannerDatas) const
+void ompl::tools::Thunder::getAllPlannerDatas(std::vector<ob::PlannerDataPtr> &plannerDatas) const
 {
-    experienceDB_->getAllPaths(plannerDatas);
+    experienceDB_->getAllPlannerDatas(plannerDatas);
 }
 
 void ompl::tools::Thunder::convertPlannerData(const ob::PlannerDataPtr plannerData, og::PathGeometric &path)

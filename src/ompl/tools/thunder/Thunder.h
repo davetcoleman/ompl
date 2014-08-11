@@ -223,7 +223,7 @@ namespace ompl
             void enablePlanningFromScratch(bool enable);
 
             /** \brief Get a vector of all the paths in the database */
-            void getAllPaths(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const;
+            void getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const;
 
             /** \brief Get the total number of paths stored in the database */
             std::size_t getExperiencesCount() const;

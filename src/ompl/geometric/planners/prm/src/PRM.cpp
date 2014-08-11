@@ -161,8 +161,6 @@ void ompl::geometric::PRM::clear()
 
 void ompl::geometric::PRM::freeMemory()
 {
-    OMPL_WARN("ompl::geometric::PRM::freeMemory() called ------------");
-
     foreach (Vertex v, boost::vertices(g_))
         si_->freeState(stateProperty_[v]);
     g_.clear();
@@ -588,6 +586,9 @@ void ompl::geometric::PRM::getPlannerData(base::PlannerData &data) const
 void ompl::geometric::PRM::setPlannerData(const base::PlannerData &data)
 {
     // Add all vertices
+    std::cout << "setPlannerData: num vertices: " << data.numVertices() << std::endl;
+    std::vector<Vertex> idToVertex;
+
     for (std::size_t vertexID = 0; vertexID < data.numVertices(); ++vertexID)
     {
         // Get the state from loaded planner data
@@ -596,26 +597,30 @@ void ompl::geometric::PRM::setPlannerData(const base::PlannerData &data)
         base::State *state = si_->cloneState(oldState);
         
         // Add the state to the graph
-        addVertex(state);
+        std::cout << "Adding vertex " << state << std::endl;
+        idToVertex.push_back(addVertex(state));
     }
 
-    OMPL_ERROR("loading edges not implemented yet");
-    /*
+    //OMPL_ERROR("loading edges not implemented yet");
+
     std::vector<unsigned int> edgeList;
     unsigned int numEdges;
+
     // Add the corresponding edges to the graph
     for (std::size_t fromVertex = 0; fromVertex < data.numVertices(); ++fromVertex)
     {
         edgeList.clear();
         numEdges = data.getEdges(fromVertex, edgeList);
+        
+        std::cout << "Vertex " << fromVertex << " has " << numEdges << " edges " << std::endl;
 
-        Vertex m = boost::vertices(g_)[fromVertex];
+        Vertex m = idToVertex[fromVertex];
 
         // Process edges
         for (std::size_t edgeId = 0; edgeId < edgeList.size(); ++edgeId)
         {
             std::size_t toVertex = edgeList[edgeId];
-            Vertex n = boost::vertices(g_)[toVertex];
+            Vertex n = idToVertex[toVertex];
                     
             // Add the edge to the graph
             const base::Cost weight(0);
@@ -623,7 +628,6 @@ void ompl::geometric::PRM::setPlannerData(const base::PlannerData &data)
             addEdge(m, n, weight);
         }
     }
-    */
 }
 
 ompl::base::Cost ompl::geometric::PRM::costHeuristic(Vertex u, Vertex v) const

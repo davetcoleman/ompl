@@ -131,6 +131,7 @@ bool ompl::tools::ExperienceDB2::load(const std::string& fileName)
         //nn_->add(plannerData);
 
         // Add to PRM
+        std::cout << "ExpeienceDB2.load() Vertices count: " << plannerData->numVertices() << std::endl;
         prm_->setPlannerData(*plannerData);
     }
 
@@ -142,23 +143,53 @@ bool ompl::tools::ExperienceDB2::load(const std::string& fileName)
     return true;
 }
 
+// TODO this is a temp debug function
+void ompl::tools::ExperienceDB2::addPlannerData(const ompl::base::PlannerData &data)
+{
+    prm_->setPlannerData(data);
+
+    std::cout << "PRM now has " << prm_->milestoneCount() << " states" << std::endl;
+
+    numUnsavedPaths_++;
+}
+
 void ompl::tools::ExperienceDB2::addPath(ompl::geometric::PathGeometric& solutionPath)
 {
     std::cout << "ADD PATH ------------------- " << std::endl;
     // Deep copy the states in the vertices so that when the planner goes out of scope, all data remains intact
     //plannerData->decoupleFromPlanner();
 
+    ompl::geometric::PRM::Vertex from;
+    ompl::geometric::PRM::Vertex to;
+
     // Add the states to one nodes files
     for (std::size_t i = 0; i < solutionPath.getStates().size(); ++i)
     {
-        ompl::base::State* oldState = solutionPath.getStates()[i];
-        ompl::base::State *state = si_->cloneState(oldState);
+        // Copy the state
+        ompl::base::State *state = si_->cloneState(solutionPath.getStates()[i]);
+
         prm_->addMilestone( state );
+
+        /*
+        if (i == 0)
+        {
+            // Do not add edge at first state
+            from = prm_->addVertex(state);
+        }
+        else
+        {
+            to = prm_->addVertex(state);
+            const base::Cost weight(0); // TODO = opt_->motionCost(stateProperty_[m], stateProperty_[n]);
+            prm_->addEdge( from, to, weight);
+            from = to; // switch for next loop
+        }
+        */
 
         OMPL_INFORM("State %d:", i);
         debugState(state);
     }
 
+    std::cout << "PRM now has " << prm_->milestoneCount() << " states" << std::endl;
     // TODO: add edges
 
     numUnsavedPaths_++;
@@ -194,12 +225,15 @@ bool ompl::tools::ExperienceDB2::save(const std::string& fileName)
     std::vector<ompl::base::PlannerDataPtr> plannerDatas;
 
     // TODO: make this more than 1 planner data perhaps
-    base::PlannerData data(si_);
-    prm_->getPlannerData(data);
+    base::PlannerDataPtr data(new base::PlannerData(si_));
+    prm_->getPlannerData(*data);
+    plannerDatas.push_back(data);
 
     // Write the number of paths we will be saving
     double numPaths = plannerDatas.size();
     outStream << numPaths;
+
+    std::cout << "Our singluar planner datas has " << numPaths << " paths" << std::endl;
 
     // Start saving each planner data object
     for (std::size_t i = 0; i < numPaths; ++i)
@@ -233,14 +267,22 @@ bool ompl::tools::ExperienceDB2::save(const std::string& fileName)
     return true;
 }
 
-void ompl::tools::ExperienceDB2::getAllPaths(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const
+void ompl::tools::ExperienceDB2::getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const
 {
-    OMPL_DEBUG("ExperienceDB2: getAllPaths");
+    OMPL_DEBUG("ExperienceDB2: getAllPlannerDatas");
 
-    // Convert the NN tree to a vector
-    //nn_->list(plannerDatas);
+    if (getExperiencesCount() == 0)
+    {
+        OMPL_INFORM("No paths found");
+        return;
+    }
+
     base::PlannerDataPtr data(new base::PlannerData(si_));
+    std::cout << "Vertices: " << data->numVertices() << std::endl;
+    
     prm_->getPlannerData(*data);
+    std::cout << "Vertices after call prm: " << data->numVertices() << std::endl;
+
     plannerDatas.push_back(data);
 
     OMPL_DEBUG("Number of paths found: %d", plannerDatas.size());
