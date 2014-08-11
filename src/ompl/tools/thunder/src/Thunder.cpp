@@ -90,6 +90,13 @@ void ompl::tools::Thunder::initialize()
 bool ompl::tools::Thunder::load(const std::string &databaseName, const std::string &databaseDirectory)
 {
     getFilePath(databaseName, databaseDirectory);
+
+    /*if (!experienceDB_)
+    {
+        OMPL_WARN("ExperienceDB2 is not finished yet and will not load");
+        return false;
+        }*/
+
     return experienceDB_->load(filePath_); // load from file
 }
 
@@ -243,7 +250,7 @@ ompl::base::PlannerStatus ompl::tools::Thunder::solve(const base::PlannerTermina
 
         //solutionPath.print(std::cout);
 
-        std::cout << OMPL_CONSOLE_COLOR_CYAN << "LIGHTNING RESULTS:" << OMPL_CONSOLE_COLOR_RESET << std::endl;
+        std::cout << OMPL_CONSOLE_COLOR_CYAN << "THUNDER RESULTS:" << OMPL_CONSOLE_COLOR_RESET << std::endl;
 
         // Do not save if approximate
         if (!haveExactSolutionPath())
@@ -404,7 +411,7 @@ void ompl::tools::Thunder::printLogs(std::ostream &out) const
     out << "        Less than 2 states:            " << logs_.numSolutionsTooShort_ << std::endl;
     out << "     Failed:                           " << logs_.numSolutionsFailed_ << std::endl;
     out << "     Approximate:                      " << logs_.numSolutionsApproximate_ << std::endl;
-    out << "  Total solutions in database:         " << experienceDB_->getExperiencesCount() << std::endl;
+    out << "  Total nodes in database:         " << experienceDB_->getExperiencesCount() << std::endl;
     out << "     Unsaved solutions:                " << experienceDB_->getNumUnsavedPaths() << std::endl;
     out << "  Average planning time:               " << logs_.getAveragePlanningTime() << std::endl;
 }

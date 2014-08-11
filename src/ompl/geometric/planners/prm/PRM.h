@@ -203,12 +203,16 @@ namespace ompl
 
             virtual void getPlannerData(base::PlannerData &data) const;
 
-            virtual void setPlannerData(base::PlannerData &data);
+            virtual void setPlannerData(const base::PlannerData &data);
 
             /** \brief While the termination condition allows, this function will construct the roadmap (using growRoadmap() and expandRoadmap(),
                 maintaining a 2:1 ratio for growing/expansion of roadmap) */
             virtual void constructRoadmap(const base::PlannerTerminationCondition &ptc);
 
+            Vertex addVertex(base::State *state);
+            
+            void addEdge(Vertex m, Vertex n, const base::Cost weight);
+            
             /** \brief If the user desires, the roadmap can be
                 improved for the given time (seconds). The solve()
                 method will also improve the roadmap, as needed.*/
@@ -276,7 +280,7 @@ namespace ompl
                 return si_->distance(stateProperty_[a], stateProperty_[b]);
             }
 
-            /** \brief Compute distance between two milestones (this is simply distance between the states of the milestones) */
+            /** \brief Get the number of milestones in the graph */
             unsigned int milestoneCount() const
             {
                 return boost::num_vertices(g_);

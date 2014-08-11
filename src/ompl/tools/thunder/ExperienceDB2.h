@@ -164,6 +164,9 @@ namespace ompl
             // Use PRM's graph datastructure to store experience
             boost::shared_ptr<ompl::geometric::PRM> prm_;
 
+            /** \brief A secondary problem definition for the prm planner to use */
+            ompl::base::ProblemDefinitionPtr                       prmProblemDef_;
+
         }; // end of class ExperienceDB2
 
     } // end of namespace

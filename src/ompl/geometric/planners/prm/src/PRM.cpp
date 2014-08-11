@@ -161,7 +161,7 @@ void ompl::geometric::PRM::clear()
 
 void ompl::geometric::PRM::freeMemory()
 {
-    OMPL_WARN("ompl::geometric::SPARStwo::freeMemory() called ------------");
+    OMPL_WARN("ompl::geometric::PRM::freeMemory() called ------------");
 
     foreach (Vertex v, boost::vertices(g_))
         si_->freeState(stateProperty_[v]);
@@ -468,6 +468,8 @@ ompl::geometric::PRM::Vertex ompl::geometric::PRM::addVertex(base::State *state)
     disjointSets_.make_set(m);
 
     nn_->add(m);
+
+    return m;
 }
 
 void ompl::geometric::PRM::addEdge(Vertex m, Vertex n, const base::Cost weight)
@@ -583,18 +585,22 @@ void ompl::geometric::PRM::getPlannerData(base::PlannerData &data) const
     }
 }
 
-ompl::geometric::PRM::setPlannerData(base::PlannerData &data)
+void ompl::geometric::PRM::setPlannerData(const base::PlannerData &data)
 {
     // Add all vertices
     for (std::size_t vertexID = 0; vertexID < data.numVertices(); ++vertexID)
     {
         // Get the state from loaded planner data
-        base::State *state = data.getVertex(vertexID).getState();
+        //base::State *state = data.getVertex(vertexID).getState();
+        const base::State *oldState = data.getVertex(vertexID).getState();
+        base::State *state = si_->cloneState(oldState);
         
         // Add the state to the graph
-        Vertex m = addVertex(state);
+        addVertex(state);
     }
 
+    OMPL_ERROR("loading edges not implemented yet");
+    /*
     std::vector<unsigned int> edgeList;
     unsigned int numEdges;
     // Add the corresponding edges to the graph
@@ -617,6 +623,7 @@ ompl::geometric::PRM::setPlannerData(base::PlannerData &data)
             addEdge(m, n, weight);
         }
     }
+    */
 }
 
 ompl::base::Cost ompl::geometric::PRM::costHeuristic(Vertex u, Vertex v) const
