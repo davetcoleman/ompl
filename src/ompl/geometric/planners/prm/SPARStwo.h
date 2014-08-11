@@ -75,6 +75,8 @@ namespace ompl
            <a href="http://www.cs.rutgers.edu/~kb572/pubs/spars2.pdf">[PDF]</a>
         */
 
+        typedef boost::shared_ptr<ompl::geometric::PathGeometric> PathGeometricPtr;
+
         /** \brief <b> SPArse Roadmap Spanner Version 2.0 </b> */
         class SPARStwo : public base::Planner
         {
@@ -294,8 +296,13 @@ namespace ompl
                 return stretchFactor_;
             }
 
-            /** \brief While the termination condition permits, construct the spanner graph */
-            void constructRoadmap(const base::PlannerTerminationCondition &ptc);
+            /** 
+             *  \brief While the termination condition permits, construct the spanner graphn
+             *  \param ptc
+             *  \param solutionpath - Allow optional input of a solution path instead of random sampling 
+             */
+            void constructRoadmap(const base::PlannerTerminationCondition &ptc, 
+                                  ompl::geometric::PathGeometricPtr solutionPath = ompl::geometric::PathGeometricPtr());
 
             /** \brief While the termination condition permits, construct the spanner graph. If \e stopOnMaxFail is true,
                 the function also terminates when the failure limit set by setMaxFailures() is reached. */
@@ -353,6 +360,18 @@ namespace ompl
             }
 
             virtual void getPlannerData(base::PlannerData &data) const;
+
+            /**
+             * \brief Set the sparse graph from file
+             * \param a pre-built graph
+             */
+            void setPlannerData(const base::PlannerData &data);
+
+            /** \brief Returns whether we have reached the iteration failures limit, maxFailures_ */
+            bool reachedFailureLimit () const;
+
+            /** \brief Print debug information about planner */
+            void printDebug(std::ostream &out = std::cout) const;
 
         protected:
 
@@ -426,9 +445,6 @@ namespace ompl
             /** \brief Returns true if we have reached the iteration failures limit, \e maxFailures_ or if a solution was added */
             bool reachedTerminationCriterion() const;
 
-            /** \brief Returns whether we have reached the iteration failures limit, maxFailures_ */
-            bool reachedFailureLimit () const;
-
             /** \brief Given two milestones from the same connected component, construct a path connecting them and set it as the solution */
             base::PathPtr constructSolution(const Vertex start, const Vertex goal) const;
 
@@ -484,7 +500,7 @@ namespace ompl
             PathSimplifierPtr                                                   psimp_;
 
             /** \brief Access to the weights of each Edge */
-            boost::property_map<Graph, boost::edge_weight_t>::type              weightProperty_;
+            boost::property_map<Graph, boost::edge_weight_t>::type              weightProperty_; // TODO: this is not used
 
             /** \brief Access to the colors for the vertices */
             boost::property_map<Graph, vertex_color_t>::type                    colorProperty_;

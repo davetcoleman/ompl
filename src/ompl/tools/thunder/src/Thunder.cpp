@@ -146,17 +146,23 @@ void ompl::tools::Thunder::setup(void)
 
         // Setup the PRM for the experience DB 
         // TODO: make this the same one as the repair planner?
-        if (!experienceDB_->getPRM())
+        if (!experienceDB_->getSPARStwo())
         {
-            bool starStrategry = true;
-            boost::shared_ptr<ompl::geometric::PRM> prm;
-            prm.reset(new ompl::geometric::PRM(si_, starStrategry));
-            prm->setProblemDefinition(pdef_);
+            boost::shared_ptr<ompl::geometric::SPARStwo> spars;
+            spars.reset(new ompl::geometric::SPARStwo(si_));
+            spars->setProblemDefinition(pdef_);
 
-            if (!prm->isSetup())
-                prm->setup();
+            if (!spars->isSetup())
+            {
+                std::cout << "Calling setup " << std::endl;
+                spars->setup();
+            }
 
-            experienceDB_->setPRM(prm);
+            spars->printDebug();
+            spars->setStretchFactor(1.2);
+            spars->setSparseDeltaFraction(0.001);
+
+            experienceDB_->setSPARStwo(spars);
         }
 
         // Set the configured flag

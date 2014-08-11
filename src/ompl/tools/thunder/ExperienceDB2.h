@@ -50,7 +50,7 @@
 #include "ompl/base/State.h"
 #include "ompl/base/SpaceInformation.h"
 #include "ompl/datastructures/NearestNeighbors.h"
-#include "ompl/geometric/planners/prm/PRM.h"
+#include "ompl/geometric/planners/prm/SPARStwo.h"
 
 namespace ompl
 {
@@ -67,7 +67,7 @@ namespace ompl
         OMPL_CLASS_FORWARD(ExperienceDB2);
         /// @endcond
 
-        typedef boost::shared_ptr<ompl::geometric::PRM> PRMPtr;
+        typedef boost::shared_ptr<ompl::geometric::SPARStwo> SPARStwoPtr;
     
         /** \class ompl::geometric::ExperienceDB2Ptr
             \brief A boost shared pointer wrapper for ompl::tools::ExperienceDB2 */
@@ -124,13 +124,13 @@ namespace ompl
              * \brief 
              * \param input - description
              */
-            void setPRM(ompl::tools::PRMPtr &prm);
+            void setSPARStwo(ompl::tools::SPARStwoPtr &prm);
 
             /**
              * \brief 
              * \return 
              */
-            ompl::tools::PRMPtr& getPRM();
+            ompl::tools::SPARStwoPtr& getSPARStwo();
 
             /**
              * \brief Find the k nearest paths to our queries one
@@ -176,8 +176,8 @@ namespace ompl
             // Track unsaved paths to determine if a save is required
             int numUnsavedPaths_;
 
-            // Use PRM's graph datastructure to store experience
-            ompl::tools::PRMPtr prm_;
+            // Use SPARStwo's graph datastructure to store experience
+            ompl::tools::SPARStwoPtr prm_;
 
         }; // end of class ExperienceDB2
 

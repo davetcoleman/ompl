@@ -126,8 +126,6 @@ void ompl::geometric::SPARStwo::freeMemory()
     sampler_.reset();
     simpleSampler_.reset();
 
-    OMPL_WARN("ompl::geometric::SPARStwo::freeMemory() called ------------");
-
     foreach (Vertex v, boost::vertices(g_))
     {
         foreach (InterfaceData &d, interfaceDataProperty_[v].interfaceHash | boost::adaptors::map_values)
@@ -172,6 +170,22 @@ bool ompl::geometric::SPARStwo::reachedFailureLimit() const
     return consecutiveFailures_ >= maxFailures_;
 }
 
+void ompl::geometric::SPARStwo::printDebug(std::ostream &out) const
+{
+    out << "SPARStwo Debug Output: " << std::endl;
+    out << "  Settings: " << std::endl;
+    out << "    Max Failures: " << getMaxFailures() << std::endl;
+    out << "    Dense Delta Fraction: " << getDenseDeltaFraction() << std::endl;
+    out << "    Sparse Delta Fraction: " << getSparseDeltaFraction() << std::endl;
+    out << "    Stretch Factor: " << getStretchFactor() << std::endl;
+    out << "  Status: " << std::endl;
+    out << "    Milestone Count: " << milestoneCount() << std::endl;
+    //    out << "    Guard Count: " << guardCount() << std::endl;
+    out << "    Iterations: " << getIterations() << std::endl;
+    //    out << "    Average Valence: " << averageValence() << std::endl;
+    out << "    Consecutive Failures: " << consecutiveFailures_ << std::endl;
+}
+
 bool ompl::geometric::SPARStwo::reachedTerminationCriterion() const
 {
     return consecutiveFailures_ >= maxFailures_ || addedSolution_;
@@ -190,9 +204,26 @@ void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationC
         constructRoadmap(ptc);
 }
 
-void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationCondition &ptc)
+void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationCondition &ptc, 
+                                                 ompl::geometric::PathGeometricPtr solutionPath)
 {
+    // Check that the query vertex is initialized (used for internal nearest neighbor searches)
     checkQueryStateInitialization();
+
+    // Optionally skip random sampling, and add to roadmap from a path
+    bool feedFromPath = false;
+    std::size_t solutionPathId = 1; // skip first state in path b/c added as start
+    if (solutionPath != NULL && solutionPath->getStateCount() > 0)
+    {
+        feedFromPath = true;
+        //std::cout << "Before interpolation: " << solutionPath->getStateCount() << std::endl;
+        //solutionPath->interpolate(); // increase the number of states
+        //std::cout << "After interpolation: " << solutionPath->getStateCount() << std::endl;
+        // initialize roadmap with start and goal of solution path
+        addGuard(si_->cloneState(solutionPath->getState(0)), START); // TODO: add this to startM_.push_back() to possibly remove it after seeding path?
+        std::cout << "Added state 0 as START guard, state: " << solutionPath->getState(0) << std::endl;
+        printDebug();
+    }
 
     if (!sampler_)
         sampler_ = si_->allocValidStateSampler();
@@ -212,33 +243,64 @@ void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationC
         ++iterations_;
         ++consecutiveFailures_;
 
-        //Generate a single sample, and attempt to connect it to nearest neighbors.
-        if (!sampler_->sample(qNew))
-            continue;
+        // Two methods for getting samples
+        if (feedFromPath)
+        {
+            std::cout << "constructRoadmap from path on state " << solutionPathId << " value: " << solutionPath->getState(solutionPathId) << std::endl;
+            if (solutionPathId >= solutionPath->getStateCount())
+            {
+                std::cout << "FINISHED inputting states " << std::endl;
+                break;
+            }
+            // Deep copy
+            qNew = si_->cloneState(solutionPath->getState(solutionPathId));
+            solutionPathId++;
+            std::cout << " --- Feeding into roadmap state " << qNew << std::endl;
+        }
+        else // normal method:
+        {
+            //Generate a single sample, and attempt to connect it to nearest neighbors.
+            if (!sampler_->sample(qNew))
+                continue;
+        }
 
         findGraphNeighbors(qNew, graphNeighborhood, visibleNeighborhood);
+        
+        std::cout << "graph neighborhood " << graphNeighborhood.size() << std::endl;
+        std::cout << "visible neighborhood " << visibleNeighborhood.size() << std::endl;
 
         if (!checkAddCoverage(qNew, visibleNeighborhood))
+        {
+            std::cout << "debug -1" << std::endl;
             if (!checkAddConnectivity(qNew, visibleNeighborhood))
+            {
+                std::cout << "debug 0 " << std::endl;
                 if (!checkAddInterface(qNew, graphNeighborhood, visibleNeighborhood))
                 {
+                    std::cout << "debug 1" << std::endl;
                     if (visibleNeighborhood.size() > 0)
                     {
+                        std::cout << "debug 2" << std::endl;
                         std::map<Vertex, base::State*> closeRepresentatives;
                         findCloseRepresentatives(workState, qNew, visibleNeighborhood[0], closeRepresentatives, ptc);
                         for (std::map<Vertex, base::State*>::iterator it = closeRepresentatives.begin(); it != closeRepresentatives.end(); ++it)
                         {
+                            std::cout << "debug 3" << std::endl;
                             updatePairPoints(visibleNeighborhood[0], qNew, it->first, it->second);
                             updatePairPoints(it->first, it->second, visibleNeighborhood[0], qNew);
                         }
+                        std::cout << "debug 4" << std::endl;
                         checkAddPath(visibleNeighborhood[0]);
                         for (std::map<Vertex, base::State*>::iterator it = closeRepresentatives.begin(); it != closeRepresentatives.end(); ++it)
                         {
+                            std::cout << "debug 5" << std::endl;
                             checkAddPath(it->first);
                             si_->freeState(it->second);
                         }
                     }
                 }
+            }
+        }
     }
     si_->freeState(workState);
     si_->freeState(qNew);
@@ -247,7 +309,6 @@ void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationC
 void ompl::geometric::SPARStwo::checkQueryStateInitialization()
 {
     boost::mutex::scoped_lock _(graphMutex_);
-    OMPL_WARN("ompl::geometric::SPARStwo::checkQueryStateInitialization() called ------------");
     if (boost::num_vertices(g_) < 1)
     {
         queryVertex_ = boost::add_vertex( g_ );
@@ -733,6 +794,7 @@ ompl::geometric::SPARStwo::Vertex ompl::geometric::SPARStwo::addGuard(base::Stat
 
 void ompl::geometric::SPARStwo::connectGuards(Vertex v, Vertex vp)
 {
+    std::cout << "connectGuards called ---------------------------------------------------------------- " << std::endl;
     assert(v <= milestoneCount());
     assert(vp <= milestoneCount());
 
@@ -810,4 +872,52 @@ void ompl::geometric::SPARStwo::getPlannerData(base::PlannerData &data) const
             data.addVertex(base::PlannerDataVertex(stateProperty_[n], (int)colorProperty_[n]));
 
     data.properties["iterations INTEGER"] = boost::lexical_cast<std::string>(iterations_);
+}
+
+void ompl::geometric::SPARStwo::setPlannerData(const base::PlannerData &data)
+{
+    /*
+    // Add all vertices
+    std::cout << "SPARS::setPlannerData: numVertices=" << data.numVertices() << std::endl;
+    std::vector<Vertex> idToVertex;
+
+    std::cout << "Adding vertex ";
+    for (std::size_t vertexID = 0; vertexID < data.numVertices(); ++vertexID)
+    {
+        // Get the state from loaded planner data
+        const base::State *oldState = data.getVertex(vertexID).getState();
+        base::State *state = si_->cloneState(oldState);
+        
+        // Add the state to the graph and remember its ID
+        std::cout << "  " << vertexID;
+        idToVertex.push_back(addVertex(state));
+    }
+    std::cout << std::endl;
+
+    // Add the corresponding edges to the graph ------------------------------------
+
+    std::vector<unsigned int> edgeList;
+    unsigned int numEdges;
+    for (std::size_t fromVertex = 0; fromVertex < data.numVertices(); ++fromVertex)
+    {
+        edgeList.clear();
+        numEdges = data.getEdges(fromVertex, edgeList);
+        
+        std::cout << "Vertex " << fromVertex << " has " << numEdges << " edges " << std::endl;
+
+        Vertex m = idToVertex[fromVertex];
+
+        // Process edges
+        for (std::size_t edgeId = 0; edgeId < edgeList.size(); ++edgeId)
+        {
+            std::size_t toVertex = edgeList[edgeId];
+            Vertex n = idToVertex[toVertex];
+                    
+            // Add the edge to the graph
+            const base::Cost weight(0);
+            std::cout << "   Adding edge from vertex " << fromVertex << " to " <<  toVertex << " into edgeList" << std::endl;
+            addEdge(m, n, weight);
+        }
+    }
+    */
 }
