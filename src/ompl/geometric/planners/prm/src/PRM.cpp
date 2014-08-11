@@ -161,6 +161,8 @@ void ompl::geometric::PRM::clear()
 
 void ompl::geometric::PRM::freeMemory()
 {
+    OMPL_WARN("ompl::geometric::SPARStwo::freeMemory() called ------------");
+
     foreach (Vertex v, boost::vertices(g_))
         si_->freeState(stateProperty_[v]);
     g_.clear();
@@ -455,10 +457,8 @@ void ompl::geometric::PRM::constructRoadmap(const base::PlannerTerminationCondit
     si_->freeStates(xstates);
 }
 
-ompl::geometric::PRM::Vertex ompl::geometric::PRM::addMilestone(base::State *state)
+ompl::geometric::PRM::Vertex ompl::geometric::PRM::addVertex(base::State *state)
 {
-    boost::mutex::scoped_lock _(graphMutex_);
-
     Vertex m = boost::add_vertex(g_);
     stateProperty_[m] = state;
     totalConnectionAttemptsProperty_[m] = 1;
@@ -468,7 +468,22 @@ ompl::geometric::PRM::Vertex ompl::geometric::PRM::addMilestone(base::State *sta
     disjointSets_.make_set(m);
 
     nn_->add(m);
+}
 
+void ompl::geometric::PRM::addEdge(Vertex m, Vertex n, const base::Cost weight)
+{
+    const unsigned int id = maxEdgeID_++;
+    const Graph::edge_property_type properties(weight, id);
+    boost::add_edge(m, n, properties, g_);
+    uniteComponents(n, m);
+}
+
+ompl::geometric::PRM::Vertex ompl::geometric::PRM::addMilestone(base::State *state)
+{
+    boost::mutex::scoped_lock _(graphMutex_);
+
+    Vertex m = addVertex(state);
+ 
     // Which milestones will we attempt to connect to?
     const std::vector<Vertex>& neighbors = connectionStrategy_(m);
 
@@ -482,10 +497,7 @@ ompl::geometric::PRM::Vertex ompl::geometric::PRM::addMilestone(base::State *sta
                 successfulConnectionAttemptsProperty_[m]++;
                 successfulConnectionAttemptsProperty_[n]++;
                 const base::Cost weight = opt_->motionCost(stateProperty_[m], stateProperty_[n]);
-                const unsigned int id = maxEdgeID_++;
-                const Graph::edge_property_type properties(weight, id);
-                boost::add_edge(m, n, properties, g_);
-                uniteComponents(n, m);
+                addEdge(m, n, weight);
             }
         }
 
@@ -568,6 +580,42 @@ void ompl::geometric::PRM::getPlannerData(base::PlannerData &data) const
         // Add tags for the newly added vertices
         data.tagState(stateProperty_[v1], const_cast<PRM*>(this)->disjointSets_.find_set(v1));
         data.tagState(stateProperty_[v2], const_cast<PRM*>(this)->disjointSets_.find_set(v2));
+    }
+}
+
+ompl::geometric::PRM::setPlannerData(base::PlannerData &data)
+{
+    // Add all vertices
+    for (std::size_t vertexID = 0; vertexID < data.numVertices(); ++vertexID)
+    {
+        // Get the state from loaded planner data
+        base::State *state = data.getVertex(vertexID).getState();
+        
+        // Add the state to the graph
+        Vertex m = addVertex(state);
+    }
+
+    std::vector<unsigned int> edgeList;
+    unsigned int numEdges;
+    // Add the corresponding edges to the graph
+    for (std::size_t fromVertex = 0; fromVertex < data.numVertices(); ++fromVertex)
+    {
+        edgeList.clear();
+        numEdges = data.getEdges(fromVertex, edgeList);
+
+        Vertex m = boost::vertices(g_)[fromVertex];
+
+        // Process edges
+        for (std::size_t edgeId = 0; edgeId < edgeList.size(); ++edgeId)
+        {
+            std::size_t toVertex = edgeList[edgeId];
+            Vertex n = boost::vertices(g_)[toVertex];
+                    
+            // Add the edge to the graph
+            const base::Cost weight(0);
+            std::cout << "Adding edge from vertex " << fromVertex << " to " <<  toVertex << " into edgeList" << std::endl;
+            addEdge(m, n, weight);
+        }
     }
 }
 

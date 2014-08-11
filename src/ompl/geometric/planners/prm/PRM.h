@@ -161,11 +161,11 @@ namespace ompl
             virtual void setProblemDefinition(const base::ProblemDefinitionPtr &pdef);
 
             /** \brief Set the connection strategy function that specifies the
-             milestones that connection attempts will be make to for a
+             milestones that connection attempts will be made for a
              given milestone.
 
              \par The behavior and performance of PRM can be changed drastically
-             by varying the number and properties if the milestones that are
+             by varying the number and properties of the milestones that are
              connected to each other.
 
              \param pdef A function that takes a milestone as an argument and
@@ -202,6 +202,8 @@ namespace ompl
             }
 
             virtual void getPlannerData(base::PlannerData &data) const;
+
+            virtual void setPlannerData(base::PlannerData &data);
 
             /** \brief While the termination condition allows, this function will construct the roadmap (using growRoadmap() and expandRoadmap(),
                 maintaining a 2:1 ratio for growing/expansion of roadmap) */
@@ -285,14 +287,14 @@ namespace ompl
                 return nn_;
             }
 
+            /** \brief Construct a milestone for a given state (\e state), store it in the nearest neighbors data structure
+                and then connect it to the roadmap in accordance to the connection strategy. */
+            virtual Vertex addMilestone(base::State *state);
+
         protected:
 
             /** \brief Free all the memory allocated by the planner */
             void freeMemory();
-
-            /** \brief Construct a milestone for a given state (\e state), store it in the nearest neighbors data structure
-                and then connect it to the roadmap in accordance to the connection strategy. */
-            virtual Vertex addMilestone(base::State *state);
 
             /** \brief Make two milestones (\e m1 and \e m2) be part of the same connected component. The component with fewer elements will get the id of the component with more elements. */
             void uniteComponents(Vertex m1, Vertex m2);

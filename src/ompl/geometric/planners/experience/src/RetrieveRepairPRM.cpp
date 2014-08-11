@@ -39,13 +39,13 @@
 #include "ompl/base/goals/GoalState.h"
 #include "ompl/base/goals/GoalSampleableRegion.h"
 #include "ompl/tools/config/SelfConfig.h"
-#include "ompl/tools/lightning/ExperienceDB.h"
+#include "ompl/tools/thunder/ExperienceDB2.h"
 
 #include <boost/thread.hpp>
 
 #include <limits>
 
-ompl::geometric::RetrieveRepairPRM::RetrieveRepairPRM(const base::SpaceInformationPtr &si, const ompl::tools::ExperienceDBPtr &experienceDB)
+ompl::geometric::RetrieveRepairPRM::RetrieveRepairPRM(const base::SpaceInformationPtr &si, const ompl::tools::ExperienceDB2Ptr &experienceDB)
     : base::Planner(si, "RetrieveRepairPRM"),
       experienceDB_(experienceDB),
       nearestK_(10) // default value
@@ -74,7 +74,7 @@ void ompl::geometric::RetrieveRepairPRM::clear(void)
         repairPlanner_->clear();
 }
 
-void ompl::geometric::RetrieveRepairPRM::setExperienceDB(ompl::tools::ExperienceDBPtr experienceDB)
+void ompl::geometric::RetrieveRepairPRM::setExperienceDB(ompl::tools::ExperienceDB2Ptr experienceDB)
 {
     experienceDB_ = experienceDB;
 }
@@ -257,7 +257,7 @@ bool ompl::geometric::RetrieveRepairPRM::findBestPath(const base::State *startSt
             // The distance between starts and goals is less when in reverse
             isReversed[pathID] = true;
             distances[pathID] = reversedDistance;
-            // We won't actually flip it until later to save memory operations and not alter our NN tree in the ExperienceDB
+            // We won't actually flip it until later to save memory operations and not alter our NN tree in the ExperienceDB2
         }
         else
         {

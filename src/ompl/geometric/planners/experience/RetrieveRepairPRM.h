@@ -46,7 +46,7 @@ namespace ompl
 {
     namespace tools
     {
-        OMPL_CLASS_FORWARD(ExperienceDB);
+        OMPL_CLASS_FORWARD(ExperienceDB2);
     }
 
     namespace geometric
@@ -70,13 +70,13 @@ namespace ompl
            <a href="http://users.wpi.edu/~dberenson/lightning.pdf">[PDF]</a>
         */
 
-        /** \brief The Lightning Framework's Retrieve-Repair component */
+        /** \brief The Thunder Framework's Retrieve-Repair component */
         class RetrieveRepairPRM : public base::Planner
         {
         public:
 
             /** \brief Constructor */
-            RetrieveRepairPRM(const base::SpaceInformationPtr &si, const ompl::tools::ExperienceDBPtr &experienceDB);
+            RetrieveRepairPRM(const base::SpaceInformationPtr &si, const ompl::tools::ExperienceDB2Ptr &experienceDB);
 
             virtual ~RetrieveRepairPRM(void);
 
@@ -115,9 +115,9 @@ namespace ompl
             virtual void clear(void);
 
             /**
-             * \brief Pass a pointer of the database from the lightning framework
+             * \brief Pass a pointer of the database from the thunder framework
              */
-            void setExperienceDB(ompl::tools::ExperienceDBPtr experienceDB);
+            void setExperienceDB(ompl::tools::ExperienceDB2Ptr experienceDB);
 
             /** \brief Set the planner that will be used for repairing invalid paths recalled from experience */
             void setRepairPlanner(const base::PlannerPtr &planner);
@@ -177,7 +177,7 @@ namespace ompl
             void freeMemory(void);
 
             /** \brief The database of motions to search through */
-            ompl::tools::ExperienceDBPtr                           experienceDB_;
+            ompl::tools::ExperienceDB2Ptr                           experienceDB_;
 
             /** \brief Recall the nearest paths and store this in planner data for introspection later */
             std::vector<ompl::base::PlannerDataPtr>                nearestPaths_;

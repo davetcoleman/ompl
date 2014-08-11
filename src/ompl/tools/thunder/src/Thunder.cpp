@@ -35,12 +35,12 @@
 /* Author: Dave Coleman */
 
 
-#include "ompl/tools/lightning/Lightning.h"
+#include "ompl/tools/thunder/Thunder.h"
 #include "ompl/base/goals/GoalSampleableRegion.h"
 #include "ompl/geometric/PathGeometric.h"
 #include "ompl/geometric/SimpleSetup.h" // use their implementation of getDefaultPlanner
 #include "ompl/base/StateSpace.h" // for storing to file
-#include "ompl/tools/lightning/ExperienceDB.h"
+#include "ompl/tools/thunder/ExperienceDB2.h"
 #include "ompl/tools/multiplan/ParallelPlan.h"
 
 // Boost
@@ -50,23 +50,23 @@ namespace og = ompl::geometric;
 namespace ob = ompl::base;
 namespace ot = ompl::tools;
 
-ompl::tools::Lightning::Lightning(const base::SpaceInformationPtr &si) :
+ompl::tools::Thunder::Thunder(const base::SpaceInformationPtr &si) :
     ompl::geometric::SimpleSetup(si)
 {
     initialize();
 }
 
-ompl::tools::Lightning::Lightning(const base::StateSpacePtr &space) :
+ompl::tools::Thunder::Thunder(const base::StateSpacePtr &space) :
     ompl::geometric::SimpleSetup(space)
 {
     initialize();
 }
 
-void ompl::tools::Lightning::initialize()
+void ompl::tools::Thunder::initialize()
 {
     std::cout << OMPL_CONSOLE_COLOR_CYAN << std::endl;
     std::cout << std::endl;
-    std::cout << "Initializing Lightning Framework ///////////////////////////////////////" << std::endl;
+    std::cout << "Initializing Thunder Framework ///////////////////////////////////////" << std::endl;
     std::cout << OMPL_CONSOLE_COLOR_RESET;
 
     recallEnabled_ = true;
@@ -77,23 +77,23 @@ void ompl::tools::Lightning::initialize()
     dtw_.reset(new ot::DynamicTimeWarp(si_));
 
     // Load the experience database
-    experienceDB_.reset(new ompl::tools::ExperienceDB(si_->getStateSpace()));
+    experienceDB_.reset(new ompl::tools::ExperienceDB2(si_->getStateSpace()));
 
     // Load the Retrieve repair database. We do it here so that setRepairPlanner() works
-    rrPlanner_ = ob::PlannerPtr(new og::RetrieveRepair(si_, experienceDB_));
+    rrPlanner_ = ob::PlannerPtr(new og::RetrieveRepairPRM(si_, experienceDB_));
 
-    OMPL_INFORM("Lightning Framework initialized.");
+    OMPL_INFORM("Thunder Framework initialized.");
     std::cout << std::endl;
     std::cout << std::endl;
 }
 
-bool ompl::tools::Lightning::load(const std::string &databaseName, const std::string &databaseDirectory)
+bool ompl::tools::Thunder::load(const std::string &databaseName, const std::string &databaseDirectory)
 {
     getFilePath(databaseName, databaseDirectory);
     return experienceDB_->load(filePath_); // load from file
 }
 
-void ompl::tools::Lightning::setup(void)
+void ompl::tools::Thunder::setup(void)
 {
     if (!configured_ || !si_->isSetup() || !planner_->isSetup() || !rrPlanner_->isSetup() )
     {
@@ -145,7 +145,7 @@ void ompl::tools::Lightning::setup(void)
     }
 }
 
-bool ompl::tools::Lightning::getFilePath(const std::string &databaseName, const std::string &databaseDirectory)
+bool ompl::tools::Thunder::getFilePath(const std::string &databaseName, const std::string &databaseDirectory)
 {
     namespace fs = boost::filesystem;
 
@@ -181,7 +181,7 @@ bool ompl::tools::Lightning::getFilePath(const std::string &databaseName, const 
     return true;
 }
 
-void ompl::tools::Lightning::clear(void)
+void ompl::tools::Thunder::clear(void)
 {
     if (planner_)
         planner_->clear();
@@ -197,9 +197,9 @@ void ompl::tools::Lightning::clear(void)
 }
 
 // we provide a duplicate implementation here to allow the planner to choose how the time is turned into a planner termination condition
-ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTerminationCondition &ptc)
+ompl::base::PlannerStatus ompl::tools::Thunder::solve(const base::PlannerTerminationCondition &ptc)
 {
-    OMPL_INFORM("Lightning Framework: Starting solve()");
+    OMPL_INFORM("Thunder Framework: Starting solve()");
 
     // Setup again in case it has not been done yet
     setup();
@@ -220,14 +220,14 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
     // Skip further processing if absolutely no path is available
     if (!lastStatus_)
     {
-        OMPL_ERROR("Lightning Solve: No solution found after %f seconds", planTime_);
+        OMPL_ERROR("Thunder Solve: No solution found after %f seconds", planTime_);
         logs_.numSolutionsFailed_++;
 
         logs_.csvDataLogStream_ << "0,neither_planner,failed,not_saved,0,";
     }
     else
     {
-        OMPL_INFORM("Lightning Solve: Possible solution found in %f seconds", planTime_);
+        OMPL_INFORM("Thunder Solve: Possible solution found in %f seconds", planTime_);
 
 
         // Smooth the result
@@ -340,27 +340,27 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
         << experienceDB_->getExperiencesCount() << ","
         << logs_.getAveragePlanningTime() << std::endl;
 
-    std::cout << "Leaving Lightning::solve() fn " << std::endl;
+    std::cout << "Leaving Thunder::solve() fn " << std::endl;
     return lastStatus_;
 }
 
-ompl::base::PlannerStatus ompl::tools::Lightning::solve(double time)
+ompl::base::PlannerStatus ompl::tools::Thunder::solve(double time)
 {
     ob::PlannerTerminationCondition ptc = ob::timedPlannerTerminationCondition( time );
     return solve(ptc);
 }
 
-bool ompl::tools::Lightning::save()
+bool ompl::tools::Thunder::save()
 {
     return experienceDB_->save(filePath_);
 }
 
-bool ompl::tools::Lightning::saveIfChanged()
+bool ompl::tools::Thunder::saveIfChanged()
 {
     return experienceDB_->saveIfChanged(filePath_);
 }
 
-void ompl::tools::Lightning::printResultsInfo(std::ostream &out) const
+void ompl::tools::Thunder::printResultsInfo(std::ostream &out) const
 {
     for (std::size_t i = 0; i < pdef_->getSolutionCount(); ++i)
     {
@@ -372,7 +372,7 @@ void ompl::tools::Lightning::printResultsInfo(std::ostream &out) const
     }
 }
 
-void ompl::tools::Lightning::print(std::ostream &out) const
+void ompl::tools::Thunder::print(std::ostream &out) const
 {
     if (si_)
     {
@@ -393,9 +393,9 @@ void ompl::tools::Lightning::print(std::ostream &out) const
         pdef_->print(out);
 }
 
-void ompl::tools::Lightning::printLogs(std::ostream &out) const
+void ompl::tools::Thunder::printLogs(std::ostream &out) const
 {
-    out << "Lightning Framework Logging Results" << std::endl;
+    out << "Thunder Framework Logging Results" << std::endl;
     out << "  Solutions Attempted:                 " << logs_.numProblems_ << std::endl;
     out << "     Solved from scratch:              " << logs_.numSolutionsFromScratch_ << std::endl;
     out << "     Solved from recall:               " << logs_.numSolutionsFromRecall_ << std::endl;
@@ -409,14 +409,14 @@ void ompl::tools::Lightning::printLogs(std::ostream &out) const
     out << "  Average planning time:               " << logs_.getAveragePlanningTime() << std::endl;
 }
 
-void ompl::tools::Lightning::saveDataLog(std::ostream &out)
+void ompl::tools::Thunder::saveDataLog(std::ostream &out)
 {
     // Export to file and clear the stream
     out << logs_.csvDataLogStream_.str();
     logs_.csvDataLogStream_.str("");
 }
 
-void ompl::tools::Lightning::enablePlanningFromRecall(bool enable)
+void ompl::tools::Thunder::enablePlanningFromRecall(bool enable)
 {
     // Remember state
     recallEnabled_ = enable;
@@ -426,7 +426,7 @@ void ompl::tools::Lightning::enablePlanningFromRecall(bool enable)
 }
 
 
-void ompl::tools::Lightning::enablePlanningFromScratch(bool enable)
+void ompl::tools::Thunder::enablePlanningFromScratch(bool enable)
 {
     // Remember state
     scratchEnabled_ = enable;
@@ -435,24 +435,24 @@ void ompl::tools::Lightning::enablePlanningFromScratch(bool enable)
     configured_ = false;
 }
 
-std::size_t ompl::tools::Lightning::getExperiencesCount() const
+std::size_t ompl::tools::Thunder::getExperiencesCount() const
 {
     return experienceDB_->getExperiencesCount();
 }
 
-void ompl::tools::Lightning::getAllPaths(std::vector<ob::PlannerDataPtr> &plannerDatas) const
+void ompl::tools::Thunder::getAllPaths(std::vector<ob::PlannerDataPtr> &plannerDatas) const
 {
     experienceDB_->getAllPaths(plannerDatas);
 }
 
-void ompl::tools::Lightning::convertPlannerData(const ob::PlannerDataPtr plannerData, og::PathGeometric &path)
+void ompl::tools::Thunder::convertPlannerData(const ob::PlannerDataPtr plannerData, og::PathGeometric &path)
 {
     // Convert the planner data verticies into a vector of states
     for (std::size_t i = 0; i < plannerData->numVertices(); ++i)
         path.append(plannerData->getVertex(i).getState());
 }
 
-bool ompl::tools::Lightning::reversePathIfNecessary(og::PathGeometric &path1, og::PathGeometric &path2)
+bool ompl::tools::Thunder::reversePathIfNecessary(og::PathGeometric &path1, og::PathGeometric &path2)
 {
     // Reverse path2 if it matches better
     const ob::State* s1 = path1.getState(0);

@@ -126,6 +126,8 @@ void ompl::geometric::SPARStwo::freeMemory()
     sampler_.reset();
     simpleSampler_.reset();
 
+    OMPL_WARN("ompl::geometric::SPARStwo::freeMemory() called ------------");
+
     foreach (Vertex v, boost::vertices(g_))
     {
         foreach (InterfaceData &d, interfaceDataProperty_[v].interfaceHash | boost::adaptors::map_values)
@@ -245,6 +247,7 @@ void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationC
 void ompl::geometric::SPARStwo::checkQueryStateInitialization()
 {
     boost::mutex::scoped_lock _(graphMutex_);
+    OMPL_WARN("ompl::geometric::SPARStwo::checkQueryStateInitialization() called ------------");
     if (boost::num_vertices(g_) < 1)
     {
         queryVertex_ = boost::add_vertex( g_ );

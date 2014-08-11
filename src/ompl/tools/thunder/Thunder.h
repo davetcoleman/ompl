@@ -64,8 +64,8 @@ namespace ompl
 
     namespace tools
     {
-        //class ExperienceDB; // forward declaration
-        OMPL_CLASS_FORWARD(ExperienceDB);
+        //class ExperienceDB2; // forward declaration
+        OMPL_CLASS_FORWARD(ExperienceDB2);
         OMPL_CLASS_FORWARD(ParallelPlan);
 
         /**
@@ -283,7 +283,7 @@ namespace ompl
             ompl::tools::ParallelPlanPtr      pp_;
 
             /** \brief A shared object between all the planners for saving and loading previous experience */
-            ompl::tools::ExperienceDBPtr      experienceDB_;
+            ompl::tools::ExperienceDB2Ptr      experienceDB_;
 
             /** \brief Tool for comparing two paths and scoring them */
             ompl::tools::DynamicTimeWarpPtr   dtw_;

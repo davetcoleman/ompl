@@ -50,6 +50,7 @@
 #include "ompl/base/State.h"
 #include "ompl/base/SpaceInformation.h"
 #include "ompl/datastructures/NearestNeighbors.h"
+#include "ompl/geometric/planners/prm/PRM.h"
 
 namespace ompl
 {
@@ -152,13 +153,16 @@ namespace ompl
             ompl::base::PlannerDataStorage plannerDataStorage_;
 
             // A nearest-neighbors datastructure containing the tree of start/goal states combined
-            boost::shared_ptr< NearestNeighbors<ompl::base::PlannerDataPtr> > nn_;
+            //boost::shared_ptr< NearestNeighbors<ompl::base::PlannerDataPtr> > nn_;
 
             // Reusable plannerData instance for filling in start and goal and performing searches on the tree
-            ompl::base::PlannerDataPtr nnSearchKey_;
+            //ompl::base::PlannerDataPtr nnSearchKey_;
 
             // Track unsaved paths to determine if a save is required
             int numUnsavedPaths_;
+
+            // Use PRM's graph datastructure to store experience
+            boost::shared_ptr<ompl::geometric::PRM> prm_;
 
         }; // end of class ExperienceDB2
 
