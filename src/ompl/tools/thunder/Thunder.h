@@ -263,6 +263,9 @@ namespace ompl
               return logs_;
           }
 
+          // TEMP
+          ompl::tools::ExperienceDB2Ptr getExperienceDB();
+
         protected:
 
             /**

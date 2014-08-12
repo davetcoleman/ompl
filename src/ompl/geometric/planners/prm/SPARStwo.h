@@ -296,17 +296,21 @@ namespace ompl
                 return stretchFactor_;
             }
 
-            /** 
+            /**
              *  \brief While the termination condition permits, construct the spanner graphn
              *  \param ptc
-             *  \param solutionpath - Allow optional input of a solution path instead of random sampling 
+             *  \param solutionpath - Allow optional input of a solution path instead of random sampling
              */
-            void constructRoadmap(const base::PlannerTerminationCondition &ptc, 
+            void constructRoadmap(const base::PlannerTerminationCondition &ptc,
                                   ompl::geometric::PathGeometricPtr solutionPath = ompl::geometric::PathGeometricPtr());
 
             /** \brief While the termination condition permits, construct the spanner graph. If \e stopOnMaxFail is true,
                 the function also terminates when the failure limit set by setMaxFailures() is reached. */
             void constructRoadmap(const base::PlannerTerminationCondition &ptc, bool stopOnMaxFail);
+
+            void addPathToRoadmap(const base::PlannerTerminationCondition &ptc, ompl::geometric::PathGeometric& solutionPath);
+
+            void addStateToRoadmap(const base::PlannerTerminationCondition &ptc, base::State *newState);
 
             /** \brief Function that can solve the motion planning
                 problem. This function can be called multiple times on
@@ -533,7 +537,6 @@ namespace ompl
 
             /** \brief Mutex to guard access to the Graph member (g_) */
             mutable boost::mutex                                                graphMutex_;
-
         };
 
     }

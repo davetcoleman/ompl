@@ -146,6 +146,7 @@ void ompl::tools::ExperienceDB2::addPlannerData(const ompl::base::PlannerData &d
 
 void ompl::tools::ExperienceDB2::addPath(ompl::geometric::PathGeometric& solutionPath)
 {
+    // Error check
     if (!prm_)
     {
         OMPL_ERROR("SPARStwo planner has not been passed into the ExperienceDB2 yet");
@@ -154,35 +155,35 @@ void ompl::tools::ExperienceDB2::addPath(ompl::geometric::PathGeometric& solutio
 
     std::cout << "-------------------------------------------------------" << std::endl;
     std::cout << "-------------------------------------------------------" << std::endl;    
-    std::cout << "before addPath SPARStwo has " << prm_->milestoneCount() << " states" << std::endl;
+    std::cout << "ADD PATH... Before addPath SPARStwo has " << prm_->milestoneCount() << " states" << std::endl;
+    std::cout << "-------------------------------------------------------" << std::endl;
+    std::cout << "-------------------------------------------------------" << std::endl;    
 
-    std::cout << "ADD PATH ------------------- " << std::endl;
-    // Deep copy the states in the vertices so that when the planner goes out of scope, all data remains intact
-    //plannerData->decoupleFromPlanner();
 
     double seconds = 10; // a large number, should never need to use this
     ompl::base::PlannerTerminationCondition ptc = ompl::base::timedPlannerTerminationCondition( seconds, 0.1 ); 
-    ompl::geometric::PathGeometricPtr solutionPathWrapped(new ompl::geometric::PathGeometric(solutionPath));
-    prm_->constructRoadmap(ptc, solutionPathWrapped);
+    prm_->addPathToRoadmap(ptc, solutionPath);
+
+
+    // this is for PRM only
     /*
-    ompl::geometric::SPARStwo::Vertex from;
-    ompl::geometric::SPARStwo::Vertex to;
+      ompl::geometric::SPARStwo::Vertex from;
+      ompl::geometric::SPARStwo::Vertex to;
 
-    // Add the states to one nodes files
-    for (std::size_t i = 0; i < solutionPath.getStates().size(); ++i)
-    {
-        // Copy the state
-        ompl::base::State *state = si_->cloneState(solutionPath.getStates()[i]);
+      // Add the states to one nodes files
+      for (std::size_t i = 0; i < solutionPath.getStates().size(); ++i)
+      {
+      // Copy the state
+      ompl::base::State *state = si_->cloneState(solutionPath.getStates()[i]);
 
-        prm_->addMilestone( state );
+      prm_->addMilestone( state );
 
-        OMPL_INFORM("State %d:", i);
-        debugState(state);
-    }
+      OMPL_INFORM("State %d:", i);
+      debugState(state);
+      }
     */
 
     std::cout << "SPARStwo now has " << prm_->milestoneCount() << " states" << std::endl;
-    // TODO: add edges
 
     numUnsavedPaths_++;
 }

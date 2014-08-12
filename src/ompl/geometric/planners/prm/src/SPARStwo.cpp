@@ -184,6 +184,7 @@ void ompl::geometric::SPARStwo::printDebug(std::ostream &out) const
     out << "    Iterations: " << getIterations() << std::endl;
     //    out << "    Average Valence: " << averageValence() << std::endl;
     out << "    Consecutive Failures: " << consecutiveFailures_ << std::endl;
+    out << "    Number of guards: " << nn_->size();
 }
 
 bool ompl::geometric::SPARStwo::reachedTerminationCriterion() const
@@ -204,9 +205,12 @@ void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationC
         constructRoadmap(ptc);
 }
 
-void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationCondition &ptc, 
+void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationCondition &ptc,
                                                  ompl::geometric::PathGeometricPtr solutionPath)
 {
+    std::cout << "should not be calling this " << std::endl;
+    throw;
+
     // Check that the query vertex is initialized (used for internal nearest neighbor searches)
     checkQueryStateInitialization();
 
@@ -255,7 +259,6 @@ void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationC
             // Deep copy
             qNew = si_->cloneState(solutionPath->getState(solutionPathId));
             solutionPathId++;
-            std::cout << " --- Feeding into roadmap state " << qNew << std::endl;
         }
         else // normal method:
         {
@@ -265,7 +268,7 @@ void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationC
         }
 
         findGraphNeighbors(qNew, graphNeighborhood, visibleNeighborhood);
-        
+
         std::cout << "graph neighborhood " << graphNeighborhood.size() << std::endl;
         std::cout << "visible neighborhood " << visibleNeighborhood.size() << std::endl;
 
@@ -301,9 +304,125 @@ void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationC
                 }
             }
         }
+        std::cout << "-------------------------------------------------------" << std::endl;
+        std::cout << "-------------------------------------------------------" << std::endl;
+        OMPL_DEBUG("Don't forget I added this break...");
+        break;
     }
     si_->freeState(workState);
     si_->freeState(qNew);
+}
+
+void ompl::geometric::SPARStwo::addPathToRoadmap(const base::PlannerTerminationCondition &ptc,
+                                                 ompl::geometric::PathGeometric& solutionPath)
+{
+    // Check that the query vertex is initialized (used for internal nearest neighbor searches)
+    checkQueryStateInitialization();
+
+    // Error check
+    if (solutionPath.getStateCount() < 2)
+    {
+        OMPL_ERROR("Less than 2 states were passed to addPathToRoadmap in the solution path");
+        return;
+    }
+
+    // Fill in the gaps of the states
+    solutionPath.interpolate();
+
+    // initialize roadmap with start and goal of solution path
+    //startM_.push_back(addGuard(si_->cloneState(solutionPath.getState(0)), START));
+    //goalM_.push_back(addGuard(si_->cloneState(solutionPath.getState(solutionPath.getStateCount() - 1)), GOAL));
+    //printDebug();
+
+    // Try to add the start and goal first, but don't force it
+    addStateToRoadmap(ptc, solutionPath.getState(0));
+    addStateToRoadmap(ptc, solutionPath.getState(solutionPath.getStateCount() - 1));
+
+    // Add solution states to SPARStwo one by one
+
+    // Create a vector of shuffled indexes
+    std::vector<std::size_t> shuffledIDs;
+    for (std::size_t i = 1; i < solutionPath.getStateCount() - 1; ++i)  // skip 0 and last because those are start/goal and are already added
+      shuffledIDs.push_back(i); // 1 2 3...
+    std::random_shuffle ( shuffledIDs.begin(), shuffledIDs.end() ); // using built-in random generator:
+
+    // Add each state randomly
+    for (std::size_t i = 0; i < shuffledIDs.size(); ++i)
+    {
+      std::cout << "Adding state " << shuffledIDs[i] << " of " << solutionPath.getStateCount() << std::endl;
+
+      // Add a single state to the roadmap
+      addStateToRoadmap(ptc, solutionPath.getState(shuffledIDs[i]));
+    }
+
+}
+
+void ompl::geometric::SPARStwo::addStateToRoadmap(const base::PlannerTerminationCondition &ptc, base::State *newState)
+{
+    // Check that the query vertex is initialized (used for internal nearest neighbor searches)
+    checkQueryStateInitialization();
+
+    if (!sampler_)
+        sampler_ = si_->allocValidStateSampler();
+    if (!simpleSampler_)
+        simpleSampler_ = si_->allocStateSampler();
+
+    // Deep copy
+    base::State *qNew = si_->cloneState(newState);
+
+    base::State *workState = si_->allocState();
+
+    /* The whole neighborhood set which has been most recently computed */
+    std::vector<Vertex> graphNeighborhood;
+    /* The visible neighborhood set which has been most recently computed */
+    std::vector<Vertex> visibleNeighborhood;
+
+    ++iterations_;
+    ++consecutiveFailures_;
+
+    findGraphNeighbors(qNew, graphNeighborhood, visibleNeighborhood);
+
+    std::cout << "graph neighborhood: " << graphNeighborhood.size() << " | visible neighborhood: " << visibleNeighborhood.size() << std::endl;
+
+    std::cout << " - checkAddCoverage() Are other nodes around it visible?" << std::endl;
+    if (!checkAddCoverage(qNew, visibleNeighborhood)) // Always add a node if no other nodes around it are visible (GUARD)
+    {
+        std::cout << " -- checkAddConnectivity() Does this node connect neighboring nodes that are not connected? " << std::endl;
+        if (!checkAddConnectivity(qNew, visibleNeighborhood))
+        {
+            std::cout << " --- checkAddInterface() Does this node's neighbor's need it to better connect them? " << std::endl;
+            if (!checkAddInterface(qNew, graphNeighborhood, visibleNeighborhood))
+            {
+                std::cout << " ---- Ensure SPARS asymptotic optimality" << std::endl;
+                if (visibleNeighborhood.size() > 0)
+                {
+                    std::map<Vertex, base::State*> closeRepresentatives;
+                    std::cout << " ----- findCloseRepresentatives()" << std::endl;
+                    findCloseRepresentatives(workState, qNew, visibleNeighborhood[0], closeRepresentatives, ptc);
+                    for (std::map<Vertex, base::State*>::iterator it = closeRepresentatives.begin(); it != closeRepresentatives.end(); ++it)
+                    {
+                        std::cout << " ------ Looping through close representatives" << std::endl;
+                        updatePairPoints(visibleNeighborhood[0], qNew, it->first, it->second);
+                        updatePairPoints(it->first, it->second, visibleNeighborhood[0], qNew);
+                    }
+                    std::cout << " ----- checkAddPath()" << std::endl;
+                    checkAddPath(visibleNeighborhood[0]);
+                    for (std::map<Vertex, base::State*>::iterator it = closeRepresentatives.begin(); it != closeRepresentatives.end(); ++it)
+                    {
+                        std::cout << " ------ Looping through close representatives to add path" << std::endl;
+                        checkAddPath(it->first);
+                        si_->freeState(it->second);
+                    }
+                }
+            }
+        }
+    }
+
+    si_->freeState(workState);
+    si_->freeState(qNew);
+
+    std::cout << std::endl;
+    std::cout << std::endl;
 }
 
 void ompl::geometric::SPARStwo::checkQueryStateInitialization()
@@ -313,6 +432,7 @@ void ompl::geometric::SPARStwo::checkQueryStateInitialization()
     {
         queryVertex_ = boost::add_vertex( g_ );
         stateProperty_[queryVertex_] = NULL;
+        visualizeCallback();
     }
 }
 
@@ -407,6 +527,7 @@ bool ompl::geometric::SPARStwo::checkAddCoverage(const base::State *qNew, std::v
     if (visibleNeighborhood.size() > 0)
         return false;
     //No free paths means we add for coverage
+    std::cout << " -   Adding node as GUARD " << std::endl;
     addGuard(si_->cloneState(qNew), COVERAGE);
     return true;
 }
@@ -429,6 +550,7 @@ bool ompl::geometric::SPARStwo::checkAddConnectivity(const base::State *qNew, st
 
         if (links.size() > 0)
         {
+            std::cout << " --   Adding node and edges for CONNECTIVITY " << std::endl;
             //Add the node
             Vertex g = addGuard(si_->cloneState(qNew), CONNECTIVITY);
 
@@ -456,6 +578,7 @@ bool ompl::geometric::SPARStwo::checkAddInterface(const base::State *qNew, std::
                 if (si_->checkMotion(stateProperty_[visibleNeighborhood[0]], stateProperty_[visibleNeighborhood[1]]))
                 {
                     //Connect them
+                    std::cout << " ---   INTERFACE: directly connected nodes " << std::endl;
                     connectGuards(visibleNeighborhood[0], visibleNeighborhood[1]);
                     //And report that we added to the roadmap
                     resetFailures();
@@ -468,6 +591,7 @@ bool ompl::geometric::SPARStwo::checkAddInterface(const base::State *qNew, std::
                     Vertex v = addGuard(si_->cloneState(qNew), INTERFACE);
                     connectGuards(v, visibleNeighborhood[0]);
                     connectGuards(v, visibleNeighborhood[1]);
+                    std::cout << " ---   INTERFACE: connected two neighbors through new interface node " << std::endl;
                     //Report success
                     return true;
                 }
@@ -789,6 +913,8 @@ ompl::geometric::SPARStwo::Vertex ompl::geometric::SPARStwo::addGuard(base::Stat
     nn_->add(m);
     resetFailures();
 
+    std::cout << " => addGuard() " << std::endl;
+    visualizeCallback();
     return m;
 }
 
@@ -803,6 +929,7 @@ void ompl::geometric::SPARStwo::connectGuards(Vertex v, Vertex vp)
     boost::mutex::scoped_lock _(graphMutex_);
     boost::add_edge(v, vp, properties, g_);
     disjointSets_.union_set(v, vp);
+    visualizeCallback();
 }
 
 ompl::base::PathPtr ompl::geometric::SPARStwo::constructSolution(const Vertex start, const Vertex goal) const
@@ -863,8 +990,9 @@ void ompl::geometric::SPARStwo::getPlannerData(base::PlannerData &data) const
                          base::PlannerDataVertex(stateProperty_[v1], (int)colorProperty_[v1]));
         }
     }
-    else
-        OMPL_INFORM("%s: There are no edges in the graph!", getName().c_str());
+    // TODO: reenable this warning
+    //else
+    //    OMPL_INFORM("%s: There are no edges in the graph!", getName().c_str());
 
     // Make sure to add edge-less nodes as well
     foreach (const Vertex n, boost::vertices(g_))
@@ -887,7 +1015,7 @@ void ompl::geometric::SPARStwo::setPlannerData(const base::PlannerData &data)
         // Get the state from loaded planner data
         const base::State *oldState = data.getVertex(vertexID).getState();
         base::State *state = si_->cloneState(oldState);
-        
+
         // Add the state to the graph and remember its ID
         std::cout << "  " << vertexID;
         idToVertex.push_back(addVertex(state));
@@ -902,7 +1030,7 @@ void ompl::geometric::SPARStwo::setPlannerData(const base::PlannerData &data)
     {
         edgeList.clear();
         numEdges = data.getEdges(fromVertex, edgeList);
-        
+
         std::cout << "Vertex " << fromVertex << " has " << numEdges << " edges " << std::endl;
 
         Vertex m = idToVertex[fromVertex];
@@ -912,7 +1040,7 @@ void ompl::geometric::SPARStwo::setPlannerData(const base::PlannerData &data)
         {
             std::size_t toVertex = edgeList[edgeId];
             Vertex n = idToVertex[toVertex];
-                    
+
             // Add the edge to the graph
             const base::Cost weight(0);
             std::cout << "   Adding edge from vertex " << fromVertex << " to " <<  toVertex << " into edgeList" << std::endl;

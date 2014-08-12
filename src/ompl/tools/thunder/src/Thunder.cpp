@@ -160,7 +160,9 @@ void ompl::tools::Thunder::setup(void)
 
             spars->printDebug();
             spars->setStretchFactor(1.2);
-            spars->setSparseDeltaFraction(0.001);
+            spars->setSparseDeltaFraction(0.1); // vertex visibility range  = maximum_extent * this_fraction
+
+            //spars->setDenseDeltaFraction(0.001);
 
             experienceDB_->setSPARStwo(spars);
         }
@@ -505,4 +507,9 @@ bool ompl::tools::Thunder::reversePathIfNecessary(og::PathGeometric &path1, og::
     }
 
     return false;
+}
+
+ompl::tools::ExperienceDB2Ptr ompl::tools::Thunder::getExperienceDB()
+{
+    return experienceDB_;
 }
