@@ -154,7 +154,8 @@ void ompl::base::Planner::printSettings(std::ostream &out) const
 
 void ompl::base::Planner::visualizeCallback()
 {
-    visualizationCallback_(this);
+    if (visualizationCallback_)
+        visualizationCallback_(this);
 }
 
 void ompl::base::Planner::setVisualizationCallback(VisualizationCallback visualizationCallback)
