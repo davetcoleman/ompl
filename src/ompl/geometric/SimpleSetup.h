@@ -181,6 +181,9 @@ namespace ompl
                 pdef_->clearSolutionPaths();
 
                 pdef_->setStartAndGoalStates(start, goal, threshold);
+
+                // Clear any past solutions since they no longer correspond to our start and goal states
+                pdef_->clearSolutionPaths();
             }
 
             /** \brief Add a starting state for planning. This call is not
