@@ -329,11 +329,6 @@ void ompl::geometric::SPARStwo::addPathToRoadmap(const base::PlannerTerminationC
     // Fill in the gaps of the states
     solutionPath.interpolate();
 
-    // initialize roadmap with start and goal of solution path
-    //startM_.push_back(addGuard(si_->cloneState(solutionPath.getState(0)), START));
-    //goalM_.push_back(addGuard(si_->cloneState(solutionPath.getState(solutionPath.getStateCount() - 1)), GOAL));
-    //printDebug();
-
     // Try to add the start and goal first, but don't force it
     addStateToRoadmap(ptc, solutionPath.getState(0));
     addStateToRoadmap(ptc, solutionPath.getState(solutionPath.getStateCount() - 1));
