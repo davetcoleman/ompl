@@ -162,6 +162,12 @@ namespace ompl
             /** \brief Save debug data about overall results from Thunder since being loaded */
             void saveDataLog(std::ostream &out = std::cout);
 
+            /** \brief Get the current planner */
+            ompl::base::PlannerPtr& getPlanner()
+            {
+                return planner_;
+            }
+
             /**
              * \brief Get a pointer to the retrieve repair planner
              */

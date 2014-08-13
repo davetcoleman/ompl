@@ -491,6 +491,9 @@ ompl::base::PlannerStatus ompl::geometric::RRTstar::solve(const base::PlannerTer
 
     OMPL_INFORM("%s: Created %u new states. Checked %u rewire options. %u goal states in tree.", getName().c_str(), statesGenerated, rewireTest, goalMotions_.size());
 
+    // Debugging
+    visualizeCallback();
+
     return base::PlannerStatus(addedSolution, approximate);
 }
 

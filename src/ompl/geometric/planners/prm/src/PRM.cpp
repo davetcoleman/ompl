@@ -424,6 +424,9 @@ ompl::base::PlannerStatus ompl::geometric::PRM::solve(const base::PlannerTermina
         pdef_->addSolutionPath (psol);
     }
 
+    // Debugging
+    visualizeCallback();
+
     // Return true if any solution was found.
     return sol ? (addedNewSolution() ? base::PlannerStatus::EXACT_SOLUTION : base::PlannerStatus::APPROXIMATE_SOLUTION) : base::PlannerStatus::TIMEOUT;
 }
