@@ -239,9 +239,15 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepairPRM::solve(const base::
 
     // Finished
     approxdif = 0;
-    base::PathPtr solutionPath = base::PathPtr(&primaryPath);
 
-    pdef_->addSolutionPath(solutionPath, approximate, approxdif, getName());
+    // Copy PathGeometric to a pointer version
+    PathGeometric *path = new PathGeometric(si_);
+    for (std::size_t i = 0; i < primaryPath.getStateCount(); ++i)
+    {
+        path->append(primaryPath.getState(i));
+    }
+
+    pdef_->addSolutionPath(ompl::base::PathPtr(path), approximate, approxdif, getName());
     solved = true;
     return base::PlannerStatus(solved, approximate);
 }
