@@ -122,23 +122,31 @@ bool ompl::geometric::SPARStwo::getSimilarPaths(int nearestK, const base::State*
     ompl::base::PathPtr solution;
     bool result = haveSolution(startVisibleNeighborhood, goalVisibleNeighborhood, solution);
 
+    // Error check
     if (!result)
-        OMPL_ERROR("getSimilarPaths(): SPARStwo returned FALSE for haveSolution");
+    {
+        OMPL_INFORM("getSimilarPaths(): SPARStwo returned FALSE for haveSolution");
+        return false;
+    }
     if (!solution)
+    {
         OMPL_ERROR("getSimilarPaths(): SPARStwo returned solution is NULL");
+        return false;
+    }
 
     // Convert to path geometic
     geometric_solution = static_cast<ompl::geometric::PathGeometric&>(*solution);
 
     // Debug output
-    for (std::size_t i = 0; i < geometric_solution.getStateCount(); ++i)
+    if (false)
     {
-        std::cout << "  getSimilarPaths(): Adding state " << i << " to plannerData"  << std::endl;
-        std::cout << "  State: " << geometric_solution.getState(i) << std::endl;
-        si_->printState(geometric_solution.getState(i), std::cout);
-        std::cout << std::endl;
-
-        //planner_data->addVertex( ompl::base::PlannerDataVertex( geometric_solution.getState(i) ) );
+        for (std::size_t i = 0; i < geometric_solution.getStateCount(); ++i)
+        {
+            std::cout << "  getSimilarPaths(): Adding state " << i << " to plannerData"  << std::endl;
+            std::cout << "  State: " << geometric_solution.getState(i) << std::endl;
+            si_->printState(geometric_solution.getState(i), std::cout);
+            std::cout << std::endl;
+        }
     }
 
     return result;
@@ -395,7 +403,7 @@ void ompl::geometric::SPARStwo::addPathToRoadmap(const base::PlannerTerminationC
     // Add each state randomly
     for (std::size_t i = 0; i < shuffledIDs.size(); ++i)
     {
-      std::cout << "Adding state " << shuffledIDs[i] << " of " << solutionPath.getStateCount() << std::endl;
+        //std::cout << "Adding state " << shuffledIDs[i] << " of " << solutionPath.getStateCount() << std::endl;
 
       // Add a single state to the roadmap
       addStateToRoadmap(ptc, solutionPath.getState(shuffledIDs[i]));
@@ -430,7 +438,8 @@ void ompl::geometric::SPARStwo::addStateToRoadmap(const base::PlannerTermination
 
     findGraphNeighbors(qNew, graphNeighborhood, visibleNeighborhood);
 
-    std::cout << "graph neighborhood: " << graphNeighborhood.size() << " | visible neighborhood: " << visibleNeighborhood.size() << std::endl;
+    if (local_verbose)
+        std::cout << "graph neighborhood: " << graphNeighborhood.size() << " | visible neighborhood: " << visibleNeighborhood.size() << std::endl;
 
     if (local_verbose)
         std::cout << " - checkAddCoverage() Are other nodes around it visible?" << std::endl;
@@ -972,14 +981,14 @@ ompl::geometric::SPARStwo::Vertex ompl::geometric::SPARStwo::addGuard(base::Stat
     nn_->add(m);
     resetFailures();
 
-    std::cout << " => addGuard() " << std::endl;
+    //std::cout << " => addGuard() " << std::endl;
     visualizeCallback();
     return m;
 }
 
 void ompl::geometric::SPARStwo::connectGuards(Vertex v, Vertex vp)
 {
-    std::cout << "connectGuards called ---------------------------------------------------------------- " << std::endl;
+    //std::cout << "connectGuards called ---------------------------------------------------------------- " << std::endl;
     assert(v <= milestoneCount());
     assert(vp <= milestoneCount());
 
@@ -1009,7 +1018,7 @@ ompl::base::PathPtr ompl::geometric::SPARStwo::constructSolution(const Vertex st
     }
 
     if (prev[goal] == goal)
-        throw Exception(name_, "Could not find solution path");
+        throw Exception(name_, "Could not find solution path - previous state is same as goal state?");
     else
     {
         PathGeometric *p = new PathGeometric(si_);
@@ -1071,7 +1080,7 @@ void ompl::geometric::SPARStwo::setPlannerData(const base::PlannerData &data)
     std::cout << "SPARS::setPlannerData: numVertices=" << data.numVertices() << std::endl;
     std::vector<Vertex> idToVertex;
 
-    std::cout << "Adding vertex \n";
+    //std::cout << "Adding vertex \n";
     for (std::size_t vertexID = 0; vertexID < data.numVertices(); ++vertexID)
     {
         // Get the state from loaded planner data
@@ -1079,7 +1088,7 @@ void ompl::geometric::SPARStwo::setPlannerData(const base::PlannerData &data)
         base::State *state = si_->cloneState(oldState);
 
         // Add the state to the graph and remember its ID
-        std::cout << "  " << vertexID << " of address " << state << " ";
+        //std::cout << "  " << vertexID << " of address " << state << " ";
         idToVertex.push_back(addGuard(state, COVERAGE)); // TODO: save the guard type
     }
     std::cout << std::endl;
@@ -1106,10 +1115,13 @@ void ompl::geometric::SPARStwo::setPlannerData(const base::PlannerData &data)
 
             // Add the edge to the graph
             const base::Cost weight(0);
-            std::cout << "    Adding edge from vertex id " << fromVertex << " to id " <<  toVertex << " into edgeList" << std::endl;
-            std::cout << "      Vertex " << m << " to " << n << std::endl;
-            std::cout << "      State address from " << stateProperty_[m] << std::endl;
-            std::cout << "      State address to   " << stateProperty_[n] << std::endl;
+            if (false)
+            {
+                std::cout << "    Adding edge from vertex id " << fromVertex << " to id " <<  toVertex << " into edgeList" << std::endl;
+                std::cout << "      Vertex " << m << " to " << n << std::endl;
+                std::cout << "      State address from " << stateProperty_[m] << std::endl;
+                std::cout << "      State address to   " << stateProperty_[n] << std::endl;
+            }
             connectGuards(m, n);
         }
     }

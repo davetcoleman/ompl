@@ -231,8 +231,6 @@ bool ompl::tools::ExperienceDB2::save(const std::string& fileName)
     double numPaths = plannerDatas.size();
     outStream << numPaths;
 
-    std::cout << "Our singluar planner datas has " << numPaths << " paths" << std::endl;
-
     // Start saving each planner data object
     for (std::size_t i = 0; i < numPaths; ++i)
     {
@@ -240,7 +238,7 @@ bool ompl::tools::ExperienceDB2::save(const std::string& fileName)
 
         OMPL_INFORM("Saving experience %d with %d verticies and %d edges", i, pd.numVertices(), pd.numEdges());
 
-        if (true) // debug code
+        if (false) // debug code
         {
             for (std::size_t i = 0; i < pd.numVertices(); ++i)
             {
@@ -286,8 +284,6 @@ void ompl::tools::ExperienceDB2::getAllPlannerDatas(std::vector<ompl::base::Plan
         return;
     }
 
-    OMPL_DEBUG("ExperienceDB2: getAllPlannerDatas");
-
     if (getExperiencesCount() == 0)
     {
         OMPL_INFORM("No paths found");
@@ -298,7 +294,7 @@ void ompl::tools::ExperienceDB2::getAllPlannerDatas(std::vector<ompl::base::Plan
     spars_->getPlannerData(*data);
     plannerDatas.push_back(data);
 
-    OMPL_DEBUG("ExperienceDB2::getAllPlannerDatas: Number of paths found: %d", plannerDatas.size());
+    OMPL_DEBUG("ExperienceDB2::getAllPlannerDatas: Number of planner databases found: %d", plannerDatas.size());
 }
 
 bool ompl::tools::ExperienceDB2::findNearestStartGoal(int nearestK, const base::State* start, const base::State* goal,

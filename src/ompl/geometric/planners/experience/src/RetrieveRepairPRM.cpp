@@ -122,6 +122,7 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepairPRM::solve(const base::
     bool solved = false;
     bool approximate = false;
     double approxdif = std::numeric_limits<double>::infinity();
+    nearestPaths_.clear();
 
     // Check if the database is empty
     if (!experienceDB_->getExperiencesCount())
@@ -160,11 +161,16 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepairPRM::solve(const base::
     ompl::geometric::PathGeometric primaryPath = ompl::geometric::PathGeometric(si_);
 
     // Search for previous solution in database
+    // TODO make this more than 1 path
     if (!experienceDB_->findNearestStartGoal(nearestK_, startState, goalState, primaryPath))
     {
         OMPL_ERROR("RetrieveRepair::solve() No nearest start goal found");
         return base::PlannerStatus::TIMEOUT; // The planner failed to find a solution
     }
+    
+    // Save this for future debugging
+    nearestPaths_.push_back(primaryPath);
+    nearestPathsChosenID_ = 0; // TODO not hardcode
 
     /*
     // Check if there are any solutions
