@@ -93,7 +93,7 @@ namespace ompl
              *  \brief Get debug information about the top recalled paths that were chosen for further filtering
              *  \return data - vector of PlannerData objects that each hold a single path
              */
-            const std::vector<base::PlannerDataPtr>& getLastRecalledNearestPaths() const;
+            const std::vector<ompl::geometric::PathGeometric>& getLastRecalledNearestPaths() const;
 
             /**
              *  \brief Get debug information about the top recalled paths that were chosen for further filtering
@@ -105,7 +105,7 @@ namespace ompl
              * \brief Get the chosen path used from database for repair
              * \return PlannerData of chosen path
              */
-            ompl::base::PlannerDataPtr getChosenRecallPath() const;
+            ompl::geometric::PathGeometric getChosenRecallPath() const;
 
             /** \brief Get information about the exploration data structure the repair motion planner used each call. */
             void getRepairPlannerDatas(std::vector<base::PlannerDataPtr> &data) const;
@@ -156,7 +156,12 @@ namespace ompl
             {
               nearestK_ = nearestK;
             }
-                    
+
+            void debugState(const ompl::base::State* state)
+            {
+                si_->printState(state, std::cout);
+            }   
+                  
         protected:
 
             /**
@@ -177,10 +182,10 @@ namespace ompl
             void freeMemory(void);
 
             /** \brief The database of motions to search through */
-            ompl::tools::ExperienceDB2Ptr                           experienceDB_;
+            ompl::tools::ExperienceDB2Ptr                          experienceDB_;
 
             /** \brief Recall the nearest paths and store this in planner data for introspection later */
-            std::vector<ompl::base::PlannerDataPtr>                nearestPaths_;
+            std::vector<ompl::geometric::PathGeometric>         nearestPaths_;
 
             /** \brief the ID within nearestPaths_ of the path that was chosen for repair */
             std::size_t                                            nearestPathsChosenID_;

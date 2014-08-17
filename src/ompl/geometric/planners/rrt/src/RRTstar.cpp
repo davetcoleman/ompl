@@ -344,6 +344,9 @@ ompl::base::PlannerStatus ompl::geometric::RRTstar::solve(const base::PlannerTer
             nn_->add(motion);
             motion->parent->children.push_back(motion);
 
+            // Debugging
+            visualizeCallback();
+
             bool checkForSolution = false;
             // rewire tree if needed
             //

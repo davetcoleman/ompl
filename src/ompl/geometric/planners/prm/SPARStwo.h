@@ -75,8 +75,6 @@ namespace ompl
            <a href="http://www.cs.rutgers.edu/~kb572/pubs/spars2.pdf">[PDF]</a>
         */
 
-        typedef boost::shared_ptr<ompl::geometric::PathGeometric> PathGeometricPtr;
-
         /** \brief <b> SPArse Roadmap Spanner Version 2.0 </b> */
         class SPARStwo : public base::Planner
         {
@@ -299,10 +297,8 @@ namespace ompl
             /**
              *  \brief While the termination condition permits, construct the spanner graphn
              *  \param ptc
-             *  \param solutionpath - Allow optional input of a solution path instead of random sampling
              */
-            void constructRoadmap(const base::PlannerTerminationCondition &ptc,
-                                  ompl::geometric::PathGeometricPtr solutionPath = ompl::geometric::PathGeometricPtr());
+            void constructRoadmap(const base::PlannerTerminationCondition &ptc);
 
             /** \brief While the termination condition permits, construct the spanner graph. If \e stopOnMaxFail is true,
                 the function also terminates when the failure limit set by setMaxFailures() is reached. */
@@ -343,6 +339,9 @@ namespace ompl
                     setup();
             }
 
+            bool getSimilarPaths(int nearestK, const base::State* start, const base::State* goal, 
+                                 ompl::geometric::PathGeometric& geometric_solution);
+            
             virtual void setup();
 
             /** \brief Retrieve the computed roadmap. */

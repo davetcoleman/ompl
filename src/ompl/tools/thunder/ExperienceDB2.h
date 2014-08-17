@@ -135,7 +135,8 @@ namespace ompl
             /**
              * \brief Find the k nearest paths to our queries one
              */
-            std::vector<ompl::base::PlannerDataPtr> findNearestStartGoal(int nearestK, const base::State* start, const base::State* goal);
+            bool findNearestStartGoal(int nearestK, const base::State* start, const base::State* goal,
+                                      ompl::geometric::PathGeometric& geometric_solution);
 
             /**
              * \brief Print info to screen
@@ -177,7 +178,7 @@ namespace ompl
             int numUnsavedPaths_;
 
             // Use SPARStwo's graph datastructure to store experience
-            ompl::tools::SPARStwoPtr prm_;
+            ompl::tools::SPARStwoPtr spars_;
 
         }; // end of class ExperienceDB2
 

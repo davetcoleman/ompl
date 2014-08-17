@@ -70,7 +70,7 @@ bool ompl::tools::ExperienceDB2::load(const std::string& fileName)
         OMPL_WARN("Database file does not exist: %s", fileName.c_str());
         return false;
     }
-    if (!prm_)
+    if (!spars_)
     {
         OMPL_ERROR("SPARStwo planner has not been passed into the ExperienceDB2 yet");
         return false;
@@ -110,14 +110,11 @@ bool ompl::tools::ExperienceDB2::load(const std::string& fileName)
         // Note: the StateStorage class checks if the states match for us
         plannerDataStorage_.load(iStream, *plannerData.get());
 
-        OMPL_INFORM("Loaded plan with %d states (vertices)", plannerData->numVertices());
-
-        // Add to nearest neighbor tree
-        //nn_->add(plannerData);
+        OMPL_INFORM("ExperienceDB2: Loaded plan with \n  %d vertices\n  %d edges\n  %d start states\n  %d goal states", 
+                    plannerData->numVertices(), plannerData->numEdges(), plannerData->numStartVertices(), plannerData->numGoalVertices());
 
         // Add to SPARStwo
-        std::cout << "ExpeienceDB2.load() Vertices count: " << plannerData->numVertices() << std::endl;
-        prm_->setPlannerData(*plannerData);
+        spars_->setPlannerData(*plannerData);
     }
 
     // Close file
@@ -131,15 +128,15 @@ bool ompl::tools::ExperienceDB2::load(const std::string& fileName)
 // TODO this is a temp debug function
 void ompl::tools::ExperienceDB2::addPlannerData(const ompl::base::PlannerData &data)
 {
-    if (!prm_)
+    if (!spars_)
     {
         OMPL_ERROR("SPARStwo planner has not been passed into the ExperienceDB2 yet");
         return;
     }
 
-    prm_->setPlannerData(data);
+    spars_->setPlannerData(data);
 
-    std::cout << "SPARStwo now has " << prm_->milestoneCount() << " states" << std::endl;
+    std::cout << "SPARStwo now has " << spars_->milestoneCount() << " states" << std::endl;
 
     numUnsavedPaths_++;
 }
@@ -147,7 +144,7 @@ void ompl::tools::ExperienceDB2::addPlannerData(const ompl::base::PlannerData &d
 void ompl::tools::ExperienceDB2::addPath(ompl::geometric::PathGeometric& solutionPath)
 {
     // Error check
-    if (!prm_)
+    if (!spars_)
     {
         OMPL_ERROR("SPARStwo planner has not been passed into the ExperienceDB2 yet");
         return;
@@ -155,14 +152,14 @@ void ompl::tools::ExperienceDB2::addPath(ompl::geometric::PathGeometric& solutio
 
     std::cout << "-------------------------------------------------------" << std::endl;
     std::cout << "-------------------------------------------------------" << std::endl;    
-    std::cout << "ADD PATH... Before addPath SPARStwo has " << prm_->milestoneCount() << " states" << std::endl;
+    std::cout << "ADD PATH... Before addPath SPARStwo has " << spars_->milestoneCount() << " states" << std::endl;
     std::cout << "-------------------------------------------------------" << std::endl;
     std::cout << "-------------------------------------------------------" << std::endl;    
 
 
     double seconds = 10; // a large number, should never need to use this
     ompl::base::PlannerTerminationCondition ptc = ompl::base::timedPlannerTerminationCondition( seconds, 0.1 ); 
-    prm_->addPathToRoadmap(ptc, solutionPath);
+    spars_->addPathToRoadmap(ptc, solutionPath);
 
 
     // this is for PRM only
@@ -176,14 +173,14 @@ void ompl::tools::ExperienceDB2::addPath(ompl::geometric::PathGeometric& solutio
       // Copy the state
       ompl::base::State *state = si_->cloneState(solutionPath.getStates()[i]);
 
-      prm_->addMilestone( state );
+      spars_->addMilestone( state );
 
       OMPL_INFORM("State %d:", i);
       debugState(state);
       }
     */
 
-    std::cout << "SPARStwo now has " << prm_->milestoneCount() << " states" << std::endl;
+    std::cout << "SPARStwo now has " << spars_->milestoneCount() << " states" << std::endl;
 
     numUnsavedPaths_++;
 }
@@ -205,7 +202,7 @@ bool ompl::tools::ExperienceDB2::save(const std::string& fileName)
         OMPL_ERROR("Empty filename passed to save function");
         return false;
     }
-    if (!prm_)
+    if (!spars_)
     {
         OMPL_ERROR("SPARStwo planner has not been passed into the ExperienceDB2 yet");
         return false;
@@ -224,7 +221,10 @@ bool ompl::tools::ExperienceDB2::save(const std::string& fileName)
 
     // TODO: make this more than 1 planner data perhaps
     base::PlannerDataPtr data(new base::PlannerData(si_));
-    prm_->getPlannerData(*data);
+    spars_->getPlannerData(*data);
+    OMPL_INFORM("Get planner data from SPARS2 with \n  %d vertices\n  %d edges\n  %d start states\n  %d goal states", 
+                data->numVertices(), data->numEdges(), data->numStartVertices(), data->numGoalVertices());
+
     plannerDatas.push_back(data);
 
     // Write the number of paths we will be saving
@@ -258,7 +258,7 @@ bool ompl::tools::ExperienceDB2::save(const std::string& fileName)
 
     // Benchmark
     double loadTime = time::seconds(time::now() - start);
-    OMPL_INFORM("Saved database to file in %f sec with %d paths", loadTime, plannerDatas.size());
+    OMPL_INFORM("Saved database to file in %f sec with %d planner datas", loadTime, plannerDatas.size());
 
     numUnsavedPaths_ = 0;
 
@@ -270,17 +270,17 @@ void ompl::tools::ExperienceDB2::setSPARStwo(ompl::tools::SPARStwoPtr &prm)
     std::cout << "-------------------------------------------------------" << std::endl;
     std::cout << "setSPARStwo " << std::endl;
     std::cout << "-------------------------------------------------------" << std::endl;
-    prm_ = prm;
+    spars_ = prm;
 }
 
 ompl::tools::SPARStwoPtr& ompl::tools::ExperienceDB2::getSPARStwo()
 {
-    return prm_;
+    return spars_;
 }
 
 void ompl::tools::ExperienceDB2::getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const
 {
-    if (!prm_)
+    if (!spars_)
     {
         OMPL_ERROR("SPARStwo planner has not been passed into the ExperienceDB2 yet");
         return;
@@ -295,13 +295,14 @@ void ompl::tools::ExperienceDB2::getAllPlannerDatas(std::vector<ompl::base::Plan
     }
 
     base::PlannerDataPtr data(new base::PlannerData(si_));
-    prm_->getPlannerData(*data);
+    spars_->getPlannerData(*data);
     plannerDatas.push_back(data);
 
     OMPL_DEBUG("ExperienceDB2::getAllPlannerDatas: Number of paths found: %d", plannerDatas.size());
 }
 
-std::vector<ompl::base::PlannerDataPtr> ompl::tools::ExperienceDB2::findNearestStartGoal(int nearestK, const base::State* start, const base::State* goal)
+bool ompl::tools::ExperienceDB2::findNearestStartGoal(int nearestK, const base::State* start, const base::State* goal,
+                                                      ompl::geometric::PathGeometric& geometric_solution)
 {
     // Fill in our pre-made PlannerData instance with the new start and goal states to be searched for
     /*
@@ -317,11 +318,17 @@ std::vector<ompl::base::PlannerDataPtr> ompl::tools::ExperienceDB2::findNearestS
     }
     assert( nnSearchKey_->numVertices() == 2);
     */
-    std::vector<ompl::base::PlannerDataPtr> nearest;
-    //nn_->nearestK(nnSearchKey_, nearestK, nearest);
-    OMPL_ERROR("NOT IMPLEMENTED YET");
 
-    return nearest;
+    if (!spars_->getSimilarPaths(nearestK, start, goal, geometric_solution))
+    {
+        OMPL_WARN("spars::getSimilarPaths() returned false - does not have a solution");
+        return false;
+    }
+    else
+    {
+        OMPL_INFORM("spars::getSimilarPaths() returned true - found a solution");
+        return true;
+    }
 }
 
 double ompl::tools::ExperienceDB2::distanceFunction(const ompl::base::PlannerDataPtr a, const ompl::base::PlannerDataPtr b) const
@@ -354,10 +361,10 @@ void ompl::tools::ExperienceDB2::debugState(const ompl::base::State* state)
 
 std::size_t ompl::tools::ExperienceDB2::getExperiencesCount() const
 {
-    if (!prm_)
+    if (!spars_)
     {
         OMPL_ERROR("SPARStwo planner has not been passed into the ExperienceDB2 yet");
         return 0;
     }
-    return prm_->milestoneCount(); // Get the number of milestones in the graph
+    return spars_->milestoneCount(); // Get the number of milestones in the graph
 }

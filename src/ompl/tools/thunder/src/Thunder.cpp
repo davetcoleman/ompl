@@ -296,6 +296,7 @@ ompl::base::PlannerStatus ompl::tools::Thunder::solve(const base::PlannerTermina
             }
             else
             {
+                /*
                 // Convert the original recalled path to PathGeometric
                 ob::PlannerDataPtr chosenRecallPathData = getRetrieveRepairPlanner().getChosenRecallPath();
                 og::PathGeometric chosenRecallPath(si_);
@@ -316,14 +317,17 @@ ompl::base::PlannerStatus ompl::tools::Thunder::solve(const base::PlannerTermina
                 else
                 {
                     OMPL_INFORM("Adding path to database because repaired path is different enough from original recalled path (score %f)", score);
-                    logs_.csvDataLogStream_ << "from_recall,score_different_enough," << score << ",";
+                */
+                OMPL_INFORM("Adding path to database because SPARS will decide for us if we should keep the nodes");
 
-                    // Logging
-                    logs_.numSolutionsFromRecallSaved_++;
+                logs_.csvDataLogStream_ << "from_recall,score_different_enough,0,";
 
-                    // Save to database
-                    experienceDB_->addPath(solutionPath);
-                }
+                // Logging
+                logs_.numSolutionsFromRecallSaved_++;
+
+                // Save to database
+                experienceDB_->addPath(solutionPath);
+                //                }
             }
         }
         else

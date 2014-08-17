@@ -157,45 +157,71 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepairPRM::solve(const base::
 
     const base::State *goalState = pis_.nextGoal(ptc);
 
-    // Search for previous solution in database
-    nearestPaths_ = experienceDB_->findNearestStartGoal(nearestK_, startState, goalState);
+    ompl::geometric::PathGeometric primaryPath = ompl::geometric::PathGeometric(si_);
 
+    // Search for previous solution in database
+    if (!experienceDB_->findNearestStartGoal(nearestK_, startState, goalState, primaryPath))
+    {
+        OMPL_ERROR("RetrieveRepair::solve() No nearest start goal found");
+        return base::PlannerStatus::TIMEOUT; // The planner failed to find a solution
+    }
+
+    /*
     // Check if there are any solutions
     if (nearestPaths_.empty())
     {
         OMPL_INFORM("No similar path founds in nearest neighbor tree, unable to retrieve repair");
         return base::PlannerStatus::TIMEOUT; // The planner failed to find a solution
     }
+    */
 
-    ompl::base::PlannerDataPtr chosenPath;
+    //ompl::base::PlannerDataPtr chosenPath = nearestPaths_[0];
 
+    /*
     // Filter top n paths to 1
     // TODO Rather than selecting 1 best path, you could also spawn n (n<=k) threads and repair the top n paths.
     if (!findBestPath(startState, goalState, chosenPath))
     {
         return base::PlannerStatus::CRASH;
     }
+    */
 
     // All saved trajectories should be at least 2 states long
-    assert(chosenPath->numVertices() >= 2);
+    //assert(chosenPath->numVertices() >= 2);
 
+    /*
     // Convert chosen PlanningData experience to an actual path
     ompl::geometric::PathGeometric *primaryPath = new PathGeometric(si_);
+    */
     // Add start
-    primaryPath->append(startState);
+    primaryPath.prepend(startState);
+
+    std::cout << std::endl;
+    std::cout << "Added start to primary path " << std::endl;
+    std::cout << "  State: " << startState << std::endl;
+    debugState(startState);
+    std::cout << std::endl;
+
     // Add old states
-    for (std::size_t i = 0; i < chosenPath->numVertices(); ++i)
+    for (std::size_t i = 0; i < primaryPath.getStateCount(); ++i)
     {
-        primaryPath->append(chosenPath->getVertex(i).getState());
+        // Debugging
+        std::cout << "Added state " << i << " to primary path " << std::endl;
+        std::cout << "  State: " << primaryPath.getState(i) << std::endl;
+        debugState(primaryPath.getState(i));
+        std::cout << std::endl;
+
+        //primaryPath.append(chosenPath->getVertex(i).getState());
     }
+
     // Add goal
-    primaryPath->append(goalState);
+    primaryPath.append(goalState);
 
     // All save trajectories should be at least 2 states long, and then we append the start and goal states
-    assert(primaryPath->getStateCount() >= 4);
+    assert(primaryPath.getStateCount() >= 4);
 
     // Repair chosen path
-    if (!repairPath(*primaryPath, ptc))
+    if (!repairPath(primaryPath, ptc))
     {
         OMPL_WARN("repairPath failed");
         return base::PlannerStatus::CRASH;
@@ -205,21 +231,24 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepairPRM::solve(const base::
     /* TODO re-enable
     OMPL_INFORM("RetrieveRepairPRM solve: Simplifying solution (smoothing)...");
     time::point simplifyStart = time::now();
-    std::size_t numStates = primaryPath->getStateCount();
+    std::size_t numStates = primaryPath.getStateCount();
     psk_->simplify(*primaryPath, ptc);
     double simplifyTime = time::seconds(time::now() - simplifyStart);
-    OMPL_INFORM("Path simplification took %f seconds and removed %d states", simplifyTime, numStates - primaryPath->getStateCount());
+    OMPL_INFORM("Path simplification took %f seconds and removed %d states", simplifyTime, numStates - primaryPath.getStateCount());
     */
 
     // Finished
     approxdif = 0;
-    pdef_->addSolutionPath(base::PathPtr(primaryPath), approximate, approxdif, getName());
+    base::PathPtr solutionPath = base::PathPtr(&primaryPath);
+
+    pdef_->addSolutionPath(solutionPath, approximate, approxdif, getName());
     solved = true;
     return base::PlannerStatus(solved, approximate);
 }
 
 bool ompl::geometric::RetrieveRepairPRM::findBestPath(const base::State *startState, const base::State *goalState, ompl::base::PlannerDataPtr& chosenPath)
 {
+    /*
     // TODO this implemention assumes the plan can go forward or backwards. I forgot the fancy word for that property
     std::cout << OMPL_CONSOLE_COLOR_CYAN << std::endl;
     OMPL_INFORM("Found %d similar paths. Filtering ---------------", nearestPaths_.size());
@@ -364,6 +393,7 @@ bool ompl::geometric::RetrieveRepairPRM::findBestPath(const base::State *startSt
     OMPL_DEBUG("Done Filtering --------------------------------------\n");
     std::cout << OMPL_CONSOLE_COLOR_RESET;
 
+    */
     return true;
 }
 
@@ -581,17 +611,17 @@ void ompl::geometric::RetrieveRepairPRM::getPlannerData(base::PlannerData &data)
     // Visualize the n candidate paths that we recalled from the database
     for (std::size_t i = 0 ; i < nearestPaths_.size() ; ++i)
     {
-        ompl::base::PlannerDataPtr pd = nearestPaths_[i];
-        for (std::size_t j = 1; j < pd->numVertices(); ++j)
+        ompl::geometric::PathGeometric path = nearestPaths_[i];
+        for (std::size_t j = 1; j < path.getStateCount(); ++j)
         {
             data.addEdge(
-                         base::PlannerDataVertex(pd->getVertex(j-1).getState() ),
-                         base::PlannerDataVertex(pd->getVertex(j).getState()   ));
+                         base::PlannerDataVertex(path.getState(j-1) ),
+                         base::PlannerDataVertex(path.getState(j)   ));
         }
     }
 }
 
-const std::vector<ompl::base::PlannerDataPtr>& ompl::geometric::RetrieveRepairPRM::getLastRecalledNearestPaths() const
+const std::vector<ompl::geometric::PathGeometric>& ompl::geometric::RetrieveRepairPRM::getLastRecalledNearestPaths() const
 {
     return nearestPaths_; // list of candidate paths
 }
@@ -601,7 +631,7 @@ const std::size_t& ompl::geometric::RetrieveRepairPRM::getLastRecalledNearestPat
     return nearestPathsChosenID_; // of the candidate paths list, the one we chose
 }
 
-ompl::base::PlannerDataPtr ompl::geometric::RetrieveRepairPRM::getChosenRecallPath() const
+ompl::geometric::PathGeometric ompl::geometric::RetrieveRepairPRM::getChosenRecallPath() const
 {
     return nearestPaths_[nearestPathsChosenID_];
 }
