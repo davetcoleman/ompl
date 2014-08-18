@@ -66,6 +66,7 @@ ompl::geometric::RetrieveRepairPRM::~RetrieveRepairPRM(void)
 
 void ompl::geometric::RetrieveRepairPRM::clear(void)
 {
+    OMPL_ERROR("ompl::geometric::RetrieveRepairPRM::clear() called");
     Planner::clear();
     freeMemory();
 
@@ -142,29 +143,18 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepairPRM::solve(const base::
         //return base::PlannerStatus::TIMEOUT; // The planner failed to find a solution
     }
 
-    // Get a single start state TODO: more than one
+    // Get a single start and goal state TODO: more than one
     const base::State *startState = pis_.nextStart();
-
-
-    // Get a single goal state TODO: more than one
-    base::Goal *goal   = pdef_->getGoal().get();
-
-    // Check that we have the correct type of goal
-    if (!goal)
-    {
-        OMPL_ERROR("Goal cannot be converted into a goal state");
-        return base::PlannerStatus::UNRECOGNIZED_GOAL_TYPE;
-    }
-
     const base::State *goalState = pis_.nextGoal(ptc);
 
+    // Create solution path struct
     ompl::geometric::PathGeometric primaryPath = ompl::geometric::PathGeometric(si_);
 
     // Search for previous solution in database
     // TODO make this more than 1 path
     if (!experienceDB_->findNearestStartGoal(nearestK_, startState, goalState, primaryPath))
     {
-        OMPL_ERROR("RetrieveRepair::solve() No nearest start goal found");
+        OMPL_INFORM("RetrieveRepair::solve() No nearest start or goal found");
         return base::PlannerStatus::TIMEOUT; // The planner failed to find a solution
     }
     

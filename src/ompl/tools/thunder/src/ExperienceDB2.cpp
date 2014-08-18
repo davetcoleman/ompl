@@ -317,7 +317,7 @@ bool ompl::tools::ExperienceDB2::findNearestStartGoal(int nearestK, const base::
 
     if (!spars_->getSimilarPaths(nearestK, start, goal, geometric_solution))
     {
-        OMPL_WARN("spars::getSimilarPaths() returned false - does not have a solution");
+        OMPL_INFORM("spars::getSimilarPaths() returned false - does not have a solution");
         return false;
     }
     else

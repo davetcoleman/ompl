@@ -209,8 +209,12 @@ bool ompl::geometric::SPARStwo::haveSolution(const std::vector<Vertex> &starts, 
 
             if (same_component && g->isStartGoalPairValid(stateProperty_[goal], stateProperty_[start]))
             {
-                solution = constructSolution(start, goal);
-                return true;
+                // Make sure that the start and goal aren't so close together that they find the same vertex
+                if (start != goal)
+                {
+                    solution = constructSolution(start, goal);
+                    return true;
+                }
             }
         }
     return false;
@@ -1041,6 +1045,16 @@ void ompl::geometric::SPARStwo::getPlannerData(base::PlannerData &data) const
 
     for (size_t i = 0; i < goalM_.size(); ++i)
         data.addGoalVertex(base::PlannerDataVertex(stateProperty_[goalM_[i]], (int)GOAL));
+
+    // I'm curious:
+    if (goalM_.size() > 0)
+    {
+        throw Exception(name_, "SPARS2 has goal states?");
+    }
+    if (startM_.size() > 0)
+    {
+        throw Exception(name_, "SPARS2 has start states?");
+    }
 
     // If there are even edges here
     if (boost::num_edges( g_ ) > 0)

@@ -111,7 +111,6 @@ ompl::base::PlannerStatus ompl::tools::ParallelPlan::solve(const base::PlannerTe
         threads[i]->join();
         delete threads[i];
     }
-    std::cout << "threads are all joined " << std::endl;
 
     if (hybridize)
     {
@@ -126,9 +125,9 @@ ompl::base::PlannerStatus ompl::tools::ParallelPlan::solve(const base::PlannerTe
     }
 
     if (pdef_->hasSolution())
-        OMPL_INFORM("ParallelPlan Solve: Solution found by one or more of the threads in %f seconds", time::seconds(time::now() - start));
+        OMPL_INFORM("ParallelPlan::solve(): Solution found by one or more threads in %f seconds", time::seconds(time::now() - start));
     else
-        OMPL_WARN("ParallelPlan Solve: Unable to find solution by any of the threads in %f seconds", time::seconds(time::now() - start));
+        OMPL_WARN("ParallelPlan::solve(): Unable to find solution by any of the threads in %f seconds", time::seconds(time::now() - start));
     
     return base::PlannerStatus(pdef_->hasSolution(), pdef_->hasApproximateSolution());
 }

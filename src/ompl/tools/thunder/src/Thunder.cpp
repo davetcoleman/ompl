@@ -268,11 +268,11 @@ ompl::base::PlannerStatus ompl::tools::Thunder::solve(const base::PlannerTermina
 
         //solutionPath.print(std::cout);
 
-        std::cout << OMPL_CONSOLE_COLOR_CYAN << "THUNDER RESULTS:" << OMPL_CONSOLE_COLOR_RESET << std::endl;
-
         // Do not save if approximate
         if (!haveExactSolutionPath())
         {
+            std::cout << OMPL_CONSOLE_COLOR_CYAN << "THUNDER RESULTS: Approximate" << OMPL_CONSOLE_COLOR_RESET << std::endl;
+
             logs_.csvDataLogStream_ << "not_exact_solution_path,not_saved,0,";
             logs_.numSolutionsApproximate_++;
 
@@ -282,7 +282,7 @@ ompl::base::PlannerStatus ompl::tools::Thunder::solve(const base::PlannerTermina
         // Use dynamic time warping to see if the repaired path is too similar to the original
         else if (getSolutionPlannerName() == rrPlanner_->getName())
         {
-            OMPL_INFORM("Solution from Recall");
+            std::cout << OMPL_CONSOLE_COLOR_CYAN << "THUNDER RESULTS: From Recall" << OMPL_CONSOLE_COLOR_RESET << std::endl;
 
             // Logging
             logs_.numSolutionsFromRecall_++;
@@ -332,7 +332,7 @@ ompl::base::PlannerStatus ompl::tools::Thunder::solve(const base::PlannerTermina
         }
         else
         {
-            OMPL_INFORM("Solution from Scratch");
+            std::cout << OMPL_CONSOLE_COLOR_CYAN << "THUNDER RESULTS: From Scratch" << OMPL_CONSOLE_COLOR_RESET << std::endl;
 
             // Logging
             logs_.numSolutionsFromScratch_++;
