@@ -66,7 +66,6 @@ ompl::geometric::RetrieveRepairPRM::~RetrieveRepairPRM(void)
 
 void ompl::geometric::RetrieveRepairPRM::clear(void)
 {
-    OMPL_ERROR("ompl::geometric::RetrieveRepairPRM::clear() called");
     Planner::clear();
     freeMemory();
 

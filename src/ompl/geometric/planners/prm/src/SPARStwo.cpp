@@ -599,7 +599,7 @@ bool ompl::geometric::SPARStwo::checkAddCoverage(const base::State *qNew, std::v
     if (visibleNeighborhood.size() > 0)
         return false;
     //No free paths means we add for coverage
-    std::cout << " -   Adding node as GUARD " << std::endl;
+    std::cout << " --   Adding node for COVERAGE " << std::endl;
     addGuard(si_->cloneState(qNew), COVERAGE);
     return true;
 }
@@ -622,7 +622,7 @@ bool ompl::geometric::SPARStwo::checkAddConnectivity(const base::State *qNew, st
 
         if (links.size() > 0)
         {
-            std::cout << " --   Adding node and edges for CONNECTIVITY " << std::endl;
+            std::cout << " --   Adding node for CONNECTIVITY " << std::endl;
             //Add the node
             Vertex g = addGuard(si_->cloneState(qNew), CONNECTIVITY);
 
@@ -660,6 +660,7 @@ bool ompl::geometric::SPARStwo::checkAddInterface(const base::State *qNew, std::
                 else
                 {
                     //Add the new node to the graph, to bridge the interface
+                    std::cout << " --   Adding node for INTERFACE  " << std::endl;
                     Vertex v = addGuard(si_->cloneState(qNew), INTERFACE);
                     connectGuards(v, visibleNeighborhood[0]);
                     connectGuards(v, visibleNeighborhood[1]);
@@ -742,6 +743,7 @@ bool ompl::geometric::SPARStwo::checkAddPath( Vertex v )
                         foreach (base::State *st, states)
                         {
                             // no need to clone st, since we will destroy p; we just copy the pointer
+                            std::cout << " --   Adding node for QUALITY" << std::endl;
                             vnew = addGuard(st , QUALITY);
 
                             connectGuards(prior, vnew);
@@ -847,6 +849,7 @@ void ompl::geometric::SPARStwo::findCloseRepresentatives(base::State *workArea, 
         else
         {
             //This guy can't be seen by anybody, so we should take this opportunity to add him
+            std::cout << " --   Adding node for COVERAGE" << std::endl;
             addGuard(si_->cloneState(workArea), COVERAGE);
 
             //We should also stop our efforts to add a dense path
@@ -978,14 +981,14 @@ ompl::geometric::SPARStwo::Vertex ompl::geometric::SPARStwo::addGuard(base::Stat
     stateProperty_[m] = state;
     colorProperty_[m] = type;
 
-    assert(si_->isValid(state));
+    //assert(si_->isValid(state));
     abandonLists(state);
 
     disjointSets_.make_set(m);
     nn_->add(m);
     resetFailures();
 
-    //std::cout << " => addGuard() " << std::endl;
+    std::cout << " -> addGuard() of type " << type << std::endl;
     visualizeCallback();
     return m;
 }
@@ -1070,9 +1073,10 @@ void ompl::geometric::SPARStwo::getPlannerData(base::PlannerData &data) const
             // Add the reverse edge, since we're constructing an undirected roadmap
             data.addEdge(base::PlannerDataVertex(stateProperty_[v2], (int)colorProperty_[v2]),
                          base::PlannerDataVertex(stateProperty_[v1], (int)colorProperty_[v1]));
+
+            //OMPL_INFORM("Adding edge from vertex of type %d to vertex of type %d", colorProperty_[v1], colorProperty_[v2]);
         }
     }
-    // TODO: reenable this warning
     else
         OMPL_INFORM("%s: There are no edges in the graph!", getName().c_str());
 
@@ -1102,8 +1106,12 @@ void ompl::geometric::SPARStwo::setPlannerData(const base::PlannerData &data)
         base::State *state = si_->cloneState(oldState);
 
         // Add the state to the graph and remember its ID
-        //std::cout << "  " << vertexID << " of address " << state << " ";
-        idToVertex.push_back(addGuard(state, COVERAGE)); // TODO: save the guard type
+        std::cout << "  " << vertexID << " of address " << state << " and tag " << data.getVertex(vertexID).getTag() << std::endl;
+
+        // Get the tag, which in this application represents the vertex type
+        GuardType type = static_cast<GuardType>( data.getVertex(vertexID).getTag() );
+
+        idToVertex.push_back(addGuard(state, type )); // TODO: save the guard type
     }
     std::cout << std::endl;
 
