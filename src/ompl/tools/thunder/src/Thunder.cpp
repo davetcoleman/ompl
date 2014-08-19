@@ -443,7 +443,7 @@ void ompl::tools::Thunder::printLogs(std::ostream &out) const
     out << "        Less than 2 states:            " << logs_.numSolutionsTooShort_ << std::endl;
     out << "     Failed:                           " << logs_.numSolutionsFailed_ << std::endl;
     out << "     Approximate:                      " << logs_.numSolutionsApproximate_ << std::endl;
-    out << "  Total nodes in database:         " << experienceDB_->getExperiencesCount() << std::endl;
+    out << "  Total nodes in database:             " << experienceDB_->getExperiencesCount() << std::endl;
     out << "     Unsaved solutions:                " << experienceDB_->getNumUnsavedPaths() << std::endl;
     out << "  Average planning time:               " << logs_.getAveragePlanningTime() << std::endl;
 }

@@ -150,17 +150,12 @@ void ompl::tools::ExperienceDB2::addPath(ompl::geometric::PathGeometric& solutio
         return;
     }
 
-    std::cout << "-------------------------------------------------------" << std::endl;
-    std::cout << "-------------------------------------------------------" << std::endl;    
-    std::cout << "ADD PATH... Before addPath SPARStwo has " << spars_->milestoneCount() << " states" << std::endl;
-    std::cout << "-------------------------------------------------------" << std::endl;
-    std::cout << "-------------------------------------------------------" << std::endl;    
-
+    std::cout << std::endl;
+    std::cout << "ExperienceDB2::addPath(): Before add SPARStwo has " << spars_->milestoneCount() << " states" << std::endl;
 
     double seconds = 10; // a large number, should never need to use this
     ompl::base::PlannerTerminationCondition ptc = ompl::base::timedPlannerTerminationCondition( seconds, 0.1 ); 
     spars_->addPathToRoadmap(ptc, solutionPath);
-
 
     // this is for PRM only
     /*
@@ -298,24 +293,9 @@ void ompl::tools::ExperienceDB2::getAllPlannerDatas(std::vector<ompl::base::Plan
 }
 
 bool ompl::tools::ExperienceDB2::findNearestStartGoal(int nearestK, const base::State* start, const base::State* goal,
-                                                      ompl::geometric::PathGeometric& geometric_solution)
+                                                      ompl::geometric::PathGeometric& geometricSolution)
 {
-    // Fill in our pre-made PlannerData instance with the new start and goal states to be searched for
-    /*
-    if (nnSearchKey_->numVertices() == 2)
-    {
-        nnSearchKey_->getVertex( 0 ) = ompl::base::PlannerDataVertex(start);
-        nnSearchKey_->getVertex( 1 ) = ompl::base::PlannerDataVertex(goal);
-    }
-    else
-    {
-        nnSearchKey_->addVertex( ompl::base::PlannerDataVertex(start) );
-        nnSearchKey_->addVertex( ompl::base::PlannerDataVertex(goal) );
-    }
-    assert( nnSearchKey_->numVertices() == 2);
-    */
-
-    if (!spars_->getSimilarPaths(nearestK, start, goal, geometric_solution))
+    if (!spars_->getSimilarPaths(nearestK, start, goal, geometricSolution))
     {
         OMPL_INFORM("spars::getSimilarPaths() returned false - does not have a solution");
         return false;

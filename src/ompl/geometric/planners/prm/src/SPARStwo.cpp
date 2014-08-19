@@ -97,7 +97,7 @@ void ompl::geometric::SPARStwo::setup()
 }
 
 bool ompl::geometric::SPARStwo::getSimilarPaths(int nearestK, const base::State* start, const base::State* goal, 
-                                                ompl::geometric::PathGeometric& geometric_solution)
+                                                ompl::geometric::PathGeometric& geometricSolution)
 {
     // TODO: nearestK unused
     // Start
@@ -135,16 +135,16 @@ bool ompl::geometric::SPARStwo::getSimilarPaths(int nearestK, const base::State*
     }
 
     // Convert to path geometic
-    geometric_solution = static_cast<ompl::geometric::PathGeometric&>(*solution);
+    geometricSolution = static_cast<ompl::geometric::PathGeometric&>(*solution);
 
     // Debug output
     if (false)
     {
-        for (std::size_t i = 0; i < geometric_solution.getStateCount(); ++i)
+        for (std::size_t i = 0; i < geometricSolution.getStateCount(); ++i)
         {
             std::cout << "  getSimilarPaths(): Adding state " << i << " to plannerData"  << std::endl;
-            std::cout << "  State: " << geometric_solution.getState(i) << std::endl;
-            si_->printState(geometric_solution.getState(i), std::cout);
+            std::cout << "  State: " << geometricSolution.getState(i) << std::endl;
+            si_->printState(geometricSolution.getState(i), std::cout);
             std::cout << std::endl;
         }
     }
@@ -204,14 +204,18 @@ bool ompl::geometric::SPARStwo::haveSolution(const std::vector<Vertex> &starts, 
         {
             // we lock because the connected components algorithm is incremental and may change disjointSets_
             graphMutex_.lock();
+
+            // decide if start and goal are connected
             bool same_component = sameComponent(start, goal);
             graphMutex_.unlock();
 
+            // Check if the chosen start and goal can be used together to satisfy problem
             if (same_component && g->isStartGoalPairValid(stateProperty_[goal], stateProperty_[start]))
             {
                 // Make sure that the start and goal aren't so close together that they find the same vertex
                 if (start != goal)
                 {
+                    std::cout << "haveSolution testing between vertex " << start << " and " << goal << std::endl;
                     solution = constructSolution(start, goal);
                     return true;
                 }

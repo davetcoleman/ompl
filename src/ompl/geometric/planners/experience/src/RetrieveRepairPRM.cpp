@@ -129,17 +129,8 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepairPRM::solve(const base::
     {
         OMPL_INFORM("Experience database is empty so unable to run RetrieveRepairPRM algorithm.");
 
-        /*
-        while (ptc != true)
-        {
-            std::cout << "Sleeping... " << std::endl;
-            boost::this_thread::sleep(boost::posix_time::milliseconds(1000));
-        }
-        */
-
         // TODO: it seems TIMEOUT causes the wrong behavior in parallel plan
         return base::PlannerStatus::CRASH;
-        //return base::PlannerStatus::TIMEOUT; // The planner failed to find a solution
     }
 
     // Get a single start and goal state TODO: more than one
@@ -188,26 +179,26 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepairPRM::solve(const base::
     // Convert chosen PlanningData experience to an actual path
     ompl::geometric::PathGeometric *primaryPath = new PathGeometric(si_);
     */
+
     // Add start
     primaryPath.prepend(startState);
 
+    /*
     std::cout << std::endl;
     std::cout << "Added start to primary path " << std::endl;
     std::cout << "  State: " << startState << std::endl;
     debugState(startState);
     std::cout << std::endl;
 
-    // Add old states
+    // Debugging
     for (std::size_t i = 0; i < primaryPath.getStateCount(); ++i)
     {
-        // Debugging
         std::cout << "Added state " << i << " to primary path " << std::endl;
         std::cout << "  State: " << primaryPath.getState(i) << std::endl;
         debugState(primaryPath.getState(i));
         std::cout << std::endl;
-
-        //primaryPath.append(chosenPath->getVertex(i).getState());
     }
+    */
 
     // Add goal
     primaryPath.append(goalState);
