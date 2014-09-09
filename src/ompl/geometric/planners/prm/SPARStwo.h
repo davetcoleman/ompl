@@ -296,9 +296,9 @@ namespace ompl
             /**
              * Thrown to stop the A* search when finished.
              */
-            class foundGoalException
-            {
-            };
+            //class foundGoalException
+            //{
+            //};
 
             ////////////////////////////////////////////////////////////////////////////////////////
             /**
@@ -437,8 +437,17 @@ namespace ompl
                     setup();
             }
 
+            /**
+             * \brief Search the roadmap for the best path close to the given start and goal states that is valid
+             * \param nearestK - unused
+             * \param start
+             * \param goal
+             * \param geometricSolution - the resulting path             
+             * \return 
+             */
             bool getSimilarPaths(int nearestK, const base::State* start, const base::State* goal, 
-                                 ompl::geometric::PathGeometric& geometric_solution);
+                                 ompl::geometric::PathGeometric& geometricSolution, 
+                                 const base::PlannerTerminationCondition &ptc);
             
             virtual void setup();
 
@@ -538,16 +547,26 @@ namespace ompl
             void connectGuards( Vertex v, Vertex vp );
 
             /** \brief Check if there exists a solution, i.e., there exists a pair of milestones such that the first is in \e start and the second is in \e goal, and the two milestones are in the same connected component. If a solution is found, the path is saved. */
-            bool haveSolution(const std::vector<Vertex> &start, const std::vector<Vertex> &goal, base::PathPtr &solution);
+            bool haveSolution(const std::vector<Vertex> &start, const std::vector<Vertex> &goal, 
+                              base::PathPtr &solution, const base::PlannerTerminationCondition &ptc);
 
+            /** \brief Check recalled path for collision and disable as needed */
+            bool lazyCollisionCheck(base::PathPtr &candidateSolution, const base::PlannerTerminationCondition &ptc);
+                                    
             /** Thread that checks for solution */
             void checkForSolution(const base::PlannerTerminationCondition &ptc, base::PathPtr &solution);
 
             /** \brief Returns true if we have reached the iteration failures limit, \e maxFailures_ or if a solution was added */
             bool reachedTerminationCriterion() const;
 
-            /** \brief Given two milestones from the same connected component, construct a path connecting them and set it as the solution */
-            base::PathPtr constructSolution(const Vertex start, const Vertex goal) const;
+            /** \brief Given two milestones from the same connected component, construct a path connecting them and set it as the solution 
+             *  \param start
+             *  \param goal
+             *  \param the shared path ptr to fill in with a found solution path
+             *  \return true if candidate solution found
+             */
+            bool constructSolution(const Vertex start, const Vertex goal,
+                                            base::PathPtr &candidateSolution) const;
 
             /** \brief Check if two milestones (\e m1 and \e m2) are part of the same connected component. This is not a const function since we use incremental connected components from boost */
             bool sameComponent(Vertex m1, Vertex m2);

@@ -142,7 +142,7 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepairPRM::solve(const base::
 
     // Search for previous solution in database
     // TODO make this more than 1 path
-    if (!experienceDB_->findNearestStartGoal(nearestK_, startState, goalState, primaryPath))
+    if (!experienceDB_->findNearestStartGoal(nearestK_, startState, goalState, primaryPath, ptc))
     {
         OMPL_INFORM("RetrieveRepair::solve() No nearest start or goal found");
         return base::PlannerStatus::TIMEOUT; // The planner failed to find a solution
@@ -203,7 +203,7 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepairPRM::solve(const base::
     // Add goal
     primaryPath.append(goalState);
 
-    // All save trajectories should be at least 2 states long, and then we append the start and goal states
+    // All save trajectories should be at least 2 states long, then we append the start and goal states, for min of 4
     assert(primaryPath.getStateCount() >= 4);
 
     // Repair chosen path
@@ -389,7 +389,8 @@ bool ompl::geometric::RetrieveRepairPRM::findBestPath(const base::State *startSt
     return true;
 }
 
-bool ompl::geometric::RetrieveRepairPRM::repairPath(ompl::geometric::PathGeometric &primaryPath, const base::PlannerTerminationCondition &ptc)
+bool ompl::geometric::RetrieveRepairPRM::repairPath(ompl::geometric::PathGeometric &primaryPath, 
+                                                    const base::PlannerTerminationCondition &ptc)
 {
     // \todo: we could reuse our collision checking from the previous step to make this faster
     //        but that complicates everything and I'm not suppose to be spending too much time

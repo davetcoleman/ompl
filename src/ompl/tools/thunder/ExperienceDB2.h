@@ -136,7 +136,8 @@ namespace ompl
              * \brief Find the k nearest paths to our queries one
              */
             bool findNearestStartGoal(int nearestK, const base::State* start, const base::State* goal,
-                                      ompl::geometric::PathGeometric& geometric_solution);
+                                      ompl::geometric::PathGeometric& geometric_solution,
+                                      const base::PlannerTerminationCondition& ptc);
 
             /**
              * \brief Print info to screen

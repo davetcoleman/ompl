@@ -260,9 +260,9 @@ bool ompl::tools::ExperienceDB2::save(const std::string& fileName)
 
 void ompl::tools::ExperienceDB2::setSPARStwo(ompl::tools::SPARStwoPtr &prm)
 {
-    std::cout << "-------------------------------------------------------" << std::endl;
-    std::cout << "setSPARStwo " << std::endl;
-    std::cout << "-------------------------------------------------------" << std::endl;
+    // std::cout << "-------------------------------------------------------" << std::endl;
+    // std::cout << "setSPARStwo " << std::endl;
+    // std::cout << "-------------------------------------------------------" << std::endl;
     spars_ = prm;
 }
 
@@ -293,9 +293,9 @@ void ompl::tools::ExperienceDB2::getAllPlannerDatas(std::vector<ompl::base::Plan
 }
 
 bool ompl::tools::ExperienceDB2::findNearestStartGoal(int nearestK, const base::State* start, const base::State* goal,
-                                                      ompl::geometric::PathGeometric& geometricSolution)
+                                                      ompl::geometric::PathGeometric& geometricSolution, const base::PlannerTerminationCondition& ptc)
 {
-    if (!spars_->getSimilarPaths(nearestK, start, goal, geometricSolution))
+  if (!spars_->getSimilarPaths(nearestK, start, goal, geometricSolution, ptc))
     {
         OMPL_INFORM("spars::getSimilarPaths() returned false - does not have a solution");
         return false;
