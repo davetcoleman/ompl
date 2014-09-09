@@ -37,6 +37,7 @@
 #ifndef OMPL_GEOMETRIC_PLANNERS_SPARS_TWO_
 #define OMPL_GEOMETRIC_PLANNERS_SPARS_TWO_
 
+//#include "ompl/geometric/planners/prm/SPARStwo_graph.h" // custom helper functions for boost graph
 #include "ompl/geometric/planners/PlannerIncludes.h"
 #include "ompl/datastructures/NearestNeighbors.h"
 #include "ompl/geometric/PathSimplifier.h"
@@ -46,6 +47,10 @@
 #include <boost/unordered_map.hpp>
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/filtered_graph.hpp>
+#include <boost/graph/graph_utility.hpp>
+#include <boost/graph/astar_search.hpp>
+#include <boost/property_map/property_map.hpp>
 #include <boost/pending/disjoint_sets.hpp>
 #include <boost/function.hpp>
 #include <boost/thread.hpp>
@@ -91,12 +96,17 @@ namespace ompl
                 QUALITY,
             };
 
+            ////////////////////////////////////////////////////////////////////////////////////////
+            // BOOST GRAPH DETAILS
+            ////////////////////////////////////////////////////////////////////////////////////////
+
             /** \brief The type used internally for representing vertex IDs */
             typedef unsigned long int VertexIndexType;
 
             /** \brief Pair of vertices which support an interface. */
             typedef std::pair< VertexIndexType, VertexIndexType > VertexPair;
 
+            ////////////////////////////////////////////////////////////////////////////////////////
             /** \brief Interface information storage class, which does bookkeeping for criterion four. */
             struct InterfaceData
             {
@@ -181,6 +191,7 @@ namespace ompl
             /** \brief the hash which maps pairs of neighbor points to pairs of states */
             typedef boost::unordered_map< VertexPair, InterfaceData, boost::hash< VertexPair > > InterfaceHash;
 
+            ////////////////////////////////////////////////////////////////////////////////////////
             // The InterfaceHash structure is wrapped inside of this struct due to a compilation error on
             // GCC 4.6 with Boost 1.48.  An implicit assignment operator overload does not compile with these
             // components, so an explicit overload is given here.
@@ -203,6 +214,7 @@ namespace ompl
                 typedef boost::vertex_property_tag kind;
             };
 
+            ////////////////////////////////////////////////////////////////////////////////////////
             /**
              @brief The underlying roadmap graph.
 
@@ -233,6 +245,92 @@ namespace ompl
 
             /** \brief Edge in Graph */
             typedef boost::graph_traits<Graph>::edge_descriptor   Edge;
+
+            ////////////////////////////////////////////////////////////////////////////////////////
+            /**
+             * Used to artifically supress edges during A* search.
+             * @implements ReadablePropertyMapConcept
+             */
+            class edgeWeightMap
+            {
+            private:
+    
+                const Graph &g;                         // Graph used
+                const std::vector<Edge> &avoid; // List of neighborhoods to stay out of
+    
+            public:
+    
+                /** Map key type. */
+                typedef Edge key_type;
+                /** Map value type. */
+                typedef double value_type;
+                /** Map auxiliary value type. */
+                typedef double &reference;
+                /** Map type. */
+                typedef boost::readable_property_map_tag category;
+    
+                /**
+                 * Construct map for certain constraints.
+                 * @param graph         Graph to use
+                 * @param avoidThese    list of neighborhoods to stay out of
+                 */
+                edgeWeightMap (const Graph &graph, const std::vector<Edge> &avoidThese);
+    
+                /**
+                 * Get the weight of an edge.
+                 * @param e     the edge
+                 * @return infinity if \a e lies in a forbidden neighborhood; actual weight of \a e otherwise
+                 */
+                double get (Edge e) const;
+    
+            private:
+                /**
+                 * Should this edge be avoided?
+                 * @param e edge to consider
+                 * @return true if \a e lies within a forbidden neighborhood; false otherwise
+                 */
+                bool shouldAvoid (Edge e) const;
+            };
+
+            ////////////////////////////////////////////////////////////////////////////////////////
+            /**
+             * Thrown to stop the A* search when finished.
+             */
+            class foundGoalException
+            {
+            };
+
+            ////////////////////////////////////////////////////////////////////////////////////////
+            /**
+             * Vertex visitor to check if A* search is finished.
+             * @implements AStarVisitorConcept
+             */            
+            class CustomVisitor : public boost::default_astar_visitor
+            {
+            private:
+    
+                Vertex goal;    // Goal Vertex of the search
+    
+            public:
+    
+                /**
+                 * Construct a visitor for a given search.
+                 * @param goal  goal vertex of the search
+                 */
+                CustomVisitor (Vertex goal);
+    
+                /**
+                 * Check if we have arrived at the goal.
+                 * @param u current vertex
+                 * @param g graph we are searching on
+                 * @throw foundGoalException if \a u is the goal
+                 */
+                void examine_vertex(Vertex u, const Graph &g) const;
+            };
+
+            ////////////////////////////////////////////////////////////////////////////////////////
+            // SPARS MEMBER FUNCTIONS
+            ////////////////////////////////////////////////////////////////////////////////////////
 
             /** \brief Constructor */
             SPARStwo(const base::SpaceInformationPtr &si);

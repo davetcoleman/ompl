@@ -49,6 +49,58 @@
 #define foreach BOOST_FOREACH
 #define foreach_reverse BOOST_REVERSE_FOREACH
 
+// edgeWeightMap methods ////////////////////////////////////////////////////////////////////////////
+
+BOOST_CONCEPT_ASSERT((boost::ReadablePropertyMapConcept<ompl::geometric::SPARStwo::edgeWeightMap, ompl::geometric::SPARStwo::Edge>));
+
+ompl::geometric::SPARStwo::edgeWeightMap::edgeWeightMap (const Graph &graph, const std::vector<Edge> &avoidThese)
+:  g(graph), avoid(avoidThese)
+{
+}
+
+double ompl::geometric::SPARStwo::edgeWeightMap::get (Edge e) const
+{
+    if (shouldAvoid(e))
+        return std::numeric_limits<double>::infinity();
+    //    return g.getEdgeWeight(e);
+    return boost::get(boost::edge_weight, g, e);
+}
+        
+bool ompl::geometric::SPARStwo::edgeWeightMap::shouldAvoid (Edge e) const
+{
+    // Check each avoidEdge to see if candidate edge is to be avoided
+    for (std::size_t i = 0; i < avoid.size(); i++)
+    {
+        if (avoid[i] == e)
+            return true;
+    }
+    return false;
+}
+
+namespace boost
+{
+    double get (const ompl::geometric::SPARStwo::edgeWeightMap &m, const ompl::geometric::SPARStwo::Edge &e)
+    {
+        return m.get(e);
+    }
+}
+
+// CustomVisitor methods ////////////////////////////////////////////////////////////////////////////
+
+BOOST_CONCEPT_ASSERT((boost::AStarVisitorConcept<ompl::geometric::SPARStwo::CustomVisitor, ompl::geometric::SPARStwo::Graph>));
+
+ompl::geometric::SPARStwo::CustomVisitor::CustomVisitor (Vertex goal)
+: goal(goal)
+{
+}
+
+void ompl::geometric::SPARStwo::CustomVisitor::examine_vertex (Vertex u, const Graph &) const
+{
+    if (u == goal)
+        throw foundGoalException();
+}
+
+// SPARStwo methods ////////////////////////////////////////////////////////////////////////////////////////
 ompl::geometric::SPARStwo::SPARStwo(const base::SpaceInformationPtr &si) :
     base::Planner(si, "SPARStwo"),
     stretchFactor_(3.),
@@ -1015,19 +1067,55 @@ ompl::base::PathPtr ompl::geometric::SPARStwo::constructSolution(const Vertex st
 {
     boost::mutex::scoped_lock _(graphMutex_);
 
-    boost::vector_property_map<Vertex> prev(boost::num_vertices(g_));
+    //boost::vector_property_map<Vertex> prev(boost::num_vertices(g_));
+
+    // Test disabling things
+    //Edge disableThisEdge = g.getEdge(A,C);
+    std::vector<Edge> avoid;
+    //avoid.push_back(disableThisEdge);
+
+    // Datastructure to store the shortest path tree
+    Vertex *predecessors = new Vertex[boost::num_vertices(g_)];
 
     try
     {
-        boost::astar_search(g_, start,
+        /* boost::astar_search(g_, start,
                             boost::bind(&SPARStwo::distanceFunction, this, _1, goal),
                             boost::predecessor_map(prev).
-                            visitor(AStarGoalVisitor<Vertex>(goal)));
+                            visitor(AStarGoalVisitor<Vertex>(goal)));  */
+        boost::astar_search(g_, // graph
+                            start, // start state
+                            boost::bind(&SPARStwo::distanceFunction, this, _1, goal), // the heuristic
+                            // ability to disable edges (set cost to inifinity):
+                            boost::weight_map(edgeWeightMap(g_, avoid)).
+                            predecessor_map(predecessors).
+                            visitor(CustomVisitor(goal)));
+    }
+    catch (ompl::geometric::SPARStwo::foundGoalException&)
+    {
+      // the custom exception from CustomVisitor      
+        std::cout << "Found Goal" << std::endl;
+
+        // Trace back the shortest path in reverse
+        Vertex v;
+        PathGeometric *path = new PathGeometric(si_);
+        for (v = goal; v != predecessors[v]; v = predecessors[v])
+            path->append(stateProperty_[v]);
+        if (v != goal)
+            path->append(stateProperty_[v]);
+        path->reverse();
+
+        return base::PathPtr(path);
     }
     catch (AStarFoundGoal&)
     {
+        // the default exception for AStarGoalVisitor
+        OMPL_ERROR("AStarFoundGoal exception - no implementation");
     }
 
+    throw Exception(name_, "Could not find solution path - A* returned no path");
+
+    /*
     if (prev[goal] == goal)
         throw Exception(name_, "Could not find solution path - previous state is same as goal state?");
     else
@@ -1040,6 +1128,7 @@ ompl::base::PathPtr ompl::geometric::SPARStwo::constructSolution(const Vertex st
 
         return base::PathPtr(p);
     }
+    */
 }
 
 void ompl::geometric::SPARStwo::getPlannerData(base::PlannerData &data) const
