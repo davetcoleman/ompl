@@ -296,9 +296,9 @@ namespace ompl
             /**
              * Thrown to stop the A* search when finished.
              */
-            //class foundGoalException
-            //{
-            //};
+            class foundGoalException
+            {
+            };
 
             ////////////////////////////////////////////////////////////////////////////////////////
             /**
@@ -469,6 +469,15 @@ namespace ompl
                 return iterations_;
             }
 
+            /**
+             * \brief Convert astar results to correctly ordered path
+             * \param vertexPath
+             * \param goal
+             * \param path - returned solution
+             * \return true on success
+             */
+            bool convertVertexPathToBasePath(std::vector<Vertex> &vertexPath, Vertex goal, ompl::base::PathPtr &path);
+
             virtual void getPlannerData(base::PlannerData &data) const;
 
             /**
@@ -551,7 +560,7 @@ namespace ompl
                               base::PathPtr &solution, const base::PlannerTerminationCondition &ptc);
 
             /** \brief Check recalled path for collision and disable as needed */
-            bool lazyCollisionCheck(base::PathPtr &candidateSolution, const base::PlannerTerminationCondition &ptc);
+            bool lazyCollisionCheck(std::vector<Vertex> &vertexPath, const base::PlannerTerminationCondition &ptc);
                                     
             /** Thread that checks for solution */
             void checkForSolution(const base::PlannerTerminationCondition &ptc, base::PathPtr &solution);
@@ -562,11 +571,11 @@ namespace ompl
             /** \brief Given two milestones from the same connected component, construct a path connecting them and set it as the solution 
              *  \param start
              *  \param goal
-             *  \param the shared path ptr to fill in with a found solution path
+             *  \param vertexPath
              *  \return true if candidate solution found
              */
             bool constructSolution(const Vertex start, const Vertex goal,
-                                            base::PathPtr &candidateSolution) const;
+                                   std::vector<Vertex> &vertexPath) const;
 
             /** \brief Check if two milestones (\e m1 and \e m2) are part of the same connected component. This is not a const function since we use incremental connected components from boost */
             bool sameComponent(Vertex m1, Vertex m2);
@@ -653,6 +662,8 @@ namespace ompl
 
             /** \brief Mutex to guard access to the Graph member (g_) */
             mutable boost::mutex                                                graphMutex_;
+
+            std::vector<Edge> avoid_; // temporary
         };
 
     }

@@ -61,19 +61,39 @@ ompl::geometric::SPARStwo::edgeWeightMap::edgeWeightMap (const Graph &graph, con
 
 double ompl::geometric::SPARStwo::edgeWeightMap::get (Edge e) const
 {
+    std::cout << "ompl::geometric::SPARStwo::edgeWeightMap::get " << e << std::endl;
+    
+    // TODO uncomment section below
+    double weight; 
+
+    if (shouldAvoid(e))
+        weight = std::numeric_limits<double>::infinity();
+    else
+        weight = boost::get(boost::edge_weight, g, e);
+
+    std::cout << "     returning weight " << weight << std::endl; // TODO uncomment section below
+
+    return weight;
+
+    /*
     if (shouldAvoid(e))
         return std::numeric_limits<double>::infinity();
-    //    return g.getEdgeWeight(e);
+
     return boost::get(boost::edge_weight, g, e);
+    */
 }
         
 bool ompl::geometric::SPARStwo::edgeWeightMap::shouldAvoid (Edge e) const
 {
+    std::cout << "     shouldAvoid vector of size " << avoid.size() << std::endl;
     // Check each avoidEdge to see if candidate edge is to be avoided
     for (std::size_t i = 0; i < avoid.size(); i++)
-    {
+    {        
         if (avoid[i] == e)
+        {
+            std::cout << "    ==== FOUND EDGE ON AVOID LIST ====" << std::endl;
             return true;
+        }
     }
     return false;
 }
@@ -98,10 +118,11 @@ ompl::geometric::SPARStwo::CustomVisitor::CustomVisitor (Vertex goal)
 void ompl::geometric::SPARStwo::CustomVisitor::examine_vertex (Vertex u, const Graph &) const
 {
     if (u == goal)
-        throw AStarFoundGoal();
+        throw foundGoalException(); //AStarFoundGoal();
 }
 
 // SPARStwo methods ////////////////////////////////////////////////////////////////////////////////////////
+
 ompl::geometric::SPARStwo::SPARStwo(const base::SpaceInformationPtr &si) :
     base::Planner(si, "SPARStwo"),
     stretchFactor_(3.),
@@ -149,6 +170,50 @@ void ompl::geometric::SPARStwo::setup()
     denseDelta_ = denseDeltaFraction_ * maxExt;
 }
 
+void ompl::geometric::SPARStwo::setProblemDefinition(const base::ProblemDefinitionPtr &pdef)
+{
+    Planner::setProblemDefinition(pdef);
+    clearQuery();
+}
+
+void ompl::geometric::SPARStwo::clearQuery()
+{
+    startM_.clear();
+    goalM_.clear();
+    pis_.restart();
+}
+
+void ompl::geometric::SPARStwo::clear()
+{
+    Planner::clear();
+    clearQuery();
+    resetFailures();
+    iterations_ = 0;
+    freeMemory();
+    if (nn_)
+        nn_->clear();
+}
+
+void ompl::geometric::SPARStwo::freeMemory()
+{
+    Planner::clear();
+    sampler_.reset();
+    simpleSampler_.reset();
+
+    foreach (Vertex v, boost::vertices(g_))
+    {
+        foreach (InterfaceData &d, interfaceDataProperty_[v].interfaceHash | boost::adaptors::map_values)
+            d.clear(si_);
+        if( stateProperty_[v] != NULL )
+            si_->freeState(stateProperty_[v]);
+        stateProperty_[v] = NULL;
+    }
+    g_.clear();
+
+    if (nn_)
+        nn_->clear();
+}
+
 bool ompl::geometric::SPARStwo::getSimilarPaths(int nearestK, const base::State* start, const base::State* goal, 
                                                 ompl::geometric::PathGeometric& geometricSolution,
                                                 const base::PlannerTerminationCondition &ptc)
@@ -157,6 +222,7 @@ bool ompl::geometric::SPARStwo::getSimilarPaths(int nearestK, const base::State*
     // Start
     std::vector<Vertex> startGraphNeighborhood;
     std::vector<Vertex> startVisibleNeighborhood;
+
     base::State* startCopy = si_->cloneState(start);
     findGraphNeighbors(startCopy, startGraphNeighborhood, startVisibleNeighborhood);
 
@@ -206,54 +272,16 @@ bool ompl::geometric::SPARStwo::getSimilarPaths(int nearestK, const base::State*
     return result;
 }
 
-void ompl::geometric::SPARStwo::setProblemDefinition(const base::ProblemDefinitionPtr &pdef)
-{
-    Planner::setProblemDefinition(pdef);
-    clearQuery();
-}
-
-void ompl::geometric::SPARStwo::clearQuery()
-{
-    startM_.clear();
-    goalM_.clear();
-    pis_.restart();
-}
-
-void ompl::geometric::SPARStwo::clear()
-{
-    Planner::clear();
-    clearQuery();
-    resetFailures();
-    iterations_ = 0;
-    freeMemory();
-    if (nn_)
-        nn_->clear();
-}
-
-void ompl::geometric::SPARStwo::freeMemory()
-{
-    Planner::clear();
-    sampler_.reset();
-    simpleSampler_.reset();
-
-    foreach (Vertex v, boost::vertices(g_))
-    {
-        foreach (InterfaceData &d, interfaceDataProperty_[v].interfaceHash | boost::adaptors::map_values)
-            d.clear(si_);
-        if( stateProperty_[v] != NULL )
-            si_->freeState(stateProperty_[v]);
-        stateProperty_[v] = NULL;
-    }
-    g_.clear();
-
-    if (nn_)
-        nn_->clear();
-}
-
 bool ompl::geometric::SPARStwo::haveSolution(const std::vector<Vertex> &starts, const std::vector<Vertex> &goals, 
-                                             base::PathPtr &candidateSolution, const base::PlannerTerminationCondition &ptc)
+                                             base::PathPtr &candidateSolution,
+                                             const base::PlannerTerminationCondition &ptc)
 {
-    base::Goal *g = pdef_->getGoal().get();
+    // Vector to store candidate paths in before they are converted to PathPtrs
+    std::vector<Vertex> vertexPath;
+
+    base::Goal *g = pdef_->getGoal().get(); // for checking isStartGoalPairValid
+
+    // Try every combination of nearby start and goal pairs
     foreach (Vertex start, starts)
     {
         foreach (Vertex goal, goals)
@@ -261,7 +289,9 @@ bool ompl::geometric::SPARStwo::haveSolution(const std::vector<Vertex> &starts, 
             // we lock because the connected components algorithm is incremental and may change disjointSets_
             graphMutex_.lock();
 
-            // decide if start and goal are connected
+            // decide if start and goal are connected 
+            // TODO this does not compute dynamic graphcs
+            // i.e. it will say its the same components even when an edge has been disabled
             bool same_component = sameComponent(start, goal);
             graphMutex_.unlock();
 
@@ -269,54 +299,61 @@ bool ompl::geometric::SPARStwo::haveSolution(const std::vector<Vertex> &starts, 
             if (same_component && g->isStartGoalPairValid(stateProperty_[goal], stateProperty_[start]))
             {
                 // Make sure that the start and goal aren't so close together that they find the same vertex
-                if (start != goal)
+                if (start == goal)
                 {
-                    std::cout << "haveSolution: found connection between vertex " << start << " and " 
-                              << goal << std::endl;
+                    continue; // skip this pair
+                }
 
-                    // Keep looking for paths between chosen start and goal until one is found that is valid,
-                    // or no further paths remain
-                    bool havePartialSolution = false;
-                    while (true)
+                std::cout << "haveSolution: found connection between vertex " << start << " and " 
+                          << goal << std::endl;
+
+                // Keep looking for paths between chosen start and goal until one is found that is valid,
+                // or no further paths can be found between them because of disabled edges
+                bool havePartialSolution = false;
+                while (true)
+                {
+                    std::cout << "while true... " << std::endl;
+
+                    // Check if our planner is out of time
+                    if (ptc == true)
                     {
-                        std::cout << "while true... " << std::endl;
+                        OMPL_DEBUG("haveSolution function interrupted because termination condition is true.");
+                        std::cout << OMPL_CONSOLE_COLOR_RESET;
+                        return false;
+                    }
 
-                        // Check if our planner is out of time
-                        if (ptc == true)
+                    // Attempt to find a solution from start to goal
+                    if (!constructSolution(start, goal, vertexPath))
+                    {
+                        std::cout << "unable to construct solution " << std::endl;
+                        // no solution path found. check if a previous partially correct solution was found
+                        if (havePartialSolution)
                         {
-                            OMPL_DEBUG("haveSolution function interrupted because termination condition is true.");
-                            std::cout << OMPL_CONSOLE_COLOR_RESET;
-                            return false;
+                            std::cout << "has partial solution " << std::endl;
+                            convertVertexPathToBasePath(vertexPath, goal, candidateSolution);
+                            return true; // we previously found a path that is at least partially valid
                         }
-
-                        // Attempt to find a solution from start to goal
-                        if (!constructSolution(start, goal, candidateSolution))
-                        {
-                            std::cout << "  unable to construct solution " << std::endl;
-                            // no solution path found. check if a previous partially correct solution was found
-                            if (havePartialSolution)
-                            {
-                                std::cout << "  has partial solution " << std::endl;
-                                return true; // we previously found a path that is at least partially valid
-                            }
                             
-                            std::cout << "  no partial solution " << std::endl;
-                            // no path found what so ever
-                            return false;
-                        }
-                        havePartialSolution = true; // we have found at least one path at this point. may be invalid
-                        std::cout << "  has partial solution " << std::endl;
+                        std::cout << "  no partial solution " << std::endl;
+                        // no path found what so ever
+                        return false;
+                    }
+                    havePartialSolution = true; // we have found at least one path at this point. may be invalid
 
-                        // Check if all the points in the potential solution are valid
-                        if (lazyCollisionCheck(candidateSolution, ptc))
-                        {
-                            std::cout << "   lazy collision check returned valid " << std::endl;
-                            // the path is valid, we are done!
-                            return true;
-                        }
-                        // else, loop with updated graph that has the invalid edges/states disabled
-                    } // while
-                } // if
+                    std::cout << "has at least a partial solution, maybe exact solution" << std::endl;
+                    std::cout << "Solution has " << vertexPath.size() << " vertices" << std::endl;
+
+                    // Check if all the points in the potential solution are valid
+                    if (lazyCollisionCheck(vertexPath, ptc))
+                    {
+                        std::cout << "lazy collision check returned valid " << std::endl;
+                            
+                        // the path is valid, we are done!
+                        convertVertexPathToBasePath(vertexPath, goal, candidateSolution);
+                        return true;
+                    }
+                    // else, loop with updated graph that has the invalid edges/states disabled
+                } // while
             } // if
         } // foreach
     } // foreach
@@ -324,24 +361,100 @@ bool ompl::geometric::SPARStwo::haveSolution(const std::vector<Vertex> &starts, 
     return false;
 }
 
-bool ompl::geometric::SPARStwo::lazyCollisionCheck(base::PathPtr &candidateSolution,
+bool ompl::geometric::SPARStwo::constructSolution(const Vertex start, const Vertex goal,
+                                                  std::vector<Vertex> &vertexPath) const
+{
+    //boost::vector_property_map<Vertex> prev(boost::num_vertices(g_));
+
+    Vertex *vertexPredecessors = new Vertex[boost::num_vertices(g_)];
+    bool foundGoal = false;
+
+    double *vertexDistances = new double[boost::num_vertices(g_)];
+    //for (std::size_t i = 0; i < boost::num_vertices(g_); ++i)
+    //    d[i] = 33;
+
+
+    try
+    {
+        /* boost::astar_search(g_, start,
+                            boost::bind(&SPARStwo::distanceFunction, this, _1, goal),
+                            boost::predecessor_map(prev).
+                            visitor(AStarGoalVisitor<Vertex>(goal)));  */
+        boost::astar_search(g_, // graph
+                            start, // start state
+                            boost::bind(&SPARStwo::distanceFunction, this, _1, goal), // the heuristic
+                            // ability to disable edges (set cost to inifinity):
+                            boost::weight_map(edgeWeightMap(g_, avoid_)).
+                            predecessor_map(vertexPredecessors).
+                            distance_map(&vertexDistances[0]).
+                            visitor(CustomVisitor(goal)));
+    }
+    catch (ompl::geometric::SPARStwo::foundGoalException&)
+        //catch (AStarFoundGoal&) // the default exception for AStarGoalVisitor
+    {
+        std::cout << std::endl;
+        // the custom exception from CustomVisitor      
+        std::cout << "constructSolution: Astar found goal vertex ------------------------" << std::endl;
+        std::cout << "distance to goal: " << vertexDistances[goal] << std::endl;
+        std::cout << std::endl;
+
+        if (vertexDistances[goal] > 1.7e+308) // terrible hack for detecting infinity
+        //double diff = d[goal] - std::numeric_limits<double>::infinity();
+        //std::cout << "Diff from inifinity is " << diff << std::endl;
+        //if ((diff < std::numeric_limits<double>::epsilon()) && (-diff < std::numeric_limits<double>::epsilon()))
+        // check if the distance to goal is inifinity. if so, it is unreachable
+        //if (d[goal] >= std::numeric_limits<double>::infinity())
+        {
+            std::cout << "Distance to goal is infinity" << std::endl;
+            foundGoal = false;
+        }
+        else
+        {
+            // Only clear the vertexPath after we know we have a new solution, otherwise it might have a good
+            // previous one
+            vertexPath.clear(); // remove any old solutions
+
+            // Trace back the shortest path in reverse and only save the states
+            Vertex v;
+            std::cout << "goal is " << goal << std::endl;
+            for (v = goal; v != vertexPredecessors[v]; v = vertexPredecessors[v])
+            {
+                std::cout << "push_back " << v << std::endl;
+                vertexPath.push_back(v);
+            }
+            if (v != goal) // TODO explain this because i don't understand
+            {
+                std::cout << "finally push_back " << v << std::endl;
+                vertexPath.push_back(v);
+            }
+
+            foundGoal = true;
+        }
+    }
+
+    delete[] vertexPredecessors;
+    delete[] vertexDistances;
+
+    // No solution found from start to goal
+    return foundGoal;
+}
+
+bool ompl::geometric::SPARStwo::lazyCollisionCheck(std::vector<Vertex> &vertexPath,
                                                    const base::PlannerTerminationCondition &ptc)
 {
-    // TODO work with edges at this point, not states
     std::cout << OMPL_CONSOLE_COLOR_BROWN << std::endl;
     std::cout << "Lazy collision check " << std::endl;
 
-    // Convert path
-    ompl::geometric::PathGeometric &geometricSolution = static_cast<ompl::geometric::PathGeometric&>(*candidateSolution);
-
     bool hasInvalidEdges = false;
 
+    // Initialize
+    Vertex fromVertex = vertexPath[0];
+    Vertex toVertex;
+    
     // Loop through every pair of states and make sure path is valid.
-    for (std::size_t toID = 1; toID < geometricSolution.getStateCount(); ++toID)
+    for (std::size_t toID = 1; toID < vertexPath.size(); ++toID)
     {
-        std::size_t fromID = toID-1; // this is our last known valid state
-        ompl::base::State* fromState = geometricSolution.getState(fromID);
-        ompl::base::State* toState = geometricSolution.getState(toID);
+        toVertex = vertexPath[toID];
 
         // Check if our planner is out of time
         if (ptc == true)
@@ -352,17 +465,25 @@ bool ompl::geometric::SPARStwo::lazyCollisionCheck(base::PathPtr &candidateSolut
         }
 
         // Check path between states
-        if (!si_->checkMotion(fromState, toState))
+        if (!si_->checkMotion(stateProperty_[fromVertex], stateProperty_[toVertex]))
         {
             // Path between (from, to) states not valid, disable the edge
-            std::cout << "DISABLING EDGE!" << std::endl;
-            
+            std::cout << "DISABLING EDGE from vertex " << fromVertex << " to vertex " << toVertex << std::endl;
+
+            // Test disabling things
+            Edge disableThisEdge = boost::edge(fromVertex, toVertex, g_).first;
+            std::cout << "  -- EDGE  " << disableThisEdge << std::endl;
+            avoid_.push_back(disableThisEdge);
+
             hasInvalidEdges = true;            
         }
+
+        // switch vertex focus
+        fromVertex = toVertex;
     }
 
-    OMPL_INFORM("Done repairing ---------------------------------");
-    std::cout << OMPL_CONSOLE_COLOR_RESET;
+    OMPL_INFORM("Done lazy collision checking ---------------------------");
+    std::cout << OMPL_CONSOLE_COLOR_RESET << std::endl;
 
     // Only return true if nothing was found invalid
     return !hasInvalidEdges;
@@ -1056,7 +1177,7 @@ ompl::geometric::SPARStwo::Vertex ompl::geometric::SPARStwo::addGuard(base::Stat
     nn_->add(m);
     resetFailures();
 
-    std::cout << " -> addGuard() of type " << type << std::endl;
+    //std::cout << " -> addGuard() of type " << type << std::endl;
     visualizeCallback();
     return m;
 }
@@ -1070,61 +1191,28 @@ void ompl::geometric::SPARStwo::connectGuards(Vertex v, Vertex vp)
     const double weight = distanceFunction(v, vp);
     const Graph::edge_property_type properties(weight);
     boost::mutex::scoped_lock _(graphMutex_);
+
+    //std::cout << "Connecting vertex " << v << " to vertex " << vp <<  " ++++++++++++++++++" << std::endl;
+
     boost::add_edge(v, vp, properties, g_);
     disjointSets_.union_set(v, vp);
     visualizeCallback();
 }
 
-bool ompl::geometric::SPARStwo::constructSolution(const Vertex start, const Vertex goal,
-                                                                 base::PathPtr &solution) const
+bool ompl::geometric::SPARStwo::convertVertexPathToBasePath(std::vector<Vertex> &vertexPath, Vertex goal,
+                                                            ompl::base::PathPtr &path)
 {
-    boost::mutex::scoped_lock _(graphMutex_);
+    ompl::geometric::PathGeometric *pathGeometric = new ompl::geometric::PathGeometric(si_);
 
-    //boost::vector_property_map<Vertex> prev(boost::num_vertices(g_));
-
-    // Test disabling things
-    //Edge disableThisEdge = g.getEdge(A,C);
-    std::vector<Edge> avoid;
-    //avoid.push_back(disableThisEdge);
-
-    // Datastructure to store the shortest path tree
-    Vertex *predecessors = new Vertex[boost::num_vertices(g_)];
-
-    try
+    // Reverse the vertexPath and convert to state path
+    for (std::size_t i = vertexPath.size(); i > 0; --i)
     {
-        /* boost::astar_search(g_, start,
-                            boost::bind(&SPARStwo::distanceFunction, this, _1, goal),
-                            boost::predecessor_map(prev).
-                            visitor(AStarGoalVisitor<Vertex>(goal)));  */
-        boost::astar_search(g_, // graph
-                            start, // start state
-                            boost::bind(&SPARStwo::distanceFunction, this, _1, goal), // the heuristic
-                            // ability to disable edges (set cost to inifinity):
-                            boost::weight_map(edgeWeightMap(g_, avoid)).
-                            predecessor_map(predecessors).
-                            visitor(CustomVisitor(goal)));
-    }
-    //catch (ompl::geometric::SPARStwo::foundGoalException&)
-    catch (AStarFoundGoal&) // the default exception for AStarGoalVisitor
-    {
-      // the custom exception from CustomVisitor      
-        std::cout << "Found Goal" << std::endl;
-
-        // Trace back the shortest path in reverse
-        Vertex v;
-        PathGeometric *path = new PathGeometric(si_);
-        for (v = goal; v != predecessors[v]; v = predecessors[v])
-            path->append(stateProperty_[v]);
-        if (v != goal)
-            path->append(stateProperty_[v]);
-        path->reverse();
-
-        solution = base::PathPtr(path);
-        return true;
+        pathGeometric->append(stateProperty_[vertexPath[i-1]]);
     }
 
-    // No solution found from start to goal
-    return false;
+    path = base::PathPtr(pathGeometric);
+
+    return true;
 }
 
 void ompl::geometric::SPARStwo::getPlannerData(base::PlannerData &data) const
@@ -1156,12 +1244,14 @@ void ompl::geometric::SPARStwo::getPlannerData(base::PlannerData &data) const
         {
             const Vertex v1 = boost::source(e, g_);
             const Vertex v2 = boost::target(e, g_);
+
+            // TODO save weights!
             data.addEdge(base::PlannerDataVertex(stateProperty_[v1], (int)colorProperty_[v1]),
                          base::PlannerDataVertex(stateProperty_[v2], (int)colorProperty_[v2]));
 
             // Add the reverse edge, since we're constructing an undirected roadmap
-            data.addEdge(base::PlannerDataVertex(stateProperty_[v2], (int)colorProperty_[v2]),
-                         base::PlannerDataVertex(stateProperty_[v1], (int)colorProperty_[v1]));
+            //data.addEdge(base::PlannerDataVertex(stateProperty_[v2], (int)colorProperty_[v2]),
+            //             base::PlannerDataVertex(stateProperty_[v1], (int)colorProperty_[v1]));
 
             //OMPL_INFORM("Adding edge from vertex of type %d to vertex of type %d", colorProperty_[v1], colorProperty_[v2]);
         }
@@ -1195,7 +1285,7 @@ void ompl::geometric::SPARStwo::setPlannerData(const base::PlannerData &data)
         base::State *state = si_->cloneState(oldState);
 
         // Add the state to the graph and remember its ID
-        std::cout << "  " << vertexID << " of address " << state << " and tag " << data.getVertex(vertexID).getTag() << std::endl;
+        //std::cout << "  " << vertexID << " of address " << state << " and tag " << data.getVertex(vertexID).getTag() << std::endl;
 
         // Get the tag, which in this application represents the vertex type
         GuardType type = static_cast<GuardType>( data.getVertex(vertexID).getTag() );
@@ -1214,7 +1304,7 @@ void ompl::geometric::SPARStwo::setPlannerData(const base::PlannerData &data)
         edgeList.clear();
         numEdges = data.getEdges(fromVertex, edgeList);
 
-        std::cout << "  Vertex " << fromVertex << " has " << numEdges << " edges " << std::endl;
+        //std::cout << "  Vertex " << fromVertex << " has " << numEdges << " edges " << std::endl;
 
         Vertex m = idToVertex[fromVertex];
 
@@ -1226,14 +1316,21 @@ void ompl::geometric::SPARStwo::setPlannerData(const base::PlannerData &data)
 
             // Add the edge to the graph
             const base::Cost weight(0);
-            if (false)
+            if (true)
             {
                 std::cout << "    Adding edge from vertex id " << fromVertex << " to id " <<  toVertex << " into edgeList" << std::endl;
                 std::cout << "      Vertex " << m << " to " << n << std::endl;
-                std::cout << "      State address from " << stateProperty_[m] << std::endl;
-                std::cout << "      State address to   " << stateProperty_[n] << std::endl;
             }
             connectGuards(m, n);
         }
-    }
+    } // for
+
+    const char* name = "1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+    // Debug graph to terminal  
+    std::cout << "edge set: ";
+    print_edges(g_, name);
+
+    std::cout << "out-edges:" << std::endl;
+    print_graph(g_, name);
 }
