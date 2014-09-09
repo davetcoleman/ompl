@@ -105,7 +105,7 @@ namespace ompl
 
             /** \brief Pair of vertices which support an interface. */
             typedef std::pair< VertexIndexType, VertexIndexType > VertexPair;
-
+            
             ////////////////////////////////////////////////////////////////////////////////////////
             /** \brief Interface information storage class, which does bookkeeping for criterion four. */
             struct InterfaceData
@@ -202,6 +202,9 @@ namespace ompl
                 InterfaceHash interfaceHash;
             };
 
+            ////////////////////////////////////////////////////////////////////////////////////////
+            // Vertex properties
+
             struct vertex_state_t {
                 typedef boost::vertex_property_tag kind;
             };
@@ -215,29 +218,62 @@ namespace ompl
             };
 
             ////////////////////////////////////////////////////////////////////////////////////////
+            // Edge properties
+
+            struct edge_collision_state_t {
+                typedef boost::edge_property_tag kind;
+            };
+
+            /** \brief Possible collision states of an edge */
+            enum edge_collision_states_t
+            {
+                NOT_CHECKED,
+                IN_COLLISION,
+                FREE
+            };
+
+            ////////////////////////////////////////////////////////////////////////////////////////
             /**
              @brief The underlying roadmap graph.
 
              @par Any BGL graph representation could be used here. Because we
              expect the roadmap to be sparse (m<n^2), an adjacency_list is more
-             appropriate than an adjacency_matrix.
+             appropriate than an adjacency_matrix. Edges are undirected.
 
-             @par Obviously, a ompl::base::State* vertex property is required.
-             The incremental connected components algorithm requires
-             vertex_predecessor_t and vertex_rank_t properties.
-             If boost::vecS is not used for vertex storage, then there must also
+             *Properties of vertices*
+             - vertex_state_t: an ompl::base::State* is required for OMPL
+             - vertex_predecessor_t: The incremental connected components algorithm requires it
+             - vertex_rank_t: The incremental connected components algorithm requires it
+             - vertex_color_t - TODO
+             - vertex_interface_data_t - needed by SPARS2 for maintainings its sparse properties
+             
+             Note: If boost::vecS is not used for vertex storage, then there must also
              be a boost:vertex_index_t property manually added.
 
-             @par Edges should be undirected and have a weight property.
+             *Properties of edges*
+             - edge_weight_t - cost/distance between two vertices
+             - edge_collision_state_t - used for lazy collision checking, determines if an edge has been checked
+                  already for collision. 0 = not checked/unknown, 1 = in collision, 2 = free
              */
+            
+            /** Wrapper for the vertex's multiple as its property. */
+            typedef boost::property < vertex_state_t, base::State*,
+                    boost::property < boost::vertex_predecessor_t, VertexIndexType,
+                    boost::property < boost::vertex_rank_t, VertexIndexType,
+                    boost::property < vertex_color_t, GuardType,
+                    boost::property < vertex_interface_data_t, InterfaceHashStruct > > > > > VertexProperties;
+
+            /** Wrapper for the double assigned to an edge as its weight property. */
+            typedef boost::property < boost::edge_weight_t, double,
+                    boost::property < edge_collision_state_t, int > > EdgeProperties;
+
+            /** The underlying boost graph type (undirected weighted-edge adjacency list with above properties). */
             typedef boost::adjacency_list <
-                boost::vecS, boost::vecS, boost::undirectedS,
-                boost::property < vertex_state_t, base::State*,
-                boost::property < boost::vertex_predecessor_t, VertexIndexType,
-                boost::property < boost::vertex_rank_t, VertexIndexType,
-                boost::property < vertex_color_t, GuardType,
-                boost::property < vertex_interface_data_t, InterfaceHashStruct > > > > >,
-                boost::property < boost::edge_weight_t, double >
+                boost::vecS, 
+                boost::vecS, 
+                boost::undirectedS,
+                VertexProperties,
+                EdgeProperties
             > Graph;
 
             /** \brief Vertex in Graph */
@@ -245,6 +281,12 @@ namespace ompl
 
             /** \brief Edge in Graph */
             typedef boost::graph_traits<Graph>::edge_descriptor   Edge;
+
+            ////////////////////////////////////////////////////////////////////////////////////////
+            // Typedefs for property maps
+
+            /** \brief Access map that stores the lazy collision checking status of each edge */
+            typedef boost::property_map<Graph, edge_collision_state_t>::type EdgeCollisionStateMap;
 
             ////////////////////////////////////////////////////////////////////////////////////////
             /**
@@ -255,8 +297,8 @@ namespace ompl
             {
             private:
     
-                const Graph &g;                         // Graph used
-                const std::vector<Edge> &avoid; // List of neighborhoods to stay out of
+                const Graph &g_;                         // Graph used
+                const EdgeCollisionStateMap &collisionStates_;
     
             public:
     
@@ -272,9 +314,8 @@ namespace ompl
                 /**
                  * Construct map for certain constraints.
                  * @param graph         Graph to use
-                 * @param avoidThese    list of neighborhoods to stay out of
                  */
-                edgeWeightMap (const Graph &graph, const std::vector<Edge> &avoidThese);
+                edgeWeightMap (const Graph &graph, const EdgeCollisionStateMap &collisionStates);
     
                 /**
                  * Get the weight of an edge.
@@ -283,13 +324,6 @@ namespace ompl
                  */
                 double get (Edge e) const;
     
-            private:
-                /**
-                 * Should this edge be avoided?
-                 * @param e edge to consider
-                 * @return true if \a e lies within a forbidden neighborhood; false otherwise
-                 */
-                bool shouldAvoid (Edge e) const;
             };
 
             ////////////////////////////////////////////////////////////////////////////////////////
@@ -622,14 +656,17 @@ namespace ompl
             /** \brief Number of sample points to use when trying to detect interfaces. */
             unsigned int                                                        nearSamplePoints_;
 
-            /** \brief Access to the internal base::state at each Vertex */
-            boost::property_map<Graph, vertex_state_t>::type                    stateProperty_;
-
             /** \brief A path simplifier used to simplify dense paths added to the graph */
             PathSimplifierPtr                                                   psimp_;
 
             /** \brief Access to the weights of each Edge */
-            boost::property_map<Graph, boost::edge_weight_t>::type              weightProperty_; // TODO: this is not used
+            boost::property_map<Graph, boost::edge_weight_t>::type              edgeWeightProperty_; // TODO: this is not used
+
+            /** \brief Access to the collision checking state of each Edge */
+            EdgeCollisionStateMap                                               edgeCollisionStateProperty_;
+
+            /** \brief Access to the internal base::state at each Vertex */
+            boost::property_map<Graph, vertex_state_t>::type                    stateProperty_;
 
             /** \brief Access to the colors for the vertices */
             boost::property_map<Graph, vertex_color_t>::type                    colorProperty_;
@@ -661,12 +698,11 @@ namespace ompl
             double                                                              denseDelta_;
 
             /** \brief Mutex to guard access to the Graph member (g_) */
-            mutable boost::mutex                                                graphMutex_;
-
-            std::vector<Edge> avoid_; // temporary
-        };
+            mutable boost::mutex                                                graphMutex_; 
+      };
 
     }
 }
 
 #endif
+

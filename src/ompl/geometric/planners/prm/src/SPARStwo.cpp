@@ -54,8 +54,10 @@
 
 BOOST_CONCEPT_ASSERT((boost::ReadablePropertyMapConcept<ompl::geometric::SPARStwo::edgeWeightMap, ompl::geometric::SPARStwo::Edge>));
 
-ompl::geometric::SPARStwo::edgeWeightMap::edgeWeightMap (const Graph &graph, const std::vector<Edge> &avoidThese)
-:  g(graph), avoid(avoidThese)
+ompl::geometric::SPARStwo::edgeWeightMap::edgeWeightMap (const Graph &graph, 
+                                                         const EdgeCollisionStateMap &collisionStates)
+    : g_(graph), 
+      collisionStates_(collisionStates)
 {
 }
 
@@ -66,38 +68,24 @@ double ompl::geometric::SPARStwo::edgeWeightMap::get (Edge e) const
     // TODO uncomment section below
     double weight; 
 
-    if (shouldAvoid(e))
+    // Get the status of collision checking for this edge
+    const int collisionState = collisionStates_[e];
+    std::cout << "||||||||| Collision State is " << collisionState << " |||||||||||" << std::endl;
+
+    if (collisionStates_[e] == IN_COLLISION)
         weight = std::numeric_limits<double>::infinity();
     else
-        weight = boost::get(boost::edge_weight, g, e);
+        weight = boost::get(boost::edge_weight, g_, e);
 
     std::cout << "     returning weight " << weight << std::endl; // TODO uncomment section below
 
     return weight;
 
     /*
-    if (shouldAvoid(e))
-        return std::numeric_limits<double>::infinity();
-
     return boost::get(boost::edge_weight, g, e);
     */
 }
         
-bool ompl::geometric::SPARStwo::edgeWeightMap::shouldAvoid (Edge e) const
-{
-    std::cout << "     shouldAvoid vector of size " << avoid.size() << std::endl;
-    // Check each avoidEdge to see if candidate edge is to be avoided
-    for (std::size_t i = 0; i < avoid.size(); i++)
-    {        
-        if (avoid[i] == e)
-        {
-            std::cout << "    ==== FOUND EDGE ON AVOID LIST ====" << std::endl;
-            return true;
-        }
-    }
-    return false;
-}
-
 namespace boost
 {
     double get (const ompl::geometric::SPARStwo::edgeWeightMap &m, const ompl::geometric::SPARStwo::Edge &e)
@@ -105,6 +93,15 @@ namespace boost
         return m.get(e);
     }
 }
+
+/*namespace boost
+{
+    double get (const ompl::geometric::SPARStwo::Graph &g, const ompl::geometric::SPARStwo::Edge &e)
+    {
+        return g.get(e);
+    }
+}
+*/
 
 // CustomVisitor methods ////////////////////////////////////////////////////////////////////////////
 
@@ -130,12 +127,17 @@ ompl::geometric::SPARStwo::SPARStwo(const base::SpaceInformationPtr &si) :
     denseDeltaFraction_(.001),
     maxFailures_(5000),
     nearSamplePoints_((2*si_->getStateDimension())),
+    // Property accessors of edges
+    edgeWeightProperty_(boost::get(boost::edge_weight, g_)),
+    edgeCollisionStateProperty_(boost::get(edge_collision_state_t(), g_)),
+    // Property accessors of vertices
     stateProperty_(boost::get(vertex_state_t(), g_)),
-    weightProperty_(boost::get(boost::edge_weight, g_)),
     colorProperty_(boost::get(vertex_color_t(), g_)),
     interfaceDataProperty_(boost::get(vertex_interface_data_t(), g_)),
+    // Disjoint set acecssors
     disjointSets_(boost::get(boost::vertex_rank, g_),
                   boost::get(boost::vertex_predecessor, g_)),
+    // Other
     addedSolution_(false),
     consecutiveFailures_(0),
     iterations_(0),
@@ -384,7 +386,7 @@ bool ompl::geometric::SPARStwo::constructSolution(const Vertex start, const Vert
                             start, // start state
                             boost::bind(&SPARStwo::distanceFunction, this, _1, goal), // the heuristic
                             // ability to disable edges (set cost to inifinity):
-                            boost::weight_map(edgeWeightMap(g_, avoid_)).
+                            boost::weight_map(edgeWeightMap(g_, edgeCollisionStateProperty_)).
                             predecessor_map(vertexPredecessors).
                             distance_map(&vertexDistances[0]).
                             visitor(CustomVisitor(goal)));
@@ -454,6 +456,7 @@ bool ompl::geometric::SPARStwo::lazyCollisionCheck(std::vector<Vertex> &vertexPa
     // Loop through every pair of states and make sure path is valid.
     for (std::size_t toID = 1; toID < vertexPath.size(); ++toID)
     {
+        // Increment location on path
         toVertex = vertexPath[toID];
 
         // Check if our planner is out of time
@@ -464,17 +467,36 @@ bool ompl::geometric::SPARStwo::lazyCollisionCheck(std::vector<Vertex> &vertexPa
             return false;
         }
 
-        // Check path between states
-        if (!si_->checkMotion(stateProperty_[fromVertex], stateProperty_[toVertex]))
+        Edge thisEdge = boost::edge(fromVertex, toVertex, g_).first;
+        std::cout << "On edge  " << thisEdge << std::endl;
+
+        // Has this edge already been checked before?
+        if (edgeCollisionStateProperty_[thisEdge] == NOT_CHECKED)
         {
-            // Path between (from, to) states not valid, disable the edge
-            std::cout << "DISABLING EDGE from vertex " << fromVertex << " to vertex " << toVertex << std::endl;
+            // Check path between states
+            if (!si_->checkMotion(stateProperty_[fromVertex], stateProperty_[toVertex]))
+            {
+                // Path between (from, to) states not valid, disable the edge
+                std::cout << "  DISABLING EDGE from vertex " << fromVertex << " to vertex " << toVertex << std::endl;
 
-            // Test disabling things
-            Edge disableThisEdge = boost::edge(fromVertex, toVertex, g_).first;
-            std::cout << "  -- EDGE  " << disableThisEdge << std::endl;
-            avoid_.push_back(disableThisEdge);
-
+                // Disable edge
+                edgeCollisionStateProperty_[thisEdge] = IN_COLLISION;
+            }
+            else
+            {
+                // Mark edge as free so we no longer need to check for collision
+                edgeCollisionStateProperty_[thisEdge] = FREE;
+            }
+        }
+        else
+        {
+            std::cout << "Skipping motion check for edge because collision state is already " << edgeCollisionStateProperty_[thisEdge] << std::endl;
+        }
+        
+        // Check final result
+        if (edgeCollisionStateProperty_[thisEdge] == IN_COLLISION)
+        {
+            // Remember that this path is no longer valid, but keep checking remainder of path edges
             hasInvalidEdges = true;            
         }
 
@@ -484,6 +506,8 @@ bool ompl::geometric::SPARStwo::lazyCollisionCheck(std::vector<Vertex> &vertexPa
 
     OMPL_INFORM("Done lazy collision checking ---------------------------");
     std::cout << OMPL_CONSOLE_COLOR_RESET << std::endl;
+
+    // TODO: somewhere in the code we need to reset all edges collision status back to NOT_CHECKED for future queries
 
     // Only return true if nothing was found invalid
     return !hasInvalidEdges;
@@ -1189,13 +1213,24 @@ void ompl::geometric::SPARStwo::connectGuards(Vertex v, Vertex vp)
     assert(vp <= milestoneCount());
 
     const double weight = distanceFunction(v, vp);
-    const Graph::edge_property_type properties(weight);
-    boost::mutex::scoped_lock _(graphMutex_);
+    const int collisionState = NOT_CHECKED; // TODO value
 
     //std::cout << "Connecting vertex " << v << " to vertex " << vp <<  " ++++++++++++++++++" << std::endl;
 
-    boost::add_edge(v, vp, properties, g_);
+    // Lock to prevent corruption
+    boost::mutex::scoped_lock _(graphMutex_);
+
+    // Create the new edge
+    Edge e = (boost::add_edge(v, vp, g_)).first;
+
+    // Add associated properties to the edge
+    edgeWeightProperty_[e] = weight;
+    edgeCollisionStateProperty_[e] = collisionState; // TODO this zero is bad
+
+    // Add the edge to the incrementeal connected components datastructure
     disjointSets_.union_set(v, vp);
+
+    // Debug in Rviz
     visualizeCallback();
 }
 
