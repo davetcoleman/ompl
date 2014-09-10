@@ -138,11 +138,10 @@ void ompl::tools::Thunder::setup(void)
         {
             throw Exception("Both planning from scratch and experience have been disabled, unable to plan");
         }
-        if (scratchEnabled_)
-            pp_->addPlanner(planner_);   // Add the planning from scratch planner if desired
         if (recallEnabled_)
             pp_->addPlanner(rrPlanner_);  // Add the planning from experience planner if desired
-
+        if (scratchEnabled_)
+            pp_->addPlanner(planner_);   // Add the planning from scratch planner if desired
 
         // Setup the PRM for the experience DB 
         // TODO: make this the same one as the repair planner?
@@ -160,7 +159,8 @@ void ompl::tools::Thunder::setup(void)
 
             spars->printDebug();
             spars->setStretchFactor(1.2);
-            spars->setSparseDeltaFraction(0.1); // vertex visibility range  = maximum_extent * this_fraction
+            //spars->setSparseDeltaFraction(0.1); // vertex visibility range  = maximum_extent * this_fraction
+            spars->setSparseDeltaFraction(0.05); // vertex visibility range  = maximum_extent * this_fraction
 
             //spars->setDenseDeltaFraction(0.001);
 
@@ -203,7 +203,7 @@ bool ompl::tools::Thunder::getFilePath(const std::string &databaseName, const st
     //directories successfully created, append the group name as the file name
     rootPath = rootPath / fs::path(databaseName + ".ompl");
     filePath_ = rootPath.string();
-    OMPL_INFORM("Loading database from %s", filePath_.c_str());
+    //OMPL_INFORM("Loading database from %s", filePath_.c_str());
 
     return true;
 }

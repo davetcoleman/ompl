@@ -39,6 +39,7 @@
 #include "ompl/geometric/planners/prm/ConnectionStrategy.h"
 #include "ompl/base/goals/GoalSampleableRegion.h"
 #include "ompl/tools/config/SelfConfig.h"
+#include "ompl/tools/debug/Profiler.h" // temp
 #include <boost/lambda/bind.hpp>
 #include <boost/graph/astar_search.hpp>
 #include <boost/graph/incremental_components.hpp>
@@ -68,11 +69,11 @@ double ompl::geometric::SPARStwo::edgeWeightMap::get (Edge e) const
     {
         std::cout << "ompl::geometric::SPARStwo::edgeWeightMap::get " << e;
         if (collisionStates_[e] == IN_COLLISION)
-            std::cout << " IN COLLISION ";
+            std::cout << " IN COLLSIION ";
         if (collisionStates_[e] == FREE)
             std::cout << " FREE ";
         if (collisionStates_[e] == NOT_CHECKED)
-            std::cout << " NOT CHECKED YET";
+            std::cout << " NOT CHECKED YET ";
         std::cout << "with weight " << boost::get(boost::edge_weight, g_, e) << std::endl;
     }
 
@@ -112,7 +113,7 @@ ompl::geometric::SPARStwo::CustomVisitor::CustomVisitor (Vertex goal)
 void ompl::geometric::SPARStwo::CustomVisitor::examine_vertex (Vertex u, const Graph &) const
 {
     if (u == goal)
-        throw foundGoalException(); //AStarFoundGoal();
+        throw AStarFoundGoal(); //foundGoalException();
 }
 
 // SPARStwo methods ////////////////////////////////////////////////////////////////////////////////////////
@@ -214,25 +215,37 @@ void ompl::geometric::SPARStwo::freeMemory()
 }
 
 bool ompl::geometric::SPARStwo::getSimilarPaths(int nearestK, const base::State* start, const base::State* goal, 
-                                                ompl::geometric::PathGeometric& geometricSolution,
+                                                CandidateSolution &candidateSolution,
                                                 const base::PlannerTerminationCondition &ptc)
 {
+    ompl::tools::Profiler::Clear();
+    ompl::tools::Profiler::Start();
+
     // TODO: nearestK unused
 
     // Get neighbors near start and goal. Note: potentially they are not *visible* - will test for this later
 
     // Start
-    findGraphNeighbors(start, startVertexCandidateNeighbors_);
+    if (!findGraphNeighbors(start, startVertexCandidateNeighbors_))
+    {
+        OMPL_INFORM("No graph neighbors found for start");                
+        return false;
+    }
     std::cout << "Found " << startVertexCandidateNeighbors_.size() << " nodes near start" << std::endl;
 
     // Goal
-    findGraphNeighbors(goal, goalVertexCandidateNeighbors_);
+    if (!findGraphNeighbors(goal, goalVertexCandidateNeighbors_))
+    {
+        OMPL_INFORM("No graph neighbors found for goal");
+        return false;
+    }
     std::cout << "Found " << goalVertexCandidateNeighbors_.size() << " nodes near goal" << std::endl;
 
     // Get paths between start and goal
-    ompl::base::PathPtr solution;
+    ompl::tools::Profiler::Begin("SPARStwo::getSimilarPaths::getPaths");
     bool result = getPaths(startVertexCandidateNeighbors_, goalVertexCandidateNeighbors_, 
-                               start, goal, solution, ptc);
+                               start, goal, candidateSolution, ptc);
+    ompl::tools::Profiler::End("SPARStwo::getSimilarPaths::getPaths");
 
     // Error check
     if (!result)
@@ -240,18 +253,18 @@ bool ompl::geometric::SPARStwo::getSimilarPaths(int nearestK, const base::State*
         OMPL_INFORM("getSimilarPaths(): SPARStwo returned FALSE for getPaths");
         return false;
     }
-    if (!solution)
+    if (!candidateSolution.path_)
     {
         OMPL_ERROR("getSimilarPaths(): SPARStwo returned solution is NULL");
         return false;
     }
 
-    // Convert to path geometic
-    geometricSolution = static_cast<ompl::geometric::PathGeometric&>(*solution);
-
     // Debug output
     if (false)
     {
+        ompl::geometric::PathGeometric geometricSolution 
+            = static_cast<ompl::geometric::PathGeometric&>(*candidateSolution.path_);
+
         for (std::size_t i = 0; i < geometricSolution.getStateCount(); ++i)
         {
             std::cout << "  getSimilarPaths(): Adding state " << i << " to plannerData"  << std::endl;
@@ -268,7 +281,7 @@ bool ompl::geometric::SPARStwo::getPaths(const std::vector<Vertex> &candidateSta
                                          const std::vector<Vertex> &candidateGoals, 
                                          const base::State* actualStart, 
                                          const base::State* actualGoal,
-                                         base::PathPtr &candidateSolution,
+                                         CandidateSolution &candidateSolution,
                                          const base::PlannerTerminationCondition &ptc)
 {
     // Vector to store candidate paths in before they are converted to PathPtrs
@@ -279,23 +292,33 @@ bool ompl::geometric::SPARStwo::getPaths(const std::vector<Vertex> &candidateSta
     // Try every combination of nearby start and goal pairs
     foreach (Vertex start, candidateStarts)
     {
+        std::cout << "Checking motion from  vertex " << actualStart << " to " << stateProperty_[start] << std::endl;
+
+        ompl::tools::Profiler::Begin("SPARStwo::getPaths::checkMotion start");
         // Check if this start is visible from the actual start
         if (!si_->checkMotion(actualStart, stateProperty_[start]))
         {
             std::cout << "FOUND CANDIDATE START THAT IS NOT VISIBLE !!!!!!!!!!!!!!!!!!! " << std::endl;
             continue; // this is actually not visible
         }
+        ompl::tools::Profiler::End("SPARStwo::getPaths::checkMotion start");
 
         foreach (Vertex goal, candidateGoals)
         {
+            std::cout << "Checking motion from  " << actualGoal << " to " << stateProperty_[goal] << std::endl;
+
+            ompl::tools::Profiler::Begin("SPARStwo::getPaths::checkMotion goal");
             // Check if this goal is visible from the actual goal
             if (!si_->checkMotion(actualGoal, stateProperty_[goal]))
             {
                 std::cout << "FOUND CANDIDATE GOAL THAT IS NOT VISIBLE !!!!!!!!!!!!!!!!!!! " << std::endl;
                 continue; // this is actually not visible
             }
+            ompl::tools::Profiler::End("SPARStwo::getPaths::checkMotion goal");
 
             // we lock because the connected components algorithm is incremental and may change disjointSets_
+            /*
+            ompl::tools::Profiler::Begin("SPARStwo::getPaths::sameComponent");
             graphMutex_.lock();
 
             // decide if start and goal are connected 
@@ -303,6 +326,9 @@ bool ompl::geometric::SPARStwo::getPaths(const std::vector<Vertex> &candidateSta
             // i.e. it will say its the same components even when an edge has been disabled
             bool same_component = sameComponent(start, goal);
             graphMutex_.unlock();
+            ompl::tools::Profiler::End("SPARStwo::getPaths::sameComponent");
+            */
+            bool same_component = true; // hacked for testing
 
             // Check if the chosen start and goal can be used together to satisfy problem
             if (same_component && g->isStartGoalPairValid(stateProperty_[goal], stateProperty_[start]))
@@ -310,6 +336,7 @@ bool ompl::geometric::SPARStwo::getPaths(const std::vector<Vertex> &candidateSta
                 // Make sure that the start and goal aren't so close together that they find the same vertex
                 if (start == goal)
                 {
+                    std::cout << "Start equals goal!!! " << std::endl;
                     continue; // skip this pair
                 }
 
@@ -339,7 +366,7 @@ bool ompl::geometric::SPARStwo::getPaths(const std::vector<Vertex> &candidateSta
                         if (havePartialSolution)
                         {
                             std::cout << "has partial solution " << std::endl;
-                            convertVertexPathToBasePath(vertexPath, goal, candidateSolution);
+                            convertVertexPathToStatePath(vertexPath, actualStart, actualGoal, candidateSolution);
                             return true; // we previously found a path that is at least partially valid
                         }
                             
@@ -358,7 +385,7 @@ bool ompl::geometric::SPARStwo::getPaths(const std::vector<Vertex> &candidateSta
                         std::cout << "lazy collision check returned valid " << std::endl;
                             
                         // the path is valid, we are done!
-                        convertVertexPathToBasePath(vertexPath, goal, candidateSolution);
+                        convertVertexPathToStatePath(vertexPath, actualStart, actualGoal, candidateSolution);
                         return true;
                     }
                     // else, loop with updated graph that has the invalid edges/states disabled
@@ -373,22 +400,14 @@ bool ompl::geometric::SPARStwo::getPaths(const std::vector<Vertex> &candidateSta
 bool ompl::geometric::SPARStwo::constructSolution(const Vertex start, const Vertex goal,
                                                   std::vector<Vertex> &vertexPath) const
 {
-    //boost::vector_property_map<Vertex> prev(boost::num_vertices(g_));
-
+    ompl::tools::Profiler::ScopedBlock("SPARStwo::constructSolution");
     Vertex *vertexPredecessors = new Vertex[boost::num_vertices(g_)];
     bool foundGoal = false;
 
     double *vertexDistances = new double[boost::num_vertices(g_)];
-    //for (std::size_t i = 0; i < boost::num_vertices(g_); ++i)
-    //    d[i] = 33;
-
 
     try
     {
-        /* boost::astar_search(g_, start,
-                            boost::bind(&SPARStwo::distanceFunction, this, _1, goal),
-                            boost::predecessor_map(prev).
-                            visitor(AStarGoalVisitor<Vertex>(goal)));  */
         boost::astar_search(g_, // graph
                             start, // start state
                             boost::bind(&SPARStwo::distanceFunction, this, _1, goal), // the heuristic
@@ -396,10 +415,11 @@ bool ompl::geometric::SPARStwo::constructSolution(const Vertex start, const Vert
                             boost::weight_map(edgeWeightMap(g_, edgeCollisionStateProperty_)).
                             predecessor_map(vertexPredecessors).
                             distance_map(&vertexDistances[0]).
+                            //visitor(AStarGoalVisitor<Vertex>(goal)));
                             visitor(CustomVisitor(goal)));
     }
-    catch (ompl::geometric::SPARStwo::foundGoalException&)
-        //catch (AStarFoundGoal&) // the default exception for AStarGoalVisitor
+    //catch (ompl::geometric::SPARStwo::foundGoalException&)
+    catch (AStarFoundGoal&) // the default exception for AStarGoalVisitor
     {
         std::cout << std::endl;
         // the custom exception from CustomVisitor      
@@ -448,6 +468,7 @@ bool ompl::geometric::SPARStwo::constructSolution(const Vertex start, const Vert
 bool ompl::geometric::SPARStwo::lazyCollisionCheck(std::vector<Vertex> &vertexPath,
                                                    const base::PlannerTerminationCondition &ptc)
 {
+    ompl::tools::Profiler::ScopedBlock("SPARStwo::lazyCollisionCheck");
     std::cout << OMPL_CONSOLE_COLOR_BROWN << std::endl;
     std::cout << "Lazy collision check " << std::endl;
 
@@ -472,7 +493,7 @@ bool ompl::geometric::SPARStwo::lazyCollisionCheck(std::vector<Vertex> &vertexPa
         }
 
         Edge thisEdge = boost::edge(fromVertex, toVertex, g_).first;
-        std::cout << "On edge  " << thisEdge << std::endl;
+        //std::cout << "On edge  " << thisEdge << std::endl;
 
         // Has this edge already been checked before?
         if (edgeCollisionStateProperty_[thisEdge] == NOT_CHECKED)
@@ -765,7 +786,7 @@ void ompl::geometric::SPARStwo::checkQueryStateInitialization()
     {
         queryVertex_ = boost::add_vertex( g_ );
         stateProperty_[queryVertex_] = NULL;
-        visualizeCallback();
+        //visualizeCallback();
     }
 }
 
@@ -963,15 +984,33 @@ void ompl::geometric::SPARStwo::findGraphNeighbors(base::State *st, std::vector<
             visibleNeighborhood.push_back(graphNeighborhood[i]);
 }
 
-void ompl::geometric::SPARStwo::findGraphNeighbors(const base::State *state, std::vector<Vertex> &graphNeighborhood)
+bool ompl::geometric::SPARStwo::findGraphNeighbors(const base::State *state, std::vector<Vertex> &graphNeighborhood)
 {
     base::State* stateCopy = si_->cloneState(state);
 
     // Don't check for visibility
     graphNeighborhood.clear();
     stateProperty_[ queryVertex_ ] = stateCopy;
-    nn_->nearestR( queryVertex_, sparseDelta_, graphNeighborhood);
+
+    // Double the range of sparseDelta_ up to 3 times until at least 1 neighbor is found
+    std::size_t expandNeighborhoodSearchAttempts = 1;
+    for (std::size_t i = 0; i < expandNeighborhoodSearchAttempts; ++i)
+    {
+        std::cout << "Attempt " << i+1 << " to find neighborhood at range " <<  sparseDelta_ * (i+1) << std::endl;
+        nn_->nearestR( queryVertex_, sparseDelta_ * (i+1), graphNeighborhood);
+
+        // Check if at least one neighbor found
+        if (graphNeighborhood.size() > 0)
+            break;
+    }
     stateProperty_[ queryVertex_ ] = NULL;
+
+    // Check if no neighbors found
+    if (!graphNeighborhood.size())
+    {
+        return false;
+    }    
+    return true;
 }
 
 void ompl::geometric::SPARStwo::approachGraph( Vertex v )
@@ -1182,7 +1221,7 @@ ompl::geometric::SPARStwo::Vertex ompl::geometric::SPARStwo::addGuard(base::Stat
     resetFailures();
 
     //std::cout << " -> addGuard() of type " << type << std::endl;
-    visualizeCallback();
+    //visualizeCallback();
     return m;
 }
 
@@ -1191,9 +1230,6 @@ void ompl::geometric::SPARStwo::connectGuards(Vertex v, Vertex vp)
     //std::cout << "connectGuards called ---------------------------------------------------------------- " << std::endl;
     assert(v <= milestoneCount());
     assert(vp <= milestoneCount());
-
-    const double weight = distanceFunction(v, vp);
-    const int collisionState = NOT_CHECKED; // TODO value
 
     //std::cout << "Connecting vertex " << v << " to vertex " << vp <<  " ++++++++++++++++++" << std::endl;
 
@@ -1204,28 +1240,75 @@ void ompl::geometric::SPARStwo::connectGuards(Vertex v, Vertex vp)
     Edge e = (boost::add_edge(v, vp, g_)).first;
 
     // Add associated properties to the edge
-    edgeWeightProperty_[e] = weight;
-    edgeCollisionStateProperty_[e] = collisionState; // TODO this zero is bad
+    edgeWeightProperty_[e] = distanceFunction(v, vp); // TODO: use this value with astar
+    edgeCollisionStateProperty_[e] = NOT_CHECKED;
 
     // Add the edge to the incrementeal connected components datastructure
     disjointSets_.union_set(v, vp);
 
     // Debug in Rviz
-    visualizeCallback();
+    //visualizeCallback();
 }
 
-bool ompl::geometric::SPARStwo::convertVertexPathToBasePath(std::vector<Vertex> &vertexPath, Vertex goal,
-                                                            ompl::base::PathPtr &path)
+bool ompl::geometric::SPARStwo::convertVertexPathToStatePath(std::vector<Vertex> &vertexPath, 
+                                                             const base::State* actualStart, 
+                                                             const base::State* actualGoal,
+                                                             CandidateSolution &candidateSolution)
 {
     ompl::geometric::PathGeometric *pathGeometric = new ompl::geometric::PathGeometric(si_);
+    candidateSolution.isApproximate_ = false; // assume path is valid
+    
+    // Add original start if it is different than the first state
+    if (actualStart != stateProperty_[vertexPath.back()])
+    {
+        pathGeometric->append(actualStart);
+        
+        // Add the edge status
+        // the edge from actualStart to start is always valid otherwise we would not have used that start
+        candidateSolution.edgeCollisionStatus_.push_back(FREE);
+    }
 
     // Reverse the vertexPath and convert to state path
     for (std::size_t i = vertexPath.size(); i > 0; --i)
     {
         pathGeometric->append(stateProperty_[vertexPath[i-1]]);
+
+        // Add the edge status
+        if (i > 1) // skip the last vertex (its reversed)
+        {
+            Edge thisEdge = boost::edge(vertexPath[i-1], vertexPath[i-2], g_).first;
+            std::cout << "On edge  " << thisEdge << std::endl;
+            
+
+            // Check if any edges in path are not free (then it an approximate path)
+            if (edgeCollisionStateProperty_[thisEdge] == IN_COLLISION)
+            {    
+                candidateSolution.isApproximate_ = true;
+                candidateSolution.edgeCollisionStatus_.push_back(IN_COLLISION);
+            }
+            else if (edgeCollisionStateProperty_[thisEdge] == NOT_CHECKED)
+            {
+                OMPL_ERROR("A chosen path has an edge that has not been checked for collision. This should not happen");
+                candidateSolution.edgeCollisionStatus_.push_back(NOT_CHECKED);
+            }
+            else 
+            {
+                candidateSolution.edgeCollisionStatus_.push_back(FREE);
+            }
+        }
     }
 
-    path = base::PathPtr(pathGeometric);
+    // Add original goal if it is different than the last state
+    if (actualGoal != stateProperty_[vertexPath.front()])
+    {
+        pathGeometric->append(actualGoal);
+
+        // Add the edge status
+        // the edge from actualGoal to goal is always valid otherwise we would not have used that goal
+        candidateSolution.edgeCollisionStatus_.push_back(FREE);
+    }
+
+    candidateSolution.path_ = base::PathPtr(pathGeometric);
 
     return true;
 }
@@ -1312,14 +1395,13 @@ void ompl::geometric::SPARStwo::setPlannerData(const base::PlannerData &data)
     // Add the corresponding edges to the graph ------------------------------------
 
     std::vector<unsigned int> edgeList;
-    unsigned int numEdges;
-    std::cout << "Adding edges " << std::endl;
+    //std::cout << "Adding edges " << std::endl;
     for (std::size_t fromVertex = 0; fromVertex < data.numVertices(); ++fromVertex)
     {
         edgeList.clear();
-        numEdges = data.getEdges(fromVertex, edgeList);
-
-        //std::cout << "  Vertex " << fromVertex << " has " << numEdges << " edges " << std::endl;
+        
+        // Get the edges
+        data.getEdges(fromVertex, edgeList); // returns num of edges
 
         Vertex m = idToVertex[fromVertex];
 
@@ -1331,7 +1413,7 @@ void ompl::geometric::SPARStwo::setPlannerData(const base::PlannerData &data)
 
             // Add the edge to the graph
             const base::Cost weight(0);
-            if (true)
+            if (false)
             {
                 std::cout << "    Adding edge from vertex id " << fromVertex << " to id " <<  toVertex << " into edgeList" << std::endl;
                 std::cout << "      Vertex " << m << " to " << n << std::endl;
@@ -1340,12 +1422,21 @@ void ompl::geometric::SPARStwo::setPlannerData(const base::PlannerData &data)
         }
     } // for
 
-    const char* name = "1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    if (false)
+    {
+        const char* name = "1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-    // Debug graph to terminal  
-    std::cout << "edge set: ";
-    print_edges(g_, name);
+        // Debug graph to terminal  
+        std::cout << "edge set: ";
+        print_edges(g_, name);
 
-    std::cout << "out-edges:" << std::endl;
-    print_graph(g_, name);
+        std::cout << "out-edges:" << std::endl;
+        print_graph(g_, name);
+    } 
+}
+
+void ompl::geometric::SPARStwo::clearEdgeCollisionStates()
+{
+    foreach (const Edge e, boost::edges(g_))
+        edgeCollisionStateProperty_[e] = NOT_CHECKED; // each edge has an unknown state
 }

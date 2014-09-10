@@ -46,6 +46,7 @@
 
 ompl::tools::ExperienceDB2::ExperienceDB2(const base::StateSpacePtr &space)
     : numUnsavedPaths_(0)
+    , saving_enabled_(true)
 {
     // Set space information
     si_.reset(new base::SpaceInformation(space));
@@ -191,6 +192,13 @@ bool ompl::tools::ExperienceDB2::saveIfChanged(const std::string& fileName)
 
 bool ompl::tools::ExperienceDB2::save(const std::string& fileName)
 {
+    // Disabled
+    if (!saving_enabled_)
+    {
+        OMPL_WARN("Not saving because option disabled for ExperienceDB");
+        return false;
+    }
+
     // Error checking
     if (fileName.empty())
     {
@@ -289,40 +297,59 @@ void ompl::tools::ExperienceDB2::getAllPlannerDatas(std::vector<ompl::base::Plan
     spars_->getPlannerData(*data);
     plannerDatas.push_back(data);
 
-    OMPL_DEBUG("ExperienceDB2::getAllPlannerDatas: Number of planner databases found: %d", plannerDatas.size());
+    //OMPL_DEBUG("ExperienceDB2::getAllPlannerDatas: Number of planner databases found: %d", plannerDatas.size());
 }
 
 bool ompl::tools::ExperienceDB2::findNearestStartGoal(int nearestK, const base::State* start, const base::State* goal,
-                                                      ompl::geometric::PathGeometric& geometricSolution, const base::PlannerTerminationCondition& ptc)
+                                                      ompl::geometric::SPARStwo::CandidateSolution &candidateSolution,
+                                                      const base::PlannerTerminationCondition& ptc)
 {
-  if (!spars_->getSimilarPaths(nearestK, start, goal, geometricSolution, ptc))
+    bool result;
+
+    // Benchmark runtime
+    time::point startTime = time::now();
+    std::size_t problems = 1;
+    
+    std::cout << "Preparing to benchmark... " << std::endl;
+    std::cout << std::endl;
+
+    for (std::size_t i = 0; i < problems; ++i)
+    {
+        std::cout << std::endl;
+        std::cout << "----------------------------------------------------------- " << std::endl;
+
+        result = spars_->getSimilarPaths(nearestK, start, goal, candidateSolution, ptc);
+
+        // Clear edge collision state for testing purposes
+        if (problems > 1)
+        {
+            spars_->clearEdgeCollisionStates();
+        }
+    }
+
+    // Benchmark runtime
+    double milliseconds = time::seconds(time::now() - startTime);
+    std::cout << "Total time: " << milliseconds << " seconds averaging " << milliseconds/problems
+              << " seconds per recalled path for "<< problems << " runs" << std::endl;
+
+    std::cout << std::endl;
+    std::cout << std::endl;
+    std::cout << std::endl;
+    std::cout << std::endl;
+    std::cout << std::endl;
+    std::cout << std::endl;
+    std::cout << std::endl;
+    std::cout << std::endl;
+
+    if (!result)
     {
         OMPL_INFORM("spars::getSimilarPaths() returned false - does not have a solution");
         return false;
     }
-    else
-    {
-        OMPL_INFORM("spars::getSimilarPaths() returned true - found a solution");
-        return true;
-    }
-}
 
-double ompl::tools::ExperienceDB2::distanceFunction(const ompl::base::PlannerDataPtr a, const ompl::base::PlannerDataPtr b) const
-{
-    // Basic implementation
-    /*
-    return si_->distance( a->getVertex(0).getState(), b->getVertex(0).getState() ) +
-        si_->distance( a->getVertex(a->numVertices()-1).getState(), b->getVertex(b->numVertices()-1).getState() );
-    */
-
-    // Bi-directional implementation - check path b from [start, goal] and [goal, start]
-    return std::min(
-        // [ a.start, b.start] + [a.goal + b.goal]
-        si_->distance( a->getVertex(0).getState(), b->getVertex(0).getState() ) +
-        si_->distance( a->getVertex(a->numVertices()-1).getState(), b->getVertex(b->numVertices()-1).getState() ),
-        // [ a.start, b.goal] + [a.goal + b.start]
-        si_->distance( a->getVertex(0).getState(), b->getVertex(b->numVertices()-1).getState() ) +
-        si_->distance( a->getVertex(a->numVertices()-1).getState(), b->getVertex(0).getState() ) );
+    OMPL_INFORM("spars::getSimilarPaths() returned true - found a solution of size %d", 
+                candidateSolution.getStateCount());
+    return true;
 }
 
 void ompl::tools::ExperienceDB2::debugVertex(const ompl::base::PlannerDataVertex& vertex)

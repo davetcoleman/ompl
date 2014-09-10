@@ -136,7 +136,7 @@ namespace ompl
              * \brief Find the k nearest paths to our queries one
              */
             bool findNearestStartGoal(int nearestK, const base::State* start, const base::State* goal,
-                                      ompl::geometric::PathGeometric& geometric_solution,
+                                      ompl::geometric::SPARStwo::CandidateSolution &candidateSolution,
                                       const base::PlannerTerminationCondition& ptc);
 
             /**
@@ -154,13 +154,22 @@ namespace ompl
                 return numUnsavedPaths_;
             }
 
-        private:
-
-            /** 
-             * \brief Add the distance between both path's starts and the distance between both path's ends together
+            /**
+             * \brief Getter for enabling experience database saving
+             */ 
+            bool getSavingEnabled()
+            {
+                return saving_enabled_;
+            }
+          
+            /**
+             * \brief Setter for enabling experience database saving
              */
-            double distanceFunction(const ompl::base::PlannerDataPtr a, const ompl::base::PlannerDataPtr b) const;
-
+            void setSavingEnabled(bool saving_enabled)
+            {
+                saving_enabled_ = saving_enabled;
+            }
+          
         protected:
 
             /// The created space information
@@ -169,17 +178,14 @@ namespace ompl
             /// Helper class for storing each plannerData instance
             ompl::base::PlannerDataStorage plannerDataStorage_;
 
-            // A nearest-neighbors datastructure containing the tree of start/goal states combined
-            //boost::shared_ptr< NearestNeighbors<ompl::base::PlannerDataPtr> > nn_;
-
-            // Reusable plannerData instance for filling in start and goal and performing searches on the tree
-            //ompl::base::PlannerDataPtr nnSearchKey_;
-
             // Track unsaved paths to determine if a save is required
             int numUnsavedPaths_;
 
             // Use SPARStwo's graph datastructure to store experience
             ompl::tools::SPARStwoPtr spars_;
+            
+            // Allow the database to save to file (new experiences)
+            bool saving_enabled_; 
 
         }; // end of class ExperienceDB2
 

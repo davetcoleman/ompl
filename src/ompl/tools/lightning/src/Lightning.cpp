@@ -176,7 +176,7 @@ bool ompl::tools::Lightning::getFilePath(const std::string &databaseName, const 
     //directories successfully created, append the group name as the file name
     rootPath = rootPath / fs::path(databaseName + ".ompl");
     filePath_ = rootPath.string();
-    OMPL_INFORM("Loading database from %s", filePath_.c_str());
+    //OMPL_INFORM("Loading database from %s", filePath_.c_str());
 
     return true;
 }

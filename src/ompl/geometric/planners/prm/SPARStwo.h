@@ -225,11 +225,31 @@ namespace ompl
             };
 
             /** \brief Possible collision states of an edge */
-            enum edge_collision_states_t
+            enum EdgeCollisionState
             {
                 NOT_CHECKED,
                 IN_COLLISION,
                 FREE
+            };
+
+            /** \brief Struct for passing around partially solved solutions */
+            struct CandidateSolution
+            {
+                bool isApproximate_;
+                base::PathPtr path_;
+                // Edge 0 is edge from vertex 0 to vertex 1. Thus, there is n-1 edges for n vertices
+                std::vector<EdgeCollisionState> edgeCollisionStatus_;
+                // TODO save the collision state of the vertexes also?
+
+                std::size_t getStateCount()
+                {
+                    return static_cast<ompl::geometric::PathGeometric&>(*path_).getStateCount();
+                }
+                
+                ompl::geometric::PathGeometric getGeometricPath()
+                {
+                    return static_cast<ompl::geometric::PathGeometric&>(*path_);
+                }
             };
 
             ////////////////////////////////////////////////////////////////////////////////////////
@@ -330,9 +350,9 @@ namespace ompl
             /**
              * Thrown to stop the A* search when finished.
              */
-            class foundGoalException
-            {
-            };
+            //class foundGoalException
+            //{
+            //};
 
             ////////////////////////////////////////////////////////////////////////////////////////
             /**
@@ -480,7 +500,7 @@ namespace ompl
              * \return 
              */
             bool getSimilarPaths(int nearestK, const base::State* start, const base::State* goal, 
-                                 ompl::geometric::PathGeometric& geometricSolution, 
+                                 CandidateSolution &candidateSolution,
                                  const base::PlannerTerminationCondition &ptc);
             
             virtual void setup();
@@ -505,12 +525,16 @@ namespace ompl
 
             /**
              * \brief Convert astar results to correctly ordered path
-             * \param vertexPath
-             * \param goal
+             * \param vertexPath - in reverse
+             * \param start - actual start that is probably not included in new path
+             * \param goal - actual goal that is probably not included in new path
              * \param path - returned solution
              * \return true on success
              */
-            bool convertVertexPathToBasePath(std::vector<Vertex> &vertexPath, Vertex goal, ompl::base::PathPtr &path);
+            bool convertVertexPathToStatePath(std::vector<Vertex> &vertexPath, 
+                                              const base::State* actualStart, 
+                                              const base::State* actualGoal, 
+                                              CandidateSolution &candidateSolution);
 
             virtual void getPlannerData(base::PlannerData &data) const;
 
@@ -525,6 +549,9 @@ namespace ompl
 
             /** \brief Print debug information about planner */
             void printDebug(std::ostream &out = std::cout) const;
+
+            /** \brief Clear all past edge state information about in collision or not */
+            void clearEdgeCollisionStates();
 
         protected:
 
@@ -553,8 +580,13 @@ namespace ompl
             void findGraphNeighbors(base::State *state, std::vector<Vertex> &graphNeighborhood, 
                                     std::vector<Vertex> &visibleNeighborhood);
 
-            /** \brief Finds nodes in the graph near state NOTE: note tested for visibility*/
-            void findGraphNeighbors(const base::State *state, std::vector<Vertex> &graphNeighborhood);
+            /**
+             * \brief Finds nodes in the graph near state NOTE: note tested for visibility
+             * \param state - vertex to find neighbors around
+             * \param result
+             * \return false is no neighbors found
+             */
+            bool findGraphNeighbors(const base::State *state, std::vector<Vertex> &graphNeighborhood);
 
             /** \brief Approaches the graph from a given vertex */
             void approachGraph( Vertex v );
@@ -598,7 +630,7 @@ namespace ompl
                           const std::vector<Vertex> &candidateGoals, 
                           const base::State* actualStart, 
                           const base::State* actualGoal,
-                          base::PathPtr &candidateSolution,
+                          CandidateSolution &candidateSolution,
                           const base::PlannerTerminationCondition &ptc);
 
             /** \brief Check recalled path for collision and disable as needed */

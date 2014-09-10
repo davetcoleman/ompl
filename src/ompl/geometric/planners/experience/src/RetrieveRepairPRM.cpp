@@ -120,14 +120,15 @@ void ompl::geometric::RetrieveRepairPRM::freeMemory(void)
 ompl::base::PlannerStatus ompl::geometric::RetrieveRepairPRM::solve(const base::PlannerTerminationCondition &ptc)
 {
     bool solved = false;
-    bool approximate = false;
     double approxdif = std::numeric_limits<double>::infinity();
     nearestPaths_.clear();
 
     // Check if the database is empty
     if (!experienceDB_->getExperiencesCount())
     {
-        OMPL_INFORM("Experience database is empty so unable to run RetrieveRepairPRM algorithm.");
+        std::cout << std::endl << OMPL_CONSOLE_COLOR_GREEN;
+        OMPL_INFORM("Experience database is empty so unable to run RetrieveRepairPRM algorithm.");      
+        std::cout << std::endl << OMPL_CONSOLE_COLOR_RESET;
 
         // TODO: it seems TIMEOUT causes the wrong behavior in parallel plan
         return base::PlannerStatus::CRASH;
@@ -138,18 +139,19 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepairPRM::solve(const base::
     const base::State *goalState = pis_.nextGoal(ptc);
 
     // Create solution path struct
-    ompl::geometric::PathGeometric primaryPath = ompl::geometric::PathGeometric(si_);
+    ompl::geometric::SPARStwo::CandidateSolution candidateSolution;
 
     // Search for previous solution in database
     // TODO make this more than 1 path
-    if (!experienceDB_->findNearestStartGoal(nearestK_, startState, goalState, primaryPath, ptc))
+    if (!experienceDB_->findNearestStartGoal(nearestK_, startState, goalState, candidateSolution, ptc))
     {
-        OMPL_INFORM("RetrieveRepair::solve() No nearest start or goal found");
-        return base::PlannerStatus::TIMEOUT; // The planner failed to find a solution
+      OMPL_INFORM("RetrieveRepair::solve() No nearest start or goal found");
+      return base::PlannerStatus::TIMEOUT; // The planner failed to find a solution
     }
+
     
     // Save this for future debugging
-    nearestPaths_.push_back(primaryPath);
+    nearestPaths_.push_back(candidateSolution.getGeometricPath());
     nearestPathsChosenID_ = 0; // TODO not hardcode
 
     /*
@@ -181,7 +183,7 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepairPRM::solve(const base::
     */
 
     // Add start
-    primaryPath.prepend(startState);
+    //primaryPath.prepend(startState);
 
     /*
     std::cout << std::endl;
@@ -201,10 +203,10 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepairPRM::solve(const base::
     */
 
     // Add goal
-    primaryPath.append(goalState);
+    //primaryPath.append(goalState);
 
     // All save trajectories should be at least 2 states long, then we append the start and goal states, for min of 4
-    assert(primaryPath.getStateCount() >= 4);
+    assert(candidateSolution.getStateCount() >= 4);
 
     // Repair chosen path
     /*if (!repairPath(primaryPath, ptc))
@@ -226,15 +228,18 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepairPRM::solve(const base::
 
     // Finished
     approxdif = 0;
+    bool approximate = candidateSolution.isApproximate_;
 
     // Copy PathGeometric to a pointer version
+    /*
     PathGeometric *path = new PathGeometric(si_);
-    for (std::size_t i = 0; i < primaryPath.getStateCount(); ++i)
+    for (std::size_t i = 0; i < candidateSolution.getStateCount(); ++i)
     {
         path->append(primaryPath.getState(i));
     }
+    */
 
-    pdef_->addSolutionPath(ompl::base::PathPtr(path), approximate, approxdif, getName());
+    pdef_->addSolutionPath(candidateSolution.path_, approximate, approxdif, getName());
     solved = true;
     return base::PlannerStatus(solved, approximate);
 }
