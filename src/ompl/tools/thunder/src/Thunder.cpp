@@ -159,8 +159,8 @@ void ompl::tools::Thunder::setup(void)
 
             spars->printDebug();
             spars->setStretchFactor(1.2);
-            //spars->setSparseDeltaFraction(0.1); // vertex visibility range  = maximum_extent * this_fraction
-            spars->setSparseDeltaFraction(0.05); // vertex visibility range  = maximum_extent * this_fraction
+            spars->setSparseDeltaFraction(0.1); // vertex visibility range  = maximum_extent * this_fraction
+            //spars->setSparseDeltaFraction(0.05); // vertex visibility range  = maximum_extent * this_fraction
 
             //spars->setDenseDeltaFraction(0.001);
 
@@ -354,14 +354,6 @@ ompl::base::PlannerStatus ompl::tools::Thunder::solve(const base::PlannerTermina
                 // TODO: maybe test this path for validity also?
 
                 // Save to database
-                
-
-                /*
-                OMPL_WARN("Temp not adding path but instead whole planner data");
-                base::PlannerData pd( si_ );
-                getPlannerData(pd);
-                experienceDB_->addPlannerData(pd);
-                */
                 experienceDB_->addPath(solutionPath);
             }
         }

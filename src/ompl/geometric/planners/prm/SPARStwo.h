@@ -446,16 +446,6 @@ namespace ompl
                 return stretchFactor_;
             }
 
-            /**
-             *  \brief While the termination condition permits, construct the spanner graphn
-             *  \param ptc
-             */
-            void constructRoadmap(const base::PlannerTerminationCondition &ptc);
-
-            /** \brief While the termination condition permits, construct the spanner graph. If \e stopOnMaxFail is true,
-                the function also terminates when the failure limit set by setMaxFailures() is reached. */
-            void constructRoadmap(const base::PlannerTerminationCondition &ptc, bool stopOnMaxFail);
-
             void addPathToRoadmap(const base::PlannerTerminationCondition &ptc, ompl::geometric::PathGeometric& solutionPath);
 
             void addStateToRoadmap(const base::PlannerTerminationCondition &ptc, base::State *newState);

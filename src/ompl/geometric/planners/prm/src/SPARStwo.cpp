@@ -570,94 +570,6 @@ bool ompl::geometric::SPARStwo::reachedTerminationCriterion() const
     return consecutiveFailures_ >= maxFailures_ || addedSolution_;
 }
 
-void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationCondition &ptc, bool stopOnMaxFail)
-{
-    if (stopOnMaxFail)
-    {
-        resetFailures();
-	base::PlannerTerminationCondition ptcOrFail =
-	    base::plannerOrTerminationCondition(ptc, base::PlannerTerminationCondition(boost::bind(&SPARStwo::reachedFailureLimit, this)));
-        constructRoadmap(ptcOrFail);
-    }
-    else
-        constructRoadmap(ptc);
-}
-
-void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationCondition &ptc)
-{
-    std::cout << "should not be calling this " << std::endl;
-    throw;
-
-    // Check that the query vertex is initialized (used for internal nearest neighbor searches)
-    checkQueryStateInitialization();
-
-    if (!sampler_)
-        sampler_ = si_->allocValidStateSampler();
-    if (!simpleSampler_)
-        simpleSampler_ = si_->allocStateSampler();
-
-    base::State *qNew = si_->allocState();
-    base::State *workState = si_->allocState();
-
-    /* The whole neighborhood set which has been most recently computed */
-    std::vector<Vertex> graphNeighborhood;
-    /* The visible neighborhood set which has been most recently computed */
-    std::vector<Vertex> visibleNeighborhood;
-
-    while (ptc == false)
-    {
-        ++iterations_;
-        ++consecutiveFailures_;
-
-        if (!sampler_->sample(qNew))
-            continue;
-
-        findGraphNeighbors(qNew, graphNeighborhood, visibleNeighborhood);
-
-        std::cout << "graph neighborhood " << graphNeighborhood.size() << std::endl;
-        std::cout << "visible neighborhood " << visibleNeighborhood.size() << std::endl;
-
-        if (!checkAddCoverage(qNew, visibleNeighborhood))
-        {
-            std::cout << "debug -1" << std::endl;
-            if (!checkAddConnectivity(qNew, visibleNeighborhood))
-            {
-                std::cout << "debug 0 " << std::endl;
-                if (!checkAddInterface(qNew, graphNeighborhood, visibleNeighborhood))
-                {
-                    std::cout << "debug 1" << std::endl;
-                    if (visibleNeighborhood.size() > 0)
-                    {
-                        std::cout << "debug 2" << std::endl;
-                        std::map<Vertex, base::State*> closeRepresentatives;
-                        findCloseRepresentatives(workState, qNew, visibleNeighborhood[0], closeRepresentatives, ptc);
-                        for (std::map<Vertex, base::State*>::iterator it = closeRepresentatives.begin(); it != closeRepresentatives.end(); ++it)
-                        {
-                            std::cout << "debug 3" << std::endl;
-                            updatePairPoints(visibleNeighborhood[0], qNew, it->first, it->second);
-                            updatePairPoints(it->first, it->second, visibleNeighborhood[0], qNew);
-                        }
-                        std::cout << "debug 4" << std::endl;
-                        checkAddPath(visibleNeighborhood[0]);
-                        for (std::map<Vertex, base::State*>::iterator it = closeRepresentatives.begin(); it != closeRepresentatives.end(); ++it)
-                        {
-                            std::cout << "debug 5" << std::endl;
-                            checkAddPath(it->first);
-                            si_->freeState(it->second);
-                        }
-                    }
-                }
-            }
-        }
-        std::cout << "-------------------------------------------------------" << std::endl;
-        std::cout << "-------------------------------------------------------" << std::endl;
-        OMPL_DEBUG("Don't forget I added this break...");
-        break;
-    }
-    si_->freeState(workState);
-    si_->freeState(qNew);
-}
-
 void ompl::geometric::SPARStwo::addPathToRoadmap(const base::PlannerTerminationCondition &ptc,
                                                  ompl::geometric::PathGeometric& solutionPath)
 {
@@ -673,6 +585,7 @@ void ompl::geometric::SPARStwo::addPathToRoadmap(const base::PlannerTerminationC
 
     // Fill in the gaps of the states
     solutionPath.interpolate();
+    std::cout << "Attempting to add  " << solutionPath.getStateCount() << " states to roadmap" << std::endl;
 
     // Try to add the start and goal first, but don't force it
     addStateToRoadmap(ptc, solutionPath.getState(0));
@@ -699,7 +612,7 @@ void ompl::geometric::SPARStwo::addPathToRoadmap(const base::PlannerTerminationC
 
 void ompl::geometric::SPARStwo::addStateToRoadmap(const base::PlannerTerminationCondition &ptc, base::State *newState)
 {
-    bool local_verbose = false;
+    bool local_verbose = true;
 
     // Check that the query vertex is initialized (used for internal nearest neighbor searches)
     checkQueryStateInitialization();
@@ -1221,7 +1134,7 @@ ompl::geometric::SPARStwo::Vertex ompl::geometric::SPARStwo::addGuard(base::Stat
     resetFailures();
 
     //std::cout << " -> addGuard() of type " << type << std::endl;
-    //visualizeCallback();
+    visualizeCallback();
     return m;
 }
 
@@ -1247,7 +1160,7 @@ void ompl::geometric::SPARStwo::connectGuards(Vertex v, Vertex vp)
     disjointSets_.union_set(v, vp);
 
     // Debug in Rviz
-    //visualizeCallback();
+    visualizeCallback();
 }
 
 bool ompl::geometric::SPARStwo::convertVertexPathToStatePath(std::vector<Vertex> &vertexPath, 
@@ -1354,8 +1267,8 @@ void ompl::geometric::SPARStwo::getPlannerData(base::PlannerData &data) const
             //OMPL_INFORM("Adding edge from vertex of type %d to vertex of type %d", colorProperty_[v1], colorProperty_[v2]);
         }
     }
-    else
-        OMPL_INFORM("%s: There are no edges in the graph!", getName().c_str());
+    //else
+    //    OMPL_INFORM("%s: There are no edges in the graph!", getName().c_str());
 
     // Make sure to add edge-less nodes as well
     foreach (const Vertex n, boost::vertices(g_))

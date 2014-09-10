@@ -94,7 +94,6 @@ namespace ompl
              */
             bool load(const std::string& fileName);
 
-            void addPlannerData(const ompl::base::PlannerData &data);
             /**
              * \brief Add a new solution path to our database. Des not actually save to file so
              *        experience will be lost if save() is not called

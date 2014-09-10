@@ -126,22 +126,6 @@ bool ompl::tools::ExperienceDB2::load(const std::string& fileName)
     return true;
 }
 
-// TODO this is a temp debug function
-void ompl::tools::ExperienceDB2::addPlannerData(const ompl::base::PlannerData &data)
-{
-    if (!spars_)
-    {
-        OMPL_ERROR("SPARStwo planner has not been passed into the ExperienceDB2 yet");
-        return;
-    }
-
-    spars_->setPlannerData(data);
-
-    std::cout << "SPARStwo now has " << spars_->milestoneCount() << " states" << std::endl;
-
-    numUnsavedPaths_++;
-}
-
 void ompl::tools::ExperienceDB2::addPath(ompl::geometric::PathGeometric& solutionPath)
 {
     // Error check
@@ -157,24 +141,6 @@ void ompl::tools::ExperienceDB2::addPath(ompl::geometric::PathGeometric& solutio
     double seconds = 10; // a large number, should never need to use this
     ompl::base::PlannerTerminationCondition ptc = ompl::base::timedPlannerTerminationCondition( seconds, 0.1 ); 
     spars_->addPathToRoadmap(ptc, solutionPath);
-
-    // this is for PRM only
-    /*
-      ompl::geometric::SPARStwo::Vertex from;
-      ompl::geometric::SPARStwo::Vertex to;
-
-      // Add the states to one nodes files
-      for (std::size_t i = 0; i < solutionPath.getStates().size(); ++i)
-      {
-      // Copy the state
-      ompl::base::State *state = si_->cloneState(solutionPath.getStates()[i]);
-
-      spars_->addMilestone( state );
-
-      OMPL_INFORM("State %d:", i);
-      debugState(state);
-      }
-    */
 
     std::cout << "SPARStwo now has " << spars_->milestoneCount() << " states" << std::endl;
 
