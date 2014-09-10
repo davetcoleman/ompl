@@ -269,8 +269,8 @@ namespace ompl
 
             /** The underlying boost graph type (undirected weighted-edge adjacency list with above properties). */
             typedef boost::adjacency_list <
-                boost::vecS, 
-                boost::vecS, 
+                boost::vecS, // store in std::vector
+                boost::vecS, // store in std::vector
                 boost::undirectedS,
                 VertexProperties,
                 EdgeProperties

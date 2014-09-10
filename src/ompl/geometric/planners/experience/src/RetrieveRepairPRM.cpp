@@ -207,11 +207,12 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepairPRM::solve(const base::
     assert(primaryPath.getStateCount() >= 4);
 
     // Repair chosen path
-    if (!repairPath(primaryPath, ptc))
+    /*if (!repairPath(primaryPath, ptc))
     {
         OMPL_WARN("repairPath failed");
         return base::PlannerStatus::CRASH;
     }
+    */
 
     // Smooth the result
     /* TODO re-enable

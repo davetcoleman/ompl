@@ -63,27 +63,24 @@ ompl::geometric::SPARStwo::edgeWeightMap::edgeWeightMap (const Graph &graph,
 
 double ompl::geometric::SPARStwo::edgeWeightMap::get (Edge e) const
 {
-    std::cout << "ompl::geometric::SPARStwo::edgeWeightMap::get " << e << std::endl;
-    
-    // TODO uncomment section below
-    double weight; 
+    // Debug
+    if (true) 
+    {
+        std::cout << "ompl::geometric::SPARStwo::edgeWeightMap::get " << e;
+        if (collisionStates_[e] == IN_COLLISION)
+            std::cout << " IN COLLISION ";
+        if (collisionStates_[e] == FREE)
+            std::cout << " FREE ";
+        if (collisionStates_[e] == NOT_CHECKED)
+            std::cout << " NOT CHECKED YET";
+        std::cout << "with weight " << boost::get(boost::edge_weight, g_, e) << std::endl;
+    }
 
     // Get the status of collision checking for this edge
-    const int collisionState = collisionStates_[e];
-    std::cout << "||||||||| Collision State is " << collisionState << " |||||||||||" << std::endl;
-
     if (collisionStates_[e] == IN_COLLISION)
-        weight = std::numeric_limits<double>::infinity();
-    else
-        weight = boost::get(boost::edge_weight, g_, e);
+        return std::numeric_limits<double>::infinity();
 
-    std::cout << "     returning weight " << weight << std::endl; // TODO uncomment section below
-
-    return weight;
-
-    /*
-    return boost::get(boost::edge_weight, g, e);
-    */
+    return boost::get(boost::edge_weight, g_, e);
 }
         
 namespace boost
@@ -418,15 +415,12 @@ bool ompl::geometric::SPARStwo::constructSolution(const Vertex start, const Vert
 
             // Trace back the shortest path in reverse and only save the states
             Vertex v;
-            std::cout << "goal is " << goal << std::endl;
             for (v = goal; v != vertexPredecessors[v]; v = vertexPredecessors[v])
             {
-                std::cout << "push_back " << v << std::endl;
                 vertexPath.push_back(v);
             }
             if (v != goal) // TODO explain this because i don't understand
             {
-                std::cout << "finally push_back " << v << std::endl;
                 vertexPath.push_back(v);
             }
 
