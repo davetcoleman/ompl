@@ -119,6 +119,7 @@ void ompl::geometric::SPARStwo::CustomVisitor::examine_vertex (Vertex u, const G
 
 ompl::geometric::SPARStwo::SPARStwo(const base::SpaceInformationPtr &si) :
     base::Planner(si, "SPARStwo"),
+    // Numeric variables
     stretchFactor_(3.),
     sparseDeltaFraction_(.25),
     denseDeltaFraction_(.001),
@@ -134,7 +135,6 @@ ompl::geometric::SPARStwo::SPARStwo(const base::SpaceInformationPtr &si) :
     // Disjoint set acecssors
     disjointSets_(boost::get(boost::vertex_rank, g_),
                   boost::get(boost::vertex_predecessor, g_)),
-    // Other
     addedSolution_(false),
     consecutiveFailures_(0),
     iterations_(0),
@@ -218,33 +218,26 @@ bool ompl::geometric::SPARStwo::getSimilarPaths(int nearestK, const base::State*
                                                 const base::PlannerTerminationCondition &ptc)
 {
     // TODO: nearestK unused
+
+    // Get neighbors near start and goal. Note: potentially they are not *visible* - will test for this later
+
     // Start
-    std::vector<Vertex> startGraphNeighborhood;
-    std::vector<Vertex> startVisibleNeighborhood;
-
-    base::State* startCopy = si_->cloneState(start);
-    findGraphNeighbors(startCopy, startGraphNeighborhood, startVisibleNeighborhood);
-
-    std::cout << "Found " << startGraphNeighborhood.size() << " nodes near start and " << startVisibleNeighborhood.size() 
-              << " nodes visibile near start" << std::endl;
+    findGraphNeighbors(start, startVertexCandidateNeighbors_);
+    std::cout << "Found " << startVertexCandidateNeighbors_.size() << " nodes near start" << std::endl;
 
     // Goal
-    std::vector<Vertex> goalGraphNeighborhood;
-    std::vector<Vertex> goalVisibleNeighborhood;
-    base::State* goalCopy = si_->cloneState(goal);
-    findGraphNeighbors(goalCopy, goalGraphNeighborhood, goalVisibleNeighborhood);
+    findGraphNeighbors(goal, goalVertexCandidateNeighbors_);
+    std::cout << "Found " << goalVertexCandidateNeighbors_.size() << " nodes near goal" << std::endl;
 
-    std::cout << "Found " << goalGraphNeighborhood.size() << " nodes near goal and " << goalVisibleNeighborhood.size() 
-              << " nodes visibile near goal" << std::endl;
-
-    // Get paths
+    // Get paths between start and goal
     ompl::base::PathPtr solution;
-    bool result = haveSolution(startVisibleNeighborhood, goalVisibleNeighborhood, solution, ptc);
+    bool result = getPaths(startVertexCandidateNeighbors_, goalVertexCandidateNeighbors_, 
+                               start, goal, solution, ptc);
 
     // Error check
     if (!result)
     {
-        OMPL_INFORM("getSimilarPaths(): SPARStwo returned FALSE for haveSolution");
+        OMPL_INFORM("getSimilarPaths(): SPARStwo returned FALSE for getPaths");
         return false;
     }
     if (!solution)
@@ -271,9 +264,12 @@ bool ompl::geometric::SPARStwo::getSimilarPaths(int nearestK, const base::State*
     return result;
 }
 
-bool ompl::geometric::SPARStwo::haveSolution(const std::vector<Vertex> &starts, const std::vector<Vertex> &goals, 
-                                             base::PathPtr &candidateSolution,
-                                             const base::PlannerTerminationCondition &ptc)
+bool ompl::geometric::SPARStwo::getPaths(const std::vector<Vertex> &candidateStarts, 
+                                         const std::vector<Vertex> &candidateGoals, 
+                                         const base::State* actualStart, 
+                                         const base::State* actualGoal,
+                                         base::PathPtr &candidateSolution,
+                                         const base::PlannerTerminationCondition &ptc)
 {
     // Vector to store candidate paths in before they are converted to PathPtrs
     std::vector<Vertex> vertexPath;
@@ -281,10 +277,24 @@ bool ompl::geometric::SPARStwo::haveSolution(const std::vector<Vertex> &starts, 
     base::Goal *g = pdef_->getGoal().get(); // for checking isStartGoalPairValid
 
     // Try every combination of nearby start and goal pairs
-    foreach (Vertex start, starts)
+    foreach (Vertex start, candidateStarts)
     {
-        foreach (Vertex goal, goals)
+        // Check if this start is visible from the actual start
+        if (!si_->checkMotion(actualStart, stateProperty_[start]))
         {
+            std::cout << "FOUND CANDIDATE START THAT IS NOT VISIBLE !!!!!!!!!!!!!!!!!!! " << std::endl;
+            continue; // this is actually not visible
+        }
+
+        foreach (Vertex goal, candidateGoals)
+        {
+            // Check if this goal is visible from the actual goal
+            if (!si_->checkMotion(actualGoal, stateProperty_[goal]))
+            {
+                std::cout << "FOUND CANDIDATE GOAL THAT IS NOT VISIBLE !!!!!!!!!!!!!!!!!!! " << std::endl;
+                continue; // this is actually not visible
+            }
+
             // we lock because the connected components algorithm is incremental and may change disjointSets_
             graphMutex_.lock();
 
@@ -303,7 +313,7 @@ bool ompl::geometric::SPARStwo::haveSolution(const std::vector<Vertex> &starts, 
                     continue; // skip this pair
                 }
 
-                std::cout << "haveSolution: found connection between vertex " << start << " and " 
+                std::cout << "getPaths: found connection between vertex " << start << " and " 
                           << goal << std::endl;
 
                 // Keep looking for paths between chosen start and goal until one is found that is valid,
@@ -316,7 +326,7 @@ bool ompl::geometric::SPARStwo::haveSolution(const std::vector<Vertex> &starts, 
                     // Check if our planner is out of time
                     if (ptc == true)
                     {
-                        OMPL_DEBUG("haveSolution function interrupted because termination condition is true.");
+                        OMPL_DEBUG("getPaths function interrupted because termination condition is true.");
                         std::cout << OMPL_CONSOLE_COLOR_RESET;
                         return false;
                     }
@@ -560,23 +570,6 @@ void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationC
     // Check that the query vertex is initialized (used for internal nearest neighbor searches)
     checkQueryStateInitialization();
 
-    /*
-    // Optionally skip random sampling, and add to roadmap from a path
-    bool feedFromPath = false;
-    std::size_t solutionPathId = 1; // skip first state in path b/c added as start
-    if (solutionPath != NULL && solutionPath->getStateCount() > 0)
-    {
-        feedFromPath = true;
-        //std::cout << "Before interpolation: " << solutionPath->getStateCount() << std::endl;
-        //solutionPath->interpolate(); // increase the number of states
-        //std::cout << "After interpolation: " << solutionPath->getStateCount() << std::endl;
-        // initialize roadmap with start and goal of solution path
-        addGuard(si_->cloneState(solutionPath->getState(0)), START); // TODO: add this to startM_.push_back() to possibly remove it after seeding path?
-        std::cout << "Added state 0 as START guard, state: " << solutionPath->getState(0) << std::endl;
-        printDebug();
-    }
-    */
-
     if (!sampler_)
         sampler_ = si_->allocValidStateSampler();
     if (!simpleSampler_)
@@ -595,27 +588,8 @@ void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationC
         ++iterations_;
         ++consecutiveFailures_;
 
-        /*
-        // Two methods for getting samples
-        if (feedFromPath)
-        {
-            std::cout << "constructRoadmap from path on state " << solutionPathId << " value: " << solutionPath->getState(solutionPathId) << std::endl;
-            if (solutionPathId >= solutionPath->getStateCount())
-            {
-                std::cout << "FINISHED inputting states " << std::endl;
-                break;
-            }
-            // Deep copy
-            qNew = si_->cloneState(solutionPath->getState(solutionPathId));
-            solutionPathId++;
-        }
-        else // normal method:
-        {
-        */
-            //Generate a single sample, and attempt to connect it to nearest neighbors.
-            if (!sampler_->sample(qNew))
-                continue;
-            //        }
+        if (!sampler_->sample(qNew))
+            continue;
 
         findGraphNeighbors(qNew, graphNeighborhood, visibleNeighborhood);
 
@@ -975,7 +949,8 @@ void ompl::geometric::SPARStwo::resetFailures()
     consecutiveFailures_ = 0;
 }
 
-void ompl::geometric::SPARStwo::findGraphNeighbors(base::State *st, std::vector<Vertex> &graphNeighborhood, std::vector<Vertex> &visibleNeighborhood)
+void ompl::geometric::SPARStwo::findGraphNeighbors(base::State *st, std::vector<Vertex> &graphNeighborhood, 
+                                                   std::vector<Vertex> &visibleNeighborhood)
 {
     visibleNeighborhood.clear();
     stateProperty_[ queryVertex_ ] = st;
@@ -986,6 +961,17 @@ void ompl::geometric::SPARStwo::findGraphNeighbors(base::State *st, std::vector<
     for (std::size_t i = 0; i < graphNeighborhood.size() ; ++i )
         if (si_->checkMotion(st, stateProperty_[graphNeighborhood[i]]))
             visibleNeighborhood.push_back(graphNeighborhood[i]);
+}
+
+void ompl::geometric::SPARStwo::findGraphNeighbors(const base::State *state, std::vector<Vertex> &graphNeighborhood)
+{
+    base::State* stateCopy = si_->cloneState(state);
+
+    // Don't check for visibility
+    graphNeighborhood.clear();
+    stateProperty_[ queryVertex_ ] = stateCopy;
+    nn_->nearestR( queryVertex_, sparseDelta_, graphNeighborhood);
+    stateProperty_[ queryVertex_ ] = NULL;
 }
 
 void ompl::geometric::SPARStwo::approachGraph( Vertex v )

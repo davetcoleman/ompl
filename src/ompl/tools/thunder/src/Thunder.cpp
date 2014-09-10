@@ -235,8 +235,10 @@ ompl::base::PlannerStatus ompl::tools::Thunder::solve(const base::PlannerTermina
     time::point start = time::now();
 
     // Start both threads
+    std::size_t minSolCount = 2;
+    std::size_t maxSolCount = 2;
     bool hybridize = false;
-    lastStatus_ = pp_->solve(ptc, hybridize);
+    lastStatus_ = pp_->solve(ptc, minSolCount, maxSolCount, hybridize);
 
     // Planning time
     planTime_ = time::seconds(time::now() - start);
@@ -404,9 +406,9 @@ void ompl::tools::Thunder::printResultsInfo(std::ostream &out) const
     for (std::size_t i = 0; i < pdef_->getSolutionCount(); ++i)
     {
         out << OMPL_CONSOLE_COLOR_GREEN << "Solution " << i
-            << " | Length: " << pdef_->getSolutions()[i].length_
-            << " | Approximate: " << (pdef_->getSolutions()[i].approximate_ ? "true" : "false")
-            << " | Planner: " << pdef_->getSolutions()[i].plannerName_
+            << "\t | Length: " << pdef_->getSolutions()[i].length_
+            << "\t | Approximate: " << (pdef_->getSolutions()[i].approximate_ ? "true" : "false")
+            << "\t | Planner: " << pdef_->getSolutions()[i].plannerName_
             << OMPL_CONSOLE_COLOR_RESET << std::endl;
     }
 }

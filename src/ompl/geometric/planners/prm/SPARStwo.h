@@ -549,8 +549,12 @@ namespace ompl
             /** \brief A reset function for resetting the failures count */
             void resetFailures();
 
-            /** \brief Finds visible nodes in the graph near st */
-            void findGraphNeighbors(base::State *st, std::vector<Vertex> &graphNeighborhood, std::vector<Vertex> &visibleNeighborhood);
+            /** \brief Finds visible nodes in the graph near state */
+            void findGraphNeighbors(base::State *state, std::vector<Vertex> &graphNeighborhood, 
+                                    std::vector<Vertex> &visibleNeighborhood);
+
+            /** \brief Finds nodes in the graph near state NOTE: note tested for visibility*/
+            void findGraphNeighbors(const base::State *state, std::vector<Vertex> &graphNeighborhood);
 
             /** \brief Approaches the graph from a given vertex */
             void approachGraph( Vertex v );
@@ -590,8 +594,12 @@ namespace ompl
             void connectGuards( Vertex v, Vertex vp );
 
             /** \brief Check if there exists a solution, i.e., there exists a pair of milestones such that the first is in \e start and the second is in \e goal, and the two milestones are in the same connected component. If a solution is found, the path is saved. */
-            bool haveSolution(const std::vector<Vertex> &start, const std::vector<Vertex> &goal, 
-                              base::PathPtr &solution, const base::PlannerTerminationCondition &ptc);
+            bool getPaths(const std::vector<Vertex> &candidateStarts, 
+                          const std::vector<Vertex> &candidateGoals, 
+                          const base::State* actualStart, 
+                          const base::State* actualGoal,
+                          base::PathPtr &candidateSolution,
+                          const base::PlannerTerminationCondition &ptc);
 
             /** \brief Check recalled path for collision and disable as needed */
             bool lazyCollisionCheck(std::vector<Vertex> &vertexPath, const base::PlannerTerminationCondition &ptc);
@@ -699,6 +707,10 @@ namespace ompl
 
             /** \brief Mutex to guard access to the Graph member (g_) */
             mutable boost::mutex                                                graphMutex_; 
+
+            /** \brief Used by getSimilarPaths */
+            std::vector<Vertex>                                                 startVertexCandidateNeighbors_;
+            std::vector<Vertex>                                                 goalVertexCandidateNeighbors_;
       };
 
     }

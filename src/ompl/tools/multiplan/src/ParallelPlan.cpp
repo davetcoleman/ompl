@@ -138,16 +138,18 @@ void ompl::tools::ParallelPlan::solveOne(base::Planner *planner, std::size_t min
     time::point start = time::now();
     if (planner->solve(*ptc))
     {
-        std::cout << std::endl;
-        std::cout << "ParallelPlan solve returned on planner " << planner->getName().c_str() << std::endl;
-        std::cout << std::endl;
         double duration = time::seconds(time::now() - start);
+
+        std::cout << std::endl << OMPL_CONSOLE_COLOR_GREEN;
+        std::cout << "ParallelPlan.solveOne: Planner " << planner->getName().c_str() << " finished in " << 
+          duration << " seconds" << std::endl;
+        std::cout << std::endl << OMPL_CONSOLE_COLOR_RESET;
+
         foundSolCountLock_.lock();
         unsigned int nrSol = ++foundSolCount_;
         foundSolCountLock_.unlock();
         if (nrSol >= minSolCount)
             ptc->terminate();
-        OMPL_DEBUG("ParallelPlan: Solution found by %s in %lf seconds", planner->getName().c_str(), duration);
     }
 }
 
