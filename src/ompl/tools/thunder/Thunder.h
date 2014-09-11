@@ -57,7 +57,8 @@
 #include "ompl/util/Console.h"
 #include "ompl/util/Exception.h"
 
-#include "ompl/tools/lightning/DynamicTimeWarp.h"
+namespace og = ompl::geometric;
+namespace ob = ompl::base;
 
 namespace ompl
 {
@@ -241,12 +242,6 @@ namespace ompl
              */
             void convertPlannerData(const ompl::base::PlannerDataPtr plannerData, ompl::geometric::PathGeometric &path);
 
-            /** \brief Tool for comparing two paths and scoring them */
-            const ompl::tools::DynamicTimeWarpPtr& getDynamicTimeWarp() const
-            {
-                return dtw_;
-            }
-
             /** \brief After load() is called, access the generated file path for loading and saving the experience database */
             const std::string& getFilePath() const
             {
@@ -293,9 +288,6 @@ namespace ompl
 
             /** \brief A shared object between all the planners for saving and loading previous experience */
             ompl::tools::ExperienceDB2Ptr      experienceDB_;
-
-            /** \brief Tool for comparing two paths and scoring them */
-            ompl::tools::DynamicTimeWarpPtr   dtw_;
 
             /** \brief File location of database */
             std::string                       filePath_;

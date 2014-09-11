@@ -32,7 +32,7 @@
 *  POSSIBILITY OF SUCH DAMAGE.
 *********************************************************************/
 
-/* Author: Andrew Dobson */
+/* Author: Andrew Dobson, Dave Coleman */
 
 #ifndef OMPL_GEOMETRIC_PLANNERS_SPARS_TWO_
 #define OMPL_GEOMETRIC_PLANNERS_SPARS_TWO_
@@ -448,7 +448,7 @@ namespace ompl
 
             void addPathToRoadmap(const base::PlannerTerminationCondition &ptc, ompl::geometric::PathGeometric& solutionPath);
 
-            void addStateToRoadmap(const base::PlannerTerminationCondition &ptc, base::State *newState);
+            bool addStateToRoadmap(const base::PlannerTerminationCondition &ptc, base::State *newState);
 
             /** \brief Function that can solve the motion planning
                 problem. This function can be called multiple times on
@@ -628,9 +628,6 @@ namespace ompl
                                     
             /** Thread that checks for solution */
             void checkForSolution(const base::PlannerTerminationCondition &ptc, base::PathPtr &solution);
-
-            /** \brief Returns true if we have reached the iteration failures limit, \e maxFailures_ or if a solution was added */
-            bool reachedTerminationCriterion() const;
 
             /** \brief Given two milestones from the same connected component, construct a path connecting them and set it as the solution 
              *  \param start

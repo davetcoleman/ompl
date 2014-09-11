@@ -70,6 +70,8 @@ namespace ompl
 
         /** \brief Function callback for planners to call external visualizers */
         typedef boost::function<void(ompl::base::Planner*)> VisualizationCallback;
+        typedef boost::function<void(ompl::base::State*)> VisualizationStateCallback;
+        typedef boost::function<void(ompl::base::State*, ompl::base::State*)> VisualizationEdgeCallback;
 
         /** \brief Helper class to extract valid start & goal
             states. Usually used internally by planners.
@@ -371,6 +373,20 @@ namespace ompl
             /** \brief Set the callback to visualize/publish a planner's progress */
             virtual void setVisualizationCallback(VisualizationCallback visualizationCallback);
 
+            /** \brief Visualize a planner's data during runtime, externally, using a function callback
+             *         This could be called whenever the graph changes */
+            virtual void visualizeStateCallback(ompl::base::State* state);
+
+            /** \brief Set the callback to visualize/publish a planner's progress */
+            virtual void setVisualizationStateCallback(VisualizationStateCallback visualizationStateCallback);
+
+            /** \brief Visualize a planner's data during runtime, externally, using a function callback
+             *         This could be called whenever the graph changes */
+            virtual void visualizeEdgeCallback(ompl::base::State* stateA, ompl::base::State* stateB);
+
+            /** \brief Set the callback to visualize/publish a planner's progress */
+            virtual void setVisualizationEdgeCallback(VisualizationEdgeCallback visualizationEdgeCallback);
+
         protected:
 
             /** \brief This function declares a parameter for this planner instance, and specifies the setter and getter functions. */
@@ -422,7 +438,9 @@ namespace ompl
             bool                      setup_;
 
             /** \brief Optional callback to allow easy introspection of a planner's search progress */
-            VisualizationCallback     visualizationCallback_;
+            VisualizationCallback      visualizationCallback_;
+            VisualizationStateCallback visualizationStateCallback_;
+            VisualizationEdgeCallback visualizationEdgeCallback_;
         };
 
         /** \brief Definition of a function that can allocate a planner */

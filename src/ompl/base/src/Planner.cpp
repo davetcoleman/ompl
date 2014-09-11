@@ -163,6 +163,28 @@ void ompl::base::Planner::setVisualizationCallback(VisualizationCallback visuali
     visualizationCallback_ = visualizationCallback;
 }
 
+void ompl::base::Planner::visualizeStateCallback(ompl::base::State* state)
+{
+    if (visualizationStateCallback_)
+        visualizationStateCallback_(state);
+}
+
+void ompl::base::Planner::setVisualizationStateCallback(VisualizationStateCallback visualizationStateCallback)
+{
+    visualizationStateCallback_ = visualizationStateCallback;
+}
+
+void ompl::base::Planner::visualizeEdgeCallback(ompl::base::State* stateA, ompl::base::State* stateB)
+{
+    if (visualizationEdgeCallback_)
+        visualizationEdgeCallback_(stateA, stateB);
+}
+
+void ompl::base::Planner::setVisualizationEdgeCallback(VisualizationEdgeCallback visualizationEdgeCallback)
+{
+    visualizationEdgeCallback_ = visualizationEdgeCallback;
+}
+
 void ompl::base::PlannerInputStates::clear()
 {
     if (tempState_)

@@ -73,9 +73,6 @@ void ompl::tools::Thunder::initialize()
     scratchEnabled_ = true;
     filePath_ = "unloaded";
 
-    // Load dynamic time warp
-    dtw_.reset(new ot::DynamicTimeWarp(si_));
-
     // Load the experience database
     experienceDB_.reset(new ompl::tools::ExperienceDB2(si_->getStateSpace()));
 
@@ -263,7 +260,6 @@ ompl::base::PlannerStatus ompl::tools::Thunder::solve(const base::PlannerTermina
         //OMPL_INFORM("Simplifying solution (smoothing)...");
         //simplifySolution(ptc);
 
-        // Get information about the exploration data structure the motion planner used. Used later in visualizing
         og::PathGeometric solutionPath = getSolutionPath(); // copied so that it is non-const
         OMPL_INFORM("Solution path has %d states and was generated from planner %s", solutionPath.getStateCount(), getSolutionPlannerName().c_str());
         logs_.csvDataLogStream_ << solutionPath.getStateCount() << "," << getSolutionPlannerName() << ",";
@@ -281,7 +277,6 @@ ompl::base::PlannerStatus ompl::tools::Thunder::solve(const base::PlannerTermina
             // TODO not sure what to do here, use case not tested
             OMPL_WARN("NOT saving to database because the solution is APPROXIMATE");
         }
-        // Use dynamic time warping to see if the repaired path is too similar to the original
         else if (getSolutionPlannerName() == rrPlanner_->getName())
         {
             std::cout << OMPL_CONSOLE_COLOR_CYAN << "THUNDER RESULTS: From Recall" << OMPL_CONSOLE_COLOR_RESET << std::endl;
@@ -298,28 +293,6 @@ ompl::base::PlannerStatus ompl::tools::Thunder::solve(const base::PlannerTermina
             }
             else
             {
-                /*
-                // Convert the original recalled path to PathGeometric
-                ob::PlannerDataPtr chosenRecallPathData = getRetrieveRepairPlanner().getChosenRecallPath();
-                og::PathGeometric chosenRecallPath(si_);
-                convertPlannerData(chosenRecallPathData, chosenRecallPath);
-
-                // Reverse path2 if necessary so that it matches path1 better
-                reversePathIfNecessary(solutionPath, chosenRecallPath);
-
-                double score = dtw_->getPathsScoreHalfConst( solutionPath, chosenRecallPath );
-
-                //  TODO: From Ioan: It would be nice if we switch to percentages of path length for score, and maybe define this var in the magic namespace.
-                //  From Dave: Actually I think I already made the getPathsScore function length-invariant by dividing the score by the path
-                if (score < 4) //10)
-                {
-                    OMPL_ERROR("NOT saving to database because best solution was from database and is too similar (score %f)", score);
-                    logs_.csvDataLogStream_ << "from_recall,score_too_similar," << score << ",";
-                }
-                else
-                {
-                    OMPL_INFORM("Adding path to database because repaired path is different enough from original recalled path (score %f)", score);
-                */
                 OMPL_INFORM("Adding path to database because SPARS will decide for us if we should keep the nodes");
 
                 logs_.csvDataLogStream_ << "from_recall,score_different_enough,0,";
@@ -327,9 +300,17 @@ ompl::base::PlannerStatus ompl::tools::Thunder::solve(const base::PlannerTermina
                 // Logging
                 logs_.numSolutionsFromRecallSaved_++;
 
+                // HACK: adding deterministic path from start to goal
+                /*
+                std::cout << "ADDING HACKED PATH " << std::endl;
+                og::PathGeometric solutionPathHack(si_);
+                solutionPathHack.append(solutionPath.getStates().back());
+                solutionPathHack.append(solutionPath.getStates().front());
+                solutionPath = solutionPathHack;
+                */
+
                 // Save to database
-                experienceDB_->addPath(solutionPath);
-                //                }
+                experienceDB_->addPath(solutionPath);                
             }
         }
         else
@@ -351,10 +332,30 @@ ompl::base::PlannerStatus ompl::tools::Thunder::solve(const base::PlannerTermina
                 OMPL_INFORM("Adding path to database because best solution was not from database");
                 logs_.csvDataLogStream_ << "from_scratch,saving,0,";
 
-                // TODO: maybe test this path for validity also?
+
+
+                // HACK: adding deterministic path from start to goal
+
+                std::cout << "ADDING HACKED PATH " << std::endl;
+                og::PathGeometric solutionPathHack(si_);
+                
+                ob::ScopedState<> startState(si_);
+                ob::ScopedState<> middleState(si_);
+                ob::ScopedState<> goalState(si_);
+                startState[0] = 5;     startState[1] = 49;
+                middleState[0] = 25;   middleState[1] = 40;
+                goalState[0] = 40;     goalState[1] = 49;
+
+                solutionPathHack.append(startState.get());
+                solutionPathHack.append(middleState.get());
+                solutionPathHack.append(goalState.get());
+
+                experienceDB_->addPath(solutionPathHack);
+
+
 
                 // Save to database
-                experienceDB_->addPath(solutionPath);
+                //experienceDB_->addPath(solutionPath);
             }
         }
     }
