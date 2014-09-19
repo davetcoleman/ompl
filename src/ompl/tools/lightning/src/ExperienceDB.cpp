@@ -216,9 +216,9 @@ bool ompl::tools::ExperienceDB::save(const std::string& fileName)
     return true;
 }
 
-void ompl::tools::ExperienceDB::getAllPaths(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const
+void ompl::tools::ExperienceDB::getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const
 {
-    OMPL_DEBUG("ExperienceDB: getAllPaths");
+    OMPL_DEBUG("ExperienceDB: getAllPlannerDatas");
 
     // Convert the NN tree to a vector
     nn_->list(plannerDatas);

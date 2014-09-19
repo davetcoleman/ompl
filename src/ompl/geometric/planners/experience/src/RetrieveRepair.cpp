@@ -208,7 +208,7 @@ ompl::base::PlannerStatus ompl::geometric::RetrieveRepair::solve(const base::Pla
     std::size_t numStates = primaryPath->getStateCount();
     psk_->simplify(*primaryPath, ptc);
     double simplifyTime = time::seconds(time::now() - simplifyStart);
-    OMPL_INFORM("Path simplification took %f seconds and removed %d states", simplifyTime, numStates - primaryPath->getStateCount());
+    OMPL_INFORM("RetrieveRepair: Path simplification took %f seconds and removed %d states", simplifyTime, numStates - primaryPath->getStateCount());
     */
 
     // Finished
@@ -561,7 +561,7 @@ bool ompl::geometric::RetrieveRepair::replan(const ompl::base::State* start, con
     std::size_t numStates = newPathSegment.getStateCount();
     psk_->simplify(newPathSegment, ptc);
     double simplifyTime = time::seconds(time::now() - simplifyStart);
-    OMPL_INFORM("Path simplification took %f seconds and removed %d states", simplifyTime, numStates - newPathSegment.getStateCount());
+    OMPL_INFORM("RetrieveRepair: Path simplification took %f seconds and removed %d states", simplifyTime, numStates - newPathSegment.getStateCount());
 
     // Save the planner data for debugging purposes
     repairPlannerDatas_.push_back(ompl::base::PlannerDataPtr( new ompl::base::PlannerData(si_) ));

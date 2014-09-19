@@ -163,10 +163,10 @@ void ompl::base::Planner::setVisualizationCallback(VisualizationCallback visuali
     visualizationCallback_ = visualizationCallback;
 }
 
-void ompl::base::Planner::visualizeStateCallback(ompl::base::State* state)
+void ompl::base::Planner::visualizeStateCallback(ompl::base::State* state, std::size_t type)
 {
     if (visualizationStateCallback_)
-        visualizationStateCallback_(state);
+        visualizationStateCallback_(state, type);
 }
 
 void ompl::base::Planner::setVisualizationStateCallback(VisualizationStateCallback visualizationStateCallback)

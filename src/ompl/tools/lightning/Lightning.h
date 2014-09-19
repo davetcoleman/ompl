@@ -43,7 +43,7 @@
 #ifndef OMPL_TOOLS_LIGHTNING_LIGHTNING_
 #define OMPL_TOOLS_LIGHTNING_LIGHTNING_
 
-#include "ompl/geometric/SimpleSetup.h"
+#include "ompl/tools/experience/ExperienceSetup.h"
 #include "ompl/base/Planner.h"
 #include "ompl/base/PlannerData.h"
 #include "ompl/base/ProblemDefinition.h"
@@ -89,7 +89,7 @@ namespace ompl
             \brief A boost shared pointer wrapper for ompl::tools::Lightning */
 
         /** \brief Built off of SimpleSetup but provides support for planning from experience */
-        class Lightning : public ompl::geometric::SimpleSetup
+        class Lightning : public ompl::tools::ExperienceSetup
         {
         public:
             /**
@@ -147,11 +147,11 @@ namespace ompl
             void initialize();
 
         public:
-            /** \brief Load the experience database from file
+            /** \brief Set the database file to load. Actual loading occurs when setup() is called
              *  \param databaseName - used to name the database file, should be something like 'left_arm' or 'whole_body'
              *  \param databaseDirecotry - the directory to save the database to, relative to the user directory $HOME
              */
-            bool load(const std::string &databaseName = "lightning_default_group", const std::string &databaseDirectory = "ompl_storage");
+            bool setFile(const std::string &databaseName = "lightning_default_group", const std::string &databaseDirectory = "ompl_storage");
 
             /** \brief Display debug data about potential available solutions */
             void printResultsInfo(std::ostream &out = std::cout) const;
@@ -222,8 +222,8 @@ namespace ompl
              */
             void enablePlanningFromScratch(bool enable);
 
-            /** \brief Get a vector of all the paths in the database */
-            void getAllPaths(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const;
+            /** \brief Get a vector of all the planning data in the database */
+            void getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const;
 
             /** \brief Get the total number of paths stored in the database */
             std::size_t getExperiencesCount() const;
@@ -241,7 +241,7 @@ namespace ompl
                 return dtw_;
             }
 
-            /** \brief After load() is called, access the generated file path for loading and saving the experience database */
+            /** \brief After setFile() is called, access the generated file path for loading and saving the experience database */
             const std::string& getFilePath() const
             {
                 return filePath_;

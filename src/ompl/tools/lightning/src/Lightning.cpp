@@ -51,13 +51,13 @@ namespace ob = ompl::base;
 namespace ot = ompl::tools;
 
 ompl::tools::Lightning::Lightning(const base::SpaceInformationPtr &si) :
-    ompl::geometric::SimpleSetup(si)
+    ompl::tools::ExperienceSetup(si)
 {
     initialize();
 }
 
 ompl::tools::Lightning::Lightning(const base::StateSpacePtr &space) :
-    ompl::geometric::SimpleSetup(space)
+    ompl::tools::ExperienceSetup(space)
 {
     initialize();
 }
@@ -87,10 +87,10 @@ void ompl::tools::Lightning::initialize()
     std::cout << std::endl;
 }
 
-bool ompl::tools::Lightning::load(const std::string &databaseName, const std::string &databaseDirectory)
+bool ompl::tools::Lightning::setFile(const std::string &databaseName, const std::string &databaseDirectory)
 {
-    getFilePath(databaseName, databaseDirectory);
-    return experienceDB_->load(filePath_); // load from file
+    std::string fileName = "lighting_" + databaseName;
+    return getFilePath(fileName, databaseDirectory);
 }
 
 void ompl::tools::Lightning::setup(void)
@@ -140,6 +140,8 @@ void ompl::tools::Lightning::setup(void)
         if (recallEnabled_)
             pp_->addPlanner(rrPlanner_);  // Add the planning from experience planner if desired
 
+        experienceDB_->load(filePath_); // load from file
+
         // Set the configured flag
         configured_ = true;
     }
@@ -176,7 +178,7 @@ bool ompl::tools::Lightning::getFilePath(const std::string &databaseName, const 
     //directories successfully created, append the group name as the file name
     rootPath = rootPath / fs::path(databaseName + ".ompl");
     filePath_ = rootPath.string();
-    //OMPL_INFORM("Loading database from %s", filePath_.c_str());
+    OMPL_INFORM("Setting database to %s", filePath_.c_str());
 
     return true;
 }
@@ -440,9 +442,9 @@ std::size_t ompl::tools::Lightning::getExperiencesCount() const
     return experienceDB_->getExperiencesCount();
 }
 
-void ompl::tools::Lightning::getAllPaths(std::vector<ob::PlannerDataPtr> &plannerDatas) const
+void ompl::tools::Lightning::getAllPlannerDatas(std::vector<ob::PlannerDataPtr> &plannerDatas) const
 {
-    experienceDB_->getAllPaths(plannerDatas);
+    experienceDB_->getAllPlannerDatas(plannerDatas);
 }
 
 void ompl::tools::Lightning::convertPlannerData(const ob::PlannerDataPtr plannerData, og::PathGeometric &path)
