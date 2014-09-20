@@ -607,7 +607,7 @@ void ompl::geometric::SPARStwo::addPathToRoadmap(const base::PlannerTerminationC
         {
             std::cout << "Adding state " << i << " of " << solutionPath.getStateCount() << std::endl;
 
-            visualizeStateCallback(solutionPath.getState(i), 1); // Type 1 is candidate path
+            visualizeStateCallback(solutionPath.getState(i), 1, sparseDelta_); // Type 1 is candidate path
 
             // Add a single state to the roadmap
             if (addStateToRoadmap(ptc, solutionPath.getState(i)))
