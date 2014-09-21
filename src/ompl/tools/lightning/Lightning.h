@@ -54,6 +54,8 @@
 #include "ompl/geometric/PathSimplifier.h"
 #include "ompl/geometric/planners/experience/RetrieveRepair.h"
 
+#include "ompl/tools/multiplan/ParallelPlan.h"
+
 #include "ompl/util/Console.h"
 #include "ompl/util/Exception.h"
 
@@ -214,14 +216,6 @@ namespace ompl
                 function automatically. */
             virtual void setup(void);
 
-            /** \brief Optionally disable the ability to use previous plans in solutions (but will still save them) */
-            void enablePlanningFromRecall(bool enable);
-
-            /** \brief Optionally disable the ability to plan from scratch
-             *         Note: Lightning can still save modified experiences if they are different enough
-             */
-            void enablePlanningFromScratch(bool enable);
-
             /** \brief Get a vector of all the planning data in the database */
             void getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const;
 
@@ -239,12 +233,6 @@ namespace ompl
             const ompl::tools::DynamicTimeWarpPtr& getDynamicTimeWarp() const
             {
                 return dtw_;
-            }
-
-            /** \brief After setFile() is called, access the generated file path for loading and saving the experience database */
-            const std::string& getFilePath() const
-            {
-                return filePath_;
             }
 
           /**
@@ -265,19 +253,8 @@ namespace ompl
 
         protected:
 
-            /**
-             * \brief Convert the planning group name and database directory into a file path to open and save to
-             */
-            bool getFilePath(const std::string &databaseName, const std::string &databaseDirectory);
-
             /// The maintained experience planner instance
             base::PlannerPtr                  rrPlanner_;
-
-            /// Flag indicating whether recalled plans should be used to find solutions. Enabled by default.
-            bool                              recallEnabled_;
-
-            /// Flag indicating whether planning from scratch should be used to find solutions. Enabled by default.
-            bool                              scratchEnabled_;
 
             /** \brief Instance of parallel planning to use for computing solutions in parallel */
             ompl::tools::ParallelPlanPtr      pp_;
@@ -287,9 +264,6 @@ namespace ompl
 
             /** \brief Tool for comparing two paths and scoring them */
             ompl::tools::DynamicTimeWarpPtr   dtw_;
-
-            /** \brief File location of database */
-            std::string                       filePath_;
 
             /** \brief Logging data for debugging  */
             LightningLogs                     logs_;

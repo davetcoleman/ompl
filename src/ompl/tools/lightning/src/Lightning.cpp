@@ -36,15 +36,10 @@
 
 
 #include "ompl/tools/lightning/Lightning.h"
-#include "ompl/base/goals/GoalSampleableRegion.h"
-#include "ompl/geometric/PathGeometric.h"
-#include "ompl/geometric/SimpleSetup.h" // use their implementation of getDefaultPlanner
-#include "ompl/base/StateSpace.h" // for storing to file
+//#include "ompl/base/goals/GoalSampleableRegion.h"
+//#include "ompl/geometric/PathGeometric.h"
+//#include "ompl/base/StateSpace.h" // for storing to file
 #include "ompl/tools/lightning/ExperienceDB.h"
-#include "ompl/tools/multiplan/ParallelPlan.h"
-
-// Boost
-#include <boost/filesystem.hpp>
 
 namespace og = ompl::geometric;
 namespace ob = ompl::base;
@@ -90,7 +85,7 @@ void ompl::tools::Lightning::initialize()
 bool ompl::tools::Lightning::setFile(const std::string &databaseName, const std::string &databaseDirectory)
 {
     std::string fileName = "lighting_" + databaseName;
-    return getFilePath(fileName, databaseDirectory);
+    return ompl::tools::ExperienceSetup::getFilePath(fileName, databaseDirectory);
 }
 
 void ompl::tools::Lightning::setup(void)
@@ -145,42 +140,6 @@ void ompl::tools::Lightning::setup(void)
         // Set the configured flag
         configured_ = true;
     }
-}
-
-bool ompl::tools::Lightning::getFilePath(const std::string &databaseName, const std::string &databaseDirectory)
-{
-    namespace fs = boost::filesystem;
-
-    // Check that the directory exists, if not, create it
-    fs::path rootPath;
-    if (!std::string(getenv("HOME")).empty())
-        rootPath = fs::path(getenv("HOME")); // Support Linux/Mac
-    else if (!std::string(getenv("HOMEPATH")).empty())
-        rootPath = fs::path(getenv("HOMEPATH")); // Support Windows
-    else
-    {
-        OMPL_WARN("Unable to find a home path for this computer");
-        rootPath = fs::path("");
-    }
-
-    rootPath = rootPath / fs::path(databaseDirectory);
-
-    boost::system::error_code returnedError;
-    fs::create_directories( rootPath, returnedError );
-
-    if ( returnedError )
-    {
-        //did not successfully create directories
-        OMPL_ERROR("Unable to create directory %s", databaseDirectory.c_str());
-        return false;
-    }
-
-    //directories successfully created, append the group name as the file name
-    rootPath = rootPath / fs::path(databaseName + ".ompl");
-    filePath_ = rootPath.string();
-    OMPL_INFORM("Setting database to %s", filePath_.c_str());
-
-    return true;
 }
 
 void ompl::tools::Lightning::clear(void)
@@ -416,25 +375,6 @@ void ompl::tools::Lightning::saveDataLog(std::ostream &out)
     // Export to file and clear the stream
     out << logs_.csvDataLogStream_.str();
     logs_.csvDataLogStream_.str("");
-}
-
-void ompl::tools::Lightning::enablePlanningFromRecall(bool enable)
-{
-    // Remember state
-    recallEnabled_ = enable;
-
-    // Flag the planners as possibly misconfigured
-    configured_ = false;
-}
-
-
-void ompl::tools::Lightning::enablePlanningFromScratch(bool enable)
-{
-    // Remember state
-    scratchEnabled_ = enable;
-
-    // Flag the planners as possibly misconfigured
-    configured_ = false;
 }
 
 std::size_t ompl::tools::Lightning::getExperiencesCount() const

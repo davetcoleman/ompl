@@ -102,12 +102,12 @@ namespace ompl
             virtual bool saveIfChanged() = 0;
 
             /** \brief Optionally disable the ability to use previous plans in solutions (but will still save them) */
-            virtual void enablePlanningFromRecall(bool enable) = 0;
+            void enablePlanningFromRecall(bool enable);
 
             /** \brief Optionally disable the ability to plan from scratch
              *         Note: Lightning can still save modified experiences if they are different enough
              */
-            virtual void enablePlanningFromScratch(bool enable) = 0;
+            void enablePlanningFromScratch(bool enable);
 
             /** \brief Get a vector of all the planning data in the database */
             virtual void getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const = 0;
@@ -115,8 +115,21 @@ namespace ompl
             /** \brief Get the total number of paths stored in the database */
             virtual std::size_t getExperiencesCount() const = 0;
 
+            virtual bool getFilePath(const std::string &databaseName, const std::string &databaseDirectory);
+    
             /** \brief After setFile() is called, access the generated file path for loading and saving the experience database */
-            virtual const std::string& getFilePath() const = 0;
+            virtual const std::string& getFilePath() const;
+
+        protected:
+
+            /// Flag indicating whether recalled plans should be used to find solutions. Enabled by default.
+            bool                              recallEnabled_;
+
+            /// Flag indicating whether planning from scratch should be used to find solutions. Enabled by default.
+            bool                              scratchEnabled_;
+
+            /** \brief File location of database */
+            std::string                       filePath_;
 
         };
     }
