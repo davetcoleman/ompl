@@ -122,7 +122,17 @@ bool ompl::tools::ExperienceDB::load(const std::string& fileName)
     return true;
 }
 
-void ompl::tools::ExperienceDB::addPath(ompl::geometric::PathGeometric& solutionPath)
+void ompl::tools::ExperienceDB::addPath(ompl::geometric::PathGeometric& solutionPath, double& insertionTime)
+{
+    // Benchmark runtime
+    time::point startTime = time::now();
+    {
+        addPathHelper(solutionPath);
+    }
+    insertionTime = time::seconds(time::now() - startTime);
+}
+
+void ompl::tools::ExperienceDB::addPathHelper(ompl::geometric::PathGeometric& solutionPath)
 {
     // Create a new planner data instance
     ompl::base::PlannerDataPtr plannerData(new ompl::base::PlannerData(si_));

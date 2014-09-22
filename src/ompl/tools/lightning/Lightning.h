@@ -108,6 +108,7 @@ namespace ompl
                     , numSolutionsTooShort_(0)
                     , numProblems_(0)
                     , totalPlanningTime_(0)
+                    , totalInsertionTime_(0)
                 {
                     // Header of CSV file
                     csvDataLogStream_ << "time,states,planner,result,is_saved,score,total_scratch,total_recall,total_recall_saved,"
@@ -120,6 +121,16 @@ namespace ompl
                     return totalPlanningTime_ / numProblems_;
                 }
 
+                double getAverageInsertionTime() const
+                {
+                    // Cleanup output
+                    double time = totalInsertionTime_ / numProblems_;
+                    if (time < 0.00000001)
+                        return 0;
+                    else
+                        return totalInsertionTime_ / numProblems_;
+                }
+
                 double numSolutionsFromRecall_;
                 double numSolutionsFromRecallSaved_;
                 double numSolutionsFromScratch_;
@@ -128,6 +139,7 @@ namespace ompl
                 double numSolutionsTooShort_; // less than 3 states
                 double numProblems_; // input requests
                 double totalPlanningTime_; // of all input requests, used for averaging
+                double totalInsertionTime_; // of all input requests, used for averaging
                 std::stringstream csvDataLogStream_; // output data to file to analyze performance externally
             };
 

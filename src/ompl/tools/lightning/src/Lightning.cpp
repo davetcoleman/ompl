@@ -92,6 +92,8 @@ void ompl::tools::Lightning::setup(void)
 {
     if (!configured_ || !si_->isSetup() || !planner_->isSetup() || !rrPlanner_->isSetup() )
     {
+        OMPL_ERROR("Setting up Lightning Framework");
+
         // Setup Space Information if we haven't already done so
         if (!si_->isSetup())
             si_->setup();
@@ -135,7 +137,12 @@ void ompl::tools::Lightning::setup(void)
         if (recallEnabled_)
             pp_->addPlanner(rrPlanner_);  // Add the planning from experience planner if desired
 
-        experienceDB_->load(filePath_); // load from file
+
+        // Check if experience database is already loaded
+        if (experienceDB_->isEmpty())
+          experienceDB_->load(filePath_); // load from file
+        else
+          OMPL_ERROR("Attempting to load experience database when it is not empty");
 
         // Set the configured flag
         configured_ = true;
@@ -167,6 +174,9 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
 
     lastStatus_ = base::PlannerStatus::UNKNOWN;
     time::point start = time::now();
+
+    // Insertion time
+    double insertionTime;
 
     // Start both threads
     bool hybridize = false;
@@ -258,7 +268,7 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
                     logs_.numSolutionsFromRecallSaved_++;
 
                     // Save to database
-                    experienceDB_->addPath(solutionPath);
+                    experienceDB_->addPath(solutionPath, insertionTime);
                 }
             }
         }
@@ -284,10 +294,12 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
                 // TODO: maybe test this path for validity also?
 
                 // Save to database
-                experienceDB_->addPath(solutionPath);
+                experienceDB_->addPath(solutionPath, insertionTime);
             }
         }
     }
+
+    logs_.totalInsertionTime_ += insertionTime; // used for averaging
 
     // End this log entry with remaining stats
     logs_.csvDataLogStream_
@@ -299,7 +311,9 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
         << logs_.numSolutionsApproximate_ << ","
         << logs_.numSolutionsTooShort_ << ","
         << experienceDB_->getExperiencesCount() << ","
-        << logs_.getAveragePlanningTime() << std::endl;
+        << logs_.getAveragePlanningTime()  << ","
+        << logs_.getAverageInsertionTime()
+        << std::endl;
 
     std::cout << "Leaving Lightning::solve() fn " << std::endl;
     return lastStatus_;
@@ -357,17 +371,18 @@ void ompl::tools::Lightning::print(std::ostream &out) const
 void ompl::tools::Lightning::printLogs(std::ostream &out) const
 {
     out << "Lightning Framework Logging Results" << std::endl;
-    out << "  Solutions Attempted:                 " << logs_.numProblems_ << std::endl;
-    out << "     Solved from scratch:              " << logs_.numSolutionsFromScratch_ << std::endl;
-    out << "     Solved from recall:               " << logs_.numSolutionsFromRecall_ << std::endl;
-    out << "        That were saved:               " << logs_.numSolutionsFromRecallSaved_ << std::endl;
-    out << "        That were discarded:           " << logs_.numSolutionsFromRecall_ - logs_.numSolutionsFromRecallSaved_ << std::endl;
-    out << "        Less than 2 states:            " << logs_.numSolutionsTooShort_ << std::endl;
-    out << "     Failed:                           " << logs_.numSolutionsFailed_ << std::endl;
-    out << "     Approximate:                      " << logs_.numSolutionsApproximate_ << std::endl;
-    out << "  Total solutions in database:         " << experienceDB_->getExperiencesCount() << std::endl;
-    out << "     Unsaved solutions:                " << experienceDB_->getNumUnsavedPaths() << std::endl;
-    out << "  Average planning time:               " << logs_.getAveragePlanningTime() << std::endl;
+    out << "  Solutions Attempted:           " << logs_.numProblems_ << std::endl;
+    out << "     Solved from scratch:        " << logs_.numSolutionsFromScratch_ << " (" << logs_.numSolutionsFromScratch_/logs_.numProblems_*100 << "%)" << std::endl;
+    out << "     Solved from recall:         " << logs_.numSolutionsFromRecall_  << " (" << logs_.numSolutionsFromRecall_/logs_.numProblems_*100 << "%)" << std::endl;
+    out << "        That were saved:         " << logs_.numSolutionsFromRecallSaved_ << std::endl;
+    out << "        That were discarded:     " << logs_.numSolutionsFromRecall_ - logs_.numSolutionsFromRecallSaved_ << std::endl;
+    out << "        Less than 2 states:      " << logs_.numSolutionsTooShort_ << std::endl;
+    out << "     Failed:                     " << logs_.numSolutionsFailed_ << std::endl;
+    out << "     Approximate:                " << logs_.numSolutionsApproximate_ << std::endl;
+    out << "  Total solutions in database:   " << experienceDB_->getExperiencesCount() << std::endl;
+    out << "     Unsaved solutions:          " << experienceDB_->getNumUnsavedPaths() << std::endl;
+    out << "  Average planning time:         " << logs_.getAveragePlanningTime() << std::endl;
+    out << "  Average insertion time:        " << logs_.getAverageInsertionTime() << std::endl;
 }
 
 void ompl::tools::Lightning::saveDataLog(std::ostream &out)

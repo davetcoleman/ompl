@@ -94,8 +94,12 @@ namespace ompl
             /**
              * \brief Add a new solution path to our database. Des not actually save to file so
              *        experience will be lost if save() is not called
+             * \param new path
+             * \param returned insertion time to add to db
+             * \return true on success
              */
-            void addPath(ompl::geometric::PathGeometric& solutionPath);
+            void addPath(ompl::geometric::PathGeometric& solutionPath, double& insertionTime);
+            void addPathHelper(ompl::geometric::PathGeometric& solutionPath);
 
             /**
              * \brief Save loaded database to file, except skips saving if no paths have been added
@@ -134,6 +138,15 @@ namespace ompl
             int getNumUnsavedPaths() const
             {
                 return numUnsavedPaths_;
+            }
+
+            /**
+             * \brief Check if anything has been loaded into DB
+             * \return true if has no nodes
+             */
+            bool isEmpty()
+            {
+                return !getExperiencesCount();
             }
 
         private:
