@@ -192,7 +192,7 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
     {
         // Skip further processing if absolutely no path is available        
         OMPL_ERROR("Lightning Solve: No solution found after %f seconds", planTime_);
-        logs_.numSolutionsFailed_++;
+        logs_.numSolutionsTimedout_++;
         logs_.csvDataLogStream_ << planTime_ << ",neither_planner,timedout,not_saved,0";
     }
     else if (!lastStatus_)
@@ -399,6 +399,7 @@ void ompl::tools::Lightning::printLogs(std::ostream &out) const
     out << "        That were discarded:     " << logs_.numSolutionsFromRecall_ - logs_.numSolutionsFromRecallSaved_ << std::endl;
     out << "        Less than 2 states:      " << logs_.numSolutionsTooShort_ << std::endl;
     out << "     Failed:                     " << logs_.numSolutionsFailed_ << std::endl;
+    out << "     Timedout:                   " << logs_.numSolutionsTimedout_ << std::endl;
     out << "     Approximate:                " << logs_.numSolutionsApproximate_ << std::endl;
     out << "  LightningDb                    " << std::endl;
     out << "     Total paths:                " << experienceDB_->getExperiencesCount() << std::endl;

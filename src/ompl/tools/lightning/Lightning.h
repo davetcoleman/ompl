@@ -104,6 +104,7 @@ namespace ompl
                     , numSolutionsFromRecallSaved_(0)
                     , numSolutionsFromScratch_(0)
                     , numSolutionsFailed_(0)
+                    , numSolutionsTimedout_(0)
                     , numSolutionsApproximate_(0)
                     , numSolutionsTooShort_(0)
                     , numProblems_(0)
@@ -135,6 +136,7 @@ namespace ompl
                 double numSolutionsFromRecallSaved_;
                 double numSolutionsFromScratch_;
                 double numSolutionsFailed_;
+                double numSolutionsTimedout_;
                 double numSolutionsApproximate_;
                 double numSolutionsTooShort_; // less than 3 states
                 double numProblems_; // input requests
