@@ -84,7 +84,7 @@ void ompl::tools::Lightning::initialize()
 
 bool ompl::tools::Lightning::setFile(const std::string &databaseName, const std::string &databaseDirectory)
 {
-    std::string fileName = "lighting_" + databaseName;
+    std::string fileName = "lightning_" + databaseName;
     return ompl::tools::ExperienceSetup::getFilePath(fileName, databaseDirectory);
 }
 
@@ -188,13 +188,29 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
     logs_.numProblems_++; // used for averaging
     logs_.csvDataLogStream_ << planTime_ << ",";
 
-    // Skip further processing if absolutely no path is available
-    if (!lastStatus_)
+    if (lastStatus_ == ompl::base::PlannerStatus::TIMEOUT)
     {
+        // Skip further processing if absolutely no path is available        
         OMPL_ERROR("Lightning Solve: No solution found after %f seconds", planTime_);
         logs_.numSolutionsFailed_++;
-
-        logs_.csvDataLogStream_ << "0,neither_planner,failed,not_saved,0,";
+        logs_.csvDataLogStream_ << planTime_ << ",neither_planner,timedout,not_saved,0";
+    }
+    else if (!lastStatus_)
+    {
+        // Skip further processing if absolutely no path is available      
+        OMPL_ERROR("Lightning Solve: Unknown failure");
+        std::cout << "UNKNOWN--------------------------------------------- " << std::endl;
+        std::cout << "UNKNOWN--------------------------------------------- " << std::endl;
+        std::cout << "UNKNOWN--------------------------------------------- " << std::endl;
+        std::cout << "UNKNOWN--------------------------------------------- " << std::endl;
+        std::cout << "UNKNOWN--------------------------------------------- " << std::endl;
+        std::cout << "UNKNOWN--------------------------------------------- " << std::endl;
+        std::cout << "UNKNOWN--------------------------------------------- " << std::endl;
+        std::cout << "UNKNOWN--------------------------------------------- " << std::endl;
+        std::cout << "UNKNOWN--------------------------------------------- " << std::endl;
+        std::cout << "Planner Status: " << lastStatus_ << std::endl;
+        logs_.numSolutionsFailed_++;
+        logs_.csvDataLogStream_ << "0,neither_planner,failed,not_saved,0";
     }
     else
     {
@@ -242,6 +258,9 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
             }
             else
             {
+                // Benchmark runtime
+                time::point startTime = time::now();
+
                 // Convert the original recalled path to PathGeometric
                 ob::PlannerDataPtr chosenRecallPathData = getRetrieveRepairPlanner().getChosenRecallPath();
                 og::PathGeometric chosenRecallPath(si_);
@@ -268,8 +287,10 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
                     logs_.numSolutionsFromRecallSaved_++;
 
                     // Save to database
-                    experienceDB_->addPath(solutionPath, insertionTime);
+                    double dummyInsertionTime; // unused because does not include scoring function
+                    experienceDB_->addPath(solutionPath, dummyInsertionTime);
                 }
+                insertionTime += time::seconds(time::now() - startTime);
             }
         }
         else
@@ -379,7 +400,9 @@ void ompl::tools::Lightning::printLogs(std::ostream &out) const
     out << "        Less than 2 states:      " << logs_.numSolutionsTooShort_ << std::endl;
     out << "     Failed:                     " << logs_.numSolutionsFailed_ << std::endl;
     out << "     Approximate:                " << logs_.numSolutionsApproximate_ << std::endl;
-    out << "  Total solutions in database:   " << experienceDB_->getExperiencesCount() << std::endl;
+    out << "  LightningDb                    " << std::endl;
+    out << "     Total paths:                " << experienceDB_->getExperiencesCount() << std::endl;
+    out << "     Vertices (states):          " << experienceDB_->getExperiencesCount() << std::endl;
     out << "     Unsaved solutions:          " << experienceDB_->getNumUnsavedPaths() << std::endl;
     out << "  Average planning time:         " << logs_.getAveragePlanningTime() << std::endl;
     out << "  Average insertion time:        " << logs_.getAverageInsertionTime() << std::endl;

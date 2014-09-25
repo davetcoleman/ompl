@@ -134,6 +134,9 @@ namespace ompl
             /** \brief Get the total number of paths stored in the database */
             std::size_t getExperiencesCount() const;
 
+            /** \brief Get the total number of states stored in the database, across all paths */
+            std::size_t getStatesCount() const;
+
             /** \brief Get number of unsaved paths */
             int getNumUnsavedPaths() const
             {

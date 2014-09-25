@@ -289,3 +289,21 @@ std::size_t ompl::tools::ExperienceDB::getExperiencesCount() const
 {
     return nn_->size();
 }
+
+std::size_t ompl::tools::ExperienceDB::getStatesCount() const
+{
+    // Loop through every PlannerData and sum the number of states
+    std::size_t statesCount;
+
+    // Convert the NN tree to a vector
+    std::vector<ompl::base::PlannerDataPtr> plannerDatas;
+    nn_->list(plannerDatas);
+
+    // Start saving each planner data object
+    for (std::size_t i = 0; i < plannerDatas.size(); ++i)
+    {
+        statesCount += plannerDatas[i]->numVertices();
+    }
+
+    return statesCount;
+}
