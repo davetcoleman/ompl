@@ -95,13 +95,13 @@ void ompl::tools::Lightning::setup(void)
         OMPL_ERROR("Setting up Lightning Framework");
 
         if (!configured_)
-          OMPL_ERROR("  Because not configured_");
+            OMPL_ERROR("  Because not configured_");
         else if(!si_->isSetup())
-          OMPL_ERROR("  Because not si->isSetup");
+            OMPL_ERROR("  Because not si->isSetup");
         else if(!planner_->isSetup())
-          OMPL_ERROR("  Because not planner->isSetup");
+            OMPL_ERROR("  Because not planner->isSetup");
         else if(!rrPlanner_->isSetup())
-          OMPL_ERROR("  Because not rrPlanner->isSetup");
+            OMPL_ERROR("  Because not rrPlanner->isSetup");
 
         // Setup Space Information if we haven't already done so
         if (!si_->isSetup())
@@ -149,9 +149,12 @@ void ompl::tools::Lightning::setup(void)
 
         // Check if experience database is already loaded
         if (experienceDB_->isEmpty())
-          experienceDB_->load(filePath_); // load from file
+        {
+            OMPL_ERROR("Loading database");
+            experienceDB_->load(filePath_); // load from file
+        }
         else
-          OMPL_ERROR("Attempting to load experience database when it is not empty");
+            OMPL_ERROR("Attempting to load experience database when it is not empty");
 
         // Set the configured flag
         configured_ = true;
@@ -202,18 +205,18 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
 
     if (lastStatus_ == ompl::base::PlannerStatus::TIMEOUT)
     {
-        // Skip further processing if absolutely no path is available        
+        // Skip further processing if absolutely no path is available
         OMPL_ERROR("Lightning Solve: No solution found after %f seconds", planTime_);
         stats_.numSolutionsTimedout_++;
 
         // Logging
         log.planner = "neither_planner";
         log.result = "timedout";
-        log.is_saved = "not_saved";        
+        log.is_saved = "not_saved";
     }
     else if (!lastStatus_)
     {
-        // Skip further processing if absolutely no path is available      
+        // Skip further processing if absolutely no path is available
         OMPL_ERROR("Lightning Solve: Unknown failure");
         std::cout << "UNKNOWN--------------------------------------------- " << std::endl;
         std::cout << "UNKNOWN--------------------------------------------- " << std::endl;
