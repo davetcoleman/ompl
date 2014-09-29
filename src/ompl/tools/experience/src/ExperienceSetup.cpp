@@ -75,6 +75,25 @@ void ompl::tools::ExperienceSetup::logInitialize()
     << std::endl;
 }
 
+void ompl::tools::ExperienceSetup::convertLogToString(const ExperienceLog &log)
+{
+  csvDataLogStream_ 
+    << log.planning_time << ","
+    << log.insertion_time << ","
+    << log.planner << ","
+    << log.result << ","
+    << log.is_saved << ","
+    << log.approximate << ","
+    << log.too_short << ","
+    << log.insertion_failed << ","
+    << log.score << ","
+    << log.num_vertices << ","
+    << log.num_edges << ","
+    << log.num_connected_components << ","
+    << "0,0,0,0,0,0,0,0,0"
+    << std::endl;
+}
+
 void ompl::tools::ExperienceSetup::saveDataLog(std::ostream &out)
 {
     // Export to file and clear the stream

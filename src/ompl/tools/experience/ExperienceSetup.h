@@ -157,23 +157,7 @@ namespace ompl
             void logInitialize();
 
             /** \brief Move data to string format and put in buffer */
-            void convertLogToString(const ExperienceLog &log)
-            {
-                csvDataLogStream_ 
-                    << log.planning_time << ","
-                    << log.insertion_time << ","
-                    << log.planner << ","
-                    << log.result << ","
-                    << log.is_saved << ","
-                    << log.approximate << ","
-                    << log.too_short << ","
-                    << log.insertion_failed << ","
-                    << log.score << ","
-                    << log.num_vertices << ","
-                    << log.num_edges << ","
-                    << log.num_connected_components << ","
-                    << "0,0,0,0,0,0,0,0,0";
-            }
+            void convertLogToString(const ExperienceLog &log);
 
             /** \brief Set the database file to load. Actual loading occurs when setup() is called
              *  \param databaseName - used to name the database file, should be something like 'left_arm' or 'whole_body'
