@@ -38,6 +38,9 @@
    Paper:  Berenson, Dmitry, Pieter Abbeel, and Ken Goldberg.
            "A robot path planning framework that learns from experience."
            Robotics and Automation (ICRA), 2012 IEEE International Conference on. IEEE, 2012.
+
+   Notes:  The user of this class should invoke the loading and saving from file, otherwise experiences
+           will be lost.
 */
 
 #ifndef OMPL_TOOLS_LIGHTNING_LIGHTNING_
@@ -94,56 +97,6 @@ namespace ompl
         class Lightning : public ompl::tools::ExperienceSetup
         {
         public:
-            /**
-             * \brief Simple logging functionality encapsled in a struct
-             */
-            struct LightningLogs
-            {
-                LightningLogs()
-                    : numSolutionsFromRecall_(0)
-                    , numSolutionsFromRecallSaved_(0)
-                    , numSolutionsFromScratch_(0)
-                    , numSolutionsFailed_(0)
-                    , numSolutionsTimedout_(0)
-                    , numSolutionsApproximate_(0)
-                    , numSolutionsTooShort_(0)
-                    , numProblems_(0)
-                    , totalPlanningTime_(0)
-                    , totalInsertionTime_(0)
-                {
-                    // Header of CSV file
-                    csvDataLogStream_ << "time,states,planner,result,is_saved,score,total_scratch,total_recall,total_recall_saved,"
-                                      << "total_recall_discarded,total_failed,total_approximate,total_too_short,total_experiences,"
-                                      << "avg_planning_time" << std::endl;
-                }
-
-                double getAveragePlanningTime() const
-                {
-                    return totalPlanningTime_ / numProblems_;
-                }
-
-                double getAverageInsertionTime() const
-                {
-                    // Cleanup output
-                    double time = totalInsertionTime_ / numProblems_;
-                    if (time < 0.00000001)
-                        return 0;
-                    else
-                        return totalInsertionTime_ / numProblems_;
-                }
-
-                double numSolutionsFromRecall_;
-                double numSolutionsFromRecallSaved_;
-                double numSolutionsFromScratch_;
-                double numSolutionsFailed_;
-                double numSolutionsTimedout_;
-                double numSolutionsApproximate_;
-                double numSolutionsTooShort_; // less than 3 states
-                double numProblems_; // input requests
-                double totalPlanningTime_; // of all input requests, used for averaging
-                double totalInsertionTime_; // of all input requests, used for averaging
-                std::stringstream csvDataLogStream_; // output data to file to analyze performance externally
-            };
 
             /** \brief Constructor needs the state space used for planning. */
             explicit
@@ -174,9 +127,6 @@ namespace ompl
 
             /** \brief Display debug data about overall results from Lightning since being loaded */
             void printLogs(std::ostream &out = std::cout) const;
-
-            /** \brief Save debug data about overall results from Lightning since being loaded */
-            void saveDataLog(std::ostream &out = std::cout);
 
             /**
              * \brief Get a pointer to the retrieve repair planner
@@ -257,14 +207,6 @@ namespace ompl
            */
           bool reversePathIfNecessary(ompl::geometric::PathGeometric &path1, ompl::geometric::PathGeometric &path2);
 
-          /**
-           * \brief Getter for logging data
-           */
-          const LightningLogs& getLogs() const
-          {
-              return logs_;
-          }
-
         protected:
 
             /// The maintained experience planner instance
@@ -278,9 +220,6 @@ namespace ompl
 
             /** \brief Tool for comparing two paths and scoring them */
             ompl::tools::DynamicTimeWarpPtr   dtw_;
-
-            /** \brief Logging data for debugging  */
-            LightningLogs                     logs_;
 
         }; // end of class Lightning
 

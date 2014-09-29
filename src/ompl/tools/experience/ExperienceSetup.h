@@ -60,20 +60,120 @@ namespace ompl
         class ExperienceSetup : public ompl::geometric::SimpleSetup
         {
         public:
-
-            /** \brief Constructor needs the state space used for planning. */
-            explicit
-            ExperienceSetup(const base::SpaceInformationPtr &si)
-                : ompl::geometric::SimpleSetup(si)
+            /**
+             * \brief Simple logging functionality encapsled in a struct
+             */
+            struct ExperienceStats
             {
+                ExperienceStats()
+                    : numSolutionsFromRecall_(0)
+                    , numSolutionsFromRecallSaved_(0)
+                    , numSolutionsFromScratch_(0)
+                    , numSolutionsFailed_(0)
+                    , numSolutionsTimedout_(0)
+                    , numSolutionsApproximate_(0)
+                    , numSolutionsTooShort_(0)
+                    , numProblems_(0)
+                    , totalPlanningTime_(0)
+                    , totalInsertionTime_(0)
+                {
+                }
+
+                double getAveragePlanningTime() const
+                {
+                    return totalPlanningTime_ / numProblems_;
+                }
+
+                double getAverageInsertionTime() const
+                {
+                    // Cleanup output
+                    double time = totalInsertionTime_ / numProblems_;
+                    if (time < 0.00000001)
+                        return 0;
+                    else
+                        return totalInsertionTime_ / numProblems_;
+                }
+
+                double numSolutionsFromRecall_;
+                double numSolutionsFromRecallSaved_;
+                double numSolutionsFromScratch_;
+                double numSolutionsFailed_;                
+                double numSolutionsTimedout_;
+                double numSolutionsApproximate_;
+                double numSolutionsTooShort_; // less than 3 states
+                double numProblems_; // input requests
+                double totalPlanningTime_; // of all input requests, used for averaging
+                double totalInsertionTime_; // of all input requests, used for averaging
+            };
+
+            /**
+             * \brief Single entry for the csv data logging file
+             */
+            struct ExperienceLog
+            {
+                ExperienceLog()
+                    // Defaults
+                    : planning_time(0),
+                      insertion_time(0),
+                      planner("NA"),
+                      result("NA"),
+                      is_saved("NA"),
+                      approximate(0),
+                      too_short(0),
+                      insertion_failed(0),
+                      score(0),
+                      num_vertices(0),
+                      num_edges(0),
+                      num_connected_components(0)
+                {}
+                // Times
+                double planning_time;
+                double insertion_time;
+                // Solution properties
+                std::string planner;
+                std::string result;
+                std::string is_saved;
+                // Failure booleans
+                bool approximate;
+                bool too_short;
+                bool insertion_failed;
+                // Lightning properties
+                double score;
+                // Thunder (SPARS) properties
+                std::size_t num_vertices;
+                std::size_t num_edges;
+                std::size_t num_connected_components;
             };
 
             /** \brief Constructor needs the state space used for planning. */
             explicit
-            ExperienceSetup(const base::StateSpacePtr &space)
-                : ompl::geometric::SimpleSetup(space)
+            ExperienceSetup(const base::SpaceInformationPtr &si);
+
+            /** \brief Constructor needs the state space used for planning. */
+            explicit
+            ExperienceSetup(const base::StateSpacePtr &space);
+
+            /** \brief Load the header (first row) of the csv file */
+            void logInitialize();
+
+            /** \brief Move data to string format and put in buffer */
+            void convertLogToString(const ExperienceLog &log)
             {
-            };
+                csvDataLogStream_ 
+                    << log.planning_time << ","
+                    << log.insertion_time << ","
+                    << log.planner << ","
+                    << log.result << ","
+                    << log.is_saved << ","
+                    << log.approximate << ","
+                    << log.too_short << ","
+                    << log.insertion_failed << ","
+                    << log.score << ","
+                    << log.num_vertices << ","
+                    << log.num_edges << ","
+                    << log.num_connected_components << ","
+                    << "0,0,0,0,0,0,0,0,0";
+            }
 
             /** \brief Set the database file to load. Actual loading occurs when setup() is called
              *  \param databaseName - used to name the database file, should be something like 'left_arm' or 'whole_body'
@@ -84,11 +184,11 @@ namespace ompl
             /** \brief Display debug data about potential available solutions */
             virtual void printResultsInfo(std::ostream &out = std::cout) const = 0;
 
-            /** \brief Display debug data about overall results from Lightning since being loaded */
+            /** \brief Display debug data about overall results  since being loaded */
             virtual void printLogs(std::ostream &out = std::cout) const = 0;
 
-            /** \brief Save debug data about overall results from Lightning since being loaded */
-            virtual void saveDataLog(std::ostream &out = std::cout) = 0;
+            /** \brief Save debug data about overall results since being loaded */
+            virtual void saveDataLog(std::ostream &out = std::cout);
 
             /** \brief Set the planner to use for repairing experience paths
                 inside the RetrieveRepair planner. If the planner is not
@@ -120,6 +220,14 @@ namespace ompl
             /** \brief After setFile() is called, access the generated file path for loading and saving the experience database */
             virtual const std::string& getFilePath() const;
 
+            /**
+             * \brief Getter for logging data
+             */
+            const ExperienceStats& getStats() const
+            {
+                return stats_;
+            }
+
         protected:
 
             /// Flag indicating whether recalled plans should be used to find solutions. Enabled by default.
@@ -130,7 +238,12 @@ namespace ompl
 
             /** \brief File location of database */
             std::string                       filePath_;
+          
+            // output data to file to analyze performance externally
+            std::stringstream                 csvDataLogStream_; 
 
+            /** \brief States data for display to console  */
+            ExperienceStats                   stats_;
         };
     }
 

@@ -94,6 +94,15 @@ void ompl::tools::Lightning::setup(void)
     {
         OMPL_ERROR("Setting up Lightning Framework");
 
+        if (!configured_)
+          OMPL_ERROR("  Because not configured_");
+        else if(!si_->isSetup())
+          OMPL_ERROR("  Because not si->isSetup");
+        else if(!planner_->isSetup())
+          OMPL_ERROR("  Because not planner->isSetup");
+        else if(!rrPlanner_->isSetup())
+          OMPL_ERROR("  Because not rrPlanner->isSetup");
+
         // Setup Space Information if we haven't already done so
         if (!si_->isSetup())
             si_->setup();
@@ -184,16 +193,23 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
 
     // Planning time
     planTime_ = time::seconds(time::now() - start);
-    logs_.totalPlanningTime_ += planTime_; // used for averaging
-    logs_.numProblems_++; // used for averaging
-    logs_.csvDataLogStream_ << planTime_ << ",";
+    stats_.totalPlanningTime_ += planTime_; // used for averaging
+    stats_.numProblems_++; // used for averaging
+
+    // Create log
+    ExperienceLog log;
+    log.planning_time = planTime_;
 
     if (lastStatus_ == ompl::base::PlannerStatus::TIMEOUT)
     {
         // Skip further processing if absolutely no path is available        
         OMPL_ERROR("Lightning Solve: No solution found after %f seconds", planTime_);
-        logs_.numSolutionsTimedout_++;
-        logs_.csvDataLogStream_ << planTime_ << ",neither_planner,timedout,not_saved,0";
+        stats_.numSolutionsTimedout_++;
+
+        // Logging
+        log.planner = "neither_planner";
+        log.result = "timedout";
+        log.is_saved = "not_saved";        
     }
     else if (!lastStatus_)
     {
@@ -209,34 +225,38 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
         std::cout << "UNKNOWN--------------------------------------------- " << std::endl;
         std::cout << "UNKNOWN--------------------------------------------- " << std::endl;
         std::cout << "Planner Status: " << lastStatus_ << std::endl;
-        logs_.numSolutionsFailed_++;
-        logs_.csvDataLogStream_ << "0,neither_planner,failed,not_saved,0";
+        stats_.numSolutionsFailed_++;
+
+        // Logging
+        log.planner = "neither_planner";
+        log.result = "failed";
+        log.is_saved = "not_saved";
     }
     else
     {
         OMPL_INFORM("Lightning Solve: Possible solution found in %f seconds", planTime_);
 
-
         // Smooth the result
-        //OMPL_INFORM("Simplifying solution (smoothing)...");
-        //simplifySolution(ptc);
+        simplifySolution(ptc);
 
-        std::cout << "before get solution path " << std::endl;
-        // Get information about the exploration data structure the motion planner used. Used later in visualizing
         og::PathGeometric solutionPath = getSolutionPath(); // copied so that it is non-const
-        std::cout << "after get solution path " << std::endl;
         OMPL_INFORM("Solution path has %d states and was generated from planner %s", solutionPath.getStateCount(), getSolutionPlannerName().c_str());
-        logs_.csvDataLogStream_ << solutionPath.getStateCount() << "," << getSolutionPlannerName() << ",";
 
-        //solutionPath.print(std::cout);
-
-        std::cout << OMPL_CONSOLE_COLOR_CYAN << "LIGHTNING RESULTS:" << OMPL_CONSOLE_COLOR_RESET << std::endl;
+        // Logging
+        log.planner = getSolutionPlannerName();
 
         // Do not save if approximate
         if (!haveExactSolutionPath())
         {
-            logs_.csvDataLogStream_ << "not_exact_solution_path,not_saved,0,";
-            logs_.numSolutionsApproximate_++;
+            std::cout << OMPL_CONSOLE_COLOR_CYAN << "LIGHTNING RESULTS: Approximate" << OMPL_CONSOLE_COLOR_RESET << std::endl;
+
+            // Logging
+            log.result = "not_exact_solution";
+            log.is_saved = "not_saved";
+            log.approximate = true;
+
+            // Stats
+            stats_.numSolutionsApproximate_++;
 
             // TODO not sure what to do here, use case not tested
             OMPL_WARN("NOT saving to database because the solution is APPROXIMATE");
@@ -244,17 +264,23 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
         // Use dynamic time warping to see if the repaired path is too similar to the original
         else if (getSolutionPlannerName() == rrPlanner_->getName())
         {
-            OMPL_INFORM("Solution from Recall");
+            std::cout << OMPL_CONSOLE_COLOR_CYAN << "LIGHTNING RESULTS: From Recall" << OMPL_CONSOLE_COLOR_RESET << std::endl;
+
+            // Stats
+            stats_.numSolutionsFromRecall_++;
 
             // Logging
-            logs_.numSolutionsFromRecall_++;
+            log.result = "from_recall";
 
             // Make sure solution has at least 2 states
             if (solutionPath.getStateCount() < 2)
             {
                 OMPL_INFORM("NOT saving to database because solution is less than 2 states long");
-                logs_.numSolutionsTooShort_++;
-                logs_.csvDataLogStream_ << "from_recall,less_2_states,0,";
+                stats_.numSolutionsTooShort_++;
+
+                // Logging
+                log.is_saved = "less_2_states";
+                log.too_short = true;
             }
             else
             {
@@ -270,21 +296,28 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
                 reversePathIfNecessary(solutionPath, chosenRecallPath);
 
                 double score = dtw_->getPathsScoreHalfConst( solutionPath, chosenRecallPath );
+                log.score = score;
 
                 //  TODO: From Ioan: It would be nice if we switch to percentages of path length for score, and maybe define this var in the magic namespace.
                 //  From Dave: Actually I think I already made the getPathsScore function length-invariant by dividing the score by the path
                 if (score < 4) //10)
                 {
                     OMPL_ERROR("NOT saving to database because best solution was from database and is too similar (score %f)", score);
-                    logs_.csvDataLogStream_ << "from_recall,score_too_similar," << score << ",";
+
+                    // Logging
+                    log.insertion_failed = 1;
+                    log.is_saved = "score_too_similar";
                 }
                 else
                 {
                     OMPL_INFORM("Adding path to database because repaired path is different enough from original recalled path (score %f)", score);
-                    logs_.csvDataLogStream_ << "from_recall,score_different_enough," << score << ",";
 
                     // Logging
-                    logs_.numSolutionsFromRecallSaved_++;
+                    log.insertion_failed = 0; // TODO make this actually return result
+                    log.is_saved = "score_different_enough";
+
+                    // Stats
+                    stats_.numSolutionsFromRecallSaved_++;
 
                     // Save to database
                     double dummyInsertionTime; // unused because does not include scoring function
@@ -295,22 +328,33 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
         }
         else
         {
-            OMPL_INFORM("Solution from Scratch");
+            std::cout << OMPL_CONSOLE_COLOR_CYAN << "LIGHTNING RESULTS: From Scratch" << OMPL_CONSOLE_COLOR_RESET << std::endl;
 
             // Logging
-            logs_.numSolutionsFromScratch_++;
+            log.result = "from_scratch";
+
+            // Stats
+            stats_.numSolutionsFromScratch_++;
 
             // Make sure solution has at least 2 states
             if (solutionPath.getStateCount() < 2)
             {
                 OMPL_INFORM("NOT saving to database because solution is less than 2 states long");
-                logs_.csvDataLogStream_ << "from_scratch,less_2_states,0,";
-                logs_.numSolutionsTooShort_++;
+
+                // Logging
+                log.is_saved = "less_2_states";
+                log.too_short = true;
+
+                // Stats
+                stats_.numSolutionsTooShort_++;
             }
             else
             {
                 OMPL_INFORM("Adding path to database because best solution was not from database");
-                logs_.csvDataLogStream_ << "from_scratch,saving,0,";
+
+                // Logging
+                log.result = "from_scratch";
+                log.is_saved = "saving";
 
                 // TODO: maybe test this path for validity also?
 
@@ -320,21 +364,16 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
         }
     }
 
-    logs_.totalInsertionTime_ += insertionTime; // used for averaging
+    stats_.totalInsertionTime_ += insertionTime; // used for averaging
 
-    // End this log entry with remaining stats
-    logs_.csvDataLogStream_
-        << logs_.numSolutionsFromScratch_ << ","
-        << logs_.numSolutionsFromRecall_ << ","
-        << logs_.numSolutionsFromRecallSaved_ << ","
-        << logs_.numSolutionsFromRecall_ - logs_.numSolutionsFromRecallSaved_ << ","
-        << logs_.numSolutionsFailed_ << ","
-        << logs_.numSolutionsApproximate_ << ","
-        << logs_.numSolutionsTooShort_ << ","
-        << experienceDB_->getExperiencesCount() << ","
-        << logs_.getAveragePlanningTime()  << ","
-        << logs_.getAverageInsertionTime()
-        << std::endl;
+    // Final log data
+    log.insertion_time = insertionTime;
+    log.num_vertices = experienceDB_->getStatesCount();
+    log.num_edges = 0;
+    log.num_connected_components = 0;
+
+    // Flush the log to buffer
+    convertLogToString(log);
 
     std::cout << "Leaving Lightning::solve() fn " << std::endl;
     return lastStatus_;
@@ -392,28 +431,21 @@ void ompl::tools::Lightning::print(std::ostream &out) const
 void ompl::tools::Lightning::printLogs(std::ostream &out) const
 {
     out << "Lightning Framework Logging Results" << std::endl;
-    out << "  Solutions Attempted:           " << logs_.numProblems_ << std::endl;
-    out << "     Solved from scratch:        " << logs_.numSolutionsFromScratch_ << " (" << logs_.numSolutionsFromScratch_/logs_.numProblems_*100 << "%)" << std::endl;
-    out << "     Solved from recall:         " << logs_.numSolutionsFromRecall_  << " (" << logs_.numSolutionsFromRecall_/logs_.numProblems_*100 << "%)" << std::endl;
-    out << "        That were saved:         " << logs_.numSolutionsFromRecallSaved_ << std::endl;
-    out << "        That were discarded:     " << logs_.numSolutionsFromRecall_ - logs_.numSolutionsFromRecallSaved_ << std::endl;
-    out << "        Less than 2 states:      " << logs_.numSolutionsTooShort_ << std::endl;
-    out << "     Failed:                     " << logs_.numSolutionsFailed_ << std::endl;
-    out << "     Timedout:                   " << logs_.numSolutionsTimedout_ << std::endl;
-    out << "     Approximate:                " << logs_.numSolutionsApproximate_ << std::endl;
+    out << "  Solutions Attempted:           " << stats_.numProblems_ << std::endl;
+    out << "     Solved from scratch:        " << stats_.numSolutionsFromScratch_ << " (" << stats_.numSolutionsFromScratch_/stats_.numProblems_*100 << "%)" << std::endl;
+    out << "     Solved from recall:         " << stats_.numSolutionsFromRecall_  << " (" << stats_.numSolutionsFromRecall_/stats_.numProblems_*100 << "%)" << std::endl;
+    out << "        That were saved:         " << stats_.numSolutionsFromRecallSaved_ << std::endl;
+    out << "        That were discarded:     " << stats_.numSolutionsFromRecall_ - stats_.numSolutionsFromRecallSaved_ << std::endl;
+    out << "        Less than 2 states:      " << stats_.numSolutionsTooShort_ << std::endl;
+    out << "     Failed:                     " << stats_.numSolutionsFailed_ << std::endl;
+    out << "     Timedout:                   " << stats_.numSolutionsTimedout_ << std::endl;
+    out << "     Approximate:                " << stats_.numSolutionsApproximate_ << std::endl;
     out << "  LightningDb                    " << std::endl;
     out << "     Total paths:                " << experienceDB_->getExperiencesCount() << std::endl;
-    out << "     Vertices (states):          " << experienceDB_->getExperiencesCount() << std::endl;
+    out << "     Vertices (states):          " << experienceDB_->getStatesCount() << std::endl;
     out << "     Unsaved solutions:          " << experienceDB_->getNumUnsavedPaths() << std::endl;
-    out << "  Average planning time:         " << logs_.getAveragePlanningTime() << std::endl;
-    out << "  Average insertion time:        " << logs_.getAverageInsertionTime() << std::endl;
-}
-
-void ompl::tools::Lightning::saveDataLog(std::ostream &out)
-{
-    // Export to file and clear the stream
-    out << logs_.csvDataLogStream_.str();
-    logs_.csvDataLogStream_.str("");
+    out << "  Average planning time:         " << stats_.getAveragePlanningTime() << std::endl;
+    out << "  Average insertion time:        " << stats_.getAverageInsertionTime() << std::endl;
 }
 
 std::size_t ompl::tools::Lightning::getExperiencesCount() const
