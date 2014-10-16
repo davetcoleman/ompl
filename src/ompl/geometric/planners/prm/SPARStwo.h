@@ -32,12 +32,11 @@
 *  POSSIBILITY OF SUCH DAMAGE.
 *********************************************************************/
 
-/* Author: Andrew Dobson, Dave Coleman */
+/* Author: Andrew Dobson */
 
 #ifndef OMPL_GEOMETRIC_PLANNERS_SPARS_TWO_
 #define OMPL_GEOMETRIC_PLANNERS_SPARS_TWO_
 
-//#include "ompl/geometric/planners/prm/SPARStwo_graph.h" // custom helper functions for boost graph
 #include "ompl/geometric/planners/PlannerIncludes.h"
 #include "ompl/datastructures/NearestNeighbors.h"
 #include "ompl/geometric/PathSimplifier.h"
@@ -47,10 +46,6 @@
 #include <boost/unordered_map.hpp>
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
-#include <boost/graph/filtered_graph.hpp>
-#include <boost/graph/graph_utility.hpp>
-#include <boost/graph/astar_search.hpp>
-#include <boost/property_map/property_map.hpp>
 #include <boost/pending/disjoint_sets.hpp>
 #include <boost/function.hpp>
 #include <boost/thread.hpp>
@@ -77,7 +72,7 @@ namespace ompl
            A. Dobson, K. Bekris,
            Improving Sparse Roadmap Spanners,
            <em>IEEE International Conference on Robotics and Automation (ICRA)</em> May 2013.
-           <a href="http://www.cs.rutgers.edu/~kb572/pubs/spars2.pdf">[PDF]</a>
+           [[PDF]](http://www.cs.rutgers.edu/~kb572/pubs/spars2.pdf)
         */
 
         /** \brief <b> SPArse Roadmap Spanner Version 2.0 </b> */
@@ -96,17 +91,12 @@ namespace ompl
                 QUALITY,
             };
 
-            ////////////////////////////////////////////////////////////////////////////////////////
-            // BOOST GRAPH DETAILS
-            ////////////////////////////////////////////////////////////////////////////////////////
-
             /** \brief The type used internally for representing vertex IDs */
             typedef unsigned long int VertexIndexType;
 
             /** \brief Pair of vertices which support an interface. */
             typedef std::pair< VertexIndexType, VertexIndexType > VertexPair;
-            
-            ////////////////////////////////////////////////////////////////////////////////////////
+
             /** \brief Interface information storage class, which does bookkeeping for criterion four. */
             struct InterfaceData
             {
@@ -191,7 +181,6 @@ namespace ompl
             /** \brief the hash which maps pairs of neighbor points to pairs of states */
             typedef boost::unordered_map< VertexPair, InterfaceData, boost::hash< VertexPair > > InterfaceHash;
 
-            ////////////////////////////////////////////////////////////////////////////////////////
             // The InterfaceHash structure is wrapped inside of this struct due to a compilation error on
             // GCC 4.6 with Boost 1.48.  An implicit assignment operator overload does not compile with these
             // components, so an explicit overload is given here.
@@ -201,9 +190,6 @@ namespace ompl
                 InterfaceHashStruct& operator=(const InterfaceHashStruct &rhs) { interfaceHash = rhs.interfaceHash; return *this; }
                 InterfaceHash interfaceHash;
             };
-
-            ////////////////////////////////////////////////////////////////////////////////////////
-            // Vertex properties
 
             struct vertex_state_t {
                 typedef boost::vertex_property_tag kind;
@@ -217,83 +203,29 @@ namespace ompl
                 typedef boost::vertex_property_tag kind;
             };
 
-            ////////////////////////////////////////////////////////////////////////////////////////
-            // Edge properties
-
-            struct edge_collision_state_t {
-                typedef boost::edge_property_tag kind;
-            };
-
-            /** \brief Possible collision states of an edge */
-            enum EdgeCollisionState
-            {
-                NOT_CHECKED,
-                IN_COLLISION,
-                FREE
-            };
-
-            /** \brief Struct for passing around partially solved solutions */
-            struct CandidateSolution
-            {
-                bool isApproximate_;
-                base::PathPtr path_;
-                // Edge 0 is edge from vertex 0 to vertex 1. Thus, there is n-1 edges for n vertices
-                std::vector<EdgeCollisionState> edgeCollisionStatus_;
-                // TODO save the collision state of the vertexes also?
-
-                std::size_t getStateCount()
-                {
-                    return static_cast<ompl::geometric::PathGeometric&>(*path_).getStateCount();
-                }
-                
-                ompl::geometric::PathGeometric getGeometricPath()
-                {
-                    return static_cast<ompl::geometric::PathGeometric&>(*path_);
-                }
-            };
-
-            ////////////////////////////////////////////////////////////////////////////////////////
             /**
              @brief The underlying roadmap graph.
 
              @par Any BGL graph representation could be used here. Because we
              expect the roadmap to be sparse (m<n^2), an adjacency_list is more
-             appropriate than an adjacency_matrix. Edges are undirected.
+             appropriate than an adjacency_matrix.
 
-             *Properties of vertices*
-             - vertex_state_t: an ompl::base::State* is required for OMPL
-             - vertex_predecessor_t: The incremental connected components algorithm requires it
-             - vertex_rank_t: The incremental connected components algorithm requires it
-             - vertex_color_t - TODO
-             - vertex_interface_data_t - needed by SPARS2 for maintainings its sparse properties
-             
-             Note: If boost::vecS is not used for vertex storage, then there must also
+             @par Obviously, a ompl::base::State* vertex property is required.
+             The incremental connected components algorithm requires
+             vertex_predecessor_t and vertex_rank_t properties.
+             If boost::vecS is not used for vertex storage, then there must also
              be a boost:vertex_index_t property manually added.
 
-             *Properties of edges*
-             - edge_weight_t - cost/distance between two vertices
-             - edge_collision_state_t - used for lazy collision checking, determines if an edge has been checked
-                  already for collision. 0 = not checked/unknown, 1 = in collision, 2 = free
+             @par Edges should be undirected and have a weight property.
              */
-            
-            /** Wrapper for the vertex's multiple as its property. */
-            typedef boost::property < vertex_state_t, base::State*,
-                    boost::property < boost::vertex_predecessor_t, VertexIndexType,
-                    boost::property < boost::vertex_rank_t, VertexIndexType,
-                    boost::property < vertex_color_t, GuardType,
-                    boost::property < vertex_interface_data_t, InterfaceHashStruct > > > > > VertexProperties;
-
-            /** Wrapper for the double assigned to an edge as its weight property. */
-            typedef boost::property < boost::edge_weight_t, double,
-                    boost::property < edge_collision_state_t, int > > EdgeProperties;
-
-            /** The underlying boost graph type (undirected weighted-edge adjacency list with above properties). */
             typedef boost::adjacency_list <
-                boost::vecS, // store in std::vector
-                boost::vecS, // store in std::vector
-                boost::undirectedS,
-                VertexProperties,
-                EdgeProperties
+                boost::vecS, boost::vecS, boost::undirectedS,
+                boost::property < vertex_state_t, base::State*,
+                boost::property < boost::vertex_predecessor_t, VertexIndexType,
+                boost::property < boost::vertex_rank_t, VertexIndexType,
+                boost::property < vertex_color_t, GuardType,
+                boost::property < vertex_interface_data_t, InterfaceHashStruct > > > > >,
+                boost::property < boost::edge_weight_t, base::Cost >
             > Graph;
 
             /** \brief Vertex in Graph */
@@ -301,90 +233,6 @@ namespace ompl
 
             /** \brief Edge in Graph */
             typedef boost::graph_traits<Graph>::edge_descriptor   Edge;
-
-            ////////////////////////////////////////////////////////////////////////////////////////
-            // Typedefs for property maps
-
-            /** \brief Access map that stores the lazy collision checking status of each edge */
-            typedef boost::property_map<Graph, edge_collision_state_t>::type EdgeCollisionStateMap;
-
-            ////////////////////////////////////////////////////////////////////////////////////////
-            /**
-             * Used to artifically supress edges during A* search.
-             * @implements ReadablePropertyMapConcept
-             */
-            class edgeWeightMap
-            {
-            private:
-    
-                const Graph &g_;                         // Graph used
-                const EdgeCollisionStateMap &collisionStates_;
-    
-            public:
-    
-                /** Map key type. */
-                typedef Edge key_type;
-                /** Map value type. */
-                typedef double value_type;
-                /** Map auxiliary value type. */
-                typedef double &reference;
-                /** Map type. */
-                typedef boost::readable_property_map_tag category;
-    
-                /**
-                 * Construct map for certain constraints.
-                 * @param graph         Graph to use
-                 */
-                edgeWeightMap (const Graph &graph, const EdgeCollisionStateMap &collisionStates);
-    
-                /**
-                 * Get the weight of an edge.
-                 * @param e     the edge
-                 * @return infinity if \a e lies in a forbidden neighborhood; actual weight of \a e otherwise
-                 */
-                double get (Edge e) const;
-    
-            };
-
-            ////////////////////////////////////////////////////////////////////////////////////////
-            /**
-             * Thrown to stop the A* search when finished.
-             */
-            //class foundGoalException
-            //{
-            //};
-
-            ////////////////////////////////////////////////////////////////////////////////////////
-            /**
-             * Vertex visitor to check if A* search is finished.
-             * @implements AStarVisitorConcept
-             */            
-            class CustomVisitor : public boost::default_astar_visitor
-            {
-            private:
-    
-                Vertex goal;    // Goal Vertex of the search
-    
-            public:
-    
-                /**
-                 * Construct a visitor for a given search.
-                 * @param goal  goal vertex of the search
-                 */
-                CustomVisitor (Vertex goal);
-    
-                /**
-                 * Check if we have arrived at the goal.
-                 * @param u current vertex
-                 * @param g graph we are searching on
-                 * @throw foundGoalException if \a u is the goal
-                 */
-                void examine_vertex(Vertex u, const Graph &g) const;
-            };
-
-            ////////////////////////////////////////////////////////////////////////////////////////
-            // SPARS MEMBER FUNCTIONS
-            ////////////////////////////////////////////////////////////////////////////////////////
 
             /** \brief Constructor */
             SPARStwo(const base::SpaceInformationPtr &si);
@@ -446,9 +294,12 @@ namespace ompl
                 return stretchFactor_;
             }
 
-            void addPathToRoadmap(const base::PlannerTerminationCondition &ptc, ompl::geometric::PathGeometric& solutionPath);
+            /** \brief While the termination condition permits, construct the spanner graph */
+            void constructRoadmap(const base::PlannerTerminationCondition &ptc);
 
-            bool addStateToRoadmap(const base::PlannerTerminationCondition &ptc, base::State *newState);
+            /** \brief While the termination condition permits, construct the spanner graph. If \e stopOnMaxFail is true,
+                the function also terminates when the failure limit set by setMaxFailures() is reached. */
+            void constructRoadmap(const base::PlannerTerminationCondition &ptc, bool stopOnMaxFail);
 
             /** \brief Function that can solve the motion planning
                 problem. This function can be called multiple times on
@@ -481,18 +332,6 @@ namespace ompl
                     setup();
             }
 
-            /**
-             * \brief Search the roadmap for the best path close to the given start and goal states that is valid
-             * \param nearestK - unused
-             * \param start
-             * \param goal
-             * \param geometricSolution - the resulting path             
-             * \return 
-             */
-            bool getSimilarPaths(int nearestK, const base::State* start, const base::State* goal, 
-                                 CandidateSolution &candidateSolution,
-                                 const base::PlannerTerminationCondition &ptc);
-            
             virtual void setup();
 
             /** \brief Retrieve the computed roadmap. */
@@ -507,41 +346,21 @@ namespace ompl
                 return boost::num_vertices(g_);
             }
 
-            /** \brief Get the number of iterations the algorithm performed */
-            long unsigned int getIterations() const
-            {
-                return iterations_;
-            }
-
-            /**
-             * \brief Convert astar results to correctly ordered path
-             * \param vertexPath - in reverse
-             * \param start - actual start that is probably not included in new path
-             * \param goal - actual goal that is probably not included in new path
-             * \param path - returned solution
-             * \return true on success
-             */
-            bool convertVertexPathToStatePath(std::vector<Vertex> &vertexPath, 
-                                              const base::State* actualStart, 
-                                              const base::State* actualGoal, 
-                                              CandidateSolution &candidateSolution);
-
             virtual void getPlannerData(base::PlannerData &data) const;
-
-            /**
-             * \brief Set the sparse graph from file
-             * \param a pre-built graph
-             */
-            void setPlannerData(const base::PlannerData &data);
-
-            /** \brief Returns whether we have reached the iteration failures limit, maxFailures_ */
-            bool reachedFailureLimit () const;
 
             /** \brief Print debug information about planner */
             void printDebug(std::ostream &out = std::cout) const;
 
-            /** \brief Clear all past edge state information about in collision or not */
-            void clearEdgeCollisionStates();
+            ///////////////////////////////////////
+            // Planner progress property functions
+            std::string getIterationCount() const
+            {
+                return boost::lexical_cast<std::string>(iterations_);
+            }
+            std::string getBestCost() const
+            {
+                return boost::lexical_cast<std::string>(bestCost_);
+            }
 
         protected:
 
@@ -566,17 +385,8 @@ namespace ompl
             /** \brief A reset function for resetting the failures count */
             void resetFailures();
 
-            /** \brief Finds visible nodes in the graph near state */
-            void findGraphNeighbors(base::State *state, std::vector<Vertex> &graphNeighborhood, 
-                                    std::vector<Vertex> &visibleNeighborhood);
-
-            /**
-             * \brief Finds nodes in the graph near state NOTE: note tested for visibility
-             * \param state - vertex to find neighbors around
-             * \param result
-             * \return false is no neighbors found
-             */
-            bool findGraphNeighbors(const base::State *state, std::vector<Vertex> &graphNeighborhood);
+            /** \brief Finds visible nodes in the graph near st */
+            void findGraphNeighbors(base::State *st, std::vector<Vertex> &graphNeighborhood, std::vector<Vertex> &visibleNeighborhood);
 
             /** \brief Approaches the graph from a given vertex */
             void approachGraph( Vertex v );
@@ -616,27 +426,19 @@ namespace ompl
             void connectGuards( Vertex v, Vertex vp );
 
             /** \brief Check if there exists a solution, i.e., there exists a pair of milestones such that the first is in \e start and the second is in \e goal, and the two milestones are in the same connected component. If a solution is found, the path is saved. */
-            bool getPaths(const std::vector<Vertex> &candidateStarts, 
-                          const std::vector<Vertex> &candidateGoals, 
-                          const base::State* actualStart, 
-                          const base::State* actualGoal,
-                          CandidateSolution &candidateSolution,
-                          const base::PlannerTerminationCondition &ptc);
+            bool haveSolution(const std::vector<Vertex> &start, const std::vector<Vertex> &goal, base::PathPtr &solution);
 
-            /** \brief Check recalled path for collision and disable as needed */
-            bool lazyCollisionCheck(std::vector<Vertex> &vertexPath, const base::PlannerTerminationCondition &ptc);
-                                    
             /** Thread that checks for solution */
             void checkForSolution(const base::PlannerTerminationCondition &ptc, base::PathPtr &solution);
 
-            /** \brief Given two milestones from the same connected component, construct a path connecting them and set it as the solution 
-             *  \param start
-             *  \param goal
-             *  \param vertexPath
-             *  \return true if candidate solution found
-             */
-            bool constructSolution(const Vertex start, const Vertex goal,
-                                   std::vector<Vertex> &vertexPath) const;
+            /** \brief Returns true if we have reached the iteration failures limit, \e maxFailures_ or if a solution was added */
+            bool reachedTerminationCriterion() const;
+
+            /** \brief Returns whether we have reached the iteration failures limit, maxFailures_ */
+            bool reachedFailureLimit () const;
+
+            /** \brief Given two milestones from the same connected component, construct a path connecting them and set it as the solution */
+            base::PathPtr constructSolution(const Vertex start, const Vertex goal) const;
 
             /** \brief Check if two milestones (\e m1 and \e m2) are part of the same connected component. This is not a const function since we use incremental connected components from boost */
             bool sameComponent(Vertex m1, Vertex m2);
@@ -683,17 +485,14 @@ namespace ompl
             /** \brief Number of sample points to use when trying to detect interfaces. */
             unsigned int                                                        nearSamplePoints_;
 
+            /** \brief Access to the internal base::state at each Vertex */
+            boost::property_map<Graph, vertex_state_t>::type                    stateProperty_;
+
             /** \brief A path simplifier used to simplify dense paths added to the graph */
             PathSimplifierPtr                                                   psimp_;
 
             /** \brief Access to the weights of each Edge */
-            boost::property_map<Graph, boost::edge_weight_t>::type              edgeWeightProperty_; // TODO: this is not used
-
-            /** \brief Access to the collision checking state of each Edge */
-            EdgeCollisionStateMap                                               edgeCollisionStateProperty_;
-
-            /** \brief Access to the internal base::state at each Vertex */
-            boost::property_map<Graph, vertex_state_t>::type                    stateProperty_;
+            boost::property_map<Graph, boost::edge_weight_t>::type              weightProperty_;
 
             /** \brief Access to the colors for the vertices */
             boost::property_map<Graph, vertex_color_t>::type                    colorProperty_;
@@ -715,9 +514,6 @@ namespace ompl
             /** \brief A counter for the number of consecutive failed iterations of the algorithm */
             unsigned int                                                        consecutiveFailures_;
 
-            /** \brief A counter for the number of iterations of the algorithm */
-            long unsigned int                                                   iterations_;
-
             /** \brief Maximum visibility range for nodes in the graph */
             double                                                              sparseDelta_;
 
@@ -725,15 +521,23 @@ namespace ompl
             double                                                              denseDelta_;
 
             /** \brief Mutex to guard access to the Graph member (g_) */
-            mutable boost::mutex                                                graphMutex_; 
+            mutable boost::mutex                                                graphMutex_;
 
-            /** \brief Used by getSimilarPaths */
-            std::vector<Vertex>                                                 startVertexCandidateNeighbors_;
-            std::vector<Vertex>                                                 goalVertexCandidateNeighbors_;
-      };
+            /** \brief Objective cost function for PRM graph edges */
+            base::OptimizationObjectivePtr                                      opt_;
+
+            /** \brief Given two vertices, returns a heuristic on the cost of the path connecting them. This method wraps OptimizationObjective::motionCostHeuristic */
+            base::Cost costHeuristic(Vertex u, Vertex v) const;
+
+            //////////////////////////////
+            // Planner progress properties
+            /** \brief A counter for the number of iterations of the algorithm */
+            long unsigned int                                                   iterations_;
+            /** \brief Best cost found so far by algorithm */
+            base::Cost                                                          bestCost_;
+        };
 
     }
 }
 
 #endif
-
