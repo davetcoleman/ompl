@@ -283,6 +283,9 @@ namespace ompl
                 function automatically. */
             virtual void setup();
 
+            /** \brief Set the callback to visualize/publish a planner's progress */
+            virtual void setVisualizationStateCallback(ompl::base::VisualizationStateCallback visualizationStateCallback);
+
         protected:
 
             /// The created space information

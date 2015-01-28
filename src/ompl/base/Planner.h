@@ -446,7 +446,7 @@ namespace ompl
             /** \brief Optional callback to allow easy introspection of a planner's search progress */
             VisualizationCallback      visualizationCallback_;
             VisualizationStateCallback visualizationStateCallback_;
-            VisualizationEdgeCallback visualizationEdgeCallback_;
+            VisualizationEdgeCallback  visualizationEdgeCallback_;
         };
 
         /** \brief Definition of a function that can allocate a planner */
