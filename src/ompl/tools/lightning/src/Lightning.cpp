@@ -82,16 +82,16 @@ void ompl::tools::Lightning::setup(void)
 {
     if (!configured_ || !si_->isSetup() || !planner_->isSetup() || !rrPlanner_->isSetup() )
     {
-        OMPL_ERROR("Setting up Lightning Framework");
+        OMPL_ERROR("Setting up the Lightning Framework");
 
         if (!configured_)
-            OMPL_ERROR("  Because not configured_");
+            OMPL_ERROR("  Setting up because not configured");
         else if(!si_->isSetup())
-            OMPL_ERROR("  Because not si->isSetup");
+            OMPL_ERROR("  Setting up because not si->isSetup");
         else if(!planner_->isSetup())
-            OMPL_ERROR("  Because not planner->isSetup");
+            OMPL_ERROR("  Setting up because not planner->isSetup");
         else if(!rrPlanner_->isSetup())
-            OMPL_ERROR("  Because not rrPlanner->isSetup");
+            OMPL_ERROR("  Setting up because not rrPlanner->isSetup");
 
         // Setup Space Information if we haven't already done so
         if (!si_->isSetup())
@@ -119,14 +119,6 @@ void ompl::tools::Lightning::setup(void)
         if (!rrPlanner_->isSetup())
             rrPlanner_->setup();
 
-        // Setup parameters
-        /* TODO: what happened to this feature?
-        params_.clear();
-        params_.include(si_->params());
-        params_.include(planner_->params());
-        params_.include(rrPlanner_->params());
-        */
-
         // Create the parallel component for splitting into two threads
         pp_ = ot::ParallelPlanPtr(new ot::ParallelPlan(pdef_) );
         if (!scratchEnabled_ && !recallEnabled_)
@@ -142,11 +134,10 @@ void ompl::tools::Lightning::setup(void)
         // Check if experience database is already loaded
         if (experienceDB_->isEmpty())
         {
-            OMPL_ERROR("Loading database");
             experienceDB_->load(filePath_); // load from file
         }
         else
-            OMPL_ERROR("Attempting to load experience database when it is not empty");
+            OMPL_INFORM("Not loading database because already loaded");
 
         // Set the configured flag
         configured_ = true;
