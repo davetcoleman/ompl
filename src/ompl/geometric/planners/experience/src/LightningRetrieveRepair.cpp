@@ -410,7 +410,7 @@ bool ompl::geometric::LightningRetrieveRepair::repairPath(ompl::geometric::PathG
 
             if (!replan(fromState, toState, newPathSegment, ptc))
             {
-                OMPL_WARN("Unable to repair path between state %d and %d", fromID, toID);
+                OMPL_INFORM("Unable to repair path between state %d and %d", fromID, toID);
                 return false;
             }
 
@@ -480,7 +480,7 @@ bool ompl::geometric::LightningRetrieveRepair::replan(const ompl::base::State *s
     double planTime = time::seconds(time::now() - startTime);
     if (!lastStatus)
     {
-        OMPL_WARN("Replan Solve: No replan solution between disconnected states found after %f seconds", planTime);
+        OMPL_INFORM("Replan Solve: No replan solution between disconnected states found after %f seconds", planTime);
         return false;
     }
 
