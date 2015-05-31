@@ -42,13 +42,14 @@
 #include <ompl/geometric/PathGeometric.h>
 #include <ompl/base/SpaceInformation.h>
 
+#include <boost/numeric/ublas/matrix.hpp>
+
 namespace ompl
 {
 namespace tools
 {
 
 namespace og = ompl::geometric;
-namespace ob = ompl::base;
 
 /// @cond IGNORE
 OMPL_CLASS_FORWARD(DynamicTimeWarp);
@@ -68,7 +69,7 @@ public:
      * \param path2
      * \return score
      */
-    double calcDTWDistance(const og::PathGeometric &path1, const og::PathGeometric &path2 ) const;
+    double calcDTWDistance(const og::PathGeometric &path1, const og::PathGeometric &path2) const;
 
     /**
      * \brief Use dynamic time warping to compare the similarity of two paths
@@ -79,12 +80,15 @@ public:
      * \param path2
      * \return score
      */
-    double getPathsScore(const og::PathGeometric &path1, const og::PathGeometric &path2);
+    double getPathsScore(const og::PathGeometric &path1, const og::PathGeometric &path2) const;
 
 private:
 
     /** \brief The created space information */
     base::SpaceInformationPtr     si_;
+
+    /** \brief Distance matrix */
+    mutable boost::numeric::ublas::matrix<double> table_;
 
 }; // end of class
 
