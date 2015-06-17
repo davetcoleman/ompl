@@ -42,6 +42,7 @@
 #include "ompl/base/StateSampler.h"
 #include "ompl/base/ProjectionEvaluator.h"
 #include "ompl/base/GenericParam.h"
+#include "ompl/base/spaces/RealVectorBounds.h"
 #include "ompl/util/Console.h"
 #include "ompl/util/ClassForward.h"
 #include <boost/concept_check.hpp>
@@ -276,6 +277,32 @@ namespace ompl
             /** \brief Get the dimension of the space (not the dimension of the surrounding ambient space) */
             virtual unsigned int getDimension() const = 0;
 
+            /** \brief Check if this state space has bounds */
+            virtual bool hasBounds() const
+            {
+                return bounds_.low.size();
+            }
+
+            /** \brief Get the bounds for this state space */
+            virtual const RealVectorBounds& getBounds() const
+            {
+                // Default implementation returns no bounds
+                return bounds_;
+            }
+
+            /** \brief Get the mode (for hybrid task planning) of this state */
+            virtual int getLevel(const State *state) const
+            {
+                OMPL_ERROR("No level function implemented, unable to get level");
+                return 0;
+            }
+
+            /** \brief Set the mode (for hybrid task planning) of this state */
+            virtual void setLevel(State *state, int level)
+            {
+                OMPL_ERROR("No level function implemented, unable to set level");
+            }
+
             /** \brief Get the maximum value a call to distance() can return (or an upper bound).
                 For unbounded state spaces, this function can return infinity.
 
@@ -305,6 +332,13 @@ namespace ompl
             /** \brief Computes distance between two states. This function satisfies the properties of a
                 metric if isMetricSpace() is true, and its return value will always be between 0 and getMaximumExtent() */
             virtual double distance(const State *state1, const State *state2) const = 0;
+
+            /** \brief Computes distance between two states. This function satisfies the properties of a
+                metric if isMetricSpace() is true, and its return value will always be between 0 and getMaximumExtent() */
+            virtual double distance2(const State *state1, const State *state2) const
+            {
+                return 0; // default implementation
+            }
 
             /** \brief Get the number of chars in the serialization of a state in this space */
             virtual unsigned int getSerializationLength() const;
@@ -342,6 +376,13 @@ namespace ompl
 
             /** \brief Free the memory of the allocated state */
             virtual void freeState(State *state) const = 0;
+
+            /** \brief Populate a state with values in vector */
+            virtual bool populateState(State *state, const std::vector<double> &values)
+            {
+                OMPL_ERROR("populateState() in StateSpace.h not implemented ");
+                return true; // Not implemented
+            }
 
             /** @} */
 
@@ -539,6 +580,9 @@ namespace ompl
             /** \brief All the known substat locations, by name. */
             std::map<std::string, SubstateLocation>       substateLocationsByName_;
 
+            /** \brief By default an empty set of bounds */
+            RealVectorBounds                              bounds_;
+
         private:
 
             /** \brief State space name */
@@ -720,7 +764,6 @@ namespace ompl
 
             /** \brief Flag indicating whether adding further components is allowed or not */
             bool                          locked_;
-
         };
 
         /** \addtogroup stateAndSpaceOperators

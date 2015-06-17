@@ -42,6 +42,7 @@
 #include "ompl/geometric/PathSimplifier.h"
 #include "ompl/util/Time.h"
 #include "ompl/util/Hash.h"
+#include <ompl/tools/debug/Visualizer.h>
 
 #include <boost/range/adaptor/map.hpp>
 #include <unordered_map>
@@ -390,7 +391,7 @@ namespace ompl
             ////////////////////////////////////////////////////////////////////////////////////////
 
             /** \brief Constructor */
-            SPARSdb(const base::SpaceInformationPtr &si);
+            SPARSdb(const base::SpaceInformationPtr &si, tools::VisualizerPtr visual);
 
             /** \brief Destructor */
             ~SPARSdb() override;
@@ -602,13 +603,13 @@ namespace ompl
             void checkQueryStateInitialization();
 
             /** \brief Checks to see if the sample needs to be added to ensure coverage of the space */
-            bool checkAddCoverage(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood);
+            bool checkAddCoverage(const base::State *candidateState, std::vector<Vertex> &visibleNeighborhood);
 
             /** \brief Checks to see if the sample needs to be added to ensure connectivity */
-            bool checkAddConnectivity(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood);
+            bool checkAddConnectivity(const base::State *candidateState, std::vector<Vertex> &visibleNeighborhood);
 
             /** \brief Checks to see if the current sample reveals the existence of an interface, and if so, tries to bridge it. */
-            bool checkAddInterface(const base::State *qNew, std::vector<Vertex> &graphNeighborhood,
+            bool checkAddInterface(const base::State *candidateState, std::vector<Vertex> &graphNeighborhood,
                                    std::vector<Vertex> &visibleNeighborhood);
 
             /** \brief Checks vertex v for short paths through its region and adds when appropriate. */
@@ -635,8 +636,8 @@ namespace ompl
             /** \brief Finds the representative of the input state, st  */
             Vertex findGraphRepresentative(base::State *st);
 
-            /** \brief Finds representatives of samples near qNew_ which are not his representative */
-            void findCloseRepresentatives(base::State *workState, const base::State *qNew, Vertex qRep,
+            /** \brief Finds representatives of samples near candidateState_ which are not his representative */
+            void findCloseRepresentatives(base::State *workState, const base::State *candidateState, Vertex candidateRep,
                                           std::map<Vertex, base::State*> &closeRepresentatives,
                                           const base::PlannerTerminationCondition &ptc);
 
@@ -665,7 +666,7 @@ namespace ompl
             Vertex addGuard(base::State *state, GuardType type);
 
             /** \brief Connect two guards in the roadmap */
-            void connectGuards( Vertex v, Vertex vp );
+            void connectGuards( Vertex v1, Vertex v2 );
 
             /** \brief Check if there exists a solution, i.e., there exists a pair of milestones such that the first is in \e start and the second is in \e goal, and the two milestones are in the same connected component. If a solution is found, the path is saved. */
             bool getPaths(const std::vector<Vertex> &candidateStarts,
@@ -705,10 +706,10 @@ namespace ompl
             bool sameComponent(Vertex m1, Vertex m2);
 
             /** \brief Compute distance between two milestones (this is simply distance between the states of the milestones) */
-            double distanceFunction(const Vertex a, const Vertex b) const
-            {
-                return si_->distance(stateProperty_[a], stateProperty_[b]);
-            }
+            double distanceFunction(const Vertex a, const Vertex b) const;
+
+            /** \brief Class for managing various visualization features */
+            tools::VisualizerPtr visual_;
 
             /** \brief Sampler user for generating valid samples in the state space */
             base::ValidStateSamplerPtr                                          sampler_;
@@ -750,7 +751,7 @@ namespace ompl
             PathSimplifierPtr                                                   psimp_;
 
             /** \brief Access to the weights of each Edge */
-            boost::property_map<Graph, boost::edge_weight_t>::type              edgeWeightProperty_; // TODO: this is not used
+            boost::property_map<Graph, boost::edge_weight_t>::type              edgeWeightProperty_; // TODO: this is not used?
 
             /** \brief Access to the collision checking state of each Edge */
             EdgeCollisionStateMap                                               edgeCollisionStateProperty_;
@@ -799,4 +800,3 @@ namespace ompl
 }
 
 #endif
-

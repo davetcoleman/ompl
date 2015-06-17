@@ -83,7 +83,9 @@ namespace ompl
 /// @endcond
 
 ompl::base::StateSpace::StateSpace()
+    : bounds_(0)
 {
+
     AllocatedSpaces &as = getAllocatedSpaces();
     std::lock_guard<std::mutex> smLock(as.lock_);
 

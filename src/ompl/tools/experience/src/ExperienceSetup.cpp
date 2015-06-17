@@ -58,37 +58,37 @@ void ompl::tools::ExperienceSetup::logInitialize()
   // Header of CSV file
   csvDataLogStream_
     // Times
-    << "planning_time,insertion_time,"
+    << "planningTime,insertion_time,"
     // Solution properties
     << "planner,result,is_saved,"
     // Failure booleans
-    << "approximate,too_short,insertion_failed,"
+    << "approximate,too_short,insertionFailed,"
     // Lightning properties
     << "score,"
     // Thunder (SPARS) properties
-    << "num_vertices,num_edges,num_connected_components,"
+    << "numVertices,numEdges,numConnectedComponents,"
     // Hack for using python cause im lazy right now
     << "total_experiences,total_scratch,total_recall,total_failed,total_approximate,"
-    << "total_too_short,total_insertion_failed,"
-    << "avg_planning_time,avg_insertion_time"
+    << "total_too_short,total_insertionFailed,"
+    << "avg_planningTime,avg_insertion_time"
     << std::endl;
 }
 
 void ompl::tools::ExperienceSetup::convertLogToString(const ExperienceLog &log)
 {
   csvDataLogStream_
-    << log.planning_time << ","
-    << log.insertion_time << ","
+    << log.planningTime << ","
+    << log.insertionTime << ","
     << log.planner << ","
     << log.result << ","
-    << log.is_saved << ","
+    << log.isSaved << ","
     << log.approximate << ","
-    << log.too_short << ","
-    << log.insertion_failed << ","
+    << log.tooShort << ","
+    << log.insertionFailed << ","
     << log.score << ","
-    << log.num_vertices << ","
-    << log.num_edges << ","
-    << log.num_connected_components
+    << log.numVertices << ","
+    << log.numEdges << ","
+    << log.numConnectedComponents
     << std::endl;
 }
 
@@ -127,4 +127,3 @@ void ompl::tools::ExperienceSetup::enablePlanningFromScratch(bool enable)
     // Flag the planners as possibly misconfigured
     configured_ = false;
 }
-

@@ -80,7 +80,7 @@ namespace ompl
             class StateType : public State
             {
             public:
-                StateType() : State()
+                StateType() : State(), level_(0)
                 {
                 }
 
@@ -100,6 +100,9 @@ namespace ompl
 
                 /** \brief The value of the actual vector in R<sup>n</sup> */
                 double *values;
+
+                /** \brief The discrete mode/level of the state */
+                int level_;
             };
 
             /** \brief Constructor. The dimension of of the space needs to be specified. A space representing
@@ -173,6 +176,9 @@ namespace ompl
 
             void freeState(State *state) const override;
 
+            /** \brief Populate a state with values in vector */
+            virtual bool populateState(ompl::base::State *state, const std::vector<double> &values);
+
             double* getValueAddressAtIndex(State *state, const unsigned int index) const override;
 
             void printState(const State *state, std::ostream &out) const override;
@@ -182,6 +188,12 @@ namespace ompl
             void registerProjections() override;
 
             void setup() override;
+
+            /** \brief Get the mode (for hybrid task planning) of this state */
+            virtual int getLevel(const ompl::base::State *state) const;
+
+            /** \brief Set the mode (for hybrid task planning) of this state */
+            virtual void setLevel(ompl::base::State *state, int level);
 
         protected:
 
@@ -201,7 +213,6 @@ namespace ompl
 
             /** \brief The size of a state, in bytes */
             std::size_t                         stateBytes_;
-
         };
     }
 }
