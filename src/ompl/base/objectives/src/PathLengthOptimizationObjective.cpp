@@ -32,9 +32,13 @@
 *  POSSIBILITY OF SUCH DAMAGE.
 *********************************************************************/
 
-/* Author: Luis G. Torres */
+/* Author: Luis G. Torres, Jonathan Gammell */
 
 #include "ompl/base/objectives/PathLengthOptimizationObjective.h"
+#if OMPL_HAVE_EIGEN3
+#include "ompl/base/samplers/informed/PathLengthDirectInfSampler.h"
+#endif
+#include <boost/make_shared.hpp>
 
 ompl::base::PathLengthOptimizationObjective::
 PathLengthOptimizationObjective(const SpaceInformationPtr &si) :
@@ -57,3 +61,11 @@ ompl::base::Cost ompl::base::PathLengthOptimizationObjective::motionCostHeuristi
 {
     return motionCost(s1, s2);
 }
+
+#if OMPL_HAVE_EIGEN3
+ompl::base::InformedSamplerPtr ompl::base::PathLengthOptimizationObjective::allocInformedStateSampler(const ProblemDefinitionPtr probDefn, unsigned int maxNumberCalls) const
+{
+    // Make the direct path-length informed sampler and return
+    return boost::make_shared<PathLengthDirectInfSampler>(probDefn, maxNumberCalls);
+}
+#endif
