@@ -14,6 +14,9 @@ notReadyText <- "The benchmarking results are not available yet, check back late
 
 sessionsFolder = "/tmp/omplweb_sessions"
 
+problemParamsAggregateText <- "all (aggregate)"
+problemParamsSeparateText <- "all (separate)"
+
 disable <- function(x) {
   if (inherits(x, 'shiny.tag')) {
     if (x$name %in% c('input', 'select', 'label'))
@@ -33,8 +36,23 @@ conditionalDisable <- function(widget, condition) {
         widget
 }
 
+sqlProblemParamSelect <- function(param, val) {
+    if (val == problemParamsAggregateText || val == problemParamsSeparateText)
+        # select all
+        "1"
+    else
+        # select specific parameter value.
+        # Use fuzzy matching when comparing numbers because precision is lost
+        # when real-valued parameter values are converted to strings for
+        # parameter selection widget.
+        if (regexpr('[-+]?\\d*\\.\\d+|\\d+', val)[1] == -1)
+            sprintf('experiments.%s = "%s"', param, val)
+        else
+            sprintf('ABS(experiments.%s - %s) < 1e-10', param, val)
+}
 sqlPlannerSelect <- function(name) sprintf('plannerConfigs.name = "%s"', name)
 sqlVersionSelect <- function(version) sprintf('experiments.version = "%s"', version)
+
 problemSelectWidget <- function(con, name) {
     problems <- dbGetQuery(con, "SELECT DISTINCT name FROM experiments")
     problems <- problems$name
@@ -42,6 +60,60 @@ problemSelectWidget <- function(con, name) {
         label = h4("Motion planning problem"),
         choices = problems)
     conditionalDisable(widget, length(problems) < 2)
+}
+problemParams <- function(con) {
+    params <- dbGetQuery(con, "PRAGMA table_info(experiments)")
+    numParams <- length(params$name)
+    if (numParams > 12)
+        paramNames <- params[13:numParams,]
+    else
+        paramNames <- NULL
+}
+problemParamValue <- function(prefix, param, input) {
+     eval(parse(text=sprintf("input$%s", paste0(prefix, "problemParam", param))))
+}
+problemParamValues <- function(con, prefix, input) {
+    params <- problemParams(con)
+    values <- lapply(params$name, problemParamValue, prefix=prefix, input=input)
+    names(values) <- params$name
+    return(values)
+}
+problemParamGroupBy <- function(values) {
+    grouping <- match(problemParamsSeparateText, values)
+    if (is.na(grouping))
+        NULL
+    else
+        names(values)[grouping]
+}
+problemParamSelectWidget <- function(name, con, prefix, problem, version) {
+    query <- sprintf("SELECT DISTINCT %s AS \"values\" FROM experiments WHERE name=\"%s\" AND version=\"%s\";", name, problem, version)
+    values <- dbGetQuery(con, query)
+    values <- values$values
+    dispName <- gsub("_", " ", name)
+    internalName <- paste0(prefix, "problemParam", name)
+    if (length(values)==1)
+    {
+        # don't show any widget for parameter if the only value is NA
+        if (!is.na(values[1]))
+            # disable selection if there is only value for parameter
+            disable(selectInput(internalName, label = h6(dispName), choices = values))
+    }
+    else
+        selectInput(internalName, label = h6(dispName), choices = append(values,
+            c(problemParamsAggregateText, problemParamsSeparateText), 0))
+}
+
+problemParamSelectWidgets <- function(con, prefix, problem, version) {
+    params <- problemParams(con)
+    if (!is.null(params))
+    {
+        paramWidgets <- lapply(params$name, problemParamSelectWidget,
+            con = con, prefix = prefix, problem = problem, version = version)
+        div(class="well well-light",
+            h5("Problem parameters"),
+            paramWidgets
+        )
+    }
 }
 
 numVersions <- function(con) {
@@ -119,8 +191,6 @@ server <- function(input, output, session) {
             database <- paste(sessionsFolder, query$user, query$job, sep="/")
         }
 
-        #return(normalizePath(database))
-
         if (file.exists(database)) {
             dbConnection <- dbConnect(dbDriver("SQLite"), database)
             ready <- dbExistsTable(dbConnection, "experiments")
@@ -148,6 +218,28 @@ server <- function(input, output, session) {
     output$progProblemSelect <- renderUI({ problemSelectWidget(con(), "progProblem") })
     output$regrProblemSelect <- renderUI({ problemSelectWidget(con(), "regrProblem") })
 
+    output$perfProblemParamSelect <- renderUI({
+        validate(
+            need(input$perfProblem, 'Select a problem'),
+            need(input$perfVersion, 'Select a version')
+        )
+        problemParamSelectWidgets(con(), "perf", input$perfProblem, input$perfVersion)
+    })
+    output$progProblemParamSelect <- renderUI({
+        validate(
+            need(input$progProblem, 'Select a problem'),
+            need(input$progVersion, 'Select a version')
+        )
+        problemParamSelectWidgets(con(), "prog", input$progProblem, input$progVersion)
+    })
+    output$regrProblemParamSelect <- renderUI({
+        validate(
+            need(input$regrProblem, 'Select a problem'),
+            need(input$regrVersions, 'Select a version')
+        )
+        problemParamSelectWidgets(con(), "regr", input$regrProblem, tail(input$regrVersions, n=1))
+    })
+
     output$perfAttrSelect <- renderUI({
         list(
             perfAttrSelectWidget(con(), "perfAttr"),
@@ -155,12 +247,19 @@ server <- function(input, output, session) {
             conditionalPanel(condition = 'input.perfShowAdvOptions',
                 div(class="well well-light",
                     checkboxInput("perfShowAsCDF", label = "Show as cumulative distribution function"),
-                    checkboxInput("perfShowSimplified", label = "Include results after simplification")
+                    checkboxInput("perfShowSimplified", label = "Include results after simplification"),
+                    checkboxInput("perfShowParameterizedBoxPlots", label = "Show box plots for parametrized benchmarks"),
+                    checkboxInput("perfShowSQLquery", label = "Show SQL query")
                 )
             )
         )
     })
-    output$regrAttrSelect <- renderUI({ perfAttrSelectWidget(con(), "regrAttr") })
+    output$regrAttrSelect <- renderUI({
+        list(
+            perfAttrSelectWidget(con(), "regrAttr"),
+            checkboxInput("regrShowSQLquery", label = "Show SQL query")
+        )
+    })
     output$progAttrSelect <- renderUI({
         progressAttrs <- dbGetQuery(con(), "PRAGMA table_info(progress)")
         # strip off first 2 names, which correspond to an internal id and time
@@ -169,9 +268,13 @@ server <- function(input, output, session) {
             conditionalDisable(selectInput("progress", label = h4("Progress attribute"),
                 choices = attrs
             ), length(attrs) < 2),
-            div(class="well well-light",
-                checkboxInput("progressShowMeasurements", label = "Show individual measurements"),
-                sliderInput("progressOpacity", label = "Measurement opacity", 0, 100, 50)
+            checkboxInput('progShowAdvOptions', 'Show advanced options', FALSE),
+            conditionalPanel(condition = 'input.progShowAdvOptions',
+                div(class="well well-light",
+                    checkboxInput("progressShowMeasurements", label = "Show individual measurements"),
+                    sliderInput("progressOpacity", label = "Measurement opacity", 0, 100, 50),
+                    checkboxInput("progShowSQLquery", label = "Show SQL query")
+                )
             )
         )
     })
@@ -224,42 +327,52 @@ server <- function(input, output, session) {
 
     # plot of overall performance
     perfPlot <- reactive({
+        paramValues <- problemParamValues(con(), "perf", input)
+        grouping <- problemParamGroupBy(paramValues)
+
         attribs <- perfAttrs(con())
         attr <- gsub(" ", "_", input$perfAttr)
         simplifiedAttr <- paste("simplified", attr, sep="_")
         includeSimplifiedAttr <- input$perfShowSimplified && simplifiedAttr %in% attribs$name
+        # build up query
+        query <- sprintf("SELECT plannerConfigs.name AS planner, runs.%s AS attr", attr)
         if (includeSimplifiedAttr)
-            query <- sprintf("SELECT plannerConfigs.name AS planner, runs.%s, runs.%s FROM plannerConfigs INNER JOIN runs ON plannerConfigs.id = runs.plannerid INNER JOIN experiments ON experiments.id = runs.experimentid WHERE experiments.name=\"%s\" AND experiments.version=\"%s\" AND (%s);",
-                attr,
-                simplifiedAttr,
+            query <- sprintf("%s, runs.%s AS simplifiedAttr", query, simplifiedAttr)
+        if (!is.null(grouping))
+            query <- sprintf("%s, experiments.%s as \"grouping\"", query, grouping)
+        query <- sprintf("%s FROM plannerConfigs INNER JOIN runs ON plannerConfigs.id = runs.plannerid INNER JOIN experiments ON experiments.id = runs.experimentid WHERE experiments.name=\"%s\" AND experiments.version=\"%s\" AND (%s)",
+                query,
                 input$perfProblem,
                 input$perfVersion,
                 paste(sapply(input$perfPlanners, sqlPlannerSelect), collapse=" OR "))
-        else
-            query <- sprintf("SELECT plannerConfigs.name AS planner, runs.%s FROM plannerConfigs INNER JOIN runs ON plannerConfigs.id = runs.plannerid INNER JOIN experiments ON experiments.id = runs.experimentid WHERE experiments.name=\"%s\" AND experiments.version=\"%s\" AND (%s);",
-                attr,
-                input$perfProblem,
-                input$perfVersion,
-                paste(sapply(input$perfPlanners, sqlPlannerSelect), collapse=" OR "))
+        if (length(paramValues) > 0)
+            query <- sprintf("%s AND %s", query,
+                paste(mapply(sqlProblemParamSelect, names(paramValues), paramValues), collapse=" AND "))
         data <- dbGetQuery(con(), query)
         data$planner <- factor(data$planner, unique(data$planner), labels = sapply(unique(data$planner), plannerNameMapping))
+        if (!is.null(grouping))
+            data$grouping <- factor(data$grouping)
         if (attribs$type[match(attr, attribs$name)] == "ENUM")
         {
             query <- sprintf("SELECT * FROM enums WHERE name=\"%s\";", attr)
             enum <- dbGetQuery(con(), query)
             val <- enum$value
             names(val) <- enum$description
-            attrAsFactor <- factor(data[,match(attr, colnames(data))],
-                levels=enum$value, labels=enum$description)
+            attrAsFactor <- factor(data[,match("attr", colnames(data))],
+                levels=enum$value)
+            levels(attrAsFactor) <- enum$description
             p <- qplot(planner, data=data, geom="histogram", fill=attrAsFactor) +
                 # labels
                 theme(legend.title = element_blank(), text = fontSelection())
+            if (!is.null(grouping))
+                p <- p + facet_grid(. ~ grouping)
         }
         else
         {
             if (includeSimplifiedAttr)
             {
-                data <- melt(data, id.vars='planner', measure.vars=c(attr, simplifiedAttr))
+                # the "all (separate)" case is not handled here
+                data <- melt(data, id.vars='planner', measure.vars=c("attr", "simplifiedAttr"))
                 if (input$perfShowAsCDF)
                     p <- ggplot(data, aes(x = value, color = planner,
                         group = interaction(planner, variable), linetype=variable)) +
@@ -284,23 +397,42 @@ server <- function(input, output, session) {
             else
             {
                 if (input$perfShowAsCDF)
-                    p <- ggplot(data, aes_string(x = attr, group = "planner", color = "planner")) +
+                {
+                    if (is.null(grouping))
+                        p <- ggplot(data, aes(x = attr, color = planner))
+                    else
+                        p <- ggplot(data, aes(x = attr, color = planner, linetype = grouping)) +
+                            scale_linetype(name = gsub(" ", "_", grouping))
+                    p <- p +
                         # labels
                         xlab(input$perfAttr) +
                         ylab('cumulative probability') +
                         theme(text = fontSelection()) +
                         # empirical cumulative distribution function
                         stat_ecdf(size = 1)
-                else
-                    p <- ggplot(data, aes_string(x = "planner", y = attr, group = "planner")) +
-                        # labels
-                        ylab(input$perfAttr) +
-                        theme(legend.position = "none", text = fontSelection()) +
-                        # box plots for boolean, integer, and real-valued attributes
-                        geom_boxplot(color = I("#3073ba"), fill = I("#99c9eb"))
+                } else {
+                    if (input$perfShowParameterizedBoxPlots || is.null(grouping)) {
+                        p <- ggplot(data, aes(x = planner, y = attr, group = planner)) +
+                            # labels
+                            ylab(input$perfAttr) +
+                            theme(legend.position = "none", text = fontSelection()) +
+                            # box plots for boolean, integer, and real-valued attributes
+                            geom_boxplot(color = I("#3073ba"), fill = I("#99c9eb"))
+                        if (!is.null(grouping))
+                            p <- p + facet_grid(. ~ grouping)
+                    } else {
+                        p <- ggplot(data, aes(x = grouping, y = attr, group = planner, color = planner, fill = planner)) +
+                            # labels
+                            xlab(gsub('_', ' ', grouping)) +
+                            ylab(input$perfAttr) +
+                            theme(legend.title = element_blank(), text = fontSelection()) +
+                            geom_smooth(method = "loess") +
+                            scale_x_discrete(expand=c(0.05,0))
+                    }
+                }
             }
         }
-        p
+        list(plot=p, query=query)
     })
     output$perfPlot <- renderPlot({
         validate(
@@ -309,21 +441,30 @@ server <- function(input, output, session) {
             need(input$perfAttr, 'Select a benchmark attribute'),
             need(input$perfPlanners, 'Select some planners')
         )
-        print(perfPlot())
+        print(perfPlot()$plot)
     })
     output$perfDownloadPlot <- downloadHandler(filename = 'perfplot.pdf',
         content = function(file) {
             pdf(file=file, width=input$paperWidth, height=input$paperHeight)
-            print(perfPlot())
+            print(perfPlot()$plot)
             dev.off()
         }
     )
     output$perfDownloadRdata <- downloadHandler(filename = 'perfplot.RData',
         content = function(file) {
-            perfplot <- perfPlot()
+            perfplot <- perfPlot()$plot
             save(perfplot, file = file)
         }
     )
+    output$perfSQLquery <- renderText({
+        validate(
+            need(input$perfVersion, 'Select a version'),
+            need(input$perfProblem, 'Select a problem'),
+            need(input$perfAttr, 'Select a benchmark attribute'),
+            need(input$perfPlanners, 'Select some planners')
+        )
+        perfPlot()$query
+    })
     output$perfMissingDataTable <- renderTable({
         validate(
             need(input$perfVersion, 'Select a version'),
@@ -332,11 +473,24 @@ server <- function(input, output, session) {
             need(input$perfPlanners, 'Select some planners')
         )
         attr <- gsub(" ", "_", input$perfAttr)
-        query <- sprintf("SELECT plannerConfigs.name AS planner, SUM(runs.%s IS NULL) AS missing, COUNT(*) AS total FROM plannerConfigs INNER JOIN runs ON plannerConfigs.id = runs.plannerid INNER JOIN experiments ON experiments.id = runs.experimentid WHERE experiments.name=\"%s\" AND experiments.version=\"%s\" AND (%s) GROUP BY plannerConfigs.name;",
+        paramValues <- problemParamValues(con(), "perf", input)
+        grouping <- problemParamGroupBy(paramValues)
+        query <- sprintf("SELECT plannerConfigs.name AS planner")
+        if (!is.null(grouping))
+            query <- sprintf("%s, experiments.%s as \"%s\"", query, grouping, grouping)
+        query <- sprintf("%s, SUM(runs.%s IS NULL) AS missing, COUNT(*) AS total FROM plannerConfigs INNER JOIN runs ON plannerConfigs.id = runs.plannerid INNER JOIN experiments ON experiments.id = runs.experimentid WHERE experiments.name=\"%s\" AND experiments.version=\"%s\" AND (%s)",
+            query,
             attr,
             input$perfProblem,
             input$perfVersion,
             paste(sapply(input$perfPlanners, sqlPlannerSelect), collapse=" OR "))
+        if (length(paramValues) > 0)
+            query <- sprintf("%s AND %s", query,
+                paste(mapply(sqlProblemParamSelect, names(paramValues), paramValues), collapse=" AND "))
+        if (is.null(grouping))
+            query <- sprintf("%s GROUP BY plannerConfigs.name;", query)
+        else
+            query <- sprintf("%s GROUP BY plannerConfigs.name, experiments.%s;", query, grouping)
         data <- dbGetQuery(con(), query)
         data$planner <- factor(data$planner, unique(data$planner), labels = sapply(unique(data$planner), plannerNameMapping))
         data
@@ -350,22 +504,35 @@ server <- function(input, output, session) {
             need(input$progress, 'Select a benchmark attribute'),
             need(input$progPlanners, 'Select some planners')
         )
+        paramValues <- problemParamValues(con(), "prog", input)
+        grouping <- problemParamGroupBy(paramValues)
         attr <- gsub(" ", "_", input$progress)
-        query <- sprintf("SELECT plannerConfigs.name AS planner, progress.time, progress.%s FROM plannerConfigs INNER JOIN runs ON plannerConfigs.id = runs.plannerid INNER JOIN experiments ON experiments.id = runs.experimentid INNER JOIN progress ON progress.runid = runs.id WHERE experiments.name=\"%s\" AND experiments.version=\"%s\" AND progress.%s IS NOT NULL AND (%s);",
-            attr,
+        # build up query
+        query <- sprintf("SELECT plannerConfigs.name AS planner, progress.time, progress.%s AS attr", attr)
+        if (!is.null(grouping))
+            query <- sprintf("%s, experiments.%s as \"grouping\"", query, grouping)
+        query <- sprintf("%s FROM plannerConfigs INNER JOIN runs ON plannerConfigs.id = runs.plannerid INNER JOIN experiments ON experiments.id = runs.experimentid INNER JOIN progress ON progress.runid = runs.id WHERE experiments.name=\"%s\" AND experiments.version=\"%s\" AND progress.%s IS NOT NULL AND (%s)",
+            query,
             input$progProblem,
             input$progVersion,
             attr,
             paste(sapply(input$progPlanners, sqlPlannerSelect), collapse=" OR "))
+        if (length(paramValues) > 0)
+            query <- sprintf("%s AND %s", query,
+                paste(mapply(sqlProblemParamSelect, names(paramValues), paramValues), collapse=" AND "))
         data <- dbGetQuery(con(), query)
         data$planner <- factor(data$planner, unique(data$planner), labels = sapply(unique(data$planner), plannerNameMapping))
-        data
+        if (!is.null(grouping))
+            data$grouping <- factor(data$grouping)
+        list(data = data, grouping = grouping, query = query)
     })
     progPlot <- reactive({
         attr <- gsub(" ", "_", input$progress)
-        data <- progPlotData()
+        progdata <- progPlotData()
+        data <- progdata$data
+        grouping <- progdata$grouping
         validate(need(nrow(data) > 0, 'No progress data available; select a different benchmark, progress attribute, or planners.'))
-        p <- ggplot(data, aes_string(x = "time", y = attr, group = "planner", color = "planner", fill = "planner")) +
+        p <- ggplot(data, aes(x = time, y = attr, group = planner, color = planner, fill = planner)) +
             # labels
             xlab('time (s)') +
             ylab(input$progress) +
@@ -376,11 +543,15 @@ server <- function(input, output, session) {
         # optionally, add individual measurements as semi-transparent points
         if (input$progressShowMeasurements)
             p <- p + geom_point(alpha=I(input$progressOpacity / 100))
+        if (!is.null(grouping))
+            p <- p + facet_grid(grouping ~ .)
         p
     })
     output$progPlot <- renderPlot({ progPlot() })
     progNumMeasurementsPlot <- reactive({
-        data <- progPlotData()
+        progdata <- progPlotData()
+        data <- progdata$data
+        grouping <- progdata$grouping
         if (nrow(data) > 0)
         {
             p <- ggplot(data, aes(x = time, group = planner, color = planner)) +
@@ -390,6 +561,8 @@ server <- function(input, output, session) {
                 theme(text = fontSelection()) +
                 geom_freqpoly(binwidth=1) +
                 coord_cartesian(xlim = c(0, trunc(max(data$time))))
+            if (!is.null(grouping))
+                p <- p + facet_grid(grouping ~ .)
             p
         }
     })
@@ -409,28 +582,43 @@ server <- function(input, output, session) {
             save(progplot, prognummeasurementsplot, file = file)
         }
     )
+    output$progSQLquery <- renderText({
+        progPlotData()$query
+    })
 
     # regression plot
     regrPlot <- reactive({
+        regrParamValues <- problemParamValues(con(), "regr", input)
+        grouping <- problemParamGroupBy(regrParamValues)
         attr <- gsub(" ", "_", input$regrAttr)
-        query <- sprintf("SELECT plannerConfigs.name AS name, runs.%s, experiments.version FROM plannerConfigs INNER JOIN runs ON plannerConfigs.id = runs.plannerid INNER JOIN experiments ON experiments.id = runs.experimentid WHERE experiments.name=\"%s\" AND (%s) AND (%s);",
-            attr,
+        # build up query
+        query <- sprintf("SELECT plannerConfigs.name AS name, runs.%s AS attr, experiments.version", attr)
+        if (!is.null(grouping))
+            query <- sprintf("%s, experiments.%s as \"grouping\"", query, grouping)
+        query <- sprintf("%s FROM plannerConfigs INNER JOIN runs ON plannerConfigs.id = runs.plannerid INNER JOIN experiments ON experiments.id = runs.experimentid WHERE experiments.name=\"%s\" AND (%s) AND (%s)",
+            query,
             input$regrProblem,
             paste(sapply(input$regrPlanners, sqlPlannerSelect), collapse=" OR "),
             paste(sapply(input$regrVersions, sqlVersionSelect), collapse=" OR "))
+        if (length(paramValues) > 0)
+            query <- sprintf("%s AND %s", query,
+                paste(mapply(sqlProblemParamSelect, names(paramValues), paramValues), collapse=" AND "))
         data <- dbGetQuery(con(), query)
         # strip "OMPL " prefix, so we can fit more labels on the X-axis
         data$version <- sapply(data$version, stripLibnamePrefix)
         # order by order listed in data frame (i.e., "0.9.*" before "0.10.*")
         data$version <- factor(data$version, unique(data$version))
         data$name <- factor(data$name, unique(data$name), labels = sapply(unique(data$name), plannerNameMapping))
-        ggplot(data, aes_string(x = "version", y = attr, fill = "name", group = "name")) +
+        p <- ggplot(data, aes(x = version, y = attr, fill = name, group = name)) +
             # labels
             ylab(input$regrAttr) +
             theme(legend.title = element_blank(), text = fontSelection()) +
             # plot mean and error bars
             stat_summary(fun.data = "mean_cl_boot", geom="bar", position = position_dodge()) +
             stat_summary(fun.data = "mean_cl_boot", geom="errorbar", position = position_dodge())
+        if (!is.null(grouping))
+            p <- p + facet_grid(grouping ~ .)
+        list(plot = p, query = query)
     })
     output$regrPlot <- renderPlot({
         validate(
@@ -439,27 +627,31 @@ server <- function(input, output, session) {
             need(input$regrAttr, 'Select a benchmark attribute'),
             need(input$regrPlanners, 'Select some planners')
         )
-        print(regrPlot())
+        print(regrPlot()$plot)
     })
     output$regrDownloadPlot <- downloadHandler(filename = 'regrplot.pdf',
         content = function(file) {
             pdf(file=file, width=input$paperWidth, height=input$paperHeight)
-            print(regrPlot())
+            print(regrPlot()$plot)
             dev.off()
         }
     )
     output$regrDownloadRdata <- downloadHandler(filename = 'regrplot.RData',
         content = function(file) {
-            regrplot <- regrPlot()
+            regrplot <- regrPlot()$plot
             save(regrplot, file = file)
         }
     )
+    output$regrSQLquery <- renderText({
+        regrPlot()$query
+    })
 
     output$performancePage <- renderUI({
         validate(need(con(), noDatabaseText))
         sidebarLayout(
             sidebarPanel(
                 uiOutput("perfProblemSelect"),
+                uiOutput("perfProblemParamSelect"),
                 uiOutput("perfAttrSelect"),
                 uiOutput("perfVersionSelect"),
                 uiOutput("perfPlannerSelect")
@@ -469,7 +661,13 @@ server <- function(input, output, session) {
                 span(downloadLink('perfDownloadRdata', 'Download plot as RData'), class="btn btn-default"),
                 plotOutput("perfPlot"),
                 h4("Number of missing data points out of the total number of runs per planner"),
-                tableOutput("perfMissingDataTable")
+                tableOutput("perfMissingDataTable"),
+                conditionalPanel(condition = 'input.perfShowSQLquery',
+                    div(
+                        h4("SQL query"),
+                        verbatimTextOutput("perfSQLquery")
+                    )
+                )
             )
         )
     })
@@ -479,6 +677,7 @@ server <- function(input, output, session) {
         sidebarLayout(
             sidebarPanel(
                 uiOutput("progProblemSelect"),
+                uiOutput("progProblemParamSelect"),
                 uiOutput("progAttrSelect"),
                 uiOutput("progVersionSelect"),
                 uiOutput("progPlannerSelect")
@@ -487,7 +686,13 @@ server <- function(input, output, session) {
                 span(downloadLink('progDownloadPlot', 'Download plot as PDF'), class="btn btn-default"),
                 span(downloadLink('progDownloadRdata', 'Download plot as RData'), class="btn btn-default"),
                 plotOutput("progPlot"),
-                plotOutput("progNumMeasurementsPlot")
+                plotOutput("progNumMeasurementsPlot"),
+                conditionalPanel(condition = 'input.progShowSQLquery',
+                    div(
+                        h4("SQL query"),
+                        verbatimTextOutput("progSQLquery")
+                    )
+                )
             )
         )
     })
@@ -498,6 +703,7 @@ server <- function(input, output, session) {
         sidebarLayout(
             sidebarPanel(
                 uiOutput("regrProblemSelect"),
+                uiOutput("regrProblemParamSelect"),
                 uiOutput("regrAttrSelect"),
                 uiOutput("regrVersionSelect"),
                 uiOutput("regrPlannerSelect")
@@ -505,7 +711,13 @@ server <- function(input, output, session) {
             mainPanel(
                 span(downloadLink('regrDownloadPlot', 'Download plot as PDF'), class="btn btn-default"),
                 span(downloadLink('regrDownloadRdata', 'Download plot as RData'), class="btn btn-default"),
-                plotOutput("regrPlot")
+                plotOutput("regrPlot"),
+                conditionalPanel(condition = 'input.regrShowSQLquery',
+                    div(
+                        h4("SQL query"),
+                        verbatimTextOutput("regrSQLquery")
+                    )
+                )
             )
         )
     })

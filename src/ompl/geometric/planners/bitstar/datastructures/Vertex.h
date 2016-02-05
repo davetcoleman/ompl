@@ -154,11 +154,32 @@ namespace ompl
             /** \brief Mark the vertex as old. */
             void markOld();
 
+            /** \brief Returns true if the vertex has been expanded towards samples. */
+            bool hasBeenExpandedToSamples() const;
+
+            /** \brief Mark the vertex as expanded towards samples. */
+            void markExpandedToSamples();
+
+            /** \brief Mark the vertex as not expanded towards samples. */
+            void markUnexpandedToSamples();
+
+            /** \brief Returns true if the vertex has been expanded towards vertices. */
+            bool hasBeenExpandedToVertices() const;
+
+            /** \brief Mark the vertex as expanded towards vertices. */
+            void markExpandedToVertices();
+
+            /** \brief Mark the vertex as not expanded towards vertices. */
+            void markUnexpandedToVertices();
+
             /** \brief Whether the vertex has been pruned */
             bool isPruned() const;
 
             /** \brief Mark the vertex as pruned. */
             void markPruned();
+
+            /** \brief Mark the vertex as unpruned. */
+            void markUnpruned();
 
             /** \brief Mark the given vertex as a \e failed connection from this vertex */
             void markAsFailedChild(const VertexConstPtr& failedChild);
@@ -171,9 +192,6 @@ namespace ompl
             void updateCostAndDepth(bool cascadeUpdates = true);
 
         private:
-            /** \brief The type of container used to store the failed children */
-            typedef boost::unordered_set<BITstar::VertexId>             FailedIdUSet;
-
             /** \brief The vertex ID */
             BITstar::VertexId                                           vId_;
 
@@ -189,8 +207,14 @@ namespace ompl
             /** \brief Whether the vertex is a root */
             bool                                                     isRoot_;
 
-            /** \brief Whether the vertex is a new. Vertices are new until marked old. */
+            /** \brief Whether the vertex is new. */
             bool                                                     isNew_;
+
+            /** \brief Whether the vertex had been expanded to samples. */
+            bool                                                     hasBeenExpandedToSamples_;
+
+            /** \brief Whether the vertex has been expanded to vertices. */
+            bool                                                     hasBeenExpandedToVertices_;
 
             /** \brief Whether the vertex is pruned. Vertices throw if any member function other than isPruned() is access after they are pruned. */
             bool                                                     isPruned_;
@@ -209,9 +233,6 @@ namespace ompl
 
             /** \brief The child states as weak pointers, such that the ownership loop is broken and a state can be deleted once it's children are.*/
             std::vector<VertexWeakPtr>                           childWPtrs_;
-
-            /** \brief The unordered set of failed child vertices*/
-            FailedIdUSet                                              failedVIds_;
 
 
             /** \brief A helper function to check that the vertex is not pruned and throw if so */

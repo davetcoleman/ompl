@@ -7,6 +7,8 @@ OMPL provides a high level of abstraction to make it easier to integrate it into
   <a class="btn btn-default" href="#integration_moveit">MoveIt!</a>
   <a class="btn btn-default" href="#integration_openrave">OpenRAVE</a>
   <a class="btn btn-default" href="#integration_morse">MORSE</a>
+  <a class="btn btn-default" href="#integration_kautham">Kautham</a>
+  <a class="btn btn-default" href="#integration_rl">Robotics Library</a>
   <a class="btn btn-default" href="#integration_sims">SIMS</a>
   <a class="btn btn-default" href="#integration_omplapp">OMPL.app</a>
 </div>
@@ -53,6 +55,32 @@ OMPL provides a high level of abstraction to make it easier to integrate it into
 </div>
 
 
+# The Kautham Project {#integration_kautham}
+
+<div class="row">
+  <div class="col-lg-7 col-md-6 col-sm-5">
+    [The Kautham Project](https://sir.upc.edu/projects/kautham/) is a software tool used at the Institute of Industrial and Control Engineering (IOC-UPC) for teaching and research in robot motion planning. The tool can plan and simulate systems ranging from simple two degrees of freedom free-flying robots to multi-robot scenarios with mobile manipulators equipped with anthropomorphic hands.
+  </div>
+  <div class="col-lg-5 col-md-6 col-sm-7">
+    <img src="https://sir.upc.edu/projects/kautham/images/justin.JPG" width="100%">
+  </div>
+</div>
+
+
+# Robotics Library {#integration_rl}
+
+<div class="row">
+  <div class="col-lg-7 col-md-6 col-sm-5">
+    [The Robotics Library](http://www.roboticslibrary.org) is a self-contained C++ library for robot kinematics, motion planning and control. It covers mathematics, kinematics and dynamics, hardware abstraction, motion planning, collision detection, and visualization. OMPL is not included by default, but we have created [a pull request on GitHub](https://github.com/roboticslibrary/rl/pull/2) to add OMPL support. Let us know if this works for you!
+  </div>
+  <div class="col-lg-5 col-md-6 col-sm-7">
+    <div class="embed-responsive embed-responsive-16by9">
+      \htmlonly<iframe src="https://www.youtube.com/embed/9JG3uY5M04A"></iframe>\endhtmlonly
+    </div>
+  </div>
+</div>
+
+
 # SIMS {#integration_sims}
 
 <div class="row">
@@ -60,7 +88,7 @@ OMPL provides a high level of abstraction to make it easier to integrate it into
     The Kavraki lab has applied motion planning algorithms to the problem of characterizing protein flexibility and conformational changes. A better understanding of protein structure and flexibility is critical to understanding their function. Proteins can be modeled as long kinematic chains. Instead of collisions, state validity is determined by molecular energy. We have developed a conformational sampling framework called [the Structured Intuitive Move Selector (SIMS)](http://www.kavrakilab.org/bioinformatics/tracing_conformational_changes). It uses [Rosetta](http://www.rosettacommons.org) for modeling protein structures and computing their biophysical feasibility. The SIMS software is still very much under development, but will be released at some point in the near future.
   </div>
   <div class="col-lg-5 col-md-6 col-sm-7">
-    <img src="http://www.kavrakilab.org/sites/default/files/groel_path.png" width="100%">
+    <img src="http://www.kavrakilab.org/biomedicalcomputing/images/groel_path.png" width="100%">
   </div>
 </div>
 
@@ -69,7 +97,7 @@ OMPL provides a high level of abstraction to make it easier to integrate it into
 
 <div class="row">
   <div class="col-lg-7 col-md-6 col-sm-5">
-    OMPL.app consist of two components: a library and a GUI. The library provides bindings to the  [FCL](http://gamma.cs.unc.edu/FCL) and [PQP](http://gamma.cs.unc.edu/SSV) collision checking libraries. By default FCL's discrete collision checking is used, but its continuous collision checking or PQP's discrete collision checking can also be specified. The library relies on the [Assimp](http://assimp.sf.net) library to import a large variety of mesh formats that can be used to represent the robot and its environment. The python-based GUI can be used for planning motions for rigid bodies and a few vehicle types (first-order and second-order cars, a blimp, and a quadrotor). The OMPL.app distribution also contains \c ompl_benchmark, a simple tool that demonstrates some of OMPL's [benchmarking](benchmark.html) capabilities.
+    OMPL.app consist of two components: a library and a GUI. The library provides bindings to the  [FCL](http://gamma.cs.unc.edu/FCL) and [PQP](http://gamma.cs.unc.edu/SSV) collision checking libraries. By default FCL's discrete collision checking is used, but its continuous collision checking or PQP's discrete collision checking can also be specified. The library relies on the [Assimp](http://assimp.sf.net) library to import a large variety of mesh formats that can be used to represent the robot and its environment. The python-based GUI can be used for planning motions for rigid bodies and a few vehicle types (first-order and second-order cars, a blimp, and a quadrotor). The OMPL.app distribution also contains `ompl_benchmark`, a simple tool that demonstrates some of OMPL's [benchmarking](benchmark.html) capabilities.
   </div>
   <div class="col-lg-5 col-md-6 col-sm-7">
     <div class="embed-responsive embed-responsive-4by3">

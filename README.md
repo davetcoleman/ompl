@@ -1,7 +1,7 @@
 The Open Motion Planning Library (OMPL)
 =======================================
 
-Linux [![Build Status](https://travis-ci.org/ompl/ompl.svg?branch=master)](https://travis-ci.org/ompl/ompl)
+Linux / OS X [![Build Status](https://travis-ci.org/ompl/ompl.svg?branch=master)](https://travis-ci.org/ompl/ompl)
 Windows [![Build status](https://ci.appveyor.com/api/projects/status/valuv9sabye1y35n/branch/master?svg=true)](https://ci.appveyor.com/project/mamoll/ompl/branch/master)
 
 Visit the [OMPL installation page](http://ompl.kavrakilab.org/core/installation.html) for
@@ -27,7 +27,6 @@ following commands:
     mkdir -p build/Release
     cd build/Release
     cmake ../..
-    # next two steps are optional
-    make installpyplusplus && cmake . # download & install Py++
-    make update_bindings # if you want Python bindings
+    # next step is optional
+    make -j 4 update_bindings # if you want Python bindings
     make -j 4 # replace "4" with the number of cores on your machine
