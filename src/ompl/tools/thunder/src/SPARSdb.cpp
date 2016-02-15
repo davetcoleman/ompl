@@ -46,7 +46,7 @@
 #include <boost/foreach.hpp>
 
 // Allow hooks for visualizing planner
-//#define OMPL_THUNDER_DEBUG
+#define OMPL_THUNDER_DEBUG
 
 #define foreach BOOST_FOREACH
 #define foreach_reverse BOOST_REVERSE_FOREACH
@@ -374,7 +374,7 @@ bool ompl::geometric::SPARSdb::lazyCollisionSearch(const Vertex &start,
         if (!constructSolution(start, goal, vertexPath))
         {
             // We will stop looking through this start-goal combination, but perhaps this partial solution is good
-            if (verbose_)
+           if (verbose_)
                 OMPL_INFORM("        unable to construct solution between start and goal using astar");
 
             // no solution path found. check if a previous partially correct solution was found
@@ -391,7 +391,6 @@ bool ompl::geometric::SPARSdb::lazyCollisionSearch(const Vertex &start,
                 OMPL_INFORM("        no partial solution found on this astar search, keep looking through start-goal combos");
 
             // no path found what so ever
-            //return false;
             return false;
         }
         havePartialSolution = true; // we have found at least one path at this point. may be invalid
@@ -415,7 +414,7 @@ bool ompl::geometric::SPARSdb::lazyCollisionSearch(const Vertex &start,
             return true;
         }
         // else, loop with updated graph that has the invalid edges/states disabled
-    } // while
+    } // end while
 
     // we never found a valid path
     return false;
@@ -554,6 +553,11 @@ bool ompl::geometric::SPARSdb::lazyCollisionCheck(std::vector<Vertex> &vertexPat
 bool ompl::geometric::SPARSdb::sameComponent(Vertex m1, Vertex m2)
 {
     return boost::same_component(m1, m2, disjointSets_);
+}
+
+double ompl::geometric::SPARSdb::distanceFunction(const Vertex a, const Vertex b) const
+{
+    return si_->distance(stateProperty_[a], stateProperty_[b]);
 }
 
 bool ompl::geometric::SPARSdb::reachedFailureLimit() const
@@ -1202,7 +1206,7 @@ bool ompl::geometric::SPARSdb::checkAddPath( Vertex v )
             InterfaceData& d = getData( v, r, rp );
 
             //Then, if the spanner property is violated
-            if (rm_dist > stretchFactor_ * d.d_)
+            if (rm_dist > stretchFactor_ * d.last_distance_)
             {
                 spannerPropertyWasViolated = true; //Report that we added for the path
                 if (si_->checkMotion(stateProperty_[r], stateProperty_[rp]))
@@ -1612,39 +1616,39 @@ ompl::geometric::SPARSdb::Vertex ompl::geometric::SPARSdb::addGuard(base::State 
         OMPL_INFORM(" ---- addGuard() of type %f", type);
     }
 #ifdef OMPL_THUNDER_DEBUG
-        visualizeStateCallback(state, 4, sparseDelta_); // Candidate node has already (just) been added
-        sleep(0.1);
+    visualizeStateCallback(state, 4, sparseDelta_); // Candidate node has already (just) been added
+    sleep(0.1);
 #endif
 
 
     return m;
 }
 
-void ompl::geometric::SPARSdb::connectGuards(Vertex v, Vertex vp)
+void ompl::geometric::SPARSdb::connectGuards(Vertex v1, Vertex v2)
 {
     //OMPL_INFORM("connectGuards called ---------------------------------------------------------------- ");
-    assert(v <= getNumVertices());
-    assert(vp <= getNumVertices());
+    assert(v1 <= getNumVertices());
+    assert(v2 <= getNumVertices());
 
     if (verbose_)
     {
-        OMPL_INFORM(" ------- connectGuards/addEdge: Connecting vertex %f to vertex %f", v, vp);
+        OMPL_INFORM(" ------- connectGuards/addEdge: Connecting vertex %f to vertex %f", v1, v2);
     }
 
     // Create the new edge
-    Edge e = (boost::add_edge(v, vp, g_)).first;
+    Edge e = (boost::add_edge(v1, v2, g_)).first;
 
     // Add associated properties to the edge
-    edgeWeightProperty_[e] = distanceFunction(v, vp); // TODO: use this value with astar
+    edgeWeightProperty_[e] = distanceFunction(v1, v2); // TODO: use this value with astar
     edgeCollisionStateProperty_[e] = NOT_CHECKED;
 
     // Add the edge to the incrementeal connected components datastructure
-    disjointSets_.union_set(v, vp);
+    disjointSets_.union_set(v1, v2);
 
     // Debug in Rviz
 #ifdef OMPL_THUNDER_DEBUG
-        visualizeEdgeCallback(stateProperty_[v], stateProperty_[vp]);
-        sleep(0.8);
+    visualizeEdgeCallback(stateProperty_[v1], stateProperty_[v2]);
+    sleep(0.8);
 #endif
 
 }

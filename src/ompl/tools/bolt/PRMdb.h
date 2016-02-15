@@ -34,17 +34,16 @@
 
 /* Author: Andrew Dobson, Dave Coleman */
 
-#ifndef OMPL_TOOLS_THUNDER_SPARS_DB_
-#define OMPL_TOOLS_THUNDER_SPARS_DB_
+#ifndef OMPL_TOOLS_BOLT_PRM_DB_
+#define OMPL_TOOLS_BOLT_PRM_DB_
 
-#include "ompl/geometric/planners/PlannerIncludes.h"
-#include "ompl/datastructures/NearestNeighbors.h"
-#include "ompl/geometric/PathSimplifier.h"
-#include "ompl/util/Time.h"
-#include "ompl/util/Hash.h"
+#include <ompl/geometric/planners/PlannerIncludes.h>
+#include <ompl/datastructures/NearestNeighbors.h>
+#include <ompl/geometric/PathSimplifier.h>
+#include <ompl/util/Time.h>
 
 #include <boost/range/adaptor/map.hpp>
-#include <unordered_map>
+#include <boost/unordered_map.hpp>
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/filtered_graph.hpp>
@@ -53,8 +52,8 @@
 #include <boost/graph/connected_components.hpp>
 #include <boost/property_map/property_map.hpp>
 #include <boost/pending/disjoint_sets.hpp>
-#include <functional>
-#include <thread>
+#include <boost/function.hpp>
+#include <boost/thread.hpp>
 #include <iostream>
 #include <fstream>
 #include <utility>
@@ -68,24 +67,24 @@ namespace ompl
     {
 
         /**
-           @anchor gSPARSdb
+           @anchor gPRMdb
            @par Short description
-           SPARSdb is a variant of the SPARS algorithm which removes the
+           PRMdb is a variant of the PRM algorithm which removes the
            dependency on having the dense graph, D.  It works through similar
            mechanics, but uses a different approach to identifying interfaces
            and computing shortest paths through said interfaces.
 
-           This version has been modified for use with Thunder
+           This version has been modified for use with Bolt
 
            @par External documentation
            A. Dobson, K. Bekris,
-           Improving Sparse Roadmap Spanners,
+           Improving Prme Roadmap Spanners,
            <em>IEEE International Conference on Robotics and Automation (ICRA)</em> May 2013.
-           <a href="http://www.cs.rutgers.edu/~kb572/pubs/spars2.pdf">[PDF]</a>
+           <a href="http://www.cs.rutgers.edu/~kb572/pubs/prm2.pdf">[PDF]</a>
         */
 
-        /** \brief <b> SPArse Roadmap Spanner Version 2.0 </b> */
-        class SPARSdb : public base::Planner
+        /** \brief <b> Sparse Roadmap Spanner Version 2.0 </b> */
+        class PRMdb : public base::Planner
         {
         public:
 
@@ -105,10 +104,10 @@ namespace ompl
             ////////////////////////////////////////////////////////////////////////////////////////
 
             /** \brief The type used internally for representing vertex IDs */
-            using VertexIndexType = unsigned long int;
+            typedef unsigned long int VertexIndexType;
 
             /** \brief Pair of vertices which support an interface. */
-            using VertexPair = std::pair<VertexIndexType, VertexIndexType>;
+            typedef std::pair< VertexIndexType, VertexIndexType > VertexPair;
 
             ////////////////////////////////////////////////////////////////////////////////////////
             /** \brief Interface information storage class, which does bookkeeping for criterion four. */
@@ -127,11 +126,11 @@ namespace ompl
 
                 /** \brief Constructor */
                 InterfaceData() :
-                    pointA_(nullptr),
-                    pointB_(nullptr),
-                    sigmaA_(nullptr),
-                    sigmaB_(nullptr),
-                    d_(std::numeric_limits<double>::infinity())
+                    pointA_(NULL),
+                    pointB_(NULL),
+                    sigmaA_(NULL),
+                    sigmaB_(NULL),
+                    last_distance_(std::numeric_limits<double>::infinity())
                 {
                 }
 
@@ -141,22 +140,22 @@ namespace ompl
                     if (pointA_)
                     {
                         si->freeState(pointA_);
-                        pointA_ = nullptr;
+                        pointA_ = NULL;
                     }
                     if (pointB_)
                     {
                         si->freeState(pointB_);
-                        pointB_ = nullptr;
+                        pointB_ = NULL;
                     }
                     if (sigmaA_)
                     {
                         si->freeState(sigmaA_);
-                        sigmaA_ = nullptr;
+                        sigmaA_ = NULL;
                     }
                     if (sigmaB_)
                     {
                         si->freeState(sigmaB_);
-                        sigmaB_ = nullptr;
+                        sigmaB_ = NULL;
                     }
                     last_distance_ = std::numeric_limits<double>::infinity();
                 }
@@ -193,7 +192,7 @@ namespace ompl
             };
 
             /** \brief the hash which maps pairs of neighbor points to pairs of states */
-            using InterfaceHash = std::unordered_map<VertexPair, InterfaceData>;
+            typedef boost::unordered_map< VertexPair, InterfaceData, boost::hash< VertexPair > > InterfaceHash;
 
             ////////////////////////////////////////////////////////////////////////////////////////
             // The InterfaceHash structure is wrapped inside of this struct due to a compilation error on
@@ -202,7 +201,7 @@ namespace ompl
             // Remove this struct when the minimum Boost requirement is > v1.48.
             struct InterfaceHashStruct
             {
-                InterfaceHashStruct& operator=(const InterfaceHashStruct &rhs) = default;
+                InterfaceHashStruct& operator=(const InterfaceHashStruct &rhs) { interfaceHash = rhs.interfaceHash; return *this; }
                 InterfaceHash interfaceHash;
             };
 
@@ -210,22 +209,22 @@ namespace ompl
             // Vertex properties
 
             struct vertex_state_t {
-                using kind = boost::vertex_property_tag;
+                typedef boost::vertex_property_tag kind;
             };
 
-            struct vertex_color_t {
-                using kind = boost::vertex_property_tag;
+            struct vertex_type_t {
+                typedef boost::vertex_property_tag kind;
             };
 
             struct vertex_interface_data_t {
-                using kind = boost::vertex_property_tag;
+                typedef boost::vertex_property_tag kind;
             };
 
             ////////////////////////////////////////////////////////////////////////////////////////
             // Edge properties
 
             struct edge_collision_state_t {
-                using kind = boost::edge_property_tag;
+                typedef boost::edge_property_tag kind;
             };
 
             /** \brief Possible collision states of an edge */
@@ -236,6 +235,7 @@ namespace ompl
                 FREE
             };
 
+            ////////////////////////////////////////////////////////////////////////////////////////
             /** \brief Struct for passing around partially solved solutions */
             struct CandidateSolution
             {
@@ -268,8 +268,8 @@ namespace ompl
              - vertex_state_t: an ompl::base::State* is required for OMPL
              - vertex_predecessor_t: The incremental connected components algorithm requires it
              - vertex_rank_t: The incremental connected components algorithm requires it
-             - vertex_color_t - TODO
-             - vertex_interface_data_t - needed by SPARS2 for maintainings its sparse properties
+             - vertex_type_t - TODO
+             - vertex_interface_data_t - needed by PRM2 for maintainings its sparse properties
 
              Note: If boost::vecS is not used for vertex storage, then there must also
              be a boost:vertex_index_t property manually added.
@@ -281,36 +281,36 @@ namespace ompl
              */
 
             /** Wrapper for the vertex's multiple as its property. */
-            using VertexProperties = boost::property < vertex_state_t, base::State*,
+            typedef boost::property < vertex_state_t, base::State*,
                     boost::property < boost::vertex_predecessor_t, VertexIndexType,
                     boost::property < boost::vertex_rank_t, VertexIndexType,
-                    boost::property < vertex_color_t, GuardType,
-                    boost::property < vertex_interface_data_t, InterfaceHashStruct>>>>>;
+                    boost::property < vertex_type_t, GuardType,
+                    boost::property < vertex_interface_data_t, InterfaceHashStruct > > > > > VertexProperties;
 
             /** Wrapper for the double assigned to an edge as its weight property. */
-            using EdgeProperties = boost::property < boost::edge_weight_t, double,
-                    boost::property < edge_collision_state_t, int>>;
+            typedef boost::property < boost::edge_weight_t, double,
+                    boost::property < edge_collision_state_t, int > > EdgeProperties;
 
             /** The underlying boost graph type (undirected weighted-edge adjacency list with above properties). */
-            using Graph = boost::adjacency_list <
+            typedef boost::adjacency_list <
                 boost::vecS, // store in std::vector
                 boost::vecS, // store in std::vector
                 boost::undirectedS,
                 VertexProperties,
                 EdgeProperties
-            >;
+            > Graph;
 
             /** \brief Vertex in Graph */
-            using Vertex = boost::graph_traits<Graph>::vertex_descriptor;
+            typedef boost::graph_traits<Graph>::vertex_descriptor Vertex;
 
             /** \brief Edge in Graph */
-            using Edge = boost::graph_traits<Graph>::edge_descriptor;
+            typedef boost::graph_traits<Graph>::edge_descriptor   Edge;
 
             ////////////////////////////////////////////////////////////////////////////////////////
             // Typedefs for property maps
 
             /** \brief Access map that stores the lazy collision checking status of each edge */
-            using EdgeCollisionStateMap = boost::property_map<Graph, edge_collision_state_t>::type;
+            typedef boost::property_map<Graph, edge_collision_state_t>::type EdgeCollisionStateMap;
 
             ////////////////////////////////////////////////////////////////////////////////////////
             /**
@@ -327,13 +327,13 @@ namespace ompl
             public:
 
                 /** Map key type. */
-                using key_type = Edge;
+                typedef Edge key_type;
                 /** Map value type. */
-                using value_type = double;
+                typedef double value_type;
                 /** Map auxiliary value type. */
-                using reference = double &;
+                typedef double &reference;
                 /** Map type. */
-                using category = boost::readable_property_map_tag;
+                typedef boost::readable_property_map_tag category;
 
                 /**
                  * Construct map for certain constraints.
@@ -387,86 +387,86 @@ namespace ompl
             };
 
             ////////////////////////////////////////////////////////////////////////////////////////
-            // SPARS MEMBER FUNCTIONS
+            // PRM MEMBER FUNCTIONS
             ////////////////////////////////////////////////////////////////////////////////////////
 
             /** \brief Constructor */
-            SPARSdb(const base::SpaceInformationPtr &si);
+            PRMdb(const base::SpaceInformationPtr &si);
 
             /** \brief Destructor */
-            ~SPARSdb() override;
+            virtual ~PRMdb();
 
-            void setProblemDefinition(const base::ProblemDefinitionPtr &pdef) override;
+            virtual void setProblemDefinition(const base::ProblemDefinitionPtr &pdef);
 
-            /** \brief Sets the stretch factor */
-            void setStretchFactor(double t)
-            {
-                stretchFactor_ = t;
-            }
+        //     /** \brief Sets the stretch factor */
+        //     void setStretchFactor(double t)
+        //     {
+        //         stretchFactor_ = t;
+        //     }
 
-            /** \brief Sets vertex visibility range as a fraction of max. extent. */
-            void setSparseDeltaFraction( double D )
-            {
-                sparseDeltaFraction_ = D;
-                if (sparseDelta_ > 0.0) // setup was previously called
-                    sparseDelta_ = D * si_->getMaximumExtent();
-            }
+        //     /** \brief Sets vertex visibility range as a fraction of max. extent. */
+        //     void setSparseDeltaFraction( double D )
+        //     {
+        //         sparseDeltaFraction_ = D;
+        //         if (sparseDelta_ > 0.0) // setup was previously called
+        //             sparseDelta_ = D * si_->getMaximumExtent();
+        //     }
 
-            /** \brief Sets interface support tolerance as a fraction of max. extent. */
-            void setDenseDeltaFraction( double d )
-            {
-                denseDeltaFraction_ = d;
-                if (denseDelta_ > 0.0) // setup was previously called
-                    denseDelta_ = d * si_->getMaximumExtent();
-            }
+        //     /** \brief Sets interface support tolerance as a fraction of max. extent. */
+        //     void setDenseDeltaFraction( double d )
+        //     {
+        //         denseDeltaFraction_ = d;
+        //         if (denseDelta_ > 0.0) // setup was previously called
+        //             denseDelta_ = d * si_->getMaximumExtent();
+        //     }
 
-            /** \brief Sets the maximum failures until termination */
-            void setMaxFailures( unsigned int m )
-            {
-                maxFailures_ = m;
-            }
+        //     /** \brief Sets the maximum failures until termination */
+        //     void setMaxFailures( unsigned int m )
+        //     {
+        //         maxFailures_ = m;
+        //     }
 
-            /** \brief Retrieve the maximum consecutive failure limit. */
-            unsigned int getMaxFailures( ) const
-            {
-                return maxFailures_;
-            }
+        //     /** \brief Retrieve the maximum consecutive failure limit. */
+        //     unsigned int getMaxFailures( ) const
+        //     {
+        //         return maxFailures_;
+        //     }
 
-            /** \brief Retrieve the dense graph interface support delta. */
-            double getDenseDeltaFraction( ) const
-            {
-                return denseDeltaFraction_;
-            }
+        //     /** \brief Retrieve the dense graph interface support delta. */
+        //     double getDenseDeltaFraction( ) const
+        //     {
+        //         return denseDeltaFraction_;
+        //     }
 
-            /** \brief Retrieve the sparse graph visibility range delta. */
-            double getSparseDeltaFraction( ) const
-            {
-                return sparseDeltaFraction_;
-            }
+        //     /** \brief Retrieve the sparse graph visibility range delta. */
+        //     double getSparseDeltaFraction( ) const
+        //     {
+        //         return sparseDeltaFraction_;
+        //     }
 
-            /** \brief Retrieve the spanner's set stretch factor. */
-            double getStretchFactor( ) const
-            {
-                return stretchFactor_;
-            }
+        //     /** \brief Retrieve the spanner's set stretch factor. */
+        //     double getStretchFactor( ) const
+        //     {
+        //         return stretchFactor_;
+        //     }
 
-            bool getGuardSpacingFactor(const double pathLength, double &numGuards, double &spacingFactor);
+        //     bool getGuardSpacingFactor(const double pathLength, double &numGuards, double &spacingFactor);
 
-            /**
-             * \brief Calculate the distance that should be used in inserting nodes into the db
-             * \param path length - from the trajectory
-             * \param num guards - the output result
-             * \param spacing factor - what fraction of the sparsedelta should be used in placing guards
-             * \return
-             */
-            bool getGuardSpacingFactor(const double pathLength, int &numGuards, double &spacingFactor);
+        //     /**
+        //      * \brief Calculate the distance that should be used in inserting nodes into the db
+        //      * \param path length - from the trajectory
+        //      * \param num guards - the output result
+        //      * \param spacing factor - what fraction of the sparsedelta should be used in placing guards
+        //      * \return
+        //      */
+        //     bool getGuardSpacingFactor(const double pathLength, int &numGuards, double &spacingFactor);
 
             bool addPathToRoadmap(const base::PlannerTerminationCondition &ptc,
                                   ompl::geometric::PathGeometric& solutionPath);
 
-            bool checkStartGoalConnection(ompl::geometric::PathGeometric& solutionPath);
+        //     bool checkStartGoalConnection(ompl::geometric::PathGeometric& solutionPath);
 
-            bool addStateToRoadmap(const base::PlannerTerminationCondition &ptc, base::State *newState);
+        //     bool addStateToRoadmap(const base::PlannerTerminationCondition &ptc, base::State *newState);
 
             /** \brief Function that can solve the motion planning
                 problem. This function can be called multiple times on
@@ -480,7 +480,7 @@ namespace ompl
                 input states should be however cleared, without
                 clearing the roadmap itself. This can be done using
                 the clearQuery() function. */
-            base::PlannerStatus solve(const base::PlannerTerminationCondition &ptc) override;
+            virtual base::PlannerStatus solve(const base::PlannerTerminationCondition &ptc);
 
             /** \brief Clear the query previously loaded from the ProblemDefinition.
                 Subsequent calls to solve() will reuse the previously computed roadmap,
@@ -488,30 +488,29 @@ namespace ompl
                 This enables multi-query functionality for PRM. */
             void clearQuery();
 
-            void clear() override;
+            virtual void clear();
 
-            /** \brief Set a different nearest neighbors datastructure */
-            template<template<typename T> class NN>
-            void setNearestNeighbors()
-            {
-                nn_.reset(new NN< Vertex >());
-                if (isSetup())
-                    setup();
-            }
+        //     /** \brief Set a different nearest neighbors datastructure */
+        //     template<template<typename T> class NN>
+        //     void setNearestNeighbors()
+        //     {
+        //         nn_.reset(new NN< Vertex >());
+        //         if (isSetup())
+        //             setup();
+        //     }
 
             /**
              * \brief Search the roadmap for the best path close to the given start and goal states that is valid
-             * \param nearestK - unused
              * \param start
              * \param goal
              * \param geometricSolution - the resulting path
              * \return
              */
-            bool getSimilarPaths(int nearestK, const base::State* start, const base::State* goal,
+            bool getSimilarPaths(const base::State* start, const base::State* goal,
                                  CandidateSolution &candidateSolution,
                                  const base::PlannerTerminationCondition &ptc);
 
-            void setup() override;
+            virtual void setup();
 
             /** \brief Retrieve the computed roadmap. */
             const Graph& getRoadmap() const
@@ -534,33 +533,35 @@ namespace ompl
             /** \brief Get the number of disjoint sets in the sparse roadmap. */
             unsigned int getNumConnectedComponents() const
             {
-                // Make sure graph is populated
-                if (!getNumVertices())
-                    return 0;
+              return 0; // TODO(davetcoleman):
 
-                std::vector<int> components(boost::num_vertices(g_));
+                // // Make sure graph is populated
+                // if (!getNumVertices())
+                //     return 0;
 
-                // it always overcounts by 1, i think because it is missing vertex 0 which is the new state insertion component
-                return boost::connected_components(g_, &components[0]) - 1;
+                // std::vector<int> components(boost::num_vertices(g_));
+
+                // // it always overcounts by 1, i think because it is missing vertex 0 which is the new state insertion component
+                // return boost::connected_components(g_, &components[0]) - 1;
             }
 
-            /** \brief Get the number of times a path was inserted into the database and it failed to have connectivity */
-            unsigned int getNumPathInsertionFailed() const
-            {
-                return numPathInsertionFailures_;
-            }
+        //     /** \brief Get the number of times a path was inserted into the database and it failed to have connectivity */
+        //     unsigned int getNumPathInsertionFailed() const
+        //     {
+        //         return numPathInsertionFailures_;
+        //     }
 
-            /** \brief description */
-            unsigned int getNumConsecutiveFailures() const
-            {
-                return consecutiveFailures_;
-            }
+        //     /** \brief description */
+        //     unsigned int getNumConsecutiveFailures() const
+        //     {
+        //         return consecutiveFailures_;
+        //     }
 
-            /** \brief Get the number of iterations the algorithm performed */
-            long unsigned int getIterations() const
-            {
-                return iterations_;
-            }
+        //     /** \brief Get the number of iterations the algorithm performed */
+        //     long unsigned int getIterations() const
+        //     {
+        //         return iterations_;
+        //     }
 
             /**
              * \brief Convert astar results to correctly ordered path
@@ -577,7 +578,7 @@ namespace ompl
                                               CandidateSolution &candidateSolution,
                                               bool disableCollisionWarning = false);
 
-            void getPlannerData(base::PlannerData &data) const override;
+             virtual void getPlannerData(base::PlannerData &data) const;
 
             /**
              * \brief Set the sparse graph from file
@@ -585,90 +586,93 @@ namespace ompl
              */
             void setPlannerData(const base::PlannerData &data);
 
-            /** \brief Returns whether we have reached the iteration failures limit, maxFailures_ */
-            bool reachedFailureLimit () const;
+            void generateGrid();
 
-            /** \brief Print debug information about planner */
-            void printDebug(std::ostream &out = std::cout) const;
+        //     /** \brief Returns whether we have reached the iteration failures limit, maxFailures_ */
+        //     bool reachedFailureLimit () const;
 
-            /** \brief Clear all past edge state information about in collision or not */
-            void clearEdgeCollisionStates();
+        //     /** \brief Print debug information about planner */
+        //     void printDebug(std::ostream &out = std::cout) const;
+
+        //     /** \brief Clear all past edge state information about in collision or not */
+        //     void clearEdgeCollisionStates();
 
         protected:
 
-            /** \brief Free all the memory allocated by the planner */
-            void freeMemory();
+          /** \brief Free all the memory allocated by the planner */
+          void freeMemory();
 
             /** \brief Check that the query vertex is initialized (used for internal nearest neighbor searches) */
-            void checkQueryStateInitialization();
+            void initializeQueryState();
 
-            /** \brief Checks to see if the sample needs to be added to ensure coverage of the space */
-            bool checkAddCoverage(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood);
+        //     /** \brief Checks to see if the sample needs to be added to ensure coverage of the space */
+        //     bool checkAddCoverage(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood);
 
-            /** \brief Checks to see if the sample needs to be added to ensure connectivity */
-            bool checkAddConnectivity(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood);
+        //     /** \brief Checks to see if the sample needs to be added to ensure connectivity */
+        //     bool checkAddConnectivity(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood);
 
-            /** \brief Checks to see if the current sample reveals the existence of an interface, and if so, tries to bridge it. */
-            bool checkAddInterface(const base::State *qNew, std::vector<Vertex> &graphNeighborhood,
-                                   std::vector<Vertex> &visibleNeighborhood);
+        //     /** \brief Checks to see if the current sample reveals the existence of an interface, and if so, tries to bridge it. */
+        //     bool checkAddInterface(const base::State *qNew, std::vector<Vertex> &graphNeighborhood,
+        //                            std::vector<Vertex> &visibleNeighborhood);
 
-            /** \brief Checks vertex v for short paths through its region and adds when appropriate. */
-            bool checkAddPath( Vertex v );
+        //     /** \brief Checks vertex v for short paths through its region and adds when appropriate. */
+        //     bool checkAddPath( Vertex v );
 
-            /** \brief A reset function for resetting the failures count */
-            void resetFailures();
+        //     /** \brief A reset function for resetting the failures count */
+        //     void resetFailures();
 
-            /** \brief Finds visible nodes in the graph near state */
-            void findGraphNeighbors(base::State *state, std::vector<Vertex> &graphNeighborhood,
-                                    std::vector<Vertex> &visibleNeighborhood);
+        //     /** \brief Finds visible nodes in the graph near state */
+        //     void findGraphNeighbors(base::State *state, std::vector<Vertex> &graphNeighborhood,
+        //                             std::vector<Vertex> &visibleNeighborhood);
 
             /**
              * \brief Finds nodes in the graph near state NOTE: note tested for visibility
              * \param state - vertex to find neighbors around
-             * \param result
              * \return false is no neighbors found
              */
             bool findGraphNeighbors(const base::State *state, std::vector<Vertex> &graphNeighborhood);
 
-            /** \brief Approaches the graph from a given vertex */
-            void approachGraph( Vertex v );
+        //     /** \brief Approaches the graph from a given vertex */
+        //     void approachGraph( Vertex v );
 
-            /** \brief Finds the representative of the input state, st  */
-            Vertex findGraphRepresentative(base::State *st);
+        //     /** \brief Finds the representative of the input state, st  */
+        //     Vertex findGraphRepresentative(base::State *st);
 
-            /** \brief Finds representatives of samples near qNew_ which are not his representative */
-            void findCloseRepresentatives(base::State *workState, const base::State *qNew, Vertex qRep,
-                                          std::map<Vertex, base::State*> &closeRepresentatives,
-                                          const base::PlannerTerminationCondition &ptc);
+        //     /** \brief Finds representatives of samples near qNew_ which are not his representative */
+        //     void findCloseRepresentatives(base::State *workState, const base::State *qNew, Vertex qRep,
+        //                                   std::map<Vertex, base::State*> &closeRepresentatives,
+        //                                   const base::PlannerTerminationCondition &ptc);
 
-            /** \brief High-level method which updates pair point information for repV_ with neighbor r */
-            void updatePairPoints(Vertex rep, const base::State *q, Vertex r, const base::State *s);
+        //     /** \brief High-level method which updates pair point information for repV_ with neighbor r */
+        //     void updatePairPoints(Vertex rep, const base::State *q, Vertex r, const base::State *s);
 
-            /** \brief Computes all nodes which qualify as a candidate v" for v and vp */
-            void computeVPP(Vertex v, Vertex vp, std::vector<Vertex> &VPPs);
+        //     /** \brief Computes all nodes which qualify as a candidate v" for v and vp */
+        //     void computeVPP(Vertex v, Vertex vp, std::vector<Vertex> &VPPs);
 
-            /** \brief Computes all nodes which qualify as a candidate x for v, v', and v" */
-            void computeX(Vertex v, Vertex vp, Vertex vpp, std::vector<Vertex> &Xs);
+        //     /** \brief Computes all nodes which qualify as a candidate x for v, v', and v" */
+        //     void computeX(Vertex v, Vertex vp, Vertex vpp, std::vector<Vertex> &Xs);
 
-            /** \brief Rectifies indexing order for accessing the vertex data */
-            VertexPair index( Vertex vp, Vertex vpp );
+        //     /** \brief Rectifies indexing order for accessing the vertex data */
+        //     VertexPair index( Vertex vp, Vertex vpp );
 
-            /** \brief Retrieves the Vertex data associated with v,vp,vpp */
-            InterfaceData& getData( Vertex v, Vertex vp, Vertex vpp );
+        //     /** \brief Retrieves the Vertex data associated with v,vp,vpp */
+        //     InterfaceData& getData( Vertex v, Vertex vp, Vertex vpp );
 
-            /** \brief Performs distance checking for the candidate new state, q against the current information */
-            void distanceCheck(Vertex rep, const base::State *q, Vertex r, const base::State *s, Vertex rp);
+        //     /** \brief Performs distance checking for the candidate new state, q against the current information */
+        //     void distanceCheck(Vertex rep, const base::State *q, Vertex r, const base::State *s, Vertex rp);
 
-            /** \brief When a new guard is added at state st, finds all guards who must abandon their interface information and deletes that information */
-            void abandonLists(base::State *st);
+        //     /** \brief When a new guard is added at state st, finds all guards who must abandon their interface information and deletes that information */
+        //     void abandonLists(base::State *st);
 
-            /** \brief Construct a guard for a given state (\e state) and store it in the nearest neighbors data structure */
-            Vertex addGuard(base::State *state, GuardType type);
+        //     /** \brief Construct a guard for a given state (\e state) and store it in the nearest neighbors data structure */
+        //     Vertex addGuard(base::State *state, GuardType type);
 
-            /** \brief Connect two guards in the roadmap */
-            void connectGuards( Vertex v1, Vertex v2 );
+        //     /** \brief Connect two guards in the roadmap */
+        //     void connectGuards( Vertex v1, Vertex v2 );
 
-            /** \brief Check if there exists a solution, i.e., there exists a pair of milestones such that the first is in \e start and the second is in \e goal, and the two milestones are in the same connected component. If a solution is found, the path is saved. */
+            /** \brief Check if there exists a solution, i.e., there exists a pair of milestones such that the
+                first is in \e start and the second is in \e goal, and the two milestones are in the same
+                connected component. If a solution is found, the path is saved. */
             bool getPaths(const std::vector<Vertex> &candidateStarts,
                           const std::vector<Vertex> &candidateGoals,
                           const base::State* actualStart,
@@ -690,8 +694,8 @@ namespace ompl
             /** \brief Check recalled path for collision and disable as needed */
             bool lazyCollisionCheck(std::vector<Vertex> &vertexPath, const base::PlannerTerminationCondition &ptc);
 
-            /** Thread that checks for solution */
-            void checkForSolution(const base::PlannerTerminationCondition &ptc, base::PathPtr &solution);
+        //     /** Thread that checks for solution */
+        //     void checkForSolution(const base::PlannerTerminationCondition &ptc, base::PathPtr &solution);
 
             /** \brief Given two milestones from the same connected component, construct a path connecting them and set it as the solution
              *  \param start
@@ -702,53 +706,47 @@ namespace ompl
             bool constructSolution(const Vertex start, const Vertex goal,
                                    std::vector<Vertex> &vertexPath) const;
 
-            /** \brief Check if two milestones (\e m1 and \e m2) are part of the same connected component. This is not a const function since we use incremental connected components from boost */
-            bool sameComponent(Vertex m1, Vertex m2);
+        //     /** \brief Check if two milestones (\e m1 and \e m2) are part of the same connected component. This is not a const function since we use incremental connected components from boost */
+        //     bool sameComponent(Vertex m1, Vertex m2);
 
             /** \brief Compute distance between two milestones (this is simply distance between the states of the milestones) */
             double distanceFunction(const Vertex a, const Vertex b) const;
 
-            /** \brief Sampler user for generating valid samples in the state space */
-            base::ValidStateSamplerPtr                                          sampler_;
+        //     /** \brief Sampler user for generating valid samples in the state space */
+        //     base::ValidStateSamplerPtr                                          sampler_;
 
             /** \brief Nearest neighbors data structure */
-            std::shared_ptr< NearestNeighbors<Vertex> >                       nn_;
+            boost::shared_ptr< NearestNeighbors<Vertex> >                       nn_;
 
             /** \brief Connectivity graph */
             Graph                                                               g_;
 
-            /** \brief Array of start milestones */
-            std::vector<Vertex>                                                 startM_;
-
-            /** \brief Array of goal milestones */
-            std::vector<Vertex>                                                 goalM_;
-
             /** \brief Vertex for performing nearest neighbor queries. */
             Vertex                                                              queryVertex_;
 
-            /** \brief Stretch Factor as per graph spanner literature (multiplicative bound on path quality) */
-            double                                                              stretchFactor_;
+        //     /** \brief Stretch Factor as per graph spanner literature (multiplicative bound on path quality) */
+        //     double                                                              stretchFactor_;
 
-            /** \brief Maximum visibility range for nodes in the graph as a fraction of maximum extent. */
-            double                                                              sparseDeltaFraction_;
+        //     /** \brief Maximum visibility range for nodes in the graph as a fraction of maximum extent. */
+        //     double                                                              sparseDeltaFraction_;
 
-            /** \brief Maximum range for allowing two samples to support an interface as a fraction of maximum extent. */
-            double                                                              denseDeltaFraction_;
+        //     /** \brief Maximum range for allowing two samples to support an interface as a fraction of maximum extent. */
+        //     double                                                              denseDeltaFraction_;
 
-            /** \brief The number of consecutive failures to add to the graph before termination */
-            unsigned int                                                        maxFailures_;
+        //     /** \brief The number of consecutive failures to add to the graph before termination */
+        //     unsigned int                                                        maxFailures_;
 
-            /** \brief Track how many solutions fail to have connectivity at end */
-            unsigned int                                                        numPathInsertionFailures_;
+        //     /** \brief Track how many solutions fail to have connectivity at end */
+        //     unsigned int                                                        numPathInsertionFailures_;
 
-            /** \brief Number of sample points to use when trying to detect interfaces. */
-            unsigned int                                                        nearSamplePoints_;
+        //     /** \brief Number of sample points to use when trying to detect interfaces. */
+        //     unsigned int                                                        nearSamplePoints_;
 
-            /** \brief A path simplifier used to simplify dense paths added to the graph */
-            PathSimplifierPtr                                                   psimp_;
+        //     /** \brief A path simplifier used to simplify dense paths added to the graph */
+        //     PathSimplifierPtr                                                   psimp_;
 
             /** \brief Access to the weights of each Edge */
-            boost::property_map<Graph, boost::edge_weight_t>::type              edgeWeightProperty_; // TODO: this is not used?
+            //boost::property_map<Graph, boost::edge_weight_t>::type              edgeWeightProperty_; // TODO: this is not used?
 
             /** \brief Access to the collision checking state of each Edge */
             EdgeCollisionStateMap                                               edgeCollisionStateProperty_;
@@ -756,34 +754,34 @@ namespace ompl
             /** \brief Access to the internal base::state at each Vertex */
             boost::property_map<Graph, vertex_state_t>::type                    stateProperty_;
 
-            /** \brief Access to the colors for the vertices */
-            boost::property_map<Graph, vertex_color_t>::type                    colorProperty_;
+            /** \brief Access to the SPARS vertex type for the vertices */
+            boost::property_map<Graph, vertex_type_t>::type                    typeProperty_;
 
-            /** \brief Access to the interface pair information for the vertices */
-            boost::property_map<Graph, vertex_interface_data_t>::type           interfaceDataProperty_;
+        //     /** \brief Access to the interface pair information for the vertices */
+        //     boost::property_map<Graph, vertex_interface_data_t>::type           interfaceDataProperty_;
 
-            /** \brief Data structure that maintains the connected components */
-            boost::disjoint_sets<
-                boost::property_map<Graph, boost::vertex_rank_t>::type,
-                boost::property_map<Graph, boost::vertex_predecessor_t>::type >
-                                                                                disjointSets_;
-            /** \brief Random number generator */
-            RNG                                                                 rng_;
+        //     /** \brief Data structure that maintains the connected components */
+        //     boost::disjoint_sets<
+        //         boost::property_map<Graph, boost::vertex_rank_t>::type,
+        //         boost::property_map<Graph, boost::vertex_predecessor_t>::type >
+        //                                                                         disjointSets_;
+        //     /** \brief Random number generator */
+        //     RNG                                                                 rng_;
 
-            /** \brief A flag indicating that a solution has been added during solve() */
-            bool                                                                addedSolution_;
+        //     /** \brief A flag indicating that a solution has been added during solve() */
+        //     bool                                                                addedSolution_;
 
-            /** \brief A counter for the number of consecutive failed iterations of the algorithm */
-            unsigned int                                                        consecutiveFailures_;
+        //     /** \brief A counter for the number of consecutive failed iterations of the algorithm */
+        //     unsigned int                                                        consecutiveFailures_;
 
-            /** \brief A counter for the number of iterations of the algorithm */
-            long unsigned int                                                   iterations_;
+        //     /** \brief A counter for the number of iterations of the algorithm */
+        //     long unsigned int                                                   iterations_;
 
             /** \brief Maximum visibility range for nodes in the graph */
             double                                                              sparseDelta_;
 
-            /** \brief Maximum range for allowing two samples to support an interface */
-            double                                                              denseDelta_;
+        //     /** \brief Maximum range for allowing two samples to support an interface */
+        //     double                                                              denseDelta_;
 
             /** \brief Used by getSimilarPaths */
             std::vector<Vertex>                                                 startVertexCandidateNeighbors_;
