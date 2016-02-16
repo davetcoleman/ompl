@@ -43,19 +43,24 @@ namespace og = ompl::geometric;
 namespace ob = ompl::base;
 namespace ot = ompl::tools;
 
-ompl::tools::Bolt::Bolt(const base::SpaceInformationPtr &si)
-    : ompl::tools::ExperienceSetup(si)
+namespace ompl
+{
+namespace tools
+{
+
+Bolt::Bolt(const base::SpaceInformationPtr &si)
+    : ExperienceSetup(si)
 {
     initialize();
 }
 
-ompl::tools::Bolt::Bolt(const base::StateSpacePtr &space)
-    : ompl::tools::ExperienceSetup(space)
+Bolt::Bolt(const base::StateSpacePtr &space)
+    : ExperienceSetup(space)
 {
     initialize();
 }
 
-void ompl::tools::Bolt::initialize()
+void Bolt::initialize()
 {
     OMPL_INFORM("Initializing Bolt Framework");
 
@@ -67,7 +72,7 @@ void ompl::tools::Bolt::initialize()
     dualThreadScratchEnabled_ = true;
 
     // Load the experience database
-    experienceDB_.reset(new ompl::tools::BoltDB(si_->getStateSpace()));
+    experienceDB_.reset(new geometric::BoltDB(si_->getStateSpace()));
 
     // Load the Retrieve repair database. We do it here so that setRepairPlanner() works
     rrPlanner_ = ob::PlannerPtr(new og::BoltRetrieveRepair(si_, experienceDB_));
@@ -75,7 +80,7 @@ void ompl::tools::Bolt::initialize()
     OMPL_INFORM("Bolt Framework initialized.");
 }
 
-void ompl::tools::Bolt::setup(void)
+void Bolt::setup(void)
 {
     if (!configured_ || !si_->isSetup() || !planner_->isSetup() || !rrPlanner_->isSetup() )
     {
@@ -91,9 +96,9 @@ void ompl::tools::Bolt::setup(void)
             if (!planner_)
             {
                 OMPL_INFORM("Getting default planner: ");
-                planner_ = ompl::base::PlannerPtr(new ompl::geometric::RRTConnect(si_));
+                planner_ = base::PlannerPtr(new geometric::RRTConnect(si_));
                 // This was disabled because i like to use Bolt / SPARSdb without setting a goal definition
-                //planner_ = ompl::geometric::getDefaultPlanner(pdef_->getGoal()); // we could use the repairProblemDef_ here but that isn't setup yet
+                //planner_ = geometric::getDefaultPlanner(pdef_->getGoal()); // we could use the repairProblemDef_ here but that isn't setup yet
 
                 OMPL_INFORM("No planner specified. Using default: %s", planner_->getName().c_str() );
             }
@@ -113,9 +118,9 @@ void ompl::tools::Bolt::setup(void)
                 if (!planner2_)
                 {
                     OMPL_INFORM("Getting default planner: ");
-                    planner2_ = ompl::base::PlannerPtr(new ompl::geometric::RRTConnect(si_));
+                    planner2_ = base::PlannerPtr(new geometric::RRTConnect(si_));
                     // This was disabled because i like to use Bolt / SPARSdb without setting a goal definition
-                    //planner2_ = ompl::geometric::getDefaultPlanner(pdef_->getGoal()); // we could use the repairProblemDef_ here but that isn't setup yet
+                    //planner2_ = geometric::getDefaultPlanner(pdef_->getGoal()); // we could use the repairProblemDef_ here but that isn't setup yet
 
                     OMPL_INFORM("No planner 2 specified. Using default: %s", planner2_->getName().c_str() );
                 }
@@ -149,30 +154,15 @@ void ompl::tools::Bolt::setup(void)
         }
 
         // Setup SPARS
-        if (!experienceDB_->getPRMdb())
-        {
-            OMPL_INFORM("Calling setup() for PRMdb");
-
-            // Load PRMdb
-            experienceDB_->getPRMdb().reset(new ompl::geometric::PRMdb(si_));
-            experienceDB_->getPRMdb()->setProblemDefinition(pdef_);
-            experienceDB_->getPRMdb()->setup();
-
-            //experienceDB_->getPRMdb()->setStretchFactor(1.2);
-            //experienceDB_->getPRMdb()->setSparseDeltaFraction(0.05); // vertex visibility range  = maximum_extent * this_fraction
-            //experienceDB_->getPRMdb()->setDenseDeltaFraction(0.001);
-
-            //experienceDB_->getPRMdb()->printDebug();
-
-            experienceDB_->load(filePath_); // load from file
-        }
+        OMPL_INFORM("Calling setup() for BoltDB");
+        experienceDB_->load(filePath_); // load from file
 
         // Set the configured flag
         configured_ = true;
     }
 }
 
-void ompl::tools::Bolt::clear(void)
+void Bolt::clear(void)
 {
     if (planner_)
         planner_->clear();
@@ -188,7 +178,7 @@ void ompl::tools::Bolt::clear(void)
     }
 }
 
-void ompl::tools::Bolt::setPlannerAllocator(const base::PlannerAllocator &pa)
+void Bolt::setPlannerAllocator(const base::PlannerAllocator &pa)
 {
     pa_ = pa;
     planner_.reset();
@@ -196,7 +186,7 @@ void ompl::tools::Bolt::setPlannerAllocator(const base::PlannerAllocator &pa)
     configured_ = false;
 }
 
-ompl::base::PlannerStatus ompl::tools::Bolt::solve(const base::PlannerTerminationCondition &ptc)
+base::PlannerStatus Bolt::solve(const base::PlannerTerminationCondition &ptc)
 {
     // we provide a duplicate implementation here to allow the planner to choose how the time is turned into a planner termination condition
 
@@ -230,7 +220,7 @@ ompl::base::PlannerStatus ompl::tools::Bolt::solve(const base::PlannerTerminatio
     {
         OMPL_WARN("Bolt: not stopping until a solution or a failure is found from both threads. THIS MODE IS JUST FOR TESTING");
         // This mode is more for benchmarking, since I don't care about optimality
-        // If \e hybridize is false, when \e minSolCount new solutions are found (added to the set of solutions maintained by ompl::base::Goal), the rest of the planners are stopped as well.
+        // If \e hybridize is false, when \e minSolCount new solutions are found (added to the set of solutions maintained by base::Goal), the rest of the planners are stopped as well.
 
         // Start both threads
         std::size_t minSolCount = 2;
@@ -250,7 +240,7 @@ ompl::base::PlannerStatus ompl::tools::Bolt::solve(const base::PlannerTerminatio
     stats_.totalPlanningTime_ += planTime_; // used for averaging
     stats_.numProblems_++; // used for averaging
 
-    if (lastStatus_ == ompl::base::PlannerStatus::TIMEOUT)
+    if (lastStatus_ == base::PlannerStatus::TIMEOUT)
     {
         // Skip further processing if absolutely no path is available
         OMPL_ERROR("Bolt Solve: No solution found after %f seconds", planTime_);
@@ -325,7 +315,7 @@ ompl::base::PlannerStatus ompl::tools::Bolt::solve(const base::PlannerTerminatio
             }
             else if (false) // always add when from recall
             {
-                OMPL_INFORM("Adding path to database because PRM will decide for us if we should keep the nodes");
+                OMPL_INFORM("Adding path to database because BoltDB will decide for us if we should keep the nodes");
 
                 // Stats
                 stats_.numSolutionsFromRecallSaved_++;
@@ -339,7 +329,7 @@ ompl::base::PlannerStatus ompl::tools::Bolt::solve(const base::PlannerTerminatio
             }
             else // never add when from recall
             {
-                OMPL_INFORM("NOT adding path to database because PRM already has it");
+                OMPL_INFORM("NOT adding path to database because BoltDB already has it");
 
                 // Logging
                 log.is_saved = "skipped";
@@ -385,9 +375,9 @@ ompl::base::PlannerStatus ompl::tools::Bolt::solve(const base::PlannerTerminatio
 
     // Final log data
     //log.insertion_time = insertionTime; TODO fix this
-    log.num_vertices = experienceDB_->getPRMdb()->getNumVertices();
-    log.num_edges = experienceDB_->getPRMdb()->getNumEdges();
-    log.num_connected_components = experienceDB_->getPRMdb()->getNumConnectedComponents();
+    log.num_vertices = experienceDB_->getNumVertices();
+    log.num_edges = experienceDB_->getNumEdges();
+    log.num_connected_components = 0;
 
     // Flush the log to buffer
     convertLogToString(log);
@@ -395,25 +385,25 @@ ompl::base::PlannerStatus ompl::tools::Bolt::solve(const base::PlannerTerminatio
     return lastStatus_;
 }
 
-ompl::base::PlannerStatus ompl::tools::Bolt::solve(double time)
+base::PlannerStatus Bolt::solve(double time)
 {
     ob::PlannerTerminationCondition ptc = ob::timedPlannerTerminationCondition( time );
     return solve(ptc);
 }
 
-bool ompl::tools::Bolt::save()
+bool Bolt::save()
 {
-    setup(); // ensure the PRM db has been loaded to the Experience DB
+    setup(); // ensure the db has been loaded to the Experience DB
     return experienceDB_->save(filePath_);
 }
 
-bool ompl::tools::Bolt::saveIfChanged()
+bool Bolt::saveIfChanged()
 {
-    setup(); // ensure the PRM db has been loaded to the Experience DB
+    setup(); // ensure the db has been loaded to the Experience DB
     return experienceDB_->saveIfChanged(filePath_);
 }
 
-void ompl::tools::Bolt::printResultsInfo(std::ostream &out) const
+void Bolt::printResultsInfo(std::ostream &out) const
 {
     for (std::size_t i = 0; i < pdef_->getSolutionCount(); ++i)
     {
@@ -424,7 +414,7 @@ void ompl::tools::Bolt::printResultsInfo(std::ostream &out) const
     }
 }
 
-void ompl::tools::Bolt::print(std::ostream &out) const
+void Bolt::print(std::ostream &out) const
 {
     if (si_)
     {
@@ -450,7 +440,7 @@ void ompl::tools::Bolt::print(std::ostream &out) const
         pdef_->print(out);
 }
 
-void ompl::tools::Bolt::printLogs(std::ostream &out) const
+void Bolt::printLogs(std::ostream &out) const
 {
     if (!recallEnabled_)
         out << "Scratch Planning Logging Results (inside Bolt Framework)" << std::endl;
@@ -465,36 +455,35 @@ void ompl::tools::Bolt::printLogs(std::ostream &out) const
     out << "    Failed:                     " << stats_.numSolutionsFailed_ << std::endl;
     out << "    Timedout:                    " << stats_.numSolutionsTimedout_ << std::endl;
     out << "    Approximate:                 " << stats_.numSolutionsApproximate_ << std::endl;
-    out << "  PRMdb                        " << std::endl;
-    out << "    Vertices:                    " << experienceDB_->getPRMdb()->getNumVertices() << std::endl;
-    out << "    Edges:                       " << experienceDB_->getPRMdb()->getNumEdges() << std::endl;
-    out << "    Connected Components:        " << experienceDB_->getPRMdb()->getNumConnectedComponents() << std::endl;
+    out << "  BoltDB                        " << std::endl;
+    out << "    Vertices:                    " << experienceDB_->getNumVertices() << std::endl;
+    out << "    Edges:                       " << experienceDB_->getNumEdges() << std::endl;
     out << "    Unsaved paths inserted:      " << experienceDB_->getNumPathsInserted() << std::endl;
-    //out << "    Consecutive state failures:  " << experienceDB_->getPRMdb()->getNumConsecutiveFailures() << std::endl;
-    //out << "    Connected path failures:     " << experienceDB_->getPRMdb()->getNumPathInsertionFailed() << std::endl;
-    //out << "    Sparse Delta Fraction:       " << experienceDB_->getPRMdb()->getSparseDeltaFraction() << std::endl;
+    //out << "    Consecutive state failures:  " << experienceDB_->getNumConsecutiveFailures() << std::endl;
+    //out << "    Connected path failures:     " << experienceDB_->getNumPathInsertionFailed() << std::endl;
+    //out << "    Sparse Delta Fraction:       " << experienceDB_->getSparseDeltaFraction() << std::endl;
     out << "  Average planning time:         " << stats_.getAveragePlanningTime() << std::endl;
     out << "  Average insertion time:        " << stats_.getAverageInsertionTime() << std::endl;
 }
 
-std::size_t ompl::tools::Bolt::getExperiencesCount() const
+std::size_t Bolt::getExperiencesCount() const
 {
-    return experienceDB_->getPRMdb()->getNumVertices();
+    return experienceDB_->getNumVertices();
 }
 
-void ompl::tools::Bolt::getAllPlannerDatas(std::vector<ob::PlannerDataPtr> &plannerDatas) const
+void Bolt::getAllPlannerDatas(std::vector<ob::PlannerDataPtr> &plannerDatas) const
 {
     experienceDB_->getAllPlannerDatas(plannerDatas);
 }
 
-void ompl::tools::Bolt::convertPlannerData(const ob::PlannerDataPtr plannerData, og::PathGeometric &path)
+void Bolt::convertPlannerData(const ob::PlannerDataPtr plannerData, og::PathGeometric &path)
 {
     // Convert the planner data verticies into a vector of states
     for (std::size_t i = 0; i < plannerData->numVertices(); ++i)
         path.append(plannerData->getVertex(i).getState());
 }
 
-bool ompl::tools::Bolt::reversePathIfNecessary(og::PathGeometric &path1, og::PathGeometric &path2)
+bool Bolt::reversePathIfNecessary(og::PathGeometric &path1, og::PathGeometric &path2)
 {
     // Reverse path2 if it matches better
     const ob::State* s1 = path1.getState(0);
@@ -516,12 +505,12 @@ bool ompl::tools::Bolt::reversePathIfNecessary(og::PathGeometric &path1, og::Pat
     return false;
 }
 
-ompl::tools::BoltDBPtr ompl::tools::Bolt::getExperienceDB()
+geometric::BoltDBPtr Bolt::getExperienceDB()
 {
     return experienceDB_;
 }
 
-bool ompl::tools::Bolt::doPostProcessing()
+bool Bolt::doPostProcessing()
 {
     OMPL_INFORM("Performing post-processing for %i queued solution paths", QueuedSolutionPaths_.size());
 
@@ -540,3 +529,6 @@ bool ompl::tools::Bolt::doPostProcessing()
 
     return true;
 }
+
+} // namespace tools
+} // namespace ompl

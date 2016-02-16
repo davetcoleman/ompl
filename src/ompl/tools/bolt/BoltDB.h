@@ -45,12 +45,26 @@
 #include <ompl/base/State.h>
 #include <ompl/base/SpaceInformation.h>
 #include <ompl/datastructures/NearestNeighbors.h>
-#include <ompl/tools/bolt/PRMdb.h>
+#include <ompl/base/PlannerTerminationCondition.h>
+
+// Boost
+#include <boost/range/adaptor/map.hpp>
+#include <boost/unordered_map.hpp>
+#include <boost/graph/graph_traits.hpp>
+#include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/filtered_graph.hpp>
+#include <boost/graph/graph_utility.hpp>
+#include <boost/graph/astar_search.hpp>
+#include <boost/graph/connected_components.hpp>
+#include <boost/property_map/property_map.hpp>
+#include <boost/pending/disjoint_sets.hpp>
+#include <boost/function.hpp>
+#include <boost/thread.hpp>
 
 namespace ompl
 {
 
-    namespace tools
+    namespace geometric
     {
         /**
            @anchor BoltDB
@@ -60,9 +74,8 @@ namespace ompl
 
         /// @cond IGNORE
         OMPL_CLASS_FORWARD(BoltDB);
+        //OMPL_CLASS_FORWARD(BoltRetrieveRepair);
         /// @endcond
-
-        typedef boost::shared_ptr<ompl::geometric::PRMdb> PRMdbPtr;
 
         /** \class ompl::geometric::BoltDBPtr
             \brief A boost shared pointer wrapper for ompl::tools::BoltDB */
@@ -70,7 +83,316 @@ namespace ompl
         /** \brief Save and load entire paths from file */
         class BoltDB
         {
+            friend class BoltRetrieveRepair;
+
         public:
+
+            ////////////////////////////////////////////////////////////////////////////////////////
+            // VERTEX PROPERTIES
+            ////////////////////////////////////////////////////////////////////////////////////////
+
+            /** \brief Enumeration which specifies the reason a guard is added to the spanner. */
+            enum GuardType
+            {
+                START,
+                GOAL,
+                COVERAGE,
+                CONNECTIVITY,
+                INTERFACE,
+                QUALITY,
+            };
+
+            ////////////////////////////////////////////////////////////////////////////////////////
+            // BOOST GRAPH DETAILS
+            ////////////////////////////////////////////////////////////////////////////////////////
+
+            /** \brief The type used internally for representing vertex IDs */
+            typedef unsigned long int VertexIndexType; // TODO(davetcoleman): just use size_t?
+
+            /** \brief Pair of vertices which support an interface. */
+            //typedef std::pair< VertexIndexType, VertexIndexType > VertexPair;
+
+            ////////////////////////////////////////////////////////////////////////////////////////
+            /** \brief Interface information storage class, which does bookkeeping for criterion four. */
+            // struct InterfaceData
+            // {
+            //     /** \brief States which lie inside the visibility region of a vertex and support an interface. */
+            //     base::State *pointA_;
+            //     base::State *pointB_;
+
+            //     /** \brief States which lie just outside the visibility region of a vertex and support an interface. */
+            //     base::State *sigmaA_;
+            //     base::State *sigmaB_;
+
+            //     /** \brief Last known distance between the two interfaces supported by points_ and sigmas. */
+            //     double       last_distance_;
+
+            //     /** \brief Constructor */
+            //     InterfaceData() :
+            //         pointA_(NULL),
+            //         pointB_(NULL),
+            //         sigmaA_(NULL),
+            //         sigmaB_(NULL),
+            //         last_distance_(std::numeric_limits<double>::infinity())
+            //     {
+            //     }
+
+            //     /** \brief Clears the given interface data. */
+            //     void clear(const base::SpaceInformationPtr& si)
+            //     {
+            //         if (pointA_)
+            //         {
+            //             si->freeState(pointA_);
+            //             pointA_ = NULL;
+            //         }
+            //         if (pointB_)
+            //         {
+            //             si->freeState(pointB_);
+            //             pointB_ = NULL;
+            //         }
+            //         if (sigmaA_)
+            //         {
+            //             si->freeState(sigmaA_);
+            //             sigmaA_ = NULL;
+            //         }
+            //         if (sigmaB_)
+            //         {
+            //             si->freeState(sigmaB_);
+            //             sigmaB_ = NULL;
+            //         }
+            //         last_distance_ = std::numeric_limits<double>::infinity();
+            //     }
+
+            //     /** \brief Sets information for the first interface (i.e. interface with smaller index vertex). */
+            //     void setFirst(const base::State *p, const base::State *s, const base::SpaceInformationPtr& si)
+            //     {
+            //         if (pointA_)
+            //             si->copyState(pointA_, p);
+            //         else
+            //             pointA_ = si->cloneState(p);
+            //         if (sigmaA_)
+            //             si->copyState(sigmaA_, s);
+            //         else
+            //             sigmaA_ = si->cloneState(s);
+            //         if (pointB_)
+            //             last_distance_ = si->distance(pointA_, pointB_);
+            //     }
+
+            //     /** \brief Sets information for the second interface (i.e. interface with larger index vertex). */
+            //     void setSecond(const base::State *p, const base::State *s, const base::SpaceInformationPtr& si)
+            //     {
+            //         if (pointB_)
+            //             si->copyState(pointB_, p);
+            //         else
+            //             pointB_ = si->cloneState(p);
+            //         if (sigmaB_)
+            //             si->copyState(sigmaB_, s);
+            //         else
+            //             sigmaB_ = si->cloneState(s);
+            //         if (pointA_)
+            //             last_distance_ = si->distance(pointA_, pointB_);
+            //     }
+            // };
+
+            /** \brief the hash which maps pairs of neighbor points to pairs of states */
+            //typedef boost::unordered_map< VertexPair, InterfaceData, boost::hash< VertexPair > > InterfaceHash;
+
+            ////////////////////////////////////////////////////////////////////////////////////////
+            // The InterfaceHash structure is wrapped inside of this struct due to a compilation error on
+            // GCC 4.6 with Boost 1.48.  An implicit assignment operator overload does not compile with these
+            // components, so an explicit overload is given here.
+            // Remove this struct when the minimum Boost requirement is > v1.48.
+            // struct InterfaceHashStruct
+            // {
+            //     InterfaceHashStruct& operator=(const InterfaceHashStruct &rhs) { interfaceHash = rhs.interfaceHash; return *this; }
+            //     InterfaceHash interfaceHash;
+            // };
+
+            ////////////////////////////////////////////////////////////////////////////////////////
+            // Vertex properties
+
+            struct vertex_state_t {
+                typedef boost::vertex_property_tag kind;
+            };
+
+            struct vertex_type_t {
+                typedef boost::vertex_property_tag kind;
+            };
+
+            // struct vertex_interface_data_t {
+            //     typedef boost::vertex_property_tag kind;
+            // };
+
+            ////////////////////////////////////////////////////////////////////////////////////////
+            // Edge properties
+
+            struct edge_collision_state_t {
+                typedef boost::edge_property_tag kind;
+            };
+
+            /** \brief Possible collision states of an edge */
+            enum EdgeCollisionState
+            {
+                NOT_CHECKED,
+                IN_COLLISION,
+                FREE
+            };
+
+            ////////////////////////////////////////////////////////////////////////////////////////
+            /** \brief Struct for passing around partially solved solutions */
+            struct CandidateSolution
+            {
+                bool isApproximate_;
+                base::PathPtr path_;
+                // Edge 0 is edge from vertex 0 to vertex 1. Thus, there is n-1 edges for n vertices
+                std::vector<EdgeCollisionState> edgeCollisionStatus_;
+                // TODO save the collision state of the vertexes also?
+
+                std::size_t getStateCount()
+                {
+                    return static_cast<ompl::geometric::PathGeometric&>(*path_).getStateCount();
+                }
+
+                ompl::geometric::PathGeometric& getGeometricPath()
+                {
+                    return static_cast<ompl::geometric::PathGeometric&>(*path_);
+                }
+            };
+
+            ////////////////////////////////////////////////////////////////////////////////////////
+            /**
+             @brief The underlying roadmap graph.
+
+             @par Any BGL graph representation could be used here. Because we
+             expect the roadmap to be sparse (m<n^2), an adjacency_list is more
+             appropriate than an adjacency_matrix. Edges are undirected.
+
+             *Properties of vertices*
+             - vertex_state_t: an ompl::base::State* is required for OMPL
+             - vertex_predecessor_t: The incremental connected components algorithm requires it
+             - vertex_rank_t: The incremental connected components algorithm requires it
+             - vertex_type_t - TODO
+             - vertex_interface_data_t - needed by PRM2 for maintainings its sparse properties
+
+             Note: If boost::vecS is not used for vertex storage, then there must also
+             be a boost:vertex_index_t property manually added.
+
+             *Properties of edges*
+             - edge_weight_t - cost/distance between two vertices
+             - edge_collision_state_t - used for lazy collision checking, determines if an edge has been checked
+                  already for collision. 0 = not checked/unknown, 1 = in collision, 2 = free
+             */
+
+            /** Wrapper for the vertex's multiple as its property. */
+            typedef boost::property < vertex_state_t, base::State*,
+                    boost::property < boost::vertex_predecessor_t, VertexIndexType,
+                    boost::property < boost::vertex_rank_t, VertexIndexType,
+                    boost::property < vertex_type_t, GuardType //,
+                  //boost::property < vertex_interface_data_t, InterfaceHashStruct >
+                                      > > > > VertexProperties;
+
+            /** Wrapper for the double assigned to an edge as its weight property. */
+            typedef boost::property < boost::edge_weight_t, double,
+                    boost::property < edge_collision_state_t, int > > EdgeProperties;
+
+            /** The underlying boost graph type (undirected weighted-edge adjacency list with above properties). */
+            typedef boost::adjacency_list <
+                boost::vecS, // store in std::vector
+                boost::vecS, // store in std::vector
+                boost::undirectedS,
+                VertexProperties,
+                EdgeProperties
+            > Graph;
+
+            /** \brief Vertex in Graph */
+            typedef boost::graph_traits<Graph>::vertex_descriptor Vertex;
+
+            /** \brief Edge in Graph */
+            typedef boost::graph_traits<Graph>::edge_descriptor   Edge;
+
+            ////////////////////////////////////////////////////////////////////////////////////////
+            // Typedefs for property maps
+
+            /** \brief Access map that stores the lazy collision checking status of each edge */
+            typedef boost::property_map<Graph, edge_collision_state_t>::type EdgeCollisionStateMap;
+
+            ////////////////////////////////////////////////////////////////////////////////////////
+            /**
+             * Used to artifically supress edges during A* search.
+             * @implements ReadablePropertyMapConcept
+             */
+            class edgeWeightMap
+            {
+            private:
+
+                const Graph &g_;                         // Graph used
+                const EdgeCollisionStateMap &collisionStates_;
+
+            public:
+
+                /** Map key type. */
+                typedef Edge key_type;
+                /** Map value type. */
+                typedef double value_type;
+                /** Map auxiliary value type. */
+                typedef double &reference;
+                /** Map type. */
+                typedef boost::readable_property_map_tag category;
+
+                /**
+                 * Construct map for certain constraints.
+                 * @param graph         Graph to use
+                 */
+                edgeWeightMap (const Graph &graph, const EdgeCollisionStateMap &collisionStates);
+
+                /**
+                 * Get the weight of an edge.
+                 * @param e     the edge
+                 * @return infinity if \a e lies in a forbidden neighborhood; actual weight of \a e otherwise
+                 */
+                double get (Edge e) const;
+
+            };
+
+            ////////////////////////////////////////////////////////////////////////////////////////
+            /**
+             * Thrown to stop the A* search when finished.
+             */
+            class foundGoalException
+            {
+            };
+
+            ////////////////////////////////////////////////////////////////////////////////////////
+            /**
+             * Vertex visitor to check if A* search is finished.
+             * @implements AStarVisitorConcept
+             */
+            class CustomVisitor : public boost::default_astar_visitor
+            {
+            private:
+
+                Vertex goal;    // Goal Vertex of the search
+
+            public:
+
+                /**
+                 * Construct a visitor for a given search.
+                 * @param goal  goal vertex of the search
+                 */
+                CustomVisitor (Vertex goal);
+
+                /**
+                 * Check if we have arrived at the goal.
+                 * @param u current vertex
+                 * @param g graph we are searching on
+                 * @throw foundGoalException if \a u is the goal
+                 */
+                void examine_vertex(Vertex u, const Graph &g) const;
+            };
+
+            ////////////////////////////////////////////////////////////////////////////////////////
+            // BoltDB MEMBER FUNCTIONS
+            ////////////////////////////////////////////////////////////////////////////////////////
 
             /** \brief Constructor needs the state space used for planning.
              *  \param space - state space
@@ -115,17 +437,6 @@ namespace ompl
              */
             void getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const;
 
-            /** \brief Create the database structure for saving experiences */
-            void setPRMdb(ompl::tools::PRMdbPtr &prm);
-
-            /** \brief Hook for debugging */
-            ompl::tools::PRMdbPtr& getPRMdb();
-
-            /** \brief Find the k nearest paths to our queries one */
-            bool findNearestStartGoal(const base::State* start, const base::State* goal,
-                                      ompl::geometric::PRMdb::CandidateSolution &candidateSolution,
-                                      const base::PlannerTerminationCondition& ptc);
-
             /** \brief Print info to screen */
             void debugVertex(const ompl::base::PlannerDataVertex& vertex);
             void debugState(const ompl::base::State* state);
@@ -154,13 +465,69 @@ namespace ompl
              */
             bool isEmpty()
             {
-                return !prm_->getNumVertices();
+                return !getNumVertices();
             }
+
+            /** \brief Retrieve the computed roadmap. */
+            const Graph& getRoadmap() const
+            {
+                return g_;
+            }
+
+            /** \brief Get the number of vertices in the sparse roadmap. */
+            unsigned int getNumVertices() const
+            {
+                return boost::num_vertices(g_);
+            }
+
+            /** \brief Get the number of edges in the sparse roadmap. */
+            unsigned int getNumEdges() const
+            {
+                return boost::num_edges(g_);
+            }
+
+            /**
+             * \brief Get the sparse graph to save to file
+             * \param data - where to convert the data into
+             */
+             virtual void getPlannerData(base::PlannerData &data) const;
+
+            /**
+             * \brief Set the sparse graph from file
+             * \param a pre-built graph
+             */
+            void setPlannerData(const base::PlannerData &data);
+
+            /**
+             * \brief Discretize the space into a simple grid
+             */
+            void generateGrid();
+
+            /** \brief Free all the memory allocated by the database */
+            void freeMemory();
+
+            /** \brief Check that the query vertex is initialized (used for internal nearest neighbor searches) */
+            void initializeQueryState();
+
+            /** \brief Compute distance between two milestones (this is simply distance between the states of the milestones) */
+            double distanceFunction(const Vertex a, const Vertex b) const;
+
+            /** \brief Clear all past edge state information about in collision or not */
+            void clearEdgeCollisionStates();
+
+            /** \brief Given two milestones from the same connected component, construct a path connecting them and set it as the solution
+             *  \param start
+             *  \param goal
+             *  \param vertexPath
+             *  \return true if candidate solution found
+             */
+            bool astarSearch(const BoltDB::Vertex start, const BoltDB::Vertex goal,
+                                   std::vector<BoltDB::Vertex> &vertexPath) const;
 
         protected:
 
             /// The created space information
-            base::SpaceInformationPtr     si_; // TODO: is this even necessary?
+            base::SpaceInformationPtr si_;
 
             /// Helper class for storing each plannerData instance
             ompl::base::PlannerDataStorage plannerDataStorage_;
@@ -168,15 +535,35 @@ namespace ompl
             // Track unsaved paths to determine if a save is required
             int numPathsInserted_;
 
-            // Use PRMdb's graph datastructure to store experience
-            ompl::tools::PRMdbPtr prm_;
-
             // Allow the database to save to file (new experiences)
             bool saving_enabled_;
 
+            /** \brief Nearest neighbors data structure */
+            boost::shared_ptr< NearestNeighbors<Vertex> > nn_;
+
+            /** \brief Connectivity graph */
+            Graph g_;
+
+            /** \brief Vertex for performing nearest neighbor queries. */
+            Vertex queryVertex_;
+
+            /** \brief Access to the weights of each Edge */
+            //boost::property_map<Graph, boost::edge_weight_t>::type              edgeWeightProperty_; // TODO: this is not used?
+
+            /** \brief Access to the collision checking state of each Edge */
+            EdgeCollisionStateMap edgeCollisionStateProperty_;
+
+            /** \brief Access to the internal base::state at each Vertex */
+            boost::property_map<Graph, vertex_state_t>::type stateProperty_;
+
+            /** \brief Access to the SPARS vertex type for the vertices */
+            boost::property_map<Graph, vertex_type_t>::type typeProperty_;
+
+            /** \brief Option to enable debugging output */
+            bool verbose_;
+
         }; // end of class BoltDB
 
-    } // end of namespace
-
-} // end of namespace
+    } // namespace tools
+} // namespace ompl
 #endif

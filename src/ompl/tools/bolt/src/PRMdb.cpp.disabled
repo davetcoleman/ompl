@@ -44,57 +44,10 @@
 #include <boost/graph/astar_search.hpp>
 #include <boost/graph/incremental_components.hpp>
 #include <boost/property_map/vector_property_map.hpp>
-#include <boost/foreach.hpp>
 #include <ompl/base/spaces/RealVectorStateSpace.h>
 
-// Allow hooks for visualizing planner
-#define OMPL_BOLT_DEBUG
 
-#define foreach BOOST_FOREACH
-#define foreach_reverse BOOST_REVERSE_FOREACH
 
-// edgeWeightMap methods ////////////////////////////////////////////////////////////////////////////
-
-BOOST_CONCEPT_ASSERT((boost::ReadablePropertyMapConcept<ompl::geometric::PRMdb::edgeWeightMap, ompl::geometric::PRMdb::Edge>));
-
-ompl::geometric::PRMdb::edgeWeightMap::edgeWeightMap (const Graph &graph,
-                                                        const EdgeCollisionStateMap &collisionStates)
-    : g_(graph),
-      collisionStates_(collisionStates)
-{
-}
-
-double ompl::geometric::PRMdb::edgeWeightMap::get (Edge e) const
-{
-    // Get the status of collision checking for this edge
-    if (collisionStates_[e] == IN_COLLISION)
-        return std::numeric_limits<double>::infinity();
-
-    return boost::get(boost::edge_weight, g_, e);
-}
-
-namespace boost
-{
-double get (const ompl::geometric::PRMdb::edgeWeightMap &m, const ompl::geometric::PRMdb::Edge &e)
-{
-    return m.get(e);
-}
-}
-
-// CustomVisitor methods ////////////////////////////////////////////////////////////////////////////
-
-BOOST_CONCEPT_ASSERT((boost::AStarVisitorConcept<ompl::geometric::PRMdb::CustomVisitor, ompl::geometric::PRMdb::Graph>));
-
-ompl::geometric::PRMdb::CustomVisitor::CustomVisitor (Vertex goal)
-    : goal(goal)
-{
-}
-
-void ompl::geometric::PRMdb::CustomVisitor::examine_vertex (Vertex u, const Graph &) const
-{
-    if (u == goal)
-        throw foundGoalException();
-}
 
 // PRMdb methods ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -107,22 +60,14 @@ ompl::geometric::PRMdb::PRMdb(const base::SpaceInformationPtr &si) :
     // maxFailures_(5000),
     // numPathInsertionFailures_(0),
     // nearSamplePoints_((2*si_->getStateDimension())),
-    // Property accessors of edges
-    //edgeWeightProperty_(boost::get(boost::edge_weight, g_)),
-    edgeCollisionStateProperty_(boost::get(edge_collision_state_t(), g_)),
-    // Property accessors of vertices
-    stateProperty_(boost::get(vertex_state_t(), g_)),
-    typeProperty_(boost::get(vertex_type_t(), g_)),
-    //interfaceDataProperty_(boost::get(vertex_interface_data_t(), g_)),
     // Disjoint set accessors
     //disjointSets_(boost::get(boost::vertex_rank, g_),
     //boost::get(boost::vertex_predecessor, g_)),
     // addedSolution_(false),
     // consecutiveFailures_(0),
     // iterations_(0),
-    sparseDelta_(2.0),
+
     // denseDelta_(0.),
-    verbose_(true)
 {
     // specs_.recognizedGoal = base::GOAL_SAMPLEABLE_REGION;
     // specs_.approximateSolutions = false;
@@ -136,34 +81,16 @@ ompl::geometric::PRMdb::PRMdb(const base::SpaceInformationPtr &si) :
     // Planner::declareParam<unsigned int>("max_failures", this, &PRMdb::setMaxFailures, &PRMdb::getMaxFailures, "100:10:3000");
 }
 
-ompl::geometric::PRMdb::~PRMdb()
-{
-    freeMemory();
-}
-
 void ompl::geometric::PRMdb::setup()
 {
     Planner::setup();
-    if (!nn_)
-        nn_.reset(tools::SelfConfig::getDefaultNearestNeighbors<Vertex>(this));
-    nn_->setDistanceFunction(boost::bind(&PRMdb::distanceFunction, this, _1, _2));
+
     //double maxExt = si_->getMaximumExtent();
     //sparseDelta_ = sparseDeltaFraction_ * maxExt;
     //denseDelta_ = denseDeltaFraction_ * maxExt;
 
     //if (!sampler_)
     //sampler_ = si_->allocValidStateSampler();
-}
-
-void ompl::geometric::PRMdb::setProblemDefinition(const base::ProblemDefinitionPtr &pdef)
-{
-    Planner::setProblemDefinition(pdef);
-    clearQuery();
-}
-
-void ompl::geometric::PRMdb::clearQuery()
-{
-    //pis_.restart();
 }
 
 void ompl::geometric::PRMdb::clear()
@@ -177,360 +104,10 @@ void ompl::geometric::PRMdb::clear()
         nn_->clear();
 }
 
-void ompl::geometric::PRMdb::freeMemory()
-{
-    Planner::clear();
-//     sampler_.reset();
-
-    foreach (Vertex v, boost::vertices(g_))
-    {
-        //foreach (InterfaceData &d, interfaceDataProperty_[v].interfaceHash | boost::adaptors::map_values)
-        //d.clear(si_);
-        if( stateProperty_[v] != NULL )
-            si_->freeState(stateProperty_[v]);
-        stateProperty_[v] = NULL; // TODO(davetcoleman): is this needed??
-    }
-    g_.clear();
-
-    if (nn_)
-        nn_->clear();
-}
-
-bool ompl::geometric::PRMdb::getSimilarPaths(const base::State* start, const base::State* goal,
-                                               CandidateSolution &candidateSolution,
-                                               const base::PlannerTerminationCondition &ptc)
-{
-    // Get neighbors near start and goal. Note: potentially they are not *visible* - will test for this later
-
-    // Start
-    OMPL_INFORM("Looking for a node near the problem start");
-    if (!findGraphNeighbors(start, startVertexCandidateNeighbors_))
-    {
-        OMPL_INFORM("No graph neighbors found for start within radius %f", sparseDelta_);
-        return false;
-    }
-    if (verbose_)
-        OMPL_INFORM("Found %d nodes near start", startVertexCandidateNeighbors_.size());
-
-    // Goal
-    OMPL_INFORM("Looking for a node near the problem goal");
-    if (!findGraphNeighbors(goal, goalVertexCandidateNeighbors_))
-    {
-        OMPL_INFORM("No graph neighbors found for goal within radius %f", sparseDelta_);
-        return false;
-    }
-    if (verbose_)
-        OMPL_INFORM("Found %d nodes near goal", goalVertexCandidateNeighbors_.size());
-
-    // Get paths between start and goal
-    bool result = getPaths(startVertexCandidateNeighbors_, goalVertexCandidateNeighbors_,
-                           start, goal, candidateSolution, ptc);
-
-    // Error check
-    if (!result)
-    {
-        OMPL_INFORM("getSimilarPaths(): PRMdb returned FALSE for getPaths");
-        return false;
-    }
-    if (!candidateSolution.path_)
-    {
-        OMPL_ERROR("getSimilarPaths(): PRMdb returned solution is NULL");
-        return false;
-    }
-
-    // Debug output
-    if (false)
-    {
-        ompl::geometric::PathGeometric geometricSolution
-            = static_cast<ompl::geometric::PathGeometric&>(*candidateSolution.path_);
-
-        for (std::size_t i = 0; i < geometricSolution.getStateCount(); ++i)
-        {
-            OMPL_INFORM("  getSimilarPaths(): Adding state %f to plannerData", i );
-            si_->printState(geometricSolution.getState(i), std::cout);
-        }
-    }
-
-    return result;
-}
-
-bool ompl::geometric::PRMdb::getPaths(const std::vector<Vertex> &candidateStarts,
-                                        const std::vector<Vertex> &candidateGoals,
-                                        const base::State* actualStart,
-                                        const base::State* actualGoal,
-                                        CandidateSolution &candidateSolution,
-                                        const base::PlannerTerminationCondition &ptc)
-{
-    // Try every combination of nearby start and goal pairs
-    foreach (Vertex start, candidateStarts)
-    {
-        // Check if this start is visible from the actual start
-        if (!si_->checkMotion(actualStart, stateProperty_[start]))
-        {
-            if (verbose_)
-                OMPL_WARN("FOUND CANDIDATE START THAT IS NOT VISIBLE ");
-            continue; // this is actually not visible
-        }
-
-        foreach (Vertex goal, candidateGoals)
-        {
-            if (verbose_)
-                OMPL_INFORM("  foreach_goal: Checking motion from  %d to %d", actualGoal, stateProperty_[goal]);
-
-            // Check if our planner is out of time
-            if (ptc == true)
-            {
-                OMPL_DEBUG("getPaths function interrupted because termination condition is true.");
-                return false;
-            }
-
-            // Check if this goal is visible from the actual goal
-            if (!si_->checkMotion(actualGoal, stateProperty_[goal]))
-            {
-                if (verbose_)
-                    OMPL_INFORM("FOUND CANDIDATE GOAL THAT IS NOT VISIBLE! ");
-                continue; // this is actually not visible
-            }
-
-            // Repeatidly search through graph for connection then check for collisions then repeat
-            if (lazyCollisionSearch( start, goal, actualStart, actualGoal, candidateSolution, ptc))
-            {
-                // Found a path
-                return true;
-            }
-            else
-            {
-                // Did not find a path
-                OMPL_INFORM("Did not find a path, looking for other start/goal combinations ");
-            }
-
-        } // foreach
-    } // foreach
-
-    return false;
-}
-
-bool ompl::geometric::PRMdb::lazyCollisionSearch(const Vertex &start,
-                                                   const Vertex &goal,
-                                                   const base::State* actualStart,
-                                                   const base::State* actualGoal,
-                                                   CandidateSolution &candidateSolution,
-                                                   const base::PlannerTerminationCondition &ptc)
-{
-    // Vector to store candidate paths in before they are converted to PathPtrs
-    std::vector<Vertex> vertexPath;
-
-    // Make sure that the start and goal aren't so close together that they find the same vertex
-    if (start == goal)
-    {
-        if (verbose_)
-            OMPL_INFORM("    Start equals goal, skipping ");
-        return false; // TODO(davetcoleman): should this be skipped, or maybe returned as the solution?
-    }
-
-    // Keep looking for paths between chosen start and goal until one is found that is valid,
-    // or no further paths can be found between them because of disabled edges
-    // this is necessary for lazy collision checking i.e. rerun after marking invalid edges we found
-    bool havePartialSolution = false;
-    while (true)
-    {
-        if (verbose_)
-            OMPL_INFORM("      while true: look for valid paths between start and goal");
-
-        // Check if our planner is out of time
-        if (ptc == true)
-        {
-            OMPL_DEBUG("lazyCollisionSearch: function interrupted because termination condition is true.");
-            return false;
-        }
-
-        // Attempt to find a solution from start to goal
-        if (!constructSolution(start, goal, vertexPath))
-        {
-            // We will stop looking through this start-goal combination, but perhaps this partial solution is good
-           if (verbose_)
-                OMPL_INFORM("        unable to construct solution between start and goal using astar");
-
-            // no solution path found. check if a previous partially correct solution was found
-            if (havePartialSolution && false)     // TODO: re-implement partial solution logic
-            {
-                if (verbose_)
-                    OMPL_INFORM("has partial solution ");
-                // Save this candidateSolution for later
-                convertVertexPathToStatePath(vertexPath, actualStart, actualGoal, candidateSolution);
-                return false;
-            }
-
-            if (verbose_)
-                OMPL_INFORM("        no partial solution found on this astar search, keep looking through start-goal combos");
-
-            // no path found what so ever
-            return false;
-        }
-        havePartialSolution = true; // we have found at least one path at this point. may be invalid
-
-        if (verbose_)
-        {
-            OMPL_INFORM("        has at least a partial solution, maybe exact solution");
-            OMPL_INFORM("        Solution has %d vertices", vertexPath.size());
-        }
-
-        // Check if all the points in the potential solution are valid
-        if (lazyCollisionCheck(vertexPath, ptc))
-        {
-            if (verbose_)
-            {
-                OMPL_INFORM("---------- lazy collision check returned valid ");
-            }
-
-            // the path is valid, we are done!
-            convertVertexPathToStatePath(vertexPath, actualStart, actualGoal, candidateSolution);
-            return true;
-        }
-        // else, loop with updated graph that has the invalid edges/states disabled
-    } // end while
-
-    // we never found a valid path
-    return false;
-}
-
-bool ompl::geometric::PRMdb::constructSolution(const Vertex start, const Vertex goal,
-                                                 std::vector<Vertex> &vertexPath) const
-{
-    Vertex *vertexPredecessors = new Vertex[boost::num_vertices(g_)];
-    bool foundGoal = false;
-
-    double *vertexDistances = new double[boost::num_vertices(g_)];
-
-    try
-    {
-        boost::astar_search(g_, // graph
-                            start, // start state
-                            boost::bind(&PRMdb::distanceFunction, this, _1, goal), // the heuristic
-                            // ability to disable edges (set cost to inifinity):
-                            boost::weight_map(edgeWeightMap(g_, edgeCollisionStateProperty_)).
-                            predecessor_map(vertexPredecessors).
-                            distance_map(&vertexDistances[0]).
-                            visitor(CustomVisitor(goal)));
-    }
-    catch (ompl::geometric::PRMdb::foundGoalException&)
-    {
-        // the custom exception from CustomVisitor
-        if (verbose_ && false)
-        {
-            OMPL_INFORM("constructSolution: Astar found goal vertex ------------------------");
-            OMPL_INFORM("distance to goal: %f", vertexDistances[goal]);
-        }
-
-        if (vertexDistances[goal] > 1.7e+308) // TODO(davetcoleman): fix terrible hack for detecting infinity
-            //double diff = d[goal] - std::numeric_limits<double>::infinity();
-            //if ((diff < std::numeric_limits<double>::epsilon()) && (-diff < std::numeric_limits<double>::epsilon()))
-            // check if the distance to goal is inifinity. if so, it is unreachable
-            //if (d[goal] >= std::numeric_limits<double>::infinity())
-        {
-            if (verbose_)
-                OMPL_INFORM("Distance to goal is infinity");
-            foundGoal = false;
-        }
-        else
-        {
-            // Only clear the vertexPath after we know we have a new solution, otherwise it might have a good
-            // previous one
-            vertexPath.clear(); // remove any old solutions
-
-            // Trace back the shortest path in reverse and only save the states
-            Vertex v;
-            for (v = goal; v != vertexPredecessors[v]; v = vertexPredecessors[v])
-            {
-                vertexPath.push_back(v);
-            }
-            if (v != goal) // TODO explain this because i don't understand
-            {
-                vertexPath.push_back(v);
-            }
-
-            foundGoal = true;
-        }
-    }
-
-    delete[] vertexPredecessors;
-    delete[] vertexDistances;
-
-    // No solution found from start to goal
-    return foundGoal;
-}
-
-bool ompl::geometric::PRMdb::lazyCollisionCheck(std::vector<Vertex> &vertexPath,
-                                                  const base::PlannerTerminationCondition &ptc)
-{
-    OMPL_DEBUG("Starting lazy collision checking");
-
-    bool hasInvalidEdges = false;
-
-    // Initialize
-    Vertex fromVertex = vertexPath[0];
-    Vertex toVertex;
-
-    // Loop through every pair of states and make sure path is valid.
-    for (std::size_t toID = 1; toID < vertexPath.size(); ++toID)
-    {
-        // Increment location on path
-        toVertex = vertexPath[toID];
-
-        // Check if our planner is out of time
-        if (ptc)
-        {
-            OMPL_DEBUG("Lazy collision check function interrupted because termination condition is true.");
-            return false;
-        }
-
-        Edge thisEdge = boost::edge(fromVertex, toVertex, g_).first;
-
-        // Has this edge already been checked before?
-        if (edgeCollisionStateProperty_[thisEdge] == NOT_CHECKED)
-        {
-            // Check path between states
-            if (!si_->checkMotion(stateProperty_[fromVertex], stateProperty_[toVertex]))
-            {
-                // Path between (from, to) states not valid, disable the edge
-                OMPL_INFORM("  DISABLING EDGE from vertex %f to vertex %f", fromVertex, toVertex);
-
-                // Disable edge
-                edgeCollisionStateProperty_[thisEdge] = IN_COLLISION;
-            }
-            else
-            {
-                // Mark edge as free so we no longer need to check for collision
-                edgeCollisionStateProperty_[thisEdge] = FREE;
-            }
-        }
-
-        // Check final result
-        if (edgeCollisionStateProperty_[thisEdge] == IN_COLLISION)
-        {
-            // Remember that this path is no longer valid, but keep checking remainder of path edges
-            hasInvalidEdges = true;
-        }
-
-        // switch vertex focus
-        fromVertex = toVertex;
-    }
-
-    OMPL_INFORM("Done lazy collision checking");
-
-    // Only return true if nothing was found invalid
-    return !hasInvalidEdges;
-}
-
 // bool ompl::geometric::PRMdb::sameComponent(Vertex m1, Vertex m2)
 // {
 //     return boost::same_component(m1, m2, disjointSets_);
 // }
-
-double ompl::geometric::PRMdb::distanceFunction(const Vertex a, const Vertex b) const
-{
-    return si_->distance(stateProperty_[a], stateProperty_[b]);
-}
 
 // bool ompl::geometric::PRMdb::reachedFailureLimit() const
 // {
@@ -938,7 +515,7 @@ double ompl::geometric::PRMdb::distanceFunction(const Vertex a, const Vertex b) 
 //         OMPL_INFORM(" graph neighborhood: %d | visible neighborhood: %d", graphNeighborhood.size(),
 //                     visibleNeighborhood.size());
 
-//         foreach(Vertex v, visibleNeighborhood)
+//         BOOST_FOREACH(Vertex v, visibleNeighborhood)
 //         {
 //             OMPL_INFORM("Visible neighbor is vertex %f with distance %f ",
 //                         v, si_->distance( qNew, stateProperty_[v]));
@@ -1022,21 +599,6 @@ double ompl::geometric::PRMdb::distanceFunction(const Vertex a, const Vertex b) 
 
 //     return stateAdded;
 // }
-
-void ompl::geometric::PRMdb::initializeQueryState()
-{
-    if (boost::num_vertices(g_) < 1)
-    {
-        queryVertex_ = boost::add_vertex( g_ );
-        stateProperty_[queryVertex_] = NULL;
-    }
-}
-
-ompl::base::PlannerStatus ompl::geometric::PRMdb::solve(const base::PlannerTerminationCondition &ptc)
-{
-    // Disabled
-    return base::PlannerStatus::TIMEOUT;
-}
 
 // bool ompl::geometric::PRMdb::checkAddCoverage(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood)
 // {
@@ -1149,7 +711,7 @@ ompl::base::PlannerStatus ompl::geometric::PRMdb::solve(const base::PlannerTermi
 //     bool spannerPropertyWasViolated = false;
 
 //     std::vector< Vertex > rs;
-//     foreach( Vertex r, boost::adjacent_vertices( v, g_ ) )
+//     BOOST_FOREACH( Vertex r, boost::adjacent_vertices( v, g_ ) )
 //         rs.push_back(r);
 
 //     /* Candidate x vertices as described in the method, filled by function computeX(). */
@@ -1162,12 +724,12 @@ ompl::base::PlannerStatus ompl::geometric::PRMdb::solve(const base::PlannerTermi
 //     {
 //         Vertex r = rs[i];
 //         computeVPP(v, r, VPPs);
-//         foreach (Vertex rp, VPPs)
+//         BOOST_FOREACH (Vertex rp, VPPs)
 //         {
 //             //First, compute the longest path through the graph
 //             computeX(v, r, rp, Xs);
 //             double rm_dist = 0.0;
-//             foreach( Vertex rpp, Xs)
+//             BOOST_FOREACH( Vertex rpp, Xs)
 //             {
 //                 double tmp_dist = (si_->distance( stateProperty_[r], stateProperty_[v] )
 //                                    + si_->distance( stateProperty_[v], stateProperty_[rpp] ) )/2.0;
@@ -1212,7 +774,7 @@ ompl::base::PlannerStatus ompl::geometric::PRMdb::solve(const base::PlannerTermi
 //                         Vertex vnew;
 //                         std::vector<base::State*>& states = p->getStates();
 
-//                         foreach (base::State *st, states)
+//                         BOOST_FOREACH (base::State *st, states)
 //                         {
 //                             // no need to clone st, since we will destroy p; we just copy the pointer
 //                             if (verbose_)
@@ -1265,48 +827,6 @@ ompl::base::PlannerStatus ompl::geometric::PRMdb::solve(const base::PlannerTermi
 //             visibleNeighborhood.push_back(graphNeighborhood[i]);
 // }
 
-bool ompl::geometric::PRMdb::findGraphNeighbors(const base::State *state, std::vector<Vertex> &graphNeighborhood)
-{
-
-
-    // Reset
-    graphNeighborhood.clear();
-
-    // Setup search by getting a non-const version of the focused state
-    base::State* stateCopy = si_->cloneState(state);
-    stateProperty_[ queryVertex_ ] = stateCopy;
-
-    // Double the range of sparseDelta_ up to 3 times until at least 1 neighbor is found
-    std::size_t expandNeighborhoodSearchAttempts = 3;
-    double neighborSearchRadius;
-    static const double EXPAND_NEIGHBORHOOD_RATE = 0.25; // speed to which we look outside the original sparse delta neighborhood
-
-    // Begin search outward
-    for (std::size_t i = 0; i < expandNeighborhoodSearchAttempts; ++i)
-    {
-        neighborSearchRadius = sparseDelta_ + i*EXPAND_NEIGHBORHOOD_RATE*sparseDelta_;
-        if (verbose_)
-        {
-            OMPL_INFORM("-------------------------------------------------------");
-            OMPL_INFORM("Attempt %d to find neighborhood at radius %f", i+1, neighborSearchRadius);
-            OMPL_INFORM("-------------------------------------------------------");
-        }
-
-        nn_->nearestR( queryVertex_, neighborSearchRadius, graphNeighborhood);
-
-        // Check if at least one neighbor found
-        if (graphNeighborhood.size() > 0)
-            break;
-    }
-    stateProperty_[ queryVertex_ ] = NULL;
-
-    // Check if no neighbors found
-    if (!graphNeighborhood.size())
-    {
-        return false;
-    }
-    return true;
-}
 
 // void ompl::geometric::PRMdb::approachGraph( Vertex v )
 // {
@@ -1318,7 +838,7 @@ bool ompl::geometric::PRMdb::findGraphNeighbors(const base::State *state, std::v
 //         if (si_->checkMotion( stateProperty_[v], stateProperty_[hold[i]]))
 //             neigh.push_back( hold[i] );
 
-//     foreach (Vertex vp, neigh)
+//     BOOST_FOREACH (Vertex vp, neigh)
 //         connectGuards(v, vp);
 // }
 
@@ -1470,7 +990,7 @@ bool ompl::geometric::PRMdb::findGraphNeighbors(const base::State *state, std::v
 //     computeVPP(rep, r, VPPs);
 
 //     //Then, for each pair Pv(r,r')
-//     foreach (Vertex rp, VPPs)
+//     BOOST_FOREACH (Vertex rp, VPPs)
 //         //Try updating the pair info
 //         distanceCheck(rep, q, r, s, rp);
 // }
@@ -1478,7 +998,7 @@ bool ompl::geometric::PRMdb::findGraphNeighbors(const base::State *state, std::v
 // void ompl::geometric::PRMdb::computeVPP(Vertex v, Vertex vp, std::vector<Vertex> &VPPs)
 // {
 //     VPPs.clear();
-//     foreach( Vertex cvpp, boost::adjacent_vertices( v, g_ ) )
+//     BOOST_FOREACH( Vertex cvpp, boost::adjacent_vertices( v, g_ ) )
 //         if( cvpp != vp )
 //             if( !boost::edge( cvpp, vp, g_ ).second )
 //                 VPPs.push_back( cvpp );
@@ -1488,7 +1008,7 @@ bool ompl::geometric::PRMdb::findGraphNeighbors(const base::State *state, std::v
 // {
 //     Xs.clear();
 
-//     foreach (Vertex cx, boost::adjacent_vertices(vpp, g_))
+//     BOOST_FOREACH (Vertex cx, boost::adjacent_vertices(vpp, g_))
 //         if (boost::edge(cx, v, g_).second && !boost::edge(cx, vp, g_).second)
 //         {
 //             InterfaceData& d = getData( v, vpp, cx );
@@ -1568,9 +1088,9 @@ bool ompl::geometric::PRMdb::findGraphNeighbors(const base::State *state, std::v
 //     stateProperty_[queryVertex_] = NULL;
 
 //     //For each of the vertices
-//     foreach (Vertex v, hold)
+//     BOOST_FOREACH (Vertex v, hold)
 //     {
-//         foreach (VertexPair r, interfaceDataProperty_[v].interfaceHash | boost::adaptors::map_keys)
+//         BOOST_FOREACH (VertexPair r, interfaceDataProperty_[v].interfaceHash | boost::adaptors::map_keys)
 //             interfaceDataProperty_[v].interfaceHash[r].clear(si_);
 //     }
 // }
@@ -1628,270 +1148,4 @@ bool ompl::geometric::PRMdb::findGraphNeighbors(const base::State *state, std::v
 //     sleep(0.8);
 // #endif
 
-// }
-
-bool ompl::geometric::PRMdb::convertVertexPathToStatePath(std::vector<Vertex> &vertexPath,
-                                                            const base::State* actualStart,
-                                                            const base::State* actualGoal,
-                                                            CandidateSolution &candidateSolution,
-                                                            bool disableCollisionWarning)
-{
-    // Ensure the input path is not empty
-    if (!vertexPath.size())
-        return false;
-
-    ompl::geometric::PathGeometric *pathGeometric = new ompl::geometric::PathGeometric(si_);
-    candidateSolution.isApproximate_ = false; // assume path is valid
-
-    // Add original start if it is different than the first state
-    if (actualStart != stateProperty_[vertexPath.back()])
-    {
-        pathGeometric->append(actualStart);
-
-        // Add the edge status
-        // the edge from actualStart to start is always valid otherwise we would not have used that start
-        candidateSolution.edgeCollisionStatus_.push_back(FREE);
-    }
-
-    // Reverse the vertexPath and convert to state path
-    for (std::size_t i = vertexPath.size(); i > 0; --i)
-    {
-        pathGeometric->append(stateProperty_[vertexPath[i-1]]);
-
-        // Add the edge status
-        if (i > 1) // skip the last vertex (its reversed)
-        {
-            Edge thisEdge = boost::edge(vertexPath[i-1], vertexPath[i-2], g_).first;
-
-            // Check if any edges in path are not free (then it an approximate path)
-            if (edgeCollisionStateProperty_[thisEdge] == IN_COLLISION)
-            {
-                candidateSolution.isApproximate_ = true;
-                candidateSolution.edgeCollisionStatus_.push_back(IN_COLLISION);
-            }
-            else if (edgeCollisionStateProperty_[thisEdge] == NOT_CHECKED)
-            {
-                if (!disableCollisionWarning)
-                    OMPL_ERROR("A chosen path has an edge that has not been checked for collision. This should not happen");
-                candidateSolution.edgeCollisionStatus_.push_back(NOT_CHECKED);
-            }
-            else
-            {
-                candidateSolution.edgeCollisionStatus_.push_back(FREE);
-            }
-        }
-    }
-
-    // Add original goal if it is different than the last state
-    if (actualGoal != stateProperty_[vertexPath.front()])
-    {
-        pathGeometric->append(actualGoal);
-
-        // Add the edge status
-        // the edge from actualGoal to goal is always valid otherwise we would not have used that goal
-        candidateSolution.edgeCollisionStatus_.push_back(FREE);
-    }
-
-    candidateSolution.path_ = base::PathPtr(pathGeometric);
-
-    return true;
-}
-
- void ompl::geometric::PRMdb::getPlannerData(base::PlannerData &data) const
- {
-    Planner::getPlannerData(data);
-
-    // If there are even edges here
-    if (boost::num_edges( g_ ) > 0)
-    {
-        // Adding edges and all other vertices simultaneously
-        foreach (const Edge e, boost::edges(g_))
-        {
-            const Vertex v1 = boost::source(e, g_);
-            const Vertex v2 = boost::target(e, g_);
-
-            // TODO save weights!
-            data.addEdge(base::PlannerDataVertex(stateProperty_[v1], (int)typeProperty_[v1]),
-                         base::PlannerDataVertex(stateProperty_[v2], (int)typeProperty_[v2]));
-
-            //OMPL_INFORM("Adding edge from vertex of type %d to vertex of type %d", typeProperty_[v1], typeProperty_[v2]);
-        }
-    }
-    else
-        OMPL_ERROR("%s: There are no edges in the graph!", getName().c_str());
-
-    // Make sure to add edge-less nodes as well
-    foreach (const Vertex n, boost::vertices(g_))
-        if (boost::out_degree(n, g_) == 0)
-            data.addVertex(base::PlannerDataVertex(stateProperty_[n], (int)typeProperty_[n]));
-
-    //data.properties["iterations INTEGER"] = boost::lexical_cast<std::string>(iterations_);
- }
-
-void ompl::geometric::PRMdb::setPlannerData(const base::PlannerData &data)
-{
-    // Check that the query vertex is initialized (used for internal nearest neighbor searches)
-    initializeQueryState();
-
-//     // Add all vertices
-//     if (verbose_)
-//     {
-//         OMPL_INFORM("PRM::setPlannerData: numVertices=%d", data.numVertices());
-//     }
-//     OMPL_INFORM("Loading PlannerData into PRMdb");
-
-//     std::vector<Vertex> idToVertex;
-
-//     // Temp disable verbose mode for loading database
-//     bool wasVerbose = verbose_;
-//     verbose_ = false;
-
-//     OMPL_INFORM("Loading vertices:");
-//     // Add the nodes to the graph
-//     for (std::size_t vertexID = 0; vertexID < data.numVertices(); ++vertexID)
-//     {
-//         // Get the state from loaded planner data
-//         const base::State *oldState = data.getVertex(vertexID).getState();
-//         base::State *state = si_->cloneState(oldState);
-
-//         // Get the tag, which in this application represents the vertex type
-//         GuardType type = static_cast<GuardType>( data.getVertex(vertexID).getTag() );
-
-//         // ADD GUARD
-//         idToVertex.push_back(addGuard(state, type ));
-//     }
-
-//     OMPL_INFORM("Loading edges:");
-//     // Add the corresponding edges to the graph
-//     std::vector<unsigned int> edgeList;
-//     for (std::size_t fromVertex = 0; fromVertex < data.numVertices(); ++fromVertex)
-//     {
-//         edgeList.clear();
-
-//         // Get the edges
-//         data.getEdges(fromVertex, edgeList); // returns num of edges
-
-//         Vertex m = idToVertex[fromVertex];
-
-//         // Process edges
-//         for (std::size_t edgeId = 0; edgeId < edgeList.size(); ++edgeId)
-//         {
-//             std::size_t toVertex = edgeList[edgeId];
-//             Vertex n = idToVertex[toVertex];
-
-//             // Add the edge to the graph
-//             const base::Cost weight(0);
-//             if (verbose_ && false)
-//             {
-//                 OMPL_INFORM("    Adding edge from vertex id %d to id %d into edgeList", fromVertex, toVertex);
-//                 OMPL_INFORM("      Vertex %d to %d", m, n);
-//             }
-//             connectGuards(m, n);
-//         }
-//     } // for
-
-//     // Re-enable verbose mode, if necessary
-//     verbose_ = wasVerbose;
- }
-
-void ompl::geometric::PRMdb::generateGrid()
-{
-    // Check that the query vertex is initialized (used for internal nearest neighbor searches)
-    initializeQueryState();
-
-    namespace ob = ompl::base;
-    ob::RealVectorBounds bounds = si_->getStateSpace()->as<ob::RealVectorStateSpace>()->getBounds();
-
-    //double discret = 2;
-    double start = sparseDelta_ / 2.0;
-    std::size_t count = 0;
-    for (double x = bounds.low[0] + start; x <= bounds.high[0]; x += sparseDelta_)
-    {
-        for (double y = bounds.low[1] + start; y <= bounds.high[1]; y += sparseDelta_)
-        {
-            //std::cout << "sampling at " << x << ", " << y << std::endl;
-
-            // Create state
-            base::State *state = si_->getStateSpace()->allocState();
-            state->as<ob::RealVectorStateSpace::StateType>()->values[0] = x;
-            state->as<ob::RealVectorStateSpace::StateType>()->values[1] = y;
-
-            // Add vertex to graph
-            Vertex v1 = boost::add_vertex(g_);
-            typeProperty_[v1] = START; // TODO(davetcoleman): this is meaningless
-            stateProperty_[v1] = state;
-
-            // Add vertex to nearest neighbor structure
-            nn_->add(v1);
-
-            // Visualize
-#ifdef OMPL_BOLT_DEBUG
-            visualizeStateCallback(state, 1, 1); // Candidate node has already (just) been added
-            usleep(500);
-#endif
-            count++;
-        }
-    }
-    OMPL_INFORM("Sampled %f points", count);
-    count = 0;
-
-    // Loop through each vertex
-    for (std::size_t v1 = 1; v1 < getNumVertices(); ++v1) // 1 because 0 is the search vertex?
-    {
-        // Add edges
-        std::vector<Vertex> graphNeighborhood;
-        std::vector<Vertex> visibleNeighborhood;
-        base::State *state = stateProperty_[v1];
-        stateProperty_[ queryVertex_ ] = state;
-        double distance = sparseDelta_ * 1.1 * sqrt(2); // 1.1 is fudge factor
-        //OMPL_INFORM("Finding nearest nodes in NN tree within radius %f", distance);
-        nn_->nearestR( queryVertex_, distance, graphNeighborhood);
-        stateProperty_[ queryVertex_ ] = NULL;
-
-        // Now that we got the neighbors from the NN, we must remove any we can't see
-        for (std::size_t i = 0; i < graphNeighborhood.size() ; ++i )
-            if (si_->checkMotion(state, stateProperty_[graphNeighborhood[i]]))
-                visibleNeighborhood.push_back(graphNeighborhood[i]);
-
-        // For each nearby vertex, add an edge
-        for (std::size_t i = 0; i < visibleNeighborhood.size(); ++i)
-        {
-            Vertex v2 = visibleNeighborhood[i];
-
-            // Error check
-            assert(v2 <= getNumVertices());
-            assert(v1 <= getNumVertices());
-
-            // Check if these verticies already share an edge
-            if (boost::edge(v1, v2, g_).second)
-            {
-                //std::cout << "shares an edge " << std::endl;
-                continue;
-            }
-
-            // Create the new edge
-            Edge e = (boost::add_edge(v1, v2, g_)).first;
-
-            // Add associated properties to the edge
-            //edgeWeightProperty_[e] = distanceFunction(v1, v2);
-            edgeCollisionStateProperty_[e] = NOT_CHECKED;
-
-            // Debug in Rviz
-#ifdef OMPL_BOLT_DEBUG
-            // if (v1 % 30 == 0)
-            // {
-            //     visualizeEdgeCallback(stateProperty_[v1], stateProperty_[v2]);
-            //     usleep(1000);
-            // }
-#endif
-            count++;
-        }
-    }
-    OMPL_INFORM("Generated %i edges", count);
-}
-
-// void ompl::geometric::PRMdb::clearEdgeCollisionStates()
-// {
-//     foreach (const Edge e, boost::edges(g_))
-//         edgeCollisionStateProperty_[e] = NOT_CHECKED; // each edge has an unknown state
 // }
