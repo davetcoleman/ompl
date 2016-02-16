@@ -78,11 +78,11 @@ namespace ompl
         OMPL_CLASS_FORWARD(Bolt);
         /// @endcond
 
-        /** \class ompl::geometric::BoltPtr
-            \brief A boost shared pointer wrapper for ompl::tools::Bolt */
+        /** \class geometric::BoltPtr
+            \brief A boost shared pointer wrapper for tools::Bolt */
 
         /** \brief Built off of SimpleSetup but provides support for planning from experience */
-        class Bolt : public ompl::tools::ExperienceSetup
+        class Bolt : public tools::ExperienceSetup
         {
         public:
 
@@ -110,15 +110,15 @@ namespace ompl
             void printLogs(std::ostream &out = std::cout) const;
 
             /** \brief Get the current planner */
-            ompl::base::PlannerPtr& getPlanner()
+            base::PlannerPtr& getPlanner()
             {
                 return planner_;
             }
 
             /** \brief Get a pointer to the retrieve repair planner */
-            ompl::geometric::BoltRetrieveRepair& getRetrieveRepairPlanner() const
+            geometric::BoltRetrieveRepair& getRetrieveRepairPlanner() const
             {
-                return static_cast<ompl::geometric::BoltRetrieveRepair&>(*rrPlanner_);
+                return static_cast<geometric::BoltRetrieveRepair&>(*rrPlanner_);
             }
 
             /** \brief Set the planner to use for repairing experience paths
@@ -127,7 +127,7 @@ namespace ompl
             void setRepairPlanner(const base::PlannerPtr &planner)
             {
                 // This is required by the parent class but we no longer use this feature
-                //static_cast<ompl::geometric::BoltRetrieveRepair&>(*rrPlanner_).setRepairPlanner(planner);
+                //static_cast<geometric::BoltRetrieveRepair&>(*rrPlanner_).setRepairPlanner(planner);
             }
 
             /** \brief Set the planner allocator to use. This is only
@@ -160,13 +160,13 @@ namespace ompl
             virtual void setup(void);
 
             /** \brief Get a vector of all the planning data in the database */
-            void getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const;
+            void getAllPlannerDatas(std::vector<base::PlannerDataPtr> &plannerDatas) const;
 
             /** \brief Get the total number of paths stored in the database */
             std::size_t getExperiencesCount() const;
 
             /** \brief Convert PlannerData to PathGeometric. Assume ordering of verticies is order of path */
-            void convertPlannerData(const ompl::base::PlannerDataPtr plannerData, ompl::geometric::PathGeometric &path);
+            void convertPlannerData(const base::PlannerDataPtr plannerData, geometric::PathGeometric &path);
 
             /**
              * \brief If path1 and path2 have a better start/goal match when reverse, then reverse path2
@@ -174,10 +174,10 @@ namespace ompl
              * \param path to reverse
              * \return true if reverse was necessary
              */
-            bool reversePathIfNecessary(ompl::geometric::PathGeometric &path1, ompl::geometric::PathGeometric &path2);
+            bool reversePathIfNecessary(geometric::PathGeometric &path1, geometric::PathGeometric &path2);
 
             /** \brief Hook for getting access to debug data */
-            ompl::tools::BoltDBPtr getExperienceDB();
+            geometric::BoltDBPtr getExperienceDB();
 
             /** \brief Allow accumlated experiences to be processed */
             bool doPostProcessing();
@@ -194,13 +194,13 @@ namespace ompl
             bool                                         dualThreadScratchEnabled_;
 
             /** \brief Instance of parallel planning to use for computing solutions in parallel */
-            ompl::tools::ParallelPlanPtr                 pp_;
+            tools::ParallelPlanPtr                 pp_;
 
             /** \brief A shared object between all the planners for saving and loading previous experience */
-            ompl::tools::BoltDBPtr                    experienceDB_;
+            geometric::BoltDBPtr                    experienceDB_;
 
             /** \brief Accumulated experiences to be later added to experience database */
-            std::vector<ompl::geometric::PathGeometric>  QueuedSolutionPaths_;
+            std::vector<geometric::PathGeometric>  QueuedSolutionPaths_;
 
         }; // end of class Bolt
 

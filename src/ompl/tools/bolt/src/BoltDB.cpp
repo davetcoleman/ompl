@@ -39,27 +39,114 @@
 #include <ompl/base/ScopedState.h>
 #include <ompl/util/Time.h>
 #include <ompl/util/Console.h>
-#include <ompl/tools/config/SelfConfig.h>
+//#include <ompl/tools/config/SelfConfig.h>
 #include <ompl/base/PlannerDataStorage.h>
+#include <ompl/datastructures/NearestNeighborsGNATNoThreadSafety.h>
+#include <ompl/base/spaces/RealVectorStateSpace.h> // TODO: remove, this is not space agnostic
 
 // Boost
 #include <boost/filesystem.hpp>
+#include <boost/lambda/bind.hpp>
+#include <boost/graph/incremental_components.hpp>
+#include <boost/property_map/vector_property_map.hpp>
+#include <boost/foreach.hpp>
 
-ompl::tools::BoltDB::BoltDB(const base::StateSpacePtr &space)
+// Allow hooks for visualizing planner
+#define OMPL_BOLT_DEBUG
+
+namespace og = ompl::geometric;
+
+// edgeWeightMap methods ////////////////////////////////////////////////////////////////////////////
+
+BOOST_CONCEPT_ASSERT((boost::ReadablePropertyMapConcept<ompl::geometric::BoltDB::edgeWeightMap, ompl::geometric::BoltDB::Edge>));
+
+og::BoltDB::edgeWeightMap::edgeWeightMap (const Graph &graph,
+                                                        const EdgeCollisionStateMap &collisionStates)
+    : g_(graph),
+      collisionStates_(collisionStates)
+{
+}
+
+double og::BoltDB::edgeWeightMap::get (Edge e) const
+{
+    // Get the status of collision checking for this edge
+    if (collisionStates_[e] == IN_COLLISION)
+        return std::numeric_limits<double>::infinity();
+
+    return boost::get(boost::edge_weight, g_, e);
+}
+
+namespace boost
+{
+double get (const og::BoltDB::edgeWeightMap &m, const og::BoltDB::Edge &e)
+{
+    return m.get(e);
+}
+}
+
+// CustomVisitor methods ////////////////////////////////////////////////////////////////////////////
+
+BOOST_CONCEPT_ASSERT((boost::AStarVisitorConcept<og::BoltDB::CustomVisitor, og::BoltDB::Graph>));
+
+og::BoltDB::CustomVisitor::CustomVisitor (Vertex goal)
+    : goal(goal)
+{
+}
+
+void og::BoltDB::CustomVisitor::examine_vertex (Vertex u, const Graph &) const
+{
+    if (u == goal)
+        throw foundGoalException();
+}
+
+// Actual class ////////////////////////////////////////////////////////////////////////////
+
+og::BoltDB::BoltDB(const base::StateSpacePtr &space)
     : numPathsInserted_(0)
     , saving_enabled_(true)
+    // Property accessors of edges
+    //edgeWeightProperty_(boost::get(boost::edge_weight, g_)),
+    , edgeCollisionStateProperty_(boost::get(edge_collision_state_t(), g_))
+    // Property accessors of vertices
+    , stateProperty_(boost::get(vertex_state_t(), g_))
+    , typeProperty_(boost::get(vertex_type_t(), g_))
+    //interfaceDataProperty_(boost::get(vertex_interface_data_t(), g_)),
+    , verbose_(true)
 {
     // Set space information
     si_.reset(new base::SpaceInformation(space));
+
+   if (!nn_)
+   {
+       nn_.reset(new NearestNeighborsGNATNoThreadSafety<Vertex>());
+   }
+   nn_->setDistanceFunction(boost::bind(&og::BoltDB::distanceFunction, this, _1, _2));
 }
 
-ompl::tools::BoltDB::~BoltDB(void)
+og::BoltDB::~BoltDB(void)
 {
     if (numPathsInserted_)
         OMPL_WARN("The database is being unloaded with unsaved experiences");
+    freeMemory();
 }
 
-bool ompl::tools::BoltDB::load(const std::string& fileName)
+void og::BoltDB::freeMemory()
+{
+    BOOST_FOREACH (Vertex v, boost::vertices(g_))
+    {
+        //BOOST_FOREACH (InterfaceData &d, interfaceDataProperty_[v].interfaceHash | boost::adaptors::map_values)
+        //d.clear(si_);
+        if( stateProperty_[v] != NULL )
+            si_->freeState(stateProperty_[v]);
+        stateProperty_[v] = NULL; // TODO(davetcoleman): is this needed??
+    }
+    g_.clear();
+
+    if (nn_)
+        nn_->clear();
+}
+
+bool og::BoltDB::load(const std::string& fileName)
 {
     // Error checking
     if (fileName.empty())
@@ -70,11 +157,6 @@ bool ompl::tools::BoltDB::load(const std::string& fileName)
     if ( !boost::filesystem::exists( fileName ) )
     {
         OMPL_INFORM("Database file does not exist: %s.", fileName.c_str());
-        return false;
-    }
-    if (!prm_)
-    {
-        OMPL_ERROR("PRMdb planner has not been passed into the BoltDB yet");
         return false;
     }
 
@@ -112,12 +194,9 @@ bool ompl::tools::BoltDB::load(const std::string& fileName)
     OMPL_INFORM("BoltDB: Loaded planner data with \n  %d vertices\n  %d edges\n  %d start states\n  %d goal states",
                 plannerData->numVertices(), plannerData->numEdges(), plannerData->numStartVertices(), plannerData->numGoalVertices());
 
-    // Add to PRMdb
-    OMPL_INFORM("Adding plannerData to PRMdb:");
-    prm_->setPlannerData(*plannerData);
-
-    // Output the number of connected components
-    OMPL_INFORM("  %d connected components", prm_->getNumConnectedComponents());
+    // Add to db
+    OMPL_INFORM("Adding plannerData to database:");
+    setPlannerData(*plannerData);
 
     // Close file
     iStream.close();
@@ -127,16 +206,8 @@ bool ompl::tools::BoltDB::load(const std::string& fileName)
     return true;
 }
 
-bool ompl::tools::BoltDB::addPath(ompl::geometric::PathGeometric& solutionPath, double &insertionTime)
+bool og::BoltDB::addPath(og::PathGeometric& solutionPath, double &insertionTime)
 {
-    // Error check
-    if (!prm_)
-    {
-        OMPL_ERROR("PRMdb planner has not been passed into the BoltDB yet");
-        insertionTime = 0;
-        return false;
-    }
-
     // Prevent inserting into database
     if (!saving_enabled_)
     {
@@ -151,11 +222,12 @@ bool ompl::tools::BoltDB::addPath(ompl::geometric::PathGeometric& solutionPath, 
     // Benchmark runtime
     time::point startTime = time::now();
     {
-        result = prm_->addPathToRoadmap(ptc, solutionPath);
+        OMPL_ERROR("TODO: addPathToRoadmap in BoltDB");
+        //result = addPathToRoadmap(ptc, solutionPath);
     }
     insertionTime = time::seconds(time::now() - startTime);
 
-    OMPL_INFORM("PRMdb now has %d states", prm_->getNumVertices());
+    OMPL_INFORM("BoltDB now has %d states", getNumVertices());
 
     // Record this new addition
     numPathsInserted_++;
@@ -163,7 +235,7 @@ bool ompl::tools::BoltDB::addPath(ompl::geometric::PathGeometric& solutionPath, 
     return result;
 }
 
-bool ompl::tools::BoltDB::saveIfChanged(const std::string& fileName)
+bool og::BoltDB::saveIfChanged(const std::string& fileName)
 {
     if (numPathsInserted_)
         return save(fileName);
@@ -172,7 +244,7 @@ bool ompl::tools::BoltDB::saveIfChanged(const std::string& fileName)
     return true;
 }
 
-bool ompl::tools::BoltDB::save(const std::string& fileName)
+bool og::BoltDB::save(const std::string& fileName)
 {
     // Disabled
     if (!saving_enabled_)
@@ -185,11 +257,6 @@ bool ompl::tools::BoltDB::save(const std::string& fileName)
     if (fileName.empty())
     {
         OMPL_ERROR("Empty filename passed to save function");
-        return false;
-    }
-    if (!prm_)
-    {
-        OMPL_ERROR("PRMdb planner has not been passed into the BoltDB yet");
         return false;
     }
 
@@ -206,8 +273,8 @@ bool ompl::tools::BoltDB::save(const std::string& fileName)
 
     // TODO: make this more than 1 planner data perhaps
     base::PlannerDataPtr data(new base::PlannerData(si_));
-    prm_->getPlannerData(*data);
-    OMPL_INFORM("Get planner data from PRM2 with \n  %d vertices\n  %d edges\n  %d start states\n  %d goal states",
+    getPlannerData(*data);
+    OMPL_INFORM("Get planner data with \n  %d vertices\n  %d edges\n  %d start states\n  %d goal states",
                 data->numVertices(), data->numEdges(), data->numStartVertices(), data->numGoalVertices());
 
     plannerDatas.push_back(data);
@@ -248,56 +315,309 @@ bool ompl::tools::BoltDB::save(const std::string& fileName)
     return true;
 }
 
-void ompl::tools::BoltDB::setPRMdb(ompl::tools::PRMdbPtr &prm)
+void og::BoltDB::getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const
 {
-    // OMPL_INFORM("-------------------------------------------------------");
-    // OMPL_INFORM("setPRMdb ");
-    // OMPL_INFORM("-------------------------------------------------------");
-    prm_ = prm;
-}
-
-ompl::tools::PRMdbPtr& ompl::tools::BoltDB::getPRMdb()
-{
-    return prm_;
-}
-
-void ompl::tools::BoltDB::getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const
-{
-    if (!prm_)
-    {
-        OMPL_ERROR("PRMdb planner has not been passed into the BoltDB yet");
-        return;
-    }
-
     base::PlannerDataPtr data(new base::PlannerData(si_));
-    prm_->getPlannerData(*data);
+    getPlannerData(*data);
     plannerDatas.push_back(data); // TODO(davetcoleman): don't make second copy of this?
 }
 
-bool ompl::tools::BoltDB::findNearestStartGoal(const base::State* start, const base::State* goal,
-    ompl::geometric::PRMdb::CandidateSolution &candidateSolution,
-    const base::PlannerTerminationCondition& ptc)
-{
-    bool result = prm_->getSimilarPaths(start, goal, candidateSolution, ptc);
-
-    if (!result)
-    {
-        OMPL_INFORM("RETRIEVE COULD NOT FIND SOLUTION ");
-        OMPL_INFORM("prm::getSimilarPaths() returned false - retrieve could not find solution");
-        return false;
-    }
-
-    OMPL_INFORM("prm::getSimilarPaths() returned true - found a solution of size %d",
-                candidateSolution.getStateCount());
-    return true;
-}
-
-void ompl::tools::BoltDB::debugVertex(const ompl::base::PlannerDataVertex& vertex)
+void og::BoltDB::debugVertex(const ompl::base::PlannerDataVertex& vertex)
 {
     debugState(vertex.getState());
 }
 
-void ompl::tools::BoltDB::debugState(const ompl::base::State* state)
+void og::BoltDB::debugState(const ompl::base::State* state)
 {
     si_->printState(state, std::cout);
+}
+
+double og::BoltDB::distanceFunction(const Vertex a, const Vertex b) const
+{
+    return si_->distance(stateProperty_[a], stateProperty_[b]);
+}
+
+void og::BoltDB::initializeQueryState()
+{
+    if (boost::num_vertices(g_) < 1)
+    {
+        queryVertex_ = boost::add_vertex( g_ );
+        stateProperty_[queryVertex_] = NULL;
+    }
+}
+
+ void og::BoltDB::getPlannerData(base::PlannerData &data) const
+ {
+     //Planner::getPlannerData(data);
+
+    // If there are even edges here
+    if (boost::num_edges( g_ ) > 0)
+    {
+        // Adding edges and all other vertices simultaneously
+        BOOST_FOREACH (const Edge e, boost::edges(g_))
+        {
+            const Vertex v1 = boost::source(e, g_);
+            const Vertex v2 = boost::target(e, g_);
+
+            // TODO save weights!
+            data.addEdge(base::PlannerDataVertex(stateProperty_[v1], (int)typeProperty_[v1]),
+                         base::PlannerDataVertex(stateProperty_[v2], (int)typeProperty_[v2]));
+
+            //OMPL_INFORM("Adding edge from vertex of type %d to vertex of type %d", typeProperty_[v1], typeProperty_[v2]);
+        }
+    }
+    else
+        OMPL_ERROR("There are no edges in the graph!");
+
+    // Make sure to add edge-less nodes as well
+    BOOST_FOREACH (const Vertex n, boost::vertices(g_))
+        if (boost::out_degree(n, g_) == 0)
+            data.addVertex(base::PlannerDataVertex(stateProperty_[n], (int)typeProperty_[n]));
+
+    //data.properties["iterations INTEGER"] = boost::lexical_cast<std::string>(iterations_);
+ }
+
+void og::BoltDB::setPlannerData(const base::PlannerData &data)
+{
+    // Check that the query vertex is initialized (used for internal nearest neighbor searches)
+    initializeQueryState();
+
+//     // Add all vertices
+//     if (verbose_)
+//     {
+//         OMPL_INFORM("BOLTDB::setPlannerData: numVertices=%d", data.numVertices());
+//     }
+//     OMPL_INFORM("Loading PlannerData into BoltDB");
+
+//     std::vector<Vertex> idToVertex;
+
+//     // Temp disable verbose mode for loading database
+//     bool wasVerbose = verbose_;
+//     verbose_ = false;
+
+//     OMPL_INFORM("Loading vertices:");
+//     // Add the nodes to the graph
+//     for (std::size_t vertexID = 0; vertexID < data.numVertices(); ++vertexID)
+//     {
+//         // Get the state from loaded planner data
+//         const base::State *oldState = data.getVertex(vertexID).getState();
+//         base::State *state = si_->cloneState(oldState);
+
+//         // Get the tag, which in this application represents the vertex type
+//         GuardType type = static_cast<GuardType>( data.getVertex(vertexID).getTag() );
+
+//         // ADD GUARD
+//         idToVertex.push_back(addGuard(state, type ));
+//     }
+
+//     OMPL_INFORM("Loading edges:");
+//     // Add the corresponding edges to the graph
+//     std::vector<unsigned int> edgeList;
+//     for (std::size_t fromVertex = 0; fromVertex < data.numVertices(); ++fromVertex)
+//     {
+//         edgeList.clear();
+
+//         // Get the edges
+//         data.getEdges(fromVertex, edgeList); // returns num of edges
+
+//         Vertex m = idToVertex[fromVertex];
+
+//         // Process edges
+//         for (std::size_t edgeId = 0; edgeId < edgeList.size(); ++edgeId)
+//         {
+//             std::size_t toVertex = edgeList[edgeId];
+//             Vertex n = idToVertex[toVertex];
+
+//             // Add the edge to the graph
+//             const base::Cost weight(0);
+//             if (verbose_ && false)
+//             {
+//                 OMPL_INFORM("    Adding edge from vertex id %d to id %d into edgeList", fromVertex, toVertex);
+//                 OMPL_INFORM("      Vertex %d to %d", m, n);
+//             }
+//             connectGuards(m, n);
+//         }
+//     } // for
+
+//     // Re-enable verbose mode, if necessary
+//     verbose_ = wasVerbose;
+ }
+
+void og::BoltDB::generateGrid()
+{
+    if (!si_->isSetup())
+    {
+        OMPL_WARN("Space information setup was not yet called. Calling now.");
+        si_->setup();
+    }
+
+    // Check that the query vertex is initialized (used for internal nearest neighbor searches)
+    initializeQueryState();
+
+    namespace ob = ompl::base;
+    ob::RealVectorBounds bounds = si_->getStateSpace()->as<ob::RealVectorStateSpace>()->getBounds();
+
+    //double discret = 2;
+    double sparseDelta_ = 2; // TODO(davetcoleman):this is temp
+    double start = sparseDelta_ / 2.0;
+    std::size_t count = 0;
+    for (double x = bounds.low[0] + start; x <= bounds.high[0]; x += sparseDelta_)
+    {
+        for (double y = bounds.low[1] + start; y <= bounds.high[1]; y += sparseDelta_)
+        {
+            //std::cout << "sampling at " << x << ", " << y << std::endl;
+
+            // Create state
+            base::State *state = si_->getStateSpace()->allocState();
+            state->as<ob::RealVectorStateSpace::StateType>()->values[0] = x;
+            state->as<ob::RealVectorStateSpace::StateType>()->values[1] = y;
+
+            // Add vertex to graph
+            Vertex v1 = boost::add_vertex(g_);
+            typeProperty_[v1] = START; // TODO(davetcoleman): this is meaningless
+            stateProperty_[v1] = state;
+
+            // Add vertex to nearest neighbor structure
+            nn_->add(v1);
+
+            // Visualize
+// #ifdef OMPL_BOLT_DEBUG
+//             visualizeStateCallback(state, 1, 1); // Candidate node has already (just) been added
+//             usleep(500);
+// #endif
+            count++;
+        }
+    }
+    OMPL_INFORM("Sampled %f points", count);
+    count = 0;
+
+    // Loop through each vertex
+    for (std::size_t v1 = 1; v1 < getNumVertices(); ++v1) // 1 because 0 is the search vertex?
+    {
+        // Add edges
+        std::vector<Vertex> graphNeighborhood;
+        std::vector<Vertex> visibleNeighborhood;
+        base::State *state = stateProperty_[v1];
+        stateProperty_[ queryVertex_ ] = state;
+        double distance = sparseDelta_ * 1.1 * sqrt(2); // 1.1 is fudge factor
+        //OMPL_INFORM("Finding nearest nodes in NN tree within radius %f", distance);
+        nn_->nearestR( queryVertex_, distance, graphNeighborhood);
+        stateProperty_[ queryVertex_ ] = NULL;
+
+        // Now that we got the neighbors from the NN, we must remove any we can't see
+        for (std::size_t i = 0; i < graphNeighborhood.size() ; ++i )
+            if (si_->checkMotion(state, stateProperty_[graphNeighborhood[i]]))
+                visibleNeighborhood.push_back(graphNeighborhood[i]);
+
+        // For each nearby vertex, add an edge
+        for (std::size_t i = 0; i < visibleNeighborhood.size(); ++i)
+        {
+            Vertex v2 = visibleNeighborhood[i];
+
+            // Error check
+            assert(v2 <= getNumVertices());
+            assert(v1 <= getNumVertices());
+
+            // Check if these verticies already share an edge
+            if (boost::edge(v1, v2, g_).second)
+            {
+                //std::cout << "shares an edge " << std::endl;
+                continue;
+            }
+
+            // Create the new edge
+            Edge e = (boost::add_edge(v1, v2, g_)).first;
+
+            // Add associated properties to the edge
+            //edgeWeightProperty_[e] = distanceFunction(v1, v2);
+            edgeCollisionStateProperty_[e] = NOT_CHECKED;
+
+            // Debug in Rviz
+#ifdef OMPL_BOLT_DEBUG
+            // if (v1 % 30 == 0)
+            // {
+            //     visualizeEdgeCallback(stateProperty_[v1], stateProperty_[v2]);
+            //     usleep(1000);
+            // }
+#endif
+            count++;
+        }
+    }
+    OMPL_INFORM("Generated %i edges", count);
+}
+
+void og::BoltDB::clearEdgeCollisionStates()
+{
+    BOOST_FOREACH (const Edge e, boost::edges(g_))
+        edgeCollisionStateProperty_[e] = NOT_CHECKED; // each edge has an unknown state
+}
+
+bool og::BoltDB::astarSearch(const Vertex start, const Vertex goal,
+                                                 std::vector<Vertex> &vertexPath) const
+{
+    Vertex *vertexPredecessors = new Vertex[getNumVertices()];
+    //boost::vector_property_map<Vertex> vertexPredecessors(getNumVertices());
+
+    bool foundGoal = false;
+
+    double *vertexDistances = new double[getNumVertices()];
+
+    try
+    {
+        // Note: could not get astar_search to compile within BoltRetrieveRepair class because of namespacing issues
+        boost::astar_search(g_, // graph
+            start, // start state
+            boost::bind(&og::BoltDB::distanceFunction, this, _1, goal), // the heuristic
+            // ability to disable edges (set cost to inifinity):
+            boost::weight_map(edgeWeightMap(g_,
+                    edgeCollisionStateProperty_)).
+            predecessor_map(vertexPredecessors).
+            distance_map(&vertexDistances[0]).
+            visitor(CustomVisitor(goal)));
+    }
+    catch (foundGoalException&)
+    {
+        // the custom exception from CustomVisitor
+        if (verbose_ && false)
+        {
+            OMPL_INFORM("astarSearch: Astar found goal vertex ------------------------");
+            OMPL_INFORM("distance to goal: %f", vertexDistances[goal]);
+        }
+
+        if (vertexDistances[goal] > 1.7e+308) // TODO(davetcoleman): fix terrible hack for detecting infinity
+            //double diff = d[goal] - std::numeric_limits<double>::infinity();
+            //if ((diff < std::numeric_limits<double>::epsilon()) && (-diff < std::numeric_limits<double>::epsilon()))
+            // check if the distance to goal is inifinity. if so, it is unreachable
+            //if (d[goal] >= std::numeric_limits<double>::infinity())
+        {
+            if (verbose_)
+                OMPL_INFORM("Distance to goal is infinity");
+            foundGoal = false;
+        }
+        else
+        {
+            // Only clear the vertexPath after we know we have a new solution, otherwise it might have a good
+            // previous one
+            vertexPath.clear(); // remove any old solutions
+
+            // Trace back the shortest path in reverse and only save the states
+            Vertex v;
+            for (v = goal; v != vertexPredecessors[v]; v = vertexPredecessors[v])
+            {
+                vertexPath.push_back(v);
+            }
+            if (v != goal) // TODO explain this because i don't understand
+            {
+                vertexPath.push_back(v);
+            }
+
+            foundGoal = true;
+        }
+    }
+
+    //delete[] vertexPredecessors;
+    delete[] vertexDistances;
+
+    // No solution found from start to goal
+    return foundGoal;
 }
