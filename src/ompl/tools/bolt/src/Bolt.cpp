@@ -72,7 +72,7 @@ void Bolt::initialize()
     dualThreadScratchEnabled_ = true;
 
     // Load the experience database
-    experienceDB_.reset(new geometric::BoltDB(si_->getStateSpace()));
+    experienceDB_.reset(new geometric::BoltDB(si_));
 
     // Load the Retrieve repair database. We do it here so that setRepairPlanner() works
     rrPlanner_ = ob::PlannerPtr(new og::BoltRetrieveRepair(si_, experienceDB_));

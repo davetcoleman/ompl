@@ -272,7 +272,7 @@ namespace ompl
             virtual void setup();
 
             /** \brief Set the callback to visualize/publish a planner's progress */
-            virtual void setVisualizationStateCallback(ompl::base::VisualizationStateCallback visualizationStateCallback);
+            virtual void setVizStateCallback(ompl::base::VizStateCallback vizStateCallback);
 
         protected:
 

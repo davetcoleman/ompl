@@ -84,25 +84,38 @@ double get (const og::BoltDB::edgeWeightMap &m, const og::BoltDB::Edge &e)
 }
 }
 
-// CustomVisitor methods ////////////////////////////////////////////////////////////////////////////
+// CustomAstarVisitor methods ////////////////////////////////////////////////////////////////////////////
 
-BOOST_CONCEPT_ASSERT((boost::AStarVisitorConcept<og::BoltDB::CustomVisitor, og::BoltDB::Graph>));
+BOOST_CONCEPT_ASSERT((boost::AStarVisitorConcept<og::BoltDB::CustomAstarVisitor, og::BoltDB::Graph>));
 
-og::BoltDB::CustomVisitor::CustomVisitor (Vertex goal)
-    : goal(goal)
+og::BoltDB::CustomAstarVisitor::CustomAstarVisitor (Vertex goal, BoltDB* parent)
+    : goal_(goal)
+    , parent_(parent)
 {
 }
 
-void og::BoltDB::CustomVisitor::examine_vertex (Vertex u, const Graph &) const
+void og::BoltDB::CustomAstarVisitor::discover_vertex (Vertex v, const Graph &) const
 {
-    if (u == goal)
+    parent_->vizStateCallback(parent_->stateProperty_[v], 1, 1);
+    parent_->vizTriggerCallback();
+    usleep(100000);
+}
+
+void og::BoltDB::CustomAstarVisitor::examine_vertex (Vertex v, const Graph &) const
+{
+    parent_->vizStateCallback(parent_->stateProperty_[v], 5, 1);
+    parent_->vizTriggerCallback();
+    usleep(100000);
+
+    if (v == goal_)
         throw foundGoalException();
 }
 
 // Actual class ////////////////////////////////////////////////////////////////////////////
 
-og::BoltDB::BoltDB(const base::StateSpacePtr &space)
-    : numPathsInserted_(0)
+og::BoltDB::BoltDB(base::SpaceInformationPtr si)
+    : si_(si)
+    , numPathsInserted_(0)
     , saving_enabled_(true)
     // Property accessors of edges
     //edgeWeightProperty_(boost::get(boost::edge_weight, g_)),
@@ -113,9 +126,6 @@ og::BoltDB::BoltDB(const base::StateSpacePtr &space)
     //interfaceDataProperty_(boost::get(vertex_interface_data_t(), g_)),
     , verbose_(true)
 {
-    // Set space information
-    si_.reset(new base::SpaceInformation(space));
-
    if (!nn_)
    {
        nn_.reset(new NearestNeighborsGNATNoThreadSafety<Vertex>());
@@ -215,7 +225,7 @@ bool og::BoltDB::addPath(og::PathGeometric& solutionPath, double &insertionTime)
       return false;
     }
 
-    bool result;
+    bool result = true;
     double seconds = 120; //10; // a large number, should never need to use this
     ompl::base::PlannerTerminationCondition ptc = ompl::base::timedPlannerTerminationCondition( seconds, 0.1 );
 
@@ -472,6 +482,10 @@ void og::BoltDB::generateGrid()
             state->as<ob::RealVectorStateSpace::StateType>()->values[0] = x;
             state->as<ob::RealVectorStateSpace::StateType>()->values[1] = y;
 
+            // Collision check
+            if (!si_->isValid(state))
+                continue;
+
             // Add vertex to graph
             Vertex v1 = boost::add_vertex(g_);
             typeProperty_[v1] = START; // TODO(davetcoleman): this is meaningless
@@ -482,8 +496,7 @@ void og::BoltDB::generateGrid()
 
             // Visualize
 // #ifdef OMPL_BOLT_DEBUG
-//             visualizeStateCallback(state, 1, 1); // Candidate node has already (just) been added
-//             usleep(500);
+//             vizStateCallback(state, 1, 1); // Candidate node has already (just) been added
 // #endif
             count++;
         }
@@ -496,7 +509,6 @@ void og::BoltDB::generateGrid()
     {
         // Add edges
         std::vector<Vertex> graphNeighborhood;
-        std::vector<Vertex> visibleNeighborhood;
         base::State *state = stateProperty_[v1];
         stateProperty_[ queryVertex_ ] = state;
         double distance = sparseDelta_ * 1.1 * sqrt(2); // 1.1 is fudge factor
@@ -504,26 +516,26 @@ void og::BoltDB::generateGrid()
         nn_->nearestR( queryVertex_, distance, graphNeighborhood);
         stateProperty_[ queryVertex_ ] = NULL;
 
-        // Now that we got the neighbors from the NN, we must remove any we can't see
-        for (std::size_t i = 0; i < graphNeighborhood.size() ; ++i )
-            if (si_->checkMotion(state, stateProperty_[graphNeighborhood[i]]))
-                visibleNeighborhood.push_back(graphNeighborhood[i]);
-
         // For each nearby vertex, add an edge
-        for (std::size_t i = 0; i < visibleNeighborhood.size(); ++i)
+        for (std::size_t i = 0; i < graphNeighborhood.size() ; ++i )
         {
-            Vertex v2 = visibleNeighborhood[i];
+            Vertex &v2 = graphNeighborhood[i];
+
+            // Check if these verticies already share an edge
+            if (boost::edge(v1, v2, g_).second)
+                continue;
+
+            // Check if these verticies are the same
+            if (v1 == v2)
+                continue;
+
+            // remove any edges that are in collision
+            if (!si_->checkMotion(state, stateProperty_[v2]))
+                continue;
 
             // Error check
             assert(v2 <= getNumVertices());
             assert(v1 <= getNumVertices());
-
-            // Check if these verticies already share an edge
-            if (boost::edge(v1, v2, g_).second)
-            {
-                //std::cout << "shares an edge " << std::endl;
-                continue;
-            }
 
             // Create the new edge
             Edge e = (boost::add_edge(v1, v2, g_)).first;
@@ -536,13 +548,41 @@ void og::BoltDB::generateGrid()
 #ifdef OMPL_BOLT_DEBUG
             // if (v1 % 30 == 0)
             // {
-            //     visualizeEdgeCallback(stateProperty_[v1], stateProperty_[v2]);
-            //     usleep(1000);
+            //     vizEdgeCallback(stateProperty_[v1], stateProperty_[v2]);
             // }
 #endif
             count++;
         }
     }
+
+    // Loop through each vertex
+    /*bool found = false;
+    for (std::size_t v1 = 1; v1 < getNumVertices(); ++v1) // 1 because 0 is the search vertex?
+    {
+        std::size_t deg = boost::degree(v1, g_);
+        //std::cout << "deg: " << deg << ", ";
+        if (deg < 6)
+        {
+            base::State *state = stateProperty_[v1];
+            vizStateCallback(state, 1, 1);
+
+            // if (!found)
+            // {
+            //     std::cout << "showing edges for " << v1 << std::endl;
+            //     BOOST_FOREACH( Vertex v2, boost::adjacent_vertices( v1, g_ ) )
+            //     {
+            //         std::cout << "adj vertex: " << v2 << std::endl;
+            //         vizStateCallback(stateProperty_[v2], 2, 1);
+            //         vizEdgeCallback(stateProperty_[v1], stateProperty_[v2]);
+            //     }
+            //     //found = true;
+            // }
+        }
+    }
+    */
+    //std::cout << std::endl;
+    vizTriggerCallback();
+
     OMPL_INFORM("Generated %i edges", count);
 }
 
@@ -553,7 +593,7 @@ void og::BoltDB::clearEdgeCollisionStates()
 }
 
 bool og::BoltDB::astarSearch(const Vertex start, const Vertex goal,
-                                                 std::vector<Vertex> &vertexPath) const
+                                                 std::vector<Vertex> &vertexPath)
 {
     Vertex *vertexPredecessors = new Vertex[getNumVertices()];
     //boost::vector_property_map<Vertex> vertexPredecessors(getNumVertices());
@@ -573,11 +613,11 @@ bool og::BoltDB::astarSearch(const Vertex start, const Vertex goal,
                     edgeCollisionStateProperty_)).
             predecessor_map(vertexPredecessors).
             distance_map(&vertexDistances[0]).
-            visitor(CustomVisitor(goal)));
+            visitor(CustomAstarVisitor(goal, this)));
     }
     catch (foundGoalException&)
     {
-        // the custom exception from CustomVisitor
+        // the custom exception from CustomAstarVisitor
         if (verbose_ && false)
         {
             OMPL_INFORM("astarSearch: Astar found goal vertex ------------------------");
