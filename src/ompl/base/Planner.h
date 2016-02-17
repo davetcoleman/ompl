@@ -67,10 +67,10 @@ namespace ompl
             \brief A shared pointer wrapper for ompl::base::Planner */
 
         /** \brief Function callback for planners to call external visualizers */
-        typedef boost::function<void(ompl::base::Planner*)> VisualizationCallback;
-        typedef boost::function<void(ompl::base::State*, std::size_t type, double neighborRadius)> 
-          VisualizationStateCallback;
-        typedef boost::function<void(ompl::base::State*, ompl::base::State*)> VisualizationEdgeCallback;
+        typedef boost::function<void(ompl::base::State*, std::size_t type, double neighborRadius)>
+          VizStateCallback;
+        typedef boost::function<void(ompl::base::State*, ompl::base::State*)> VizEdgeCallback;
+        typedef boost::function<void(void)> VizTriggerCallback;
 
         /** \brief Helper class to extract valid start & goal
             states. Usually used internally by planners.
@@ -374,24 +374,37 @@ namespace ompl
 
             /** \brief Visualize a planner's data during runtime, externally, using a function callback
              *         This could be called whenever the graph changes */
-            virtual void visualizeCallback();
-
-            /** \brief Set the callback to visualize/publish a planner's progress */
-            virtual void setVisualizationCallback(VisualizationCallback visualizationCallback);
-
-            /** \brief Visualize a planner's data during runtime, externally, using a function callback
-             *         This could be called whenever the graph changes */
-            virtual void visualizeStateCallback(ompl::base::State* state, std::size_t type, double neighborRadius);
-
-            /** \brief Set the callback to visualize/publish a planner's progress */
-            virtual void setVisualizationStateCallback(VisualizationStateCallback visualizationStateCallback);
+            virtual void vizStateCallback(ompl::base::State* state, std::size_t type, double neighborRadius)
+            {
+                if (vizStateCallback_)
+                    vizStateCallback_(state, type, neighborRadius);
+            }
 
             /** \brief Visualize a planner's data during runtime, externally, using a function callback
              *         This could be called whenever the graph changes */
-            virtual void visualizeEdgeCallback(ompl::base::State* stateA, ompl::base::State* stateB);
+            virtual void vizEdgeCallback(ompl::base::State* stateA, ompl::base::State* stateB)
+            {
+                if (vizEdgeCallback_)
+                    vizEdgeCallback_(stateA, stateB);
+            }
+
+            /** \brief Trigger visualizer to publish graphics */
+            virtual void vizTriggerCallback()
+            {
+                if (vizTriggerCallback_)
+                    vizTriggerCallback_();
+            }
 
             /** \brief Set the callback to visualize/publish a planner's progress */
-            virtual void setVisualizationEdgeCallback(VisualizationEdgeCallback visualizationEdgeCallback);
+            virtual void setVizCallbacks(
+                ompl::base::VizStateCallback vizStateCallback,
+                ompl::base::VizEdgeCallback vizEdgeCallback,
+                ompl::base::VizTriggerCallback vizTriggerCallback)
+            {
+                vizStateCallback_ = vizStateCallback;
+                vizEdgeCallback_ = vizEdgeCallback;
+                vizTriggerCallback_ = vizTriggerCallback;
+            }
 
         protected:
 
@@ -444,9 +457,9 @@ namespace ompl
             bool                      setup_;
 
             /** \brief Optional callback to allow easy introspection of a planner's search progress */
-            VisualizationCallback      visualizationCallback_;
-            VisualizationStateCallback visualizationStateCallback_;
-            VisualizationEdgeCallback visualizationEdgeCallback_;
+            VizStateCallback vizStateCallback_;
+            VizEdgeCallback  vizEdgeCallback_;
+            VizTriggerCallback  vizTriggerCallback_;
         };
 
         /** \brief Definition of a function that can allocate a planner */

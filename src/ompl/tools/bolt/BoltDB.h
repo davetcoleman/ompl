@@ -40,6 +40,7 @@
 
 #include <ompl/base/StateSpace.h>
 #include <ompl/geometric/PathGeometric.h>
+#include <ompl/base/Planner.h>
 #include <ompl/base/PlannerData.h>
 #include <ompl/base/PlannerDataStorage.h>
 #include <ompl/base/State.h>
@@ -261,9 +262,9 @@ namespace ompl
 
             ////////////////////////////////////////////////////////////////////////////////////////
             /**
-             @brief The underlying roadmap graph.
+             \brief The underlying roadmap graph.
 
-             @par Any BGL graph representation could be used here. Because we
+             \par Any BGL graph representation could be used here. Because we
              expect the roadmap to be sparse (m<n^2), an adjacency_list is more
              appropriate than an adjacency_matrix. Edges are undirected.
 
@@ -319,7 +320,7 @@ namespace ompl
             ////////////////////////////////////////////////////////////////////////////////////////
             /**
              * Used to artifically supress edges during A* search.
-             * @implements ReadablePropertyMapConcept
+             * \implements ReadablePropertyMapConcept
              */
             class edgeWeightMap
             {
@@ -341,14 +342,14 @@ namespace ompl
 
                 /**
                  * Construct map for certain constraints.
-                 * @param graph         Graph to use
+                 * \param graph         Graph to use
                  */
                 edgeWeightMap (const Graph &graph, const EdgeCollisionStateMap &collisionStates);
 
                 /**
                  * Get the weight of an edge.
-                 * @param e     the edge
-                 * @return infinity if \a e lies in a forbidden neighborhood; actual weight of \a e otherwise
+                 * \param e     the edge
+                 * \return infinity if \a e lies in a forbidden neighborhood; actual weight of \a e otherwise
                  */
                 double get (Edge e) const;
 
@@ -365,29 +366,41 @@ namespace ompl
             ////////////////////////////////////////////////////////////////////////////////////////
             /**
              * Vertex visitor to check if A* search is finished.
-             * @implements AStarVisitorConcept
+             * \implements AStarVisitorConcept
+             * See http://www.boost.org/doc/libs/1_58_0/libs/graph/doc/AStarVisitor.html
              */
-            class CustomVisitor : public boost::default_astar_visitor
+            class CustomAstarVisitor : public boost::default_astar_visitor
             {
             private:
 
-                Vertex goal;    // Goal Vertex of the search
+                Vertex goal_;    // Goal Vertex of the search
+                BoltDB* parent_;
 
             public:
 
                 /**
                  * Construct a visitor for a given search.
-                 * @param goal  goal vertex of the search
+                 * \param goal  goal vertex of the search
                  */
-                CustomVisitor (Vertex goal);
+                CustomAstarVisitor (Vertex goal, BoltDB* parent);
 
                 /**
-                 * Check if we have arrived at the goal.
-                 * @param u current vertex
-                 * @param g graph we are searching on
-                 * @throw foundGoalException if \a u is the goal
+                 * \brief Invoked when a vertex is first discovered and is added to the OPEN list.
+                 * \param v current Vertex
+                 * \param g graph we are searching on
                  */
-                void examine_vertex(Vertex u, const Graph &g) const;
+                void discover_vertex(Vertex v, const Graph &g) const;
+
+                /**
+                 * \brief Check if we have arrived at the goal.
+                 * This is invoked on a vertex as it is popped from the queue (i.e., it has the lowest
+                 * cost on the OPEN list). This happens immediately before examine_edge() is invoked on
+                 * each of the out-edges of vertex u.
+                 * \param v current vertex
+                 * \param g graph we are searching on
+                 * \throw foundGoalException if \a u is the goal
+                 */
+                void examine_vertex(Vertex v, const Graph &g) const;
             };
 
             ////////////////////////////////////////////////////////////////////////////////////////
@@ -397,7 +410,7 @@ namespace ompl
             /** \brief Constructor needs the state space used for planning.
              *  \param space - state space
              */
-            BoltDB(const base::StateSpacePtr &space);
+            BoltDB(base::SpaceInformationPtr si);
 
             /** \brief Deconstructor */
             virtual ~BoltDB(void);
@@ -522,18 +535,52 @@ namespace ompl
              *  \return true if candidate solution found
              */
             bool astarSearch(const BoltDB::Vertex start, const BoltDB::Vertex goal,
-                                   std::vector<BoltDB::Vertex> &vertexPath) const;
+                std::vector<BoltDB::Vertex> &vertexPath);
+
+            /** \brief Visualize a planner's data during runtime, externally, using a function callback
+             *         This could be called whenever the graph changes */
+            void vizStateCallback(ompl::base::State* state, std::size_t type, double neighborRadius)
+            {
+                if (vizStateCallback_)
+                    vizStateCallback_(state, type, neighborRadius);
+            }
+
+            /** \brief Visualize a planner's data during runtime, externally, using a function callback
+             *         This could be called whenever the graph changes */
+            void vizEdgeCallback(ompl::base::State* stateA, ompl::base::State* stateB)
+            {
+                if (vizEdgeCallback_)
+                    vizEdgeCallback_(stateA, stateB);
+            }
+
+            /** \brief Trigger visualizer to publish graphics */
+            void vizTriggerCallback()
+            {
+                if (vizTriggerCallback_)
+                    vizTriggerCallback_();
+            }
+
+            /** \brief Set the callback to visualize/publish a planner's progress */
+            void setVizCallbacks(
+                ompl::base::VizStateCallback vizStateCallback,
+                ompl::base::VizEdgeCallback vizEdgeCallback,
+                ompl::base::VizTriggerCallback vizTriggerCallback)
+            {
+                vizStateCallback_ = vizStateCallback;
+                vizEdgeCallback_ = vizEdgeCallback;
+                vizTriggerCallback_ = vizTriggerCallback;
+            }
 
         protected:
 
             /// The created space information
             base::SpaceInformationPtr si_;
 
-            /// Helper class for storing each plannerData instance
-            ompl::base::PlannerDataStorage plannerDataStorage_;
-
             // Track unsaved paths to determine if a save is required
             int numPathsInserted_;
+
+            /// Helper class for storing each plannerData instance
+            ompl::base::PlannerDataStorage plannerDataStorage_;
 
             // Allow the database to save to file (new experiences)
             bool saving_enabled_;
@@ -561,6 +608,11 @@ namespace ompl
 
             /** \brief Option to enable debugging output */
             bool verbose_;
+
+            /** \brief Optional callback to allow easy introspection of a planner's search progress */
+            ompl::base::VizStateCallback vizStateCallback_;
+            ompl::base::VizEdgeCallback  vizEdgeCallback_;
+            ompl::base::VizTriggerCallback  vizTriggerCallback_;
 
         }; // end of class BoltDB
 

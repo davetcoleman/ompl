@@ -110,39 +110,6 @@ bool ompl::base::Planner::isSetup() const
     return setup_;
 }
 
-void ompl::base::Planner::visualizeCallback()
-{
-      if (visualizationCallback_)
-            visualizationCallback_(this);
-}
-
-void ompl::base::Planner::setVisualizationCallback(VisualizationCallback visualizationCallback)
-{
-      visualizationCallback_ = visualizationCallback;
-}
-
-void ompl::base::Planner::visualizeStateCallback(ompl::base::State* state, std::size_t type, double neighborRadius)
-{
-      if (visualizationStateCallback_)
-            visualizationStateCallback_(state, type, neighborRadius);
-}
-
-void ompl::base::Planner::setVisualizationStateCallback(VisualizationStateCallback visualizationStateCallback)
-{
-      visualizationStateCallback_ = visualizationStateCallback;
-}
-
-void ompl::base::Planner::visualizeEdgeCallback(ompl::base::State* stateA, ompl::base::State* stateB)
-{
-      if (visualizationEdgeCallback_)
-            visualizationEdgeCallback_(stateA, stateB);
-}
-
-void ompl::base::Planner::setVisualizationEdgeCallback(VisualizationEdgeCallback visualizationEdgeCallback)
-{
-      visualizationEdgeCallback_ = visualizationEdgeCallback;
-}
-
 void ompl::base::Planner::clear()
 {
     pis_.clear();
