@@ -52,16 +52,14 @@
 
 namespace ompl
 {
-
 namespace geometric
 {
-
 BoltRetrieveRepair::BoltRetrieveRepair(const base::SpaceInformationPtr &si, const BoltDBPtr &boltDB)
-    : base::Planner(si, "Bolt_Retrieve_Repair")
-    , boltDB_(boltDB)
-    , smoothingEnabled_(false) // makes understanding recalled paths more difficult if enabled
-    , sparseDelta_(2.0)
-    , verbose_(true)
+  : base::Planner(si, "Bolt_Retrieve_Repair")
+  , boltDB_(boltDB)
+  , smoothingEnabled_(false)  // makes understanding recalled paths more difficult if enabled
+  , sparseDelta_(2.0)
+  , verbose_(true)
 {
     specs_.approximateSolutions = true;
     specs_.directed = true;
@@ -121,7 +119,7 @@ base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCond
     if (!getPathOffGraph(startState, goalState, candidateSolution, ptc))
     {
         OMPL_INFORM("RetrieveRepair::solve() No nearest start or goal found");
-        return base::PlannerStatus::TIMEOUT; // The planner failed to find a solution
+        return base::PlannerStatus::TIMEOUT;  // The planner failed to find a solution
     }
 
     OMPL_INFORM("BoltDB::getPathOffGraph() returned true - found a solution of size %d",
@@ -136,13 +134,13 @@ base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCond
     // Smooth the result
     if (smoothingEnabled_)
     {
-      OMPL_INFORM("BoltRetrieveRepair solve: Simplifying solution (smoothing)...");
-      time::point simplifyStart = time::now();
-      std::size_t numStates = candidateSolution.getGeometricPath().getStateCount();
-      path_simplifier_->simplify(candidateSolution.getGeometricPath(), ptc);
-      double simplifyTime = time::seconds(time::now() - simplifyStart);
-      OMPL_INFORM("BoltRetrieveRepair: Path simplification took %f seconds and removed %d states",
-                  simplifyTime, numStates - candidateSolution.getGeometricPath().getStateCount());
+        OMPL_INFORM("BoltRetrieveRepair solve: Simplifying solution (smoothing)...");
+        time::point simplifyStart = time::now();
+        std::size_t numStates = candidateSolution.getGeometricPath().getStateCount();
+        path_simplifier_->simplify(candidateSolution.getGeometricPath(), ptc);
+        double simplifyTime = time::seconds(time::now() - simplifyStart);
+        OMPL_INFORM("BoltRetrieveRepair: Path simplification took %f seconds and removed %d states", simplifyTime,
+                    numStates - candidateSolution.getGeometricPath().getStateCount());
     }
 
     // Finished
@@ -160,13 +158,12 @@ void BoltRetrieveRepair::getPlannerData(base::PlannerData &data) const
 
     for (std::size_t j = 1; j < foundPath_->getStateCount(); ++j)
     {
-        data.addEdge(
-            base::PlannerDataVertex(foundPath_->getState(j-1) ),
-            base::PlannerDataVertex(foundPath_->getState(j)   ));
+        data.addEdge(base::PlannerDataVertex(foundPath_->getState(j - 1)),
+                     base::PlannerDataVertex(foundPath_->getState(j)));
     }
 }
 
-const PathGeometric& BoltRetrieveRepair::getChosenRecallPath() const
+const PathGeometric &BoltRetrieveRepair::getChosenRecallPath() const
 {
     return *foundPath_;
 }
@@ -175,25 +172,25 @@ std::size_t BoltRetrieveRepair::checkMotionScore(const base::State *s1, const ba
 {
     int segmentCount = si_->getStateSpace()->validSegmentCount(s1, s2);
 
-    std::size_t invalidStatesScore = 0; // count number of interpolated states in collision
+    std::size_t invalidStatesScore = 0;  // count number of interpolated states in collision
 
     // temporary storage for the checked state
     base::State *test = si_->allocState();
 
     // Linerarly step through motion between state 0 to state 1
-    double iteration_step = 1.0/double(segmentCount);
-    for (double location = 0.0; location <= 1.0; location += iteration_step )
+    double iteration_step = 1.0 / double(segmentCount);
+    for (double location = 0.0; location <= 1.0; location += iteration_step)
     {
         si_->getStateSpace()->interpolate(s1, s2, location, test);
 
         if (!si_->isValid(test))
         {
-            //OMPL_DEBUG("Found INVALID location between states at gradient %f", location);
-            invalidStatesScore ++;
+            // OMPL_DEBUG("Found INVALID location between states at gradient %f", location);
+            invalidStatesScore++;
         }
         else
         {
-            //OMPL_DEBUG("Found valid location between states at gradient %f", location);
+            // OMPL_DEBUG("Found valid location between states at gradient %f", location);
         }
     }
     si_->freeState(test);
@@ -201,9 +198,9 @@ std::size_t BoltRetrieveRepair::checkMotionScore(const base::State *s1, const ba
     return invalidStatesScore;
 }
 
-bool BoltRetrieveRepair::getPathOffGraph(const base::State* start, const base::State* goal,
-                                               BoltDB::CandidateSolution &candidateSolution,
-                                               const base::PlannerTerminationCondition &ptc)
+bool BoltRetrieveRepair::getPathOffGraph(const base::State *start, const base::State *goal,
+                                         BoltDB::CandidateSolution &candidateSolution,
+                                         const base::PlannerTerminationCondition &ptc)
 {
     // Get neighbors near start and goal. Note: potentially they are not *visible* - will test for this later
 
@@ -228,8 +225,8 @@ bool BoltRetrieveRepair::getPathOffGraph(const base::State* start, const base::S
         OMPL_INFORM("Found %d nodes near goal", goalVertexCandidateNeighbors_.size());
 
     // Get paths between start and goal
-    bool result = getPathOnGraph(startVertexCandidateNeighbors_, goalVertexCandidateNeighbors_,
-                           start, goal, candidateSolution, ptc);
+    bool result = getPathOnGraph(startVertexCandidateNeighbors_, goalVertexCandidateNeighbors_, start, goal,
+                                 candidateSolution, ptc);
 
     // Error check
     if (!result)
@@ -246,12 +243,12 @@ bool BoltRetrieveRepair::getPathOffGraph(const base::State* start, const base::S
     // Debug output
     if (false)
     {
-        ompl::geometric::PathGeometric geometricSolution
-            = static_cast<ompl::geometric::PathGeometric&>(*candidateSolution.path_);
+        ompl::geometric::PathGeometric geometricSolution =
+            static_cast<ompl::geometric::PathGeometric &>(*candidateSolution.path_);
 
         for (std::size_t i = 0; i < geometricSolution.getStateCount(); ++i)
         {
-            OMPL_INFORM("  getPathOffGraph(): Adding state %f to plannerData", i );
+            OMPL_INFORM("  getPathOffGraph(): Adding state %f to plannerData", i);
             si_->printState(geometricSolution.getState(i), std::cout);
         }
     }
@@ -261,8 +258,7 @@ bool BoltRetrieveRepair::getPathOffGraph(const base::State* start, const base::S
 
 bool BoltRetrieveRepair::getPathOnGraph(const std::vector<BoltDB::Vertex> &candidateStarts,
                                         const std::vector<BoltDB::Vertex> &candidateGoals,
-                                        const base::State* actualStart,
-                                        const base::State* actualGoal,
+                                        const base::State *actualStart, const base::State *actualGoal,
                                         BoltDB::CandidateSolution &candidateSolution,
                                         const base::PlannerTerminationCondition &ptc)
 {
@@ -274,13 +270,14 @@ bool BoltRetrieveRepair::getPathOnGraph(const std::vector<BoltDB::Vertex> &candi
         {
             if (verbose_)
                 OMPL_WARN("FOUND CANDIDATE START THAT IS NOT VISIBLE ");
-            continue; // this is actually not visible
+            continue;  // this is actually not visible
         }
 
         BOOST_FOREACH (BoltDB::Vertex goal, candidateGoals)
         {
             if (verbose_)
-                OMPL_INFORM("  foreach_goal: Checking motion from  %d to %d", actualGoal, boltDB_->stateProperty_[goal]);
+                OMPL_INFORM("  foreach_goal: Checking motion from  %d to %d", actualGoal,
+                            boltDB_->stateProperty_[goal]);
 
             // Check if our planner is out of time
             if (ptc == true)
@@ -294,11 +291,11 @@ bool BoltRetrieveRepair::getPathOnGraph(const std::vector<BoltDB::Vertex> &candi
             {
                 if (verbose_)
                     OMPL_INFORM("FOUND CANDIDATE GOAL THAT IS NOT VISIBLE! ");
-                continue; // this is actually not visible
+                continue;  // this is actually not visible
             }
 
             // Repeatidly search through graph for connection then check for collisions then repeat
-            if (lazyCollisionSearch( start, goal, actualStart, actualGoal, candidateSolution, ptc))
+            if (lazyCollisionSearch(start, goal, actualStart, actualGoal, candidateSolution, ptc))
             {
                 // Found a path
                 return true;
@@ -309,18 +306,16 @@ bool BoltRetrieveRepair::getPathOnGraph(const std::vector<BoltDB::Vertex> &candi
                 OMPL_INFORM("Did not find a path, looking for other start/goal combinations ");
             }
 
-        } // foreach
-    } // foreach
+        }  // foreach
+    }      // foreach
 
     return false;
 }
 
-bool BoltRetrieveRepair::lazyCollisionSearch(const BoltDB::Vertex &start,
-                                                   const BoltDB::Vertex &goal,
-                                                   const base::State* actualStart,
-                                                   const base::State* actualGoal,
-                                                   BoltDB::CandidateSolution &candidateSolution,
-                                                   const base::PlannerTerminationCondition &ptc)
+bool BoltRetrieveRepair::lazyCollisionSearch(const BoltDB::Vertex &start, const BoltDB::Vertex &goal,
+                                             const base::State *actualStart, const base::State *actualGoal,
+                                             BoltDB::CandidateSolution &candidateSolution,
+                                             const base::PlannerTerminationCondition &ptc)
 {
     // Vector to store candidate paths in before they are converted to PathPtrs
     std::vector<BoltDB::Vertex> vertexPath;
@@ -330,7 +325,7 @@ bool BoltRetrieveRepair::lazyCollisionSearch(const BoltDB::Vertex &start,
     {
         if (verbose_)
             OMPL_INFORM("    Start equals goal, skipping ");
-        return false; // TODO(davetcoleman): should this be skipped, or maybe returned as the solution?
+        return false;  // TODO(davetcoleman): should this be skipped, or maybe returned as the solution?
     }
 
     // Keep looking for paths between chosen start and goal until one is found that is valid,
@@ -352,7 +347,7 @@ bool BoltRetrieveRepair::lazyCollisionSearch(const BoltDB::Vertex &start,
         if (!boltDB_->astarSearch(start, goal, vertexPath))
         {
             // We will stop looking through this start-goal combination, but perhaps this partial solution is good
-           if (verbose_)
+            if (verbose_)
                 OMPL_INFORM("        unable to construct solution between start and goal using astar");
 
             // no path found what so ever
@@ -378,14 +373,14 @@ bool BoltRetrieveRepair::lazyCollisionSearch(const BoltDB::Vertex &start,
             return true;
         }
         // else, loop with updated graph that has the invalid edges/states disabled
-    } // end while
+    }  // end while
 
     // we never found a valid path
     return false;
 }
 
 bool BoltRetrieveRepair::lazyCollisionCheck(std::vector<BoltDB::Vertex> &vertexPath,
-                                                  const base::PlannerTerminationCondition &ptc)
+                                            const base::PlannerTerminationCondition &ptc)
 {
     OMPL_DEBUG("Starting lazy collision checking");
 
@@ -452,32 +447,33 @@ bool BoltRetrieveRepair::findGraphNeighbors(const base::State *state, std::vecto
     graphNeighborhood.clear();
 
     // Setup search by getting a non-const version of the focused state
-    base::State* stateCopy = si_->cloneState(state);
-    boltDB_->stateProperty_[ boltDB_->queryVertex_ ] = stateCopy;
+    base::State *stateCopy = si_->cloneState(state);
+    boltDB_->stateProperty_[boltDB_->queryVertex_] = stateCopy;
 
     // Double the range of sparseDelta_ up to 3 times until at least 1 neighbor is found
     std::size_t expandNeighborhoodSearchAttempts = 3;
     double neighborSearchRadius;
-    static const double EXPAND_NEIGHBORHOOD_RATE = 0.25; // speed to which we look outside the original sparse delta neighborhood
+    static const double EXPAND_NEIGHBORHOOD_RATE =
+        0.25;  // speed to which we look outside the original sparse delta neighborhood
 
     // Begin search outward
     for (std::size_t i = 0; i < expandNeighborhoodSearchAttempts; ++i)
     {
-        neighborSearchRadius = sparseDelta_ + i*EXPAND_NEIGHBORHOOD_RATE*sparseDelta_;
+        neighborSearchRadius = sparseDelta_ + i * EXPAND_NEIGHBORHOOD_RATE * sparseDelta_;
         if (verbose_)
         {
             OMPL_INFORM("-------------------------------------------------------");
-            OMPL_INFORM("Attempt %d to find neighborhood at radius %f", i+1, neighborSearchRadius);
+            OMPL_INFORM("Attempt %d to find neighborhood at radius %f", i + 1, neighborSearchRadius);
             OMPL_INFORM("-------------------------------------------------------");
         }
 
-        boltDB_->nn_->nearestR( boltDB_->queryVertex_, neighborSearchRadius, graphNeighborhood);
+        boltDB_->nn_->nearestR(boltDB_->queryVertex_, neighborSearchRadius, graphNeighborhood);
 
         // Check if at least one neighbor found
         if (graphNeighborhood.size() > 0)
             break;
     }
-    boltDB_->stateProperty_[ boltDB_->queryVertex_ ] = NULL;
+    boltDB_->stateProperty_[boltDB_->queryVertex_] = NULL;
 
     // Check if no neighbors found
     if (!graphNeighborhood.size())
@@ -488,17 +484,16 @@ bool BoltRetrieveRepair::findGraphNeighbors(const base::State *state, std::vecto
 }
 
 bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<BoltDB::Vertex> &vertexPath,
-                                                            const base::State* actualStart,
-                                                            const base::State* actualGoal,
-                                                            BoltDB::CandidateSolution &candidateSolution,
-                                                            bool disableCollisionWarning)
+                                                      const base::State *actualStart, const base::State *actualGoal,
+                                                      BoltDB::CandidateSolution &candidateSolution,
+                                                      bool disableCollisionWarning)
 {
     // Ensure the input path is not empty
     if (!vertexPath.size())
         return false;
 
     ompl::geometric::PathGeometric *pathGeometric = new ompl::geometric::PathGeometric(si_);
-    candidateSolution.isApproximate_ = false; // assume path is valid
+    candidateSolution.isApproximate_ = false;  // assume path is valid
 
     // Add original start if it is different than the first state
     if (actualStart != boltDB_->stateProperty_[vertexPath.back()])
@@ -513,12 +508,12 @@ bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<BoltDB::Vertex
     // Reverse the vertexPath and convert to state path
     for (std::size_t i = vertexPath.size(); i > 0; --i)
     {
-        pathGeometric->append(boltDB_->stateProperty_[vertexPath[i-1]]);
+        pathGeometric->append(boltDB_->stateProperty_[vertexPath[i - 1]]);
 
         // Add the edge status
-        if (i > 1) // skip the last vertex (its reversed)
+        if (i > 1)  // skip the last vertex (its reversed)
         {
-            BoltDB::Edge thisEdge = boost::edge(vertexPath[i-1], vertexPath[i-2], boltDB_->g_).first;
+            BoltDB::Edge thisEdge = boost::edge(vertexPath[i - 1], vertexPath[i - 2], boltDB_->g_).first;
 
             // Check if any edges in path are not free (then it an approximate path)
             if (boltDB_->edgeCollisionStateProperty_[thisEdge] == BoltDB::IN_COLLISION)
@@ -529,7 +524,8 @@ bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<BoltDB::Vertex
             else if (boltDB_->edgeCollisionStateProperty_[thisEdge] == BoltDB::NOT_CHECKED)
             {
                 if (!disableCollisionWarning)
-                    OMPL_ERROR("A chosen path has an edge that has not been checked for collision. This should not happen");
+                    OMPL_ERROR("A chosen path has an edge that has not been checked for collision. This should not "
+                               "happen");
                 candidateSolution.edgeCollisionStatus_.push_back(BoltDB::NOT_CHECKED);
             }
             else
@@ -554,6 +550,5 @@ bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<BoltDB::Vertex
     return true;
 }
 
-
-} // namespace geometric
-} // namespace ompl
+}  // namespace geometric
+}  // namespace ompl
