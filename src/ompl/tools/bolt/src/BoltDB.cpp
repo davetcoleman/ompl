@@ -54,6 +54,7 @@
 #define OMPL_BOLT_DEBUG
 
 namespace og = ompl::geometric;
+namespace ob = ompl::base;
 
 // edgeWeightMap methods ////////////////////////////////////////////////////////////////////////////
 
@@ -116,7 +117,7 @@ og::BoltDB::BoltDB(base::SpaceInformationPtr si)
   : si_(si)
   , graphUnsaved_(false)
   , savingEnabled_(true)
-  , sparseDelta_(2.0)
+  , sparseDelta_(1.0) // 2.0
   // Property accessors of edges
   , edgeWeightProperty_(boost::get(boost::edge_weight, g_))
   , edgeCollisionStateProperty_(boost::get(edge_collision_state_t(), g_))
@@ -154,6 +155,15 @@ void og::BoltDB::freeMemory()
 
     if (nn_)
         nn_->clear();
+
+    sampler_.reset();
+}
+
+bool og::BoltDB::setup()
+{
+    if (!sampler_)
+        sampler_ = si_->allocValidStateSampler();
+    return true;
 }
 
 bool og::BoltDB::load(const std::string &fileName)
@@ -610,7 +620,9 @@ void og::BoltDB::generateGrid()
     // Check that the query vertex is initialized (used for internal nearest neighbor searches)
     initializeQueryState();
 
-    namespace ob = ompl::base;
+    unsigned int dimension = si_->getStateSpace()->getDimension();
+    std::cout << "dimension: " << dimension << std::endl;
+
     ob::RealVectorBounds bounds = si_->getStateSpace()->as<ob::RealVectorStateSpace>()->getBounds();
 
     double start = sparseDelta_ / 2.0;
@@ -619,16 +631,22 @@ void og::BoltDB::generateGrid()
     {
         for (double y = bounds.low[1] + start; y <= bounds.high[1]; y += sparseDelta_)
         {
-            // std::cout << "sampling at " << x << ", " << y << std::endl;
+            std::cout << "sampling at " << x << ", " << y << std::endl;
 
             // Create state
             base::State *state = si_->getStateSpace()->allocState();
-            state->as<ob::RealVectorStateSpace::StateType>()->values[0] = x;
-            state->as<ob::RealVectorStateSpace::StateType>()->values[1] = y;
 
-            // Collision check
-            if (!si_->isValid(state))
-                continue;
+            sampler_->sample(state);
+
+            if (false)
+            {
+                state->as<ob::RealVectorStateSpace::StateType>()->values[0] = x;
+                state->as<ob::RealVectorStateSpace::StateType>()->values[1] = y;
+
+                // Collision check
+                if (!si_->isValid(state))
+                    continue;
+            }
 
             // Add vertex to graph
             GuardType type = START; // TODO(davetcoleman): type START is dummy
@@ -636,12 +654,12 @@ void og::BoltDB::generateGrid()
 
             // Visualize
             // #ifdef OMPL_BOLT_DEBUG
-            //vizStateCallback(state, 1, 1); // Candidate node has already (just) been added
+            viz2StateCallback(state, 5, 1); // Candidate node has already (just) been added
             // #endif
             count++;
         }
     }
-    OMPL_INFORM("Generated %f valid verticies", count);
+    OMPL_INFORM("Generated %u valid verticies", count);
     count = 0;
 
     // Loop through each vertex
@@ -653,7 +671,8 @@ void og::BoltDB::generateGrid()
         stateProperty_[queryVertex_] = state;
         double distance = sparseDelta_ * 1.1 * sqrt(2);  // 1.1 is fudge factor
         // OMPL_INFORM("Finding nearest nodes in NN tree within radius %f", distance);
-        nn_->nearestR(queryVertex_, distance, graphNeighborhood);
+        //nn_->nearestR(queryVertex_, distance, graphNeighborhood);
+        nn_->nearestK(queryVertex_, 8, graphNeighborhood);
         stateProperty_[queryVertex_] = NULL;
 
         // For each nearby vertex, add an edge
@@ -682,10 +701,10 @@ void og::BoltDB::generateGrid()
             count++;
         }
     }
+    OMPL_INFORM("Generated %i edges. Finished generating grid.", count);
 
     viz2TriggerCallback();
 
-    OMPL_INFORM("Generated %i edges. Finished generating grid.", count);
     std::cout << std::endl;
 }
 
