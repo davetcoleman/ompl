@@ -1647,7 +1647,7 @@ void ompl::geometric::SPARSdb::connectGuards(Vertex v1, Vertex v2)
 
     // Debug in Rviz
 #ifdef OMPL_THUNDER_DEBUG
-    vizEdgeCallback(stateProperty_[v1], stateProperty_[v2]);
+    vizEdgeCallback(stateProperty_[v1], stateProperty_[v2], 100);
     sleep(0.8);
 #endif
 

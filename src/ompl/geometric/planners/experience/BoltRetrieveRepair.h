@@ -96,13 +96,13 @@ class BoltRetrieveRepair : public base::Planner
      *  \brief Get debug information about the top recalled paths that were chosen for further filtering
      *  \return data - vector of PlannerData objects that each hold a single path
      */
-    const std::vector<PathGeometric> &getLastRecalledNearestPaths() const;
+    //const std::vector<PathGeometric> &getLastRecalledNearestPaths() const;
 
     /**
      *  \brief Get debug information about the top recalled paths that were chosen for further filtering
      *  \return chosenID - the index of the PlannerData object that was chosen for repair
      */
-    std::size_t getLastRecalledNearestPathChosen() const;
+    //std::size_t getLastRecalledNearestPathChosen() const;
 
     /**
      * \brief Get the chosen path used from database for repair
@@ -110,8 +110,10 @@ class BoltRetrieveRepair : public base::Planner
      */
     const PathGeometric &getChosenRecallPath() const;
 
+    /** \brief Main entry function for finding a path plan */
     virtual base::PlannerStatus solve(const base::PlannerTerminationCondition &ptc);
 
+    /** \brief Clear memory */
     virtual void clear(void);
 
     /**
@@ -119,6 +121,7 @@ class BoltRetrieveRepair : public base::Planner
      */
     void setExperienceDB(const BoltDBPtr &boltDB);
 
+    /** \brief Setup function */
     virtual void setup(void);
 
     /** \brief Optionally smooth retrieved and repaired paths from database */
@@ -143,12 +146,10 @@ class BoltRetrieveRepair : public base::Planner
      * \param start - actual start that is probably not included in new path
      * \param goal - actual goal that is probably not included in new path
      * \param path - returned solution
-     * \param disableCollisionWarning - if the func should ignore edges that are not checked
      * \return true on success
      */
     bool convertVertexPathToStatePath(std::vector<BoltDB::Vertex> &vertexPath, const base::State *actualStart,
-                                      const base::State *actualGoal, BoltDB::CandidateSolution &candidateSolution,
-                                      bool disableCollisionWarning = false);
+        const base::State *actualGoal, BoltDB::CandidateSolution &candidateSolution);
 
     /**
      * \brief Finds nodes in the graph near state NOTE: note tested for visibility

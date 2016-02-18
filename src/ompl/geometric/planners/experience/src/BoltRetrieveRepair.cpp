@@ -94,6 +94,10 @@ void BoltRetrieveRepair::freeMemory(void)
 
 base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCondition &ptc)
 {
+    OMPL_INFORM("-------------------------------------------------------");
+    OMPL_INFORM("BoltRetriveRepair::solve()");
+    OMPL_INFORM("-------------------------------------------------------");
+
     bool solved = false;
     double approxdif = std::numeric_limits<double>::infinity();
 
@@ -118,11 +122,11 @@ base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCond
     // Search for previous solution in database
     if (!getPathOffGraph(startState, goalState, candidateSolution, ptc))
     {
-        OMPL_INFORM("RetrieveRepair::solve() No nearest start or goal found");
+        OMPL_INFORM("BoltRetrieveRepair::solve() No nearest start or goal found");
         return base::PlannerStatus::TIMEOUT;  // The planner failed to find a solution
     }
 
-    OMPL_INFORM("BoltDB::getPathOffGraph() returned true - found a solution of size %d",
+    OMPL_INFORM("BoltRetrieveRepair::getPathOffGraph() returned true - found a solution of size %d",
                 candidateSolution.getStateCount());
 
     // Save this for future debugging
@@ -145,10 +149,15 @@ base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCond
 
     // Finished
     approxdif = 0;
-    bool approximate = candidateSolution.isApproximate_;
+    bool approximate = false;  // candidateSolution.isApproximate_;
 
     pdef_->addSolutionPath(candidateSolution.path_, approximate, approxdif, getName());
     solved = true;
+
+    OMPL_INFORM("-------------------------------------------------------");
+    OMPL_INFORM("Finished solve()");
+    OMPL_INFORM("-------------------------------------------------------");
+
     return base::PlannerStatus(solved, approximate);
 }
 
@@ -365,7 +374,7 @@ bool BoltRetrieveRepair::lazyCollisionSearch(const BoltDB::Vertex &start, const 
         {
             if (verbose_)
             {
-                OMPL_INFORM("---------- lazy collision check returned valid ");
+                OMPL_INFORM("Lazy collision check returned valid ");
             }
 
             // the path is valid, we are done!
@@ -462,9 +471,7 @@ bool BoltRetrieveRepair::findGraphNeighbors(const base::State *state, std::vecto
         neighborSearchRadius = sparseDelta_ + i * EXPAND_NEIGHBORHOOD_RATE * sparseDelta_;
         if (verbose_)
         {
-            OMPL_INFORM("-------------------------------------------------------");
             OMPL_INFORM("Attempt %d to find neighborhood at radius %f", i + 1, neighborSearchRadius);
-            OMPL_INFORM("-------------------------------------------------------");
         }
 
         boltDB_->nn_->nearestR(boltDB_->queryVertex_, neighborSearchRadius, graphNeighborhood);
@@ -485,15 +492,13 @@ bool BoltRetrieveRepair::findGraphNeighbors(const base::State *state, std::vecto
 
 bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<BoltDB::Vertex> &vertexPath,
                                                       const base::State *actualStart, const base::State *actualGoal,
-                                                      BoltDB::CandidateSolution &candidateSolution,
-                                                      bool disableCollisionWarning)
+                                                      BoltDB::CandidateSolution &candidateSolution)
 {
     // Ensure the input path is not empty
     if (!vertexPath.size())
         return false;
 
     ompl::geometric::PathGeometric *pathGeometric = new ompl::geometric::PathGeometric(si_);
-    candidateSolution.isApproximate_ = false;  // assume path is valid
 
     // Add original start if it is different than the first state
     if (actualStart != boltDB_->stateProperty_[vertexPath.back()])
@@ -513,19 +518,22 @@ bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<BoltDB::Vertex
         // Add the edge status
         if (i > 1)  // skip the last vertex (its reversed)
         {
-            BoltDB::Edge thisEdge = boost::edge(vertexPath[i - 1], vertexPath[i - 2], boltDB_->g_).first;
+            BoltDB::Edge edge = boost::edge(vertexPath[i - 1], vertexPath[i - 2], boltDB_->g_).first;
+
+            // reduce cost of this edge because it was just used
+            static const double REDUCTION_AMOUNT = 10;
+            boltDB_->edgeWeightProperty_[edge] =
+                std::max(boltDB_->edgeWeightProperty_[edge] - REDUCTION_AMOUNT, 0.0);
 
             // Check if any edges in path are not free (then it an approximate path)
-            if (boltDB_->edgeCollisionStateProperty_[thisEdge] == BoltDB::IN_COLLISION)
+            if (boltDB_->edgeCollisionStateProperty_[edge] == BoltDB::IN_COLLISION)
             {
-                candidateSolution.isApproximate_ = true;
+                OMPL_ERROR("Found invalid edge / approximate solution - how did this happen?");
                 candidateSolution.edgeCollisionStatus_.push_back(BoltDB::IN_COLLISION);
             }
-            else if (boltDB_->edgeCollisionStateProperty_[thisEdge] == BoltDB::NOT_CHECKED)
+            else if (boltDB_->edgeCollisionStateProperty_[edge] == BoltDB::NOT_CHECKED)
             {
-                if (!disableCollisionWarning)
-                    OMPL_ERROR("A chosen path has an edge that has not been checked for collision. This should not "
-                               "happen");
+                OMPL_ERROR("A chosen path has an edge that has not been checked for collision. This should not happen");
                 candidateSolution.edgeCollisionStatus_.push_back(BoltDB::NOT_CHECKED);
             }
             else
@@ -546,6 +554,12 @@ bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<BoltDB::Vertex
     }
 
     candidateSolution.path_ = base::PathPtr(pathGeometric);
+
+    // Ensure graph doesn't get too popular
+    boltDB_->normalizeGraphEdgeWeights();
+
+    // Mark as needing to be saved to file
+    boltDB_->graphUnsaved_ = true;
 
     return true;
 }
