@@ -408,6 +408,8 @@ class BoltDB
     /** \brief Deconstructor */
     virtual ~BoltDB(void);
 
+    bool setup();
+
     /**
      * \brief Load database from file
      * \param fileName - name of database file
@@ -604,6 +606,9 @@ class BoltDB
 
     /** \brief The created space information */
     base::SpaceInformationPtr si_;
+
+    /** \brief Sampler user for generating valid samples in the state space */
+    base::ValidStateSamplerPtr sampler_;
 
     /** \brief Determine if a save is required */
     bool graphUnsaved_;

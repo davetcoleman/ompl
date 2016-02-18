@@ -91,6 +91,9 @@ void Bolt::setup(void)
         if (!boltPlanner_->isSetup())
             boltPlanner_->setup();
 
+        // Setup database
+        boltDB_->setup();
+
         // Load from file or generate new grid
         if (!boltDB_->getNumVertices())
         {
