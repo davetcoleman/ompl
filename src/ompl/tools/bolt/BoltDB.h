@@ -245,7 +245,6 @@ class BoltDB
     /** \brief Struct for passing around partially solved solutions */
     struct CandidateSolution
     {
-        bool isApproximate_;
         base::PathPtr path_;
         // Edge 0 is edge from vertex 0 to vertex 1. Thus, there is n-1 edges for n vertices
         std::vector<EdgeCollisionState> edgeCollisionStatus_;
@@ -294,10 +293,10 @@ class BoltDB
             boost::property<boost::vertex_rank_t, VertexIndexType,
                             boost::property<vertex_type_t, GuardType  //,
                                             // boost::property < vertex_interface_data_t, InterfaceHashStruct >
-                                            >>>> VertexProperties;
+                                            > > > > VertexProperties;
 
     /** Wrapper for the double assigned to an edge as its weight property. */
-    typedef boost::property<boost::edge_weight_t, double, boost::property<edge_collision_state_t, int>> EdgeProperties;
+    typedef boost::property<boost::edge_weight_t, double, boost::property<edge_collision_state_t, int> > EdgeProperties;
 
     /** The underlying boost graph type (undirected weighted-edge adjacency list with above properties). */
     typedef boost::adjacency_list<boost::vecS,  // store in std::vector
@@ -423,7 +422,7 @@ class BoltDB
      * \param returned insertion time to add to db
      * \return true on success
      */
-    bool addPath(ompl::geometric::PathGeometric& solutionPath, double& insertionTime);
+    bool postProcessesPath(ompl::geometric::PathGeometric& solutionPath, double& insertionTime);
 
     /**
      * \brief Save loaded database to file, except skips saving if no paths have been added
@@ -439,6 +438,15 @@ class BoltDB
      */
     bool save(const std::string& fileName);
 
+    /** \brief Given two milestones from the same connected component, construct a path connecting them and set it as
+     * the solution
+     *  \param start
+     *  \param goal
+     *  \param vertexPath
+     *  \return true if candidate solution found
+     */
+    bool astarSearch(const BoltDB::Vertex start, const BoltDB::Vertex goal, std::vector<BoltDB::Vertex>& vertexPath);
+
     /**
      * \brief Get a vector of all the planner datas in the database
      */
@@ -448,22 +456,16 @@ class BoltDB
     void debugVertex(const ompl::base::PlannerDataVertex& vertex);
     void debugState(const ompl::base::State* state);
 
-    /** \brief Get number of unsaved paths */
-    int getNumPathsInserted() const
-    {
-        return numPathsInserted_;
-    }
-
     /** \brief Getter for enabling experience database saving */
     bool getSavingEnabled()
     {
-        return saving_enabled_;
+        return savingEnabled_;
     }
 
     /** \brief Setter for enabling experience database saving */
-    void setSavingEnabled(bool saving_enabled)
+    void setSavingEnabled(bool savingEnabled)
     {
-        saving_enabled_ = saving_enabled;
+        savingEnabled_ = savingEnabled;
     }
 
     /**
@@ -522,14 +524,8 @@ class BoltDB
     /** \brief Clear all past edge state information about in collision or not */
     void clearEdgeCollisionStates();
 
-    /** \brief Given two milestones from the same connected component, construct a path connecting them and set it as
-     * the solution
-     *  \param start
-     *  \param goal
-     *  \param vertexPath
-     *  \return true if candidate solution found
-     */
-    bool astarSearch(const BoltDB::Vertex start, const BoltDB::Vertex goal, std::vector<BoltDB::Vertex>& vertexPath);
+    /** \brief Visualize the stored database in an external program using callbacks */
+    void displayDatabase();
 
     /** \brief Visualize a planner's data during runtime, externally, using a function callback
      *         This could be called whenever the graph changes */
@@ -541,10 +537,10 @@ class BoltDB
 
     /** \brief Visualize a planner's data during runtime, externally, using a function callback
      *         This could be called whenever the graph changes */
-    void vizEdgeCallback(ompl::base::State* stateA, ompl::base::State* stateB)
+    void vizEdgeCallback(ompl::base::State* stateA, ompl::base::State* stateB, double intensity)
     {
         if (vizEdgeCallback_)
-            vizEdgeCallback_(stateA, stateB);
+            vizEdgeCallback_(stateA, stateB, intensity);
     }
 
     /** \brief Trigger visualizer to publish graphics */
@@ -563,21 +559,66 @@ class BoltDB
         vizTriggerCallback_ = vizTriggerCallback;
     }
 
+    /** \brief Visualize a planner's data during runtime, externally, using a function callback
+     *         This could be called whenever the graph changes */
+    void viz2StateCallback(ompl::base::State* state, std::size_t type, double neighborRadius)
+    {
+        if (viz2StateCallback_)
+            viz2StateCallback_(state, type, neighborRadius);
+    }
+
+    /** \brief Visualize a planner's data during runtime, externally, using a function callback
+     *         This could be called whenever the graph changes */
+    void viz2EdgeCallback(ompl::base::State* stateA, ompl::base::State* stateB, double intensity)
+    {
+        if (viz2EdgeCallback_)
+            viz2EdgeCallback_(stateA, stateB, intensity);
+    }
+
+    /** \brief Trigger visualizer to publish graphics */
+    void viz2TriggerCallback()
+    {
+        if (viz2TriggerCallback_)
+            viz2TriggerCallback_();
+    }
+
+    /** \brief Set the callback to visualize/publish a planner's progress */
+    void setViz2Callbacks(ompl::base::VizStateCallback vizStateCallback, ompl::base::VizEdgeCallback vizEdgeCallback,
+                         ompl::base::VizTriggerCallback vizTriggerCallback)
+    {
+        viz2StateCallback_ = vizStateCallback;
+        viz2EdgeCallback_ = vizEdgeCallback;
+        viz2TriggerCallback_ = vizTriggerCallback;
+    }
+
+    /** \brief Keep graph evenly weighted */
+    void normalizeGraphEdgeWeights();
+
+    /** \brief Helper for creating/loading graph verticies */
+    Vertex addVertex(base::State *state, const GuardType &type);
+
+    /** \brief Helper for creating/loading graph edges */
+    Edge addEdge(const Vertex &v1, const Vertex &v2, const double weight);
+
   protected:
-    /// The created space information
+
+    /** \brief The created space information */
     base::SpaceInformationPtr si_;
 
-    // Track unsaved paths to determine if a save is required
-    int numPathsInserted_;
+    /** \brief Determine if a save is required */
+    bool graphUnsaved_;
 
-    /// Helper class for storing each plannerData instance
+    /** \brief Helper class for storing each plannerData instance */
     ompl::base::PlannerDataStorage plannerDataStorage_;
 
-    // Allow the database to save to file (new experiences)
-    bool saving_enabled_;
+    /** \brief Allow the database to save to file (new experiences) */
+    bool savingEnabled_;
+
+    /** \brief Distance between grid points (discretization level) */
+    double sparseDelta_;
 
     /** \brief Nearest neighbors data structure */
-    boost::shared_ptr<NearestNeighbors<Vertex>> nn_;
+    boost::shared_ptr<NearestNeighbors<Vertex> > nn_;
 
     /** \brief Connectivity graph */
     Graph g_;
@@ -586,8 +627,7 @@ class BoltDB
     Vertex queryVertex_;
 
     /** \brief Access to the weights of each Edge */
-    // boost::property_map<Graph, boost::edge_weight_t>::type              edgeWeightProperty_; // TODO: this is not
-    // used?
+    boost::property_map<Graph, boost::edge_weight_t>::type edgeWeightProperty_;
 
     /** \brief Access to the collision checking state of each Edge */
     EdgeCollisionStateMap edgeCollisionStateProperty_;
@@ -601,10 +641,15 @@ class BoltDB
     /** \brief Option to enable debugging output */
     bool verbose_;
 
-    /** \brief Optional callback to allow easy introspection of a planner's search progress */
+    /** \brief Optional callbacks to allow easy introspection of a planner's search progress */
     ompl::base::VizStateCallback vizStateCallback_;
     ompl::base::VizEdgeCallback vizEdgeCallback_;
     ompl::base::VizTriggerCallback vizTriggerCallback_;
+
+    /** \brief Optional secondary callbacks to allow easy introspection of database */
+    ompl::base::VizStateCallback viz2StateCallback_;
+    ompl::base::VizEdgeCallback viz2EdgeCallback_;
+    ompl::base::VizTriggerCallback viz2TriggerCallback_;
 
 };  // end of class BoltDB
 

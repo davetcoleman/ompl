@@ -244,7 +244,7 @@ ompl::base::PlannerStatus ompl::tools::Thunder::solve(const base::PlannerTermina
 
     // Create log
     ExperienceLog log;
-    log.planning_time = planTime_;
+    log.planningTime = planTime_;
 
     // Record stats
     stats_.totalPlanningTime_ += planTime_; // used for averaging
@@ -260,7 +260,7 @@ ompl::base::PlannerStatus ompl::tools::Thunder::solve(const base::PlannerTermina
         // Logging
         log.planner = "neither_planner";
         log.result = "timedout";
-        log.is_saved = "not_saved";
+        log.isSaved = "not_saved";
     }
     else if (!lastStatus_)
     {
@@ -271,7 +271,7 @@ ompl::base::PlannerStatus ompl::tools::Thunder::solve(const base::PlannerTermina
         // Logging
         log.planner = "neither_planner";
         log.result = "failed";
-        log.is_saved = "not_saved";
+        log.isSaved = "not_saved";
     }
     else
     {
@@ -293,7 +293,7 @@ ompl::base::PlannerStatus ompl::tools::Thunder::solve(const base::PlannerTermina
 
             // Logging
             log.result = "not_exact_solution";
-            log.is_saved = "not_saved";
+            log.isSaved = "not_saved";
             log.approximate = true;
 
             // Stats
@@ -319,8 +319,8 @@ ompl::base::PlannerStatus ompl::tools::Thunder::solve(const base::PlannerTermina
                 stats_.numSolutionsTooShort_++;
 
                 // Logging
-                log.is_saved = "less_2_states";
-                log.too_short = true;
+                log.isSaved = "less_2_states";
+                log.tooShort = true;
 
             }
             else if (false) // always add when from recall
@@ -334,15 +334,15 @@ ompl::base::PlannerStatus ompl::tools::Thunder::solve(const base::PlannerTermina
                 QueuedSolutionPaths_.push_back(solutionPath);
 
                 // Logging
-                log.insertion_failed = 0; // TODO this is wrong logging data
-                log.is_saved = "always_attempt";
+                log.insertionFailed = 0; // TODO this is wrong logging data
+                log.isSaved = "always_attempt";
             }
             else // never add when from recall
             {
                 OMPL_INFORM("NOT adding path to database because SPARS already has it");
 
                 // Logging
-                log.is_saved = "skipped";
+                log.isSaved = "skipped";
             }
         }
         else
@@ -361,8 +361,8 @@ ompl::base::PlannerStatus ompl::tools::Thunder::solve(const base::PlannerTermina
                 OMPL_INFORM("NOT saving to database because solution is less than 2 states long");
 
                 // Logging
-                log.is_saved = "less_2_states";
-                log.too_short = true;
+                log.isSaved = "less_2_states";
+                log.tooShort = true;
 
                 // Stats
                 stats_.numSolutionsTooShort_++;
@@ -373,21 +373,21 @@ ompl::base::PlannerStatus ompl::tools::Thunder::solve(const base::PlannerTermina
 
                 // Logging
                 log.result = "from_scratch";
-                log.is_saved = "saving";
+                log.isSaved = "saving";
 
                 // Queue the solution path for future insertion into experience database (post-processing)
                 QueuedSolutionPaths_.push_back(solutionPath);
 
-                log.insertion_failed = 0; // TODO fix this wrong logging info
+                log.insertionFailed = 0; // TODO fix this wrong logging info
             }
         }
     }
 
     // Final log data
-    //log.insertion_time = insertionTime; TODO fix this
-    log.num_vertices = experienceDB_->getSPARSdb()->getNumVertices();
-    log.num_edges = experienceDB_->getSPARSdb()->getNumEdges();
-    log.num_connected_components = experienceDB_->getSPARSdb()->getNumConnectedComponents();
+    //log.insertionTime = insertionTime; TODO fix this
+    log.numVertices = experienceDB_->getSPARSdb()->getNumVertices();
+    log.numEdges = experienceDB_->getSPARSdb()->getNumEdges();
+    log.numConnectedComponents = experienceDB_->getSPARSdb()->getNumConnectedComponents();
 
     // Flush the log to buffer
     convertLogToString(log);

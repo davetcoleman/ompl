@@ -53,8 +53,6 @@
 #include <ompl/geometric/PathGeometric.h>
 #include <ompl/geometric/PathSimplifier.h>
 
-#include <ompl/tools/multiplan/ParallelPlan.h>
-
 #include <ompl/util/Console.h>
 #include <ompl/util/Exception.h>
 
@@ -118,7 +116,7 @@ namespace ompl
             /** \brief Get a pointer to the retrieve repair planner */
             geometric::BoltRetrieveRepair& getRetrieveRepairPlanner() const
             {
-                return static_cast<geometric::BoltRetrieveRepair&>(*rrPlanner_);
+                return static_cast<geometric::BoltRetrieveRepair&>(*boltPlanner_);
             }
 
             /** \brief Set the planner to use for repairing experience paths
@@ -127,7 +125,7 @@ namespace ompl
             void setRepairPlanner(const base::PlannerPtr &planner)
             {
                 // This is required by the parent class but we no longer use this feature
-                //static_cast<geometric::BoltRetrieveRepair&>(*rrPlanner_).setRepairPlanner(planner);
+                //static_cast<geometric::BoltRetrieveRepair&>(*boltPlanner_).setRepairPlanner(planner);
             }
 
             /** \brief Set the planner allocator to use. This is only
@@ -185,22 +183,13 @@ namespace ompl
         protected:
 
             /**  The maintained experience planner instance */
-            base::PlannerPtr                             rrPlanner_;
-
-            /**  A third planner used for testing dual-thread scratch-only planning */
-            base::PlannerPtr                             planner2_;
-
-            /**  Flag indicating whether dual thread scratch planning is enabled */
-            bool                                         dualThreadScratchEnabled_;
-
-            /** \brief Instance of parallel planning to use for computing solutions in parallel */
-            tools::ParallelPlanPtr                 pp_;
+            base::PlannerPtr boltPlanner_;
 
             /** \brief A shared object between all the planners for saving and loading previous experience */
-            geometric::BoltDBPtr                    experienceDB_;
+            geometric::BoltDBPtr boltDB_;
 
             /** \brief Accumulated experiences to be later added to experience database */
-            std::vector<geometric::PathGeometric>  QueuedSolutionPaths_;
+            std::vector<geometric::PathGeometric>  queuedSolutionPaths_;
 
         }; // end of class Bolt
 

@@ -183,7 +183,7 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
 
     // Create log
     ExperienceLog log;
-    log.planning_time = planTime_;
+    log.planningTime = planTime_;
 
     if (lastStatus_ == ompl::base::PlannerStatus::TIMEOUT)
     {
@@ -194,7 +194,7 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
         // Logging
         log.planner = "neither_planner";
         log.result = "timedout";
-        log.is_saved = "not_saved";
+        log.isSaved = "not_saved";
     }
     else if (!lastStatus_)
     {
@@ -205,7 +205,7 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
         // Logging
         log.planner = "neither_planner";
         log.result = "failed";
-        log.is_saved = "not_saved";
+        log.isSaved = "not_saved";
     }
     else
     {
@@ -225,7 +225,7 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
         {
             // Logging
             log.result = "not_exact_solution";
-            log.is_saved = "not_saved";
+            log.isSaved = "not_saved";
             log.approximate = true;
 
             // Stats
@@ -250,8 +250,8 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
                 stats_.numSolutionsTooShort_++;
 
                 // Logging
-                log.is_saved = "less_2_states";
-                log.too_short = true;
+                log.isSaved = "less_2_states";
+                log.tooShort = true;
             }
             else
             {
@@ -274,16 +274,16 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
                     OMPL_INFORM("NOT saving to database because best solution was from database and is too similar (score %f)", score);
 
                     // Logging
-                    log.insertion_failed = true;
-                    log.is_saved = "score_too_similar";
+                    log.insertionFailed = true;
+                    log.isSaved = "score_too_similar";
                 }
                 else
                 {
                     OMPL_INFORM("Adding path to database because repaired path is different enough from original recalled path (score %f)", score);
 
                     // Logging
-                    log.insertion_failed = false;
-                    log.is_saved = "score_different_enough";
+                    log.insertionFailed = false;
+                    log.isSaved = "score_different_enough";
 
                     // Stats
                     stats_.numSolutionsFromRecallSaved_++;
@@ -309,8 +309,8 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
                 OMPL_INFORM("NOT saving to database because solution is less than 2 states long");
 
                 // Logging
-                log.is_saved = "less_2_states";
-                log.too_short = true;
+                log.isSaved = "less_2_states";
+                log.tooShort = true;
 
                 // Stats
                 stats_.numSolutionsTooShort_++;
@@ -321,7 +321,7 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
 
                 // Logging
                 log.result = "from_scratch";
-                log.is_saved = "saving";
+                log.isSaved = "saving";
 
                 // Save to database
                 experienceDB_->addPath(solutionPath, insertionTime);
@@ -332,10 +332,10 @@ ompl::base::PlannerStatus ompl::tools::Lightning::solve(const base::PlannerTermi
     stats_.totalInsertionTime_ += insertionTime; // used for averaging
 
     // Final log data
-    log.insertion_time = insertionTime;
-    log.num_vertices = experienceDB_->getStatesCount();
-    log.num_edges = 0;
-    log.num_connected_components = 0;
+    log.insertionTime = insertionTime;
+    log.numVertices = experienceDB_->getStatesCount();
+    log.numEdges = 0;
+    log.numConnectedComponents = 0;
 
     // Flush the log to buffer
     convertLogToString(log);

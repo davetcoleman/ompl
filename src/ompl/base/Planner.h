@@ -68,10 +68,23 @@ namespace ompl
         /** \class ompl::base::PlannerPtr
             \brief A boost shared pointer wrapper for ompl::base::Planner */
 
-        /** \brief Function callback for planners to call external visualizers */
-        typedef boost::function<void(ompl::base::State*, std::size_t type, double neighborRadius)>
-          VizStateCallback;
-        typedef boost::function<void(ompl::base::State*, ompl::base::State*)> VizEdgeCallback;
+        /**
+         * \brief Visualization callback hook for external debugging of states
+         * \param v - state to visualize
+         * \param type - different modes/colors/sizes for visualizing the state
+         * \param neighborRadius - special extra data for showing a range around a state
+         */
+        typedef boost::function<void(ompl::base::State* v, std::size_t type, double neighborRadius)> VizStateCallback;
+        /**
+         * \brief Visualization callback hook for external debugging of edges
+         * \param v1 - from state that marks beginning of edge
+         * \param v2 - to state that marks end of edge
+         * \param intensity - signifies the weight of the edge using color
+         */
+        typedef boost::function<void(ompl::base::State* v1, ompl::base::State* v2, double intensity)> VizEdgeCallback;
+        /**
+         * \brief Visualization callback hook for external debugging that triggers the visualizer to render/publish
+         */
         typedef boost::function<void(void)> VizTriggerCallback;
 
         /** \brief Helper class to extract valid start & goal
@@ -382,10 +395,10 @@ namespace ompl
 
             /** \brief Visualize a planner's data during runtime, externally, using a function callback
              *         This could be called whenever the graph changes */
-            virtual void vizEdgeCallback(ompl::base::State* stateA, ompl::base::State* stateB)
+            virtual void vizEdgeCallback(ompl::base::State* stateA, ompl::base::State* stateB, double intensity)
             {
                 if (vizEdgeCallback_)
-                    vizEdgeCallback_(stateA, stateB);
+                    vizEdgeCallback_(stateA, stateB, intensity);
             }
 
             /** \brief Trigger visualizer to publish graphics */
