@@ -173,6 +173,9 @@ namespace ompl
 
             void freeState(State *state) const override;
 
+            /** \brief Populate a state with values in vector */
+            virtual bool populateState(ompl::base::State *state, const std::vector<double> &values);
+
             double* getValueAddressAtIndex(State *state, const unsigned int index) const override;
 
             void printState(const State *state, std::ostream &out) const override;

@@ -77,9 +77,9 @@ namespace ompl
          * \brief Visualization callback hook for external debugging of edges
          * \param v1 - from state that marks beginning of edge
          * \param v2 - to state that marks end of edge
-         * \param intensity - signifies the weight of the edge using color
+         * \param cost - signifies the weight of the edge using color
          */
-        typedef boost::function<void(ompl::base::State* v1, ompl::base::State* v2, double intensity)> VizEdgeCallback;
+        typedef boost::function<void(ompl::base::State* v1, ompl::base::State* v2, double cost)> VizEdgeCallback;
         /**
          * \brief Visualization callback hook for external debugging that triggers the visualizer to render/publish
          */
@@ -395,10 +395,10 @@ namespace ompl
 
             /** \brief Visualize a planner's data during runtime, externally, using a function callback
              *         This could be called whenever the graph changes */
-            virtual void vizEdgeCallback(ompl::base::State* stateA, ompl::base::State* stateB, double intensity)
+            virtual void vizEdgeCallback(ompl::base::State* stateA, ompl::base::State* stateB, double cost)
             {
                 if (vizEdgeCallback_)
-                    vizEdgeCallback_(stateA, stateB, intensity);
+                    vizEdgeCallback_(stateA, stateB, cost);
             }
 
             /** \brief Trigger visualizer to publish graphics */

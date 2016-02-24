@@ -505,10 +505,13 @@ bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<BoltDB::Vertex
         {
             BoltDB::Edge edge = boost::edge(vertexPath[i - 1], vertexPath[i - 2], boltDB_->g_).first;
 
-            // reduce cost of this edge because it was just used
-            static const double REDUCTION_AMOUNT = 10;
-            boltDB_->edgeWeightProperty_[edge] =
-                std::max(boltDB_->edgeWeightProperty_[edge] - REDUCTION_AMOUNT, 0.0);
+            if (boltDB_->getPopularityBiasEnabled())
+            {
+                // reduce cost of this edge because it was just used
+                static const double REDUCTION_AMOUNT = 10;
+                boltDB_->edgeWeightProperty_[edge] =
+                    std::max(boltDB_->edgeWeightProperty_[edge] - REDUCTION_AMOUNT, 0.0);
+            }
 
             // Check if any edges in path are not free (then it an approximate path)
             if (boltDB_->edgeCollisionStateProperty_[edge] == BoltDB::IN_COLLISION)
@@ -540,8 +543,11 @@ bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<BoltDB::Vertex
 
     candidateSolution.path_ = base::PathPtr(pathGeometric);
 
-    // Ensure graph doesn't get too popular
-    boltDB_->normalizeGraphEdgeWeights();
+    if (boltDB_->getPopularityBiasEnabled())
+    {
+        // Ensure graph doesn't get too popular
+        boltDB_->normalizeGraphEdgeWeights();
+    }
 
     // Mark as needing to be saved to file
     boltDB_->graphUnsaved_ = true;

@@ -524,8 +524,12 @@ class BoltDB
     /** \brief Compute distance between two milestones (this is simply distance between the states of the milestones) */
     double distanceFunction(const Vertex a, const Vertex b) const;
 
-    /** \brief Recursively discretize */
-    void recursiveDiscretization(std::vector<double> &values, std::size_t joint_id);
+    /** \brief Recursively discretize
+     *  \param values - the joint positions currently searching over
+     *  \param joint_id - the dimension currently on
+     *  \param desired_depth - how many dimensions to discretize to
+     */
+    void recursiveDiscretization(std::vector<double> &values, std::size_t joint_id, std::size_t desired_depth);
 
     /** \brief Clear all past edge state information about in collision or not */
     void clearEdgeCollisionStates();
@@ -539,14 +543,16 @@ class BoltDB
     {
         if (vizStateCallback_)
             vizStateCallback_(state, type, neighborRadius);
+        else
+            OMPL_ERROR("No viz state callback");
     }
 
     /** \brief Visualize a planner's data during runtime, externally, using a function callback
      *         This could be called whenever the graph changes */
-    void vizEdgeCallback(ompl::base::State* stateA, ompl::base::State* stateB, double intensity)
+    void vizEdgeCallback(ompl::base::State* stateA, ompl::base::State* stateB, double cost)
     {
         if (vizEdgeCallback_)
-            vizEdgeCallback_(stateA, stateB, intensity);
+            vizEdgeCallback_(stateA, stateB, cost);
     }
 
     /** \brief Trigger visualizer to publish graphics */
@@ -575,10 +581,10 @@ class BoltDB
 
     /** \brief Visualize a planner's data during runtime, externally, using a function callback
      *         This could be called whenever the graph changes */
-    void viz2EdgeCallback(ompl::base::State* stateA, ompl::base::State* stateB, double intensity)
+    void viz2EdgeCallback(ompl::base::State* stateA, ompl::base::State* stateB, double cost)
     {
         if (viz2EdgeCallback_)
-            viz2EdgeCallback_(stateA, stateB, intensity);
+            viz2EdgeCallback_(stateA, stateB, cost);
     }
 
     /** \brief Trigger visualizer to publish graphics */
@@ -592,6 +598,7 @@ class BoltDB
     void setViz2Callbacks(ompl::base::VizStateCallback vizStateCallback, ompl::base::VizEdgeCallback vizEdgeCallback,
                          ompl::base::VizTriggerCallback vizTriggerCallback)
     {
+        std::cout << "setting viz 2 callbacks " << std::endl;
         viz2StateCallback_ = vizStateCallback;
         viz2EdgeCallback_ = vizEdgeCallback;
         viz2TriggerCallback_ = vizTriggerCallback;
@@ -605,6 +612,18 @@ class BoltDB
 
     /** \brief Helper for creating/loading graph edges */
     Edge addEdge(const Vertex &v1, const Vertex &v2, const double weight);
+
+    /** \brief Get whether to bias search using popularity of edges */
+    bool getPopularityBiasEnabled()
+    {
+        return popularityBias_;
+    }
+
+    /** \brief Set whether to bias search using popularity of edges */
+    void setPopularityBiasEnabled(bool enable)
+    {
+        popularityBias_ = enable;
+    }
 
   protected:
 
@@ -623,8 +642,8 @@ class BoltDB
     /** \brief Allow the database to save to file (new experiences) */
     bool savingEnabled_;
 
-    /** \brief Distance between grid points (discretization level) */
-    double sparseDelta_;
+    /** \brief Whether to bias search using popularity of edges */
+    bool popularityBias_;
 
     /** \brief Nearest neighbors data structure */
     boost::shared_ptr<NearestNeighbors<Vertex> > nn_;
@@ -662,6 +681,14 @@ class BoltDB
 
     /** \brief Discretization helper */
     base::State *next_disc_state_;
+
+public:
+    /** \brief Whether to show astar search in progress */
+    bool visualizeAstar_;
+
+    /** \brief Distance between grid points (discretization level) */
+    double sparseDelta_;
+
 
 };  // end of class BoltDB
 
