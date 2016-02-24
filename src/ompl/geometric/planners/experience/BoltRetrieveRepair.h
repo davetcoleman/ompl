@@ -201,15 +201,13 @@ class BoltRetrieveRepair : public base::Planner
     /** \brief Optionally smooth retrieved and repaired paths from database */
     bool smoothingEnabled_;
 
-    /** \brief Maximum visibility range for nodes in the graph */
-    double sparseDelta_;
-
     /** \brief Used by getPathOffGraph */
     std::vector<BoltDB::Vertex> startVertexCandidateNeighbors_;
     std::vector<BoltDB::Vertex> goalVertexCandidateNeighbors_;
 
     /** \brief Output user feedback to console */
     bool verbose_;
+
 };
 
 }  // namespace geometric

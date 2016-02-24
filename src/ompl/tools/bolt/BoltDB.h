@@ -408,6 +408,7 @@ class BoltDB
     /** \brief Deconstructor */
     virtual ~BoltDB(void);
 
+    /** \brief Initialize database */
     bool setup();
 
     /**
@@ -522,6 +523,9 @@ class BoltDB
 
     /** \brief Compute distance between two milestones (this is simply distance between the states of the milestones) */
     double distanceFunction(const Vertex a, const Vertex b) const;
+
+    /** \brief Recursively discretize */
+    void recursiveDiscretization(std::vector<double> &values, std::size_t joint_id);
 
     /** \brief Clear all past edge state information about in collision or not */
     void clearEdgeCollisionStates();
@@ -655,6 +659,9 @@ class BoltDB
     ompl::base::VizStateCallback viz2StateCallback_;
     ompl::base::VizEdgeCallback viz2EdgeCallback_;
     ompl::base::VizTriggerCallback viz2TriggerCallback_;
+
+    /** \brief Discretization helper */
+    base::State *next_disc_state_;
 
 };  // end of class BoltDB
 
