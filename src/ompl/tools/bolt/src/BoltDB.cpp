@@ -72,8 +72,14 @@ double og::BoltDB::edgeWeightMap::get(Edge e) const
     if (collisionStates_[e] == IN_COLLISION)
         return std::numeric_limits<double>::infinity();
 
-    static const double popularity_bias = 10;
-    const double weight = boost::get(boost::edge_weight, g_, e) / 100.0 * popularity_bias;
+
+    double weight = boost::get(boost::edge_weight, g_, e);
+    // if (popularityBias_)
+    // {
+    //     static const double popularity_bias = 10;
+    //     weight = boost::get(boost::edge_weight, g_, e) / 100.0 * popularity_bias;
+    // }
+    // else
 
     //std::cout << "getting weight of edge " << e << " with value " << weight << std::endl;
 
@@ -98,14 +104,18 @@ og::BoltDB::CustomAstarVisitor::CustomAstarVisitor(Vertex goal, BoltDB *parent) 
 
 void og::BoltDB::CustomAstarVisitor::discover_vertex(Vertex v, const Graph &) const
 {
-    //parent_->vizStateCallback(parent_->stateProperty_[v], 1, 1);
+    if (parent_->visualizeAstar_)
+        parent_->vizStateCallback(parent_->stateProperty_[v], 1, 1);
 }
 
 void og::BoltDB::CustomAstarVisitor::examine_vertex(Vertex v, const Graph &) const
 {
-    //parent_->vizStateCallback(parent_->stateProperty_[v], 5, 1);
-    //parent_->vizTriggerCallback();
-    //usleep(5000);
+    if (parent_->visualizeAstar_)
+    {
+        parent_->vizStateCallback(parent_->stateProperty_[v], 5, 1);
+        parent_->vizTriggerCallback();
+        //usleep(50000);
+    }
 
     if (v == goal_)
         throw foundGoalException();
@@ -117,7 +127,7 @@ og::BoltDB::BoltDB(base::SpaceInformationPtr si)
   : si_(si)
   , graphUnsaved_(false)
   , savingEnabled_(true)
-  , sparseDelta_(2.0) // 2.0
+  , sparseDelta_(2.0)
   // Property accessors of edges
   , edgeWeightProperty_(boost::get(boost::edge_weight, g_))
   , edgeCollisionStateProperty_(boost::get(edge_collision_state_t(), g_))
@@ -125,7 +135,9 @@ og::BoltDB::BoltDB(base::SpaceInformationPtr si)
   , stateProperty_(boost::get(vertex_state_t(), g_))
   , typeProperty_(boost::get(vertex_type_t(), g_))
   // interfaceDataProperty_(boost::get(vertex_interface_data_t(), g_)),
+  , popularityBias_(false)
   , verbose_(true)
+  , visualizeAstar_(false)
 {
     if (!nn_)
     {
@@ -294,9 +306,12 @@ bool og::BoltDB::postProcessesPath(og::PathGeometric &solutionPath, double &inse
             }
 
             // reduce cost of this edge because it was just used
-            static const double REDUCTION_AMOUNT = 10;
-            edgeWeightProperty_[edge_result.first] =
-                std::max(edgeWeightProperty_[edge_result.first] - REDUCTION_AMOUNT, 0.0);
+            if (popularityBias_)
+            {
+                static const double REDUCTION_AMOUNT = 10;
+                edgeWeightProperty_[edge_result.first] =
+                    std::max(edgeWeightProperty_[edge_result.first] - REDUCTION_AMOUNT, 0.0);
+            }
 
             // We have a valid near vertex
             // Visualize
@@ -513,13 +528,6 @@ void og::BoltDB::getPlannerData(base::PlannerData &data) const
                 OMPL_ERROR("Unable to add edge");
             }
 
-            /*
-            if (!data.setEdgeWeight(v1, v2, base::Cost(edgeWeightProperty_[e])))
-            {
-                OMPL_ERROR("Unable to set edge weight");
-            }
-            */
-
             // OMPL_INFORM("Adding edge from vertex of type %d to vertex of type %d", typeProperty_[v1],
             // typeProperty_[v2]);
         }
@@ -628,9 +636,14 @@ void og::BoltDB::generateGrid()
     next_disc_state_ = si_->getStateSpace()->allocState(); // Note: it is currently possible the last state is never freed
 
     const std::size_t starting_joint_id = 0;
-    recursiveDiscretization(values, starting_joint_id);
+    std::size_t desired_depth = si_->getStateSpace()->getDimension();
+    if (desired_depth > 5)
+    {
+        OMPL_WARN("Truncated discretization depth to 5");
+        desired_depth = 5;
+    }
+    recursiveDiscretization(values, starting_joint_id, desired_depth);
     OMPL_INFORM("Generated %i verticies.", getNumVertices());
-    //viz2TriggerCallback();
 
     std::size_t count = 0;
 
@@ -661,16 +674,22 @@ void og::BoltDB::generateGrid()
             if (v1 == v2)
                 continue;
 
-            // remove any edges that are in collision
+            // Remove any edges that are in collision
             if (!si_->checkMotion(state, stateProperty_[v2]))
                 continue;
 
-            Edge e = addEdge(v1, v2, 100);
+            // Determine cost for edge depending on mode
+            double cost = 100;
+            if (!popularityBias_)
+            {
+                cost = distanceFunction(v1, v2);
+            }
 
-            //#ifdef OMPL_BOLT_DEBUG
+            Edge e = addEdge(v1, v2, cost);
+
             // Debug in Rviz
+            viz2EdgeCallback(stateProperty_[v1], stateProperty_[v2], cost);
             //viz2EdgeCallback(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
-            //#endif
 
             count++;
         }
@@ -687,7 +706,7 @@ void og::BoltDB::generateGrid()
     std::cout << std::endl;
 }
 
-void og::BoltDB::recursiveDiscretization(std::vector<double> &values, std::size_t joint_id)
+void og::BoltDB::recursiveDiscretization(std::vector<double> &values, std::size_t joint_id, std::size_t desired_depth)
 {
     ob::RealVectorBounds bounds = si_->getStateSpace()->getBounds();
 
@@ -705,10 +724,10 @@ void og::BoltDB::recursiveDiscretization(std::vector<double> &values, std::size_
         //std::cout << std::endl;
 
         // Check if we are at the end of the recursion
-        if (joint_id < si_->getStateSpace()->getDimension() - 2) // TODO(davetcoleman): note that i am skipping last dimension
+        if (joint_id < desired_depth - 1)
         {
             // Keep recursing
-            recursiveDiscretization(values, joint_id + 1);
+            recursiveDiscretization(values, joint_id + 1, desired_depth);
         }
         else // this is the end of recursion, create a new state
         {
@@ -733,7 +752,7 @@ void og::BoltDB::recursiveDiscretization(std::vector<double> &values, std::size_
             //if (getNumVertices() % 7 == 0)
             {
                 //std::cout << "visualizing state " << getNumVertices() << std::endl;
-                //viz2StateCallback(next_disc_state_, 5, 1); // Candidate node has already (just) been added
+                viz2StateCallback(next_disc_state_, 5, 1); // Candidate node has already (just) been added
                 //viz2TriggerCallback();
                 //usleep(0.01 * 1000000);
             }
@@ -752,6 +771,8 @@ void og::BoltDB::clearEdgeCollisionStates()
 
 void og::BoltDB::displayDatabase()
 {
+    OMPL_INFORM("Displaying database");
+
     // Loop through each edge
     BOOST_FOREACH (Edge e, boost::edges(g_))
     {
@@ -769,6 +790,12 @@ void og::BoltDB::displayDatabase()
 
 void og::BoltDB::normalizeGraphEdgeWeights()
 {
+    if (!popularityBias_)
+    {
+        OMPL_INFORM("Skipping normalize graph edge weights because not using popularity bias currently");
+        return;
+    }
+
     // Normalize weight of graph
     double total_cost = 0;
     BOOST_FOREACH (Edge e, boost::edges(g_))

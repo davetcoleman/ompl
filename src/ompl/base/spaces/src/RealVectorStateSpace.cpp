@@ -288,6 +288,17 @@ void ompl::base::RealVectorStateSpace::freeState(State *state) const
     delete rstate;
 }
 
+bool ompl::base::RealVectorStateSpace::populateState(State *state, const std::vector<double> &values)
+{
+  // TODO(davetcoleman): make more efficient
+  for (std::size_t i = 0; i < values.size(); ++i)
+  {
+    state->as<StateType>()->values[i] = values[i];
+  }
+  //memcpy((void *) &values[0], state->as<ModelBasedStateSpace::StateType>()->values,
+  //values.size() * sizeof(double));
+}
+
 double* ompl::base::RealVectorStateSpace::getValueAddressAtIndex(State *state, const unsigned int index) const
 {
     return index < dimension_ ? static_cast<StateType*>(state)->values + index : NULL;
