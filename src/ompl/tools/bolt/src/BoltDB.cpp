@@ -117,7 +117,7 @@ og::BoltDB::BoltDB(base::SpaceInformationPtr si)
   : si_(si)
   , graphUnsaved_(false)
   , savingEnabled_(true)
-  , sparseDelta_(1.0) // 2.0
+  , sparseDelta_(2.0) // 2.0
   // Property accessors of edges
   , edgeWeightProperty_(boost::get(boost::edge_weight, g_))
   , edgeCollisionStateProperty_(boost::get(edge_collision_state_t(), g_))
@@ -620,47 +620,19 @@ void og::BoltDB::generateGrid()
     // Check that the query vertex is initialized (used for internal nearest neighbor searches)
     initializeQueryState();
 
+    // Prepare for recursion
     unsigned int dimension = si_->getStateSpace()->getDimension();
-    std::cout << "dimension: " << dimension << std::endl;
+    std::vector<double> values(dimension, 0); // TODO(davetcoleman): currently the last joint is not being discretized, so we should set its default value smartly and not just '0'
 
-    ob::RealVectorBounds bounds = si_->getStateSpace()->as<ob::RealVectorStateSpace>()->getBounds();
+    // Choose first state to discretize
+    next_disc_state_ = si_->getStateSpace()->allocState(); // Note: it is currently possible the last state is never freed
 
-    double start = sparseDelta_ / 2.0;
+    const std::size_t starting_joint_id = 0;
+    recursiveDiscretization(values, starting_joint_id);
+    OMPL_INFORM("Generated %i verticies.", getNumVertices());
+    //viz2TriggerCallback();
+
     std::size_t count = 0;
-    for (double x = bounds.low[0] + start; x <= bounds.high[0]; x += sparseDelta_)
-    {
-        for (double y = bounds.low[1] + start; y <= bounds.high[1]; y += sparseDelta_)
-        {
-            std::cout << "sampling at " << x << ", " << y << std::endl;
-
-            // Create state
-            base::State *state = si_->getStateSpace()->allocState();
-
-            sampler_->sample(state);
-
-            if (false)
-            {
-                state->as<ob::RealVectorStateSpace::StateType>()->values[0] = x;
-                state->as<ob::RealVectorStateSpace::StateType>()->values[1] = y;
-
-                // Collision check
-                if (!si_->isValid(state))
-                    continue;
-            }
-
-            // Add vertex to graph
-            GuardType type = START; // TODO(davetcoleman): type START is dummy
-            addVertex(state, type);
-
-            // Visualize
-            // #ifdef OMPL_BOLT_DEBUG
-            viz2StateCallback(state, 5, 1); // Candidate node has already (just) been added
-            // #endif
-            count++;
-        }
-    }
-    OMPL_INFORM("Generated %u valid verticies", count);
-    count = 0;
 
     // Loop through each vertex
     for (std::size_t v1 = 1; v1 < getNumVertices(); ++v1)  // 1 because 0 is the search vertex?
@@ -669,10 +641,11 @@ void og::BoltDB::generateGrid()
         std::vector<Vertex> graphNeighborhood;
         base::State *state = stateProperty_[v1];
         stateProperty_[queryVertex_] = state;
-        double distance = sparseDelta_ * 1.1 * sqrt(2);  // 1.1 is fudge factor
+        //double distance = sparseDelta_ * 1.1 * sqrt(2);  // 1.1 is fudge factor
         // OMPL_INFORM("Finding nearest nodes in NN tree within radius %f", distance);
         //nn_->nearestR(queryVertex_, distance, graphNeighborhood);
-        nn_->nearestK(queryVertex_, 8, graphNeighborhood);
+        static const double FIND_NEAREST_K_NEIGHBORS = dimension * 4; // in 2D this created the regular square with diagonals of 8 edges
+        nn_->nearestK(queryVertex_, FIND_NEAREST_K_NEIGHBORS, graphNeighborhood);
         stateProperty_[queryVertex_] = NULL;
 
         // For each nearby vertex, add an edge
@@ -694,18 +667,81 @@ void og::BoltDB::generateGrid()
 
             Edge e = addEdge(v1, v2, 100);
 
-#ifdef OMPL_BOLT_DEBUG
+            //#ifdef OMPL_BOLT_DEBUG
             // Debug in Rviz
-            viz2EdgeCallback(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
-#endif
+            //viz2EdgeCallback(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
+            //#endif
+
             count++;
         }
     }
     OMPL_INFORM("Generated %i edges. Finished generating grid.", count);
 
+    // Get the average vertex degree (number of connected edges)
+    std::size_t average_degree = (getNumEdges() * 2) / getNumVertices();
+    OMPL_INFORM("Average degree: %i", average_degree);
+
+    // Display
     viz2TriggerCallback();
 
     std::cout << std::endl;
+}
+
+void og::BoltDB::recursiveDiscretization(std::vector<double> &values, std::size_t joint_id)
+{
+    ob::RealVectorBounds bounds = si_->getStateSpace()->getBounds();
+
+    // Error check
+    assert(bounds.high.size() == bounds.low.size());
+    assert(bounds.high.size() == si_->getStateSpace()->getDimension());
+    assert(joint_id < values.size());
+
+    // Loop thorugh current joint
+    for (double value = bounds.low[joint_id]; value <= bounds.high[joint_id]; value += sparseDelta_)
+    {
+        values[joint_id] = value;
+
+        //std::copy(values.begin(), values.end(), std::ostream_iterator<double>(std::cout, ", "));
+        //std::cout << std::endl;
+
+        // Check if we are at the end of the recursion
+        if (joint_id < si_->getStateSpace()->getDimension() - 2) // TODO(davetcoleman): note that i am skipping last dimension
+        {
+            // Keep recursing
+            recursiveDiscretization(values, joint_id + 1);
+        }
+        else // this is the end of recursion, create a new state
+        {
+            // TODO(davetcoleman): way to not allocState if in collision?
+            next_disc_state_ = si_->getStateSpace()->allocState();
+
+            // Fill the state with current values
+            si_->getStateSpace()->populateState(next_disc_state_, values);
+
+            // Collision check
+            if (!si_->isValid(next_disc_state_))
+            {
+                //OMPL_ERROR("Found a state that is not valid! ");
+                continue;
+            }
+
+            // Add vertex to graph
+            GuardType type = START; // TODO(davetcoleman): type START is dummy
+            addVertex(next_disc_state_, type);
+
+            // Visualize
+            //if (getNumVertices() % 7 == 0)
+            {
+                //std::cout << "visualizing state " << getNumVertices() << std::endl;
+                //viz2StateCallback(next_disc_state_, 5, 1); // Candidate node has already (just) been added
+                //viz2TriggerCallback();
+                //usleep(0.01 * 1000000);
+            }
+
+            // Prepare for next new state by allocating now
+            //next_disc_state_ = si_->getStateSpace()->allocState();
+        }
+    }
 }
 
 void og::BoltDB::clearEdgeCollisionStates()
@@ -765,7 +801,7 @@ og::BoltDB::Vertex og::BoltDB::addVertex(base::State *state, const GuardType &ty
     // Create vertex
     Vertex v1 = boost::add_vertex(g_);
 
-    // Add periortie
+    // Add properties
     typeProperty_[v1] = type;
     stateProperty_[v1] = state;
 

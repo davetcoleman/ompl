@@ -58,7 +58,6 @@ BoltRetrieveRepair::BoltRetrieveRepair(const base::SpaceInformationPtr &si, cons
   : base::Planner(si, "Bolt_Retrieve_Repair")
   , boltDB_(boltDB)
   , smoothingEnabled_(false)  // makes understanding recalled paths more difficult if enabled
-  , sparseDelta_(2.0)
   , verbose_(true)
 {
     specs_.approximateSolutions = true;
@@ -110,11 +109,13 @@ base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCond
     }
 
     // Restart the Planner Input States so that the first start and goal state can be fetched
-    pis_.restart();
+    pis_.restart(); // PlannerInputStates
 
     // Get a single start and goal state TODO: more than one
-    const base::State *startState = pis_.nextStart();
+    const base::State *startState = pis_.nextStart(); // PlannerInputStates
     const base::State *goalState = pis_.nextGoal(ptc);
+
+    std::cout << "pis_.getSampledGoalsCount();: " << pis_.getSampledGoalsCount() << std::endl;
 
     // Create solution path struct
     BoltDB::CandidateSolution candidateSolution;
@@ -217,7 +218,7 @@ bool BoltRetrieveRepair::getPathOffGraph(const base::State *start, const base::S
     OMPL_INFORM("Looking for a node near the problem start");
     if (!findGraphNeighbors(start, startVertexCandidateNeighbors_))
     {
-        OMPL_INFORM("No graph neighbors found for start within radius %f", sparseDelta_);
+        OMPL_INFORM("No graph neighbors found for start");
         return false;
     }
     if (verbose_)
@@ -227,7 +228,7 @@ bool BoltRetrieveRepair::getPathOffGraph(const base::State *start, const base::S
     OMPL_INFORM("Looking for a node near the problem goal");
     if (!findGraphNeighbors(goal, goalVertexCandidateNeighbors_))
     {
-        OMPL_INFORM("No graph neighbors found for goal within radius %f", sparseDelta_);
+        OMPL_INFORM("No graph neighbors found for goal");
         return false;
     }
     if (verbose_)
@@ -459,27 +460,11 @@ bool BoltRetrieveRepair::findGraphNeighbors(const base::State *state, std::vecto
     base::State *stateCopy = si_->cloneState(state);
     boltDB_->stateProperty_[boltDB_->queryVertex_] = stateCopy;
 
-    // Double the range of sparseDelta_ up to 3 times until at least 1 neighbor is found
-    std::size_t expandNeighborhoodSearchAttempts = 3;
-    double neighborSearchRadius;
-    static const double EXPAND_NEIGHBORHOOD_RATE =
-        0.25;  // speed to which we look outside the original sparse delta neighborhood
+    // Search
+    static const double FIND_NEAREST_K_NEIGHBORS = 4;
+    boltDB_->nn_->nearestK(boltDB_->queryVertex_, FIND_NEAREST_K_NEIGHBORS, graphNeighborhood);
 
-    // Begin search outward
-    for (std::size_t i = 0; i < expandNeighborhoodSearchAttempts; ++i)
-    {
-        neighborSearchRadius = sparseDelta_ + i * EXPAND_NEIGHBORHOOD_RATE * sparseDelta_;
-        if (verbose_)
-        {
-            OMPL_INFORM("Attempt %d to find neighborhood at radius %f", i + 1, neighborSearchRadius);
-        }
-
-        boltDB_->nn_->nearestR(boltDB_->queryVertex_, neighborSearchRadius, graphNeighborhood);
-
-        // Check if at least one neighbor found
-        if (graphNeighborhood.size() > 0)
-            break;
-    }
+    // Reset
     boltDB_->stateProperty_[boltDB_->queryVertex_] = NULL;
 
     // Check if no neighbors found

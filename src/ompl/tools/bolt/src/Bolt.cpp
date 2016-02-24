@@ -94,16 +94,6 @@ void Bolt::setup(void)
         // Setup database
         boltDB_->setup();
 
-        // Load from file or generate new grid
-        if (!boltDB_->getNumVertices())
-        {
-            if (!boltDB_->load(filePath_)) // load from file
-            {
-                OMPL_INFORM("No database loaded from file - generating new grid");
-                boltDB_->generateGrid();
-            }
-        }
-
         // Set the configured flag
         configured_ = true;
     }
@@ -256,6 +246,20 @@ void Bolt::printResultsInfo(std::ostream &out) const
             << "\t | Length: " << pdef_->getSolutions()[i].length_
             << "\t | Approximate: " << (pdef_->getSolutions()[i].approximate_ ? "true" : "false")
             << "\t | Planner: " << pdef_->getSolutions()[i].plannerName_ << std::endl;
+    }
+}
+
+bool Bolt::loadOrGenerate()
+{
+    // Load from file or generate new grid
+    if (!boltDB_->getNumVertices())
+    {
+        if (!boltDB_->load(filePath_)) // load from file
+        {
+            //OMPL_INFORM("No database loaded from file - doing nothing");
+            OMPL_INFORM("No database loaded from file - generating new grid");
+            boltDB_->generateGrid();
+        }
     }
 }
 
