@@ -228,13 +228,13 @@ base::PlannerStatus Bolt::solve(double time)
 
 bool Bolt::save()
 {
-    setup(); // ensure the db has been loaded to the Experience DB
+    //setup(); // ensure the db has been loaded to the Experience DB
     return boltDB_->save(filePath_);
 }
 
 bool Bolt::saveIfChanged()
 {
-    setup(); // ensure the db has been loaded to the Experience DB
+    //setup(); // ensure the db has been loaded to the Experience DB
     return boltDB_->saveIfChanged(filePath_);
 }
 
@@ -256,11 +256,24 @@ bool Bolt::loadOrGenerate()
     {
         if (!boltDB_->load(filePath_)) // load from file
         {
-            //OMPL_INFORM("No database loaded from file - doing nothing");
             OMPL_INFORM("No database loaded from file - generating new grid");
+
+            // Benchmark runtime
+            time::point startTime = time::now();
+
+            // Discretize grid
             boltDB_->generateGrid();
+
+            // Benchmark runtime
+            double duration = time::seconds(time::now() - startTime);
+            OMPL_INFORM("Grid generation total time: %f seconds (%f hz)", duration, 1.0/duration);
+
+            return true;
         }
+        return true;
     }
+    OMPL_INFORM("Database already loaded");
+    return true;
 }
 
 void Bolt::print(std::ostream &out) const

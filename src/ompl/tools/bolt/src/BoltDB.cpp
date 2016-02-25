@@ -49,6 +49,7 @@
 #include <boost/graph/incremental_components.hpp>
 #include <boost/property_map/vector_property_map.hpp>
 #include <boost/foreach.hpp>
+#include <boost/thread.hpp>
 
 // Allow hooks for visualizing planner
 #define OMPL_BOLT_DEBUG
@@ -72,7 +73,6 @@ double og::BoltDB::edgeWeightMap::get(Edge e) const
     if (collisionStates_[e] == IN_COLLISION)
         return std::numeric_limits<double>::infinity();
 
-
     double weight = boost::get(boost::edge_weight, g_, e);
     // if (popularityBias_)
     // {
@@ -81,7 +81,7 @@ double og::BoltDB::edgeWeightMap::get(Edge e) const
     // }
     // else
 
-    //std::cout << "getting weight of edge " << e << " with value " << weight << std::endl;
+    // std::cout << "getting weight of edge " << e << " with value " << weight << std::endl;
 
     return weight;
 }
@@ -114,7 +114,7 @@ void og::BoltDB::CustomAstarVisitor::examine_vertex(Vertex v, const Graph &) con
     {
         parent_->vizStateCallback(parent_->stateProperty_[v], 5, 1);
         parent_->vizTriggerCallback();
-        //usleep(50000);
+        // usleep(50000);
     }
 
     if (v == goal_)
@@ -127,7 +127,6 @@ og::BoltDB::BoltDB(base::SpaceInformationPtr si)
   : si_(si)
   , graphUnsaved_(false)
   , savingEnabled_(true)
-  , sparseDelta_(2.0)
   // Property accessors of edges
   , edgeWeightProperty_(boost::get(boost::edge_weight, g_))
   , edgeCollisionStateProperty_(boost::get(edge_collision_state_t(), g_))
@@ -138,6 +137,8 @@ og::BoltDB::BoltDB(base::SpaceInformationPtr si)
   , popularityBias_(false)
   , verbose_(true)
   , visualizeAstar_(false)
+  , visualizeGridGeneration_(false)
+  , sparseDelta_(2.0)
 {
     if (!nn_)
     {
@@ -235,14 +236,14 @@ bool og::BoltDB::load(const std::string &fileName)
                 plannerData->numGoalVertices());
 
     // Add to db
-    OMPL_INFORM("Adding plannerData to database:");
+    OMPL_INFORM("Adding plannerData to database.");
     setPlannerData(*plannerData);
 
     // Close file
     iStream.close();
 
     double loadTime = time::seconds(time::now() - start);
-    OMPL_INFORM("Loaded database from file in %f sec ", loadTime);
+    OMPL_INFORM("File load took **** %f sec ****", loadTime);
     return true;
 }
 
@@ -260,7 +261,7 @@ bool og::BoltDB::postProcessesPath(og::PathGeometric &solutionPath, double &inse
     ompl::base::PlannerTerminationCondition ptc = ompl::base::timedPlannerTerminationCondition(seconds, 0.1);
 
     // Get starting state
-    base::State* currentState = solutionPath.getStates()[0];
+    base::State *currentState = solutionPath.getStates()[0];
 
     // Find starting state's vertex
     stateProperty_[queryVertex_] = currentState;
@@ -277,7 +278,7 @@ bool og::BoltDB::postProcessesPath(og::PathGeometric &solutionPath, double &inse
         usleep(1000000);
 
         // Check if we are close to where a new node is to be expected
-        static const double percentSparse = 0.9; // if within 90%
+        static const double percentSparse = 0.9;  // if within 90%
         double distance = si_->distance(currentState, nextState);
         double distThresh = sparseDelta_ * percentSparse;
         if (distance > distThresh)
@@ -298,7 +299,7 @@ bool og::BoltDB::postProcessesPath(og::PathGeometric &solutionPath, double &inse
                 OMPL_ERROR("Nearest vertex is in collision - have not accounted for this yet");
             }
 
-            // Check if these verticies share an edge
+            // Check if these vertices share an edge
             std::pair<BoltDB::Edge, bool> edge_result = boost::edge(currentVertex, nearVertex, g_);
             if (!edge_result.second)
             {
@@ -327,12 +328,14 @@ bool og::BoltDB::postProcessesPath(og::PathGeometric &solutionPath, double &inse
         {
             std::cout << "Not close enough: " << distance << " need " << distThresh << std::endl;
         }
-
     }
 
-
-    // Record this new addition
-    graphUnsaved_ = true;
+    if (popularityBias_)
+    {
+        OMPL_ERROR("popularity bias enabled");
+        // Record this new addition
+        graphUnsaved_ = true;
+    }
 
     return result;
 }
@@ -340,7 +343,9 @@ bool og::BoltDB::postProcessesPath(og::PathGeometric &solutionPath, double &inse
 bool og::BoltDB::saveIfChanged(const std::string &fileName)
 {
     if (graphUnsaved_)
+    {
         return save(fileName);
+    }
     else
         OMPL_INFORM("Not saving because database has not changed");
     return true;
@@ -348,6 +353,9 @@ bool og::BoltDB::saveIfChanged(const std::string &fileName)
 
 bool og::BoltDB::save(const std::string &fileName)
 {
+    if (!graphUnsaved_)
+        OMPL_WARN("No need to save because graphUnsaved_ is false, but saving anyway because requested");
+
     // Disabled
     if (!savingEnabled_)
     {
@@ -382,7 +390,7 @@ bool og::BoltDB::save(const std::string &fileName)
 
     // Start saving each planner data object
     ompl::base::PlannerData &pd = *data.get();
-    OMPL_INFORM("Saving graph with %d verticies and %d edges", pd.numVertices(), pd.numEdges());
+    OMPL_INFORM("Saving graph with %d vertices and %d edges", pd.numVertices(), pd.numEdges());
 
     // Debug
     if (false)
@@ -519,11 +527,9 @@ void og::BoltDB::getPlannerData(base::PlannerData &data) const
             const Vertex v1 = boost::source(e, g_);
             const Vertex v2 = boost::target(e, g_);
 
-            if (!data.addEdge(
-                    base::PlannerDataVertex(stateProperty_[v1], (int)typeProperty_[v1]),
-                    base::PlannerDataVertex(stateProperty_[v2], (int)typeProperty_[v2]),
-                    base::PlannerDataEdge(),
-                    base::Cost(edgeWeightProperty_[e])))
+            if (!data.addEdge(base::PlannerDataVertex(stateProperty_[v1], (int)typeProperty_[v1]),
+                              base::PlannerDataVertex(stateProperty_[v2], (int)typeProperty_[v2]),
+                              base::PlannerDataEdge(), base::Cost(edgeWeightProperty_[e])))
             {
                 OMPL_ERROR("Unable to add edge");
             }
@@ -570,10 +576,10 @@ void og::BoltDB::setPlannerData(const base::PlannerData &data)
         base::State *state = si_->cloneState(oldState);
 
         // Get the tag, which in this application represents the vertex type
-        GuardType type = static_cast<GuardType>( data.getVertex(vertexID).getTag() );
+        GuardType type = static_cast<GuardType>(data.getVertex(vertexID).getTag());
 
         // ADD GUARD
-        idToVertex.push_back(addVertex(state, type ));
+        idToVertex.push_back(addVertex(state, type));
     }
 
     OMPL_INFORM("Loading edges");
@@ -584,7 +590,7 @@ void og::BoltDB::setPlannerData(const base::PlannerData &data)
         edgeList.clear();
 
         // Get the edges
-        data.getEdges(fromVertex, edgeList); // returns the id of each edge
+        data.getEdges(fromVertex, edgeList);  // returns the id of each edge
 
         Vertex v1 = idToVertex[fromVertex];
 
@@ -609,7 +615,7 @@ void og::BoltDB::setPlannerData(const base::PlannerData &data)
 
             addEdge(v1, v2, weight->value());
         }
-    } // for
+    }  // for
 
     // Re-enable verbose mode, if necessary
     verbose_ = wasVerbose;
@@ -629,72 +635,43 @@ void og::BoltDB::generateGrid()
     initializeQueryState();
 
     // Prepare for recursion
-    unsigned int dimension = si_->getStateSpace()->getDimension();
-    std::vector<double> values(dimension, 0); // TODO(davetcoleman): currently the last joint is not being discretized, so we should set its default value smartly and not just '0'
+    // TODO(davetcoleman): currently the last joint is not being discretized, so we should set its default value smartly
+    // and not just '0'
+    std::vector<double> values(si_->getStateSpace()->getDimension(), 0);
 
     // Choose first state to discretize
-    next_disc_state_ = si_->getStateSpace()->allocState(); // Note: it is currently possible the last state is never freed
+    next_disc_state_ =
+        si_->getStateSpace()->allocState();  // Note: it is currently possible the last state is never freed
 
     const std::size_t starting_joint_id = 0;
     std::size_t desired_depth = si_->getStateSpace()->getDimension();
     if (desired_depth > 5)
     {
-        OMPL_WARN("Truncated discretization depth to 5");
+        OMPL_INFORM("Truncated discretization depth to 5");
         desired_depth = 5;
     }
+
+    // Create vertices
     recursiveDiscretization(values, starting_joint_id, desired_depth);
-    OMPL_INFORM("Generated %i verticies.", getNumVertices());
+    OMPL_INFORM("Generated %i vertices.", getNumVertices());
 
-    std::size_t count = 0;
 
-    // Loop through each vertex
-    for (std::size_t v1 = 1; v1 < getNumVertices(); ++v1)  // 1 because 0 is the search vertex?
+    // Remove vertices in collision using multithreading
+    // TODO enable
+    //std::vector<Vertex> unvalidatedVertices;
+    //checkVerticesThreaded(unvalidatedVertices);
+
     {
-        // Add edges
-        std::vector<Vertex> graphNeighborhood;
-        base::State *state = stateProperty_[v1];
-        stateProperty_[queryVertex_] = state;
-        //double distance = sparseDelta_ * 1.1 * sqrt(2);  // 1.1 is fudge factor
-        // OMPL_INFORM("Finding nearest nodes in NN tree within radius %f", distance);
-        //nn_->nearestR(queryVertex_, distance, graphNeighborhood);
-        static const double FIND_NEAREST_K_NEIGHBORS = dimension * 4; // in 2D this created the regular square with diagonals of 8 edges
-        nn_->nearestK(queryVertex_, FIND_NEAREST_K_NEIGHBORS, graphNeighborhood);
-        stateProperty_[queryVertex_] = NULL;
+        // Benchmark runtime
+        time::point start_time = time::now();
 
-        // For each nearby vertex, add an edge
-        for (std::size_t i = 0; i < graphNeighborhood.size(); ++i)
-        {
-            Vertex &v2 = graphNeighborhood[i];
+        // Create edges
+        generateEdges();
 
-            // Check if these verticies already share an edge
-            if (boost::edge(v1, v2, g_).second)
-                continue;
-
-            // Check if these verticies are the same
-            if (v1 == v2)
-                continue;
-
-            // Remove any edges that are in collision
-            if (!si_->checkMotion(state, stateProperty_[v2]))
-                continue;
-
-            // Determine cost for edge depending on mode
-            double cost = 100;
-            if (!popularityBias_)
-            {
-                cost = distanceFunction(v1, v2);
-            }
-
-            Edge e = addEdge(v1, v2, cost);
-
-            // Debug in Rviz
-            viz2EdgeCallback(stateProperty_[v1], stateProperty_[v2], cost);
-            //viz2EdgeCallback(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
-
-            count++;
-        }
+        // Benchmark runtime
+        double duration = time::seconds(time::now() - start_time);
+        OMPL_WARN("Generate edges total time: %f seconds (%f hz)", duration, 1.0 / duration);
     }
-    OMPL_INFORM("Generated %i edges. Finished generating grid.", count);
 
     // Get the average vertex degree (number of connected edges)
     std::size_t average_degree = (getNumEdges() * 2) / getNumVertices();
@@ -703,7 +680,243 @@ void og::BoltDB::generateGrid()
     // Display
     viz2TriggerCallback();
 
-    std::cout << std::endl;
+    // Mark the graph as ready to be saved
+    graphUnsaved_ = true;
+}
+
+void og::BoltDB::generateEdges()
+{
+    // Benchmark runtime
+    time::point startTime = time::now();
+    std::size_t count = 0;
+
+    // Nearest Neighbor search
+    std::vector<Vertex> graphNeighborhood;
+    std::vector<Edge> unvalidatedEdges;
+    std::size_t feedbackFrequency = getNumVertices() / 10;
+
+    // Loop through each vertex
+    for (std::size_t v1 = 1; v1 < getNumVertices(); ++v1)  // 1 because 0 is the search vertex?
+    {
+        if (v1 % feedbackFrequency == 0)
+        {
+            // Benchmark runtime
+            double duration = time::seconds(time::now() - startTime);
+            std::cout << "Edge generation progress: " << double(v1) / getNumVertices() * 100.0 << " % "
+                      << "Total edges: " << count << " Total time: " << duration << std::endl;
+            startTime = time::now();
+        }
+
+        // Add edges
+        graphNeighborhood.clear();
+        base::State *state = stateProperty_[v1];
+        stateProperty_[queryVertex_] = state;
+
+        {
+            // Benchmark runtime
+            //time::point startTime = time::now();
+
+            // in 2D this created the regular square with diagonals of 8 edges
+            static const double FIND_NEAREST_K_NEIGHBORS = si_->getStateSpace()->getDimension();  // * 4;
+
+            nn_->nearestK(queryVertex_, FIND_NEAREST_K_NEIGHBORS, graphNeighborhood);
+            stateProperty_[queryVertex_] = NULL;
+
+            // Benchmark runtime
+            //double duration = time::seconds(time::now() - startTime) * 1000;
+            //OMPL_INFORM("NN Total time: %f milliseconds (%f hz)", duration, 1.0 / duration);
+        }
+
+        bool verbose = false;
+
+        // For each nearby vertex, add an edge
+        for (std::size_t i = 0; i < graphNeighborhood.size(); ++i)
+        {
+            if (verbose)
+                OMPL_INFORM("Edge %u", i);
+            Vertex &v2 = graphNeighborhood[i];
+
+            // Check if these vertices are the same
+            if (v1 == v2)
+                continue;
+
+            // Check if these vertices already share an edge
+            {
+                // Benchmark runtime
+                time::point startTime = time::now();
+
+                if (boost::edge(v1, v2, g_).second)
+                    continue;
+
+                // Benchmark runtime
+                double duration = time::seconds(time::now() - startTime) * 1000;
+                if (verbose)
+                    OMPL_INFORM("Check edge exist Total time: %f milliseconds (%f hz)", duration, 1.0 / duration);
+            }
+
+            // Create edge - maybe removed later
+            Edge e = addEdge(v1, v2, 0);
+            unvalidatedEdges.push_back(e);
+
+            count++;
+        }  // for each v2
+    }      // for each v1
+
+    OMPL_INFORM("Generated %i edges. Finished generating grid.", getNumEdges());
+
+    // Benchmark runtime
+    time::point startTime3 = time::now();
+    std::size_t numEdgesBeforeCheck = getNumEdges();
+
+    // Collision check all edges using threading
+    checkEdgesThreaded(unvalidatedEdges);
+
+    // Calculate statistics on collision state of robot
+    std::size_t numEdgesAfterCheck = getNumEdges();
+    std::size_t numRemovedEdges = numEdgesBeforeCheck - numEdgesAfterCheck;
+    double duration3 = time::seconds(time::now() - startTime3);
+
+    // User feedback
+    OMPL_INFORM("Collision State of Robot -----------------");
+    OMPL_INFORM("   Removed Edges:        %u", numRemovedEdges);
+    OMPL_INFORM("   Remaining Edges:      %u", numEdgesAfterCheck);
+    OMPL_INFORM("   Percent Removed:      %f %%", numRemovedEdges / double(numEdgesBeforeCheck) * 100.0);
+    OMPL_INFORM("   Total time:           %f sec (%f hz)", duration3, 1.0 / duration3);
+
+    // Calculate cost for each edge
+    std::size_t errorCheckCounter = 0;
+    BOOST_FOREACH (const Edge e, boost::edges(g_))
+    {
+        const Vertex &v1 = boost::source(e, g_);
+        const Vertex &v2 = boost::target(e, g_);
+
+        // Determine cost for edge depending on mode
+        double cost = 100;
+        if (!popularityBias_)
+        {
+            cost = distanceFunction(v1, v2);
+        }
+        edgeWeightProperty_[e] = cost;
+        errorCheckCounter++;
+
+        // Debug in Rviz
+        if (visualizeGridGeneration_)
+             viz2EdgeCallback(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
+    }
+    assert(errorCheckCounter == numEdgesAfterCheck);
+
+}
+
+void og::BoltDB::checkEdges()
+{
+    OMPL_WARN("Collision checking generated edges without threads");
+    OMPL_ERROR("Has not been updated for remove_edge");
+
+    BOOST_FOREACH (const Edge e, boost::edges(g_))
+    {
+        const Vertex &v1 = boost::source(e, g_);
+        const Vertex &v2 = boost::target(e, g_);
+
+        // Remove any edges that are in collision
+        if (!si_->checkMotion(stateProperty_[v1], stateProperty_[v2]))
+        {
+            edgeCollisionStateProperty_[e] = BoltDB::IN_COLLISION;
+        }
+        else
+        {
+            edgeCollisionStateProperty_[e] = BoltDB::FREE;
+        }
+    }
+}
+
+void og::BoltDB::checkEdgesThreaded(const std::vector<Edge> &unvalidatedEdges)
+{
+    bool verbose = false;
+
+    // Error check
+    assert(unvalidatedEdges.size() == getNumEdges());
+
+    // Setup threading
+    static const std::size_t numThreads = boost::thread::hardware_concurrency();
+    OMPL_INFORM("Collision checking %u generated edges using %u threads", unvalidatedEdges.size(), numThreads);
+
+    std::vector<boost::thread *> threads(numThreads);
+    std::size_t edgesPerThread = getNumEdges() / numThreads;  // rounds down
+    std::size_t startEdge = 0;
+    std::size_t endEdge;
+    std::size_t errorCheckTotalEdges = 0;
+
+    // For each thread
+    for (std::size_t i = 0; i < threads.size(); ++i)
+    {
+        endEdge = startEdge + edgesPerThread - 1;
+
+        // Check if this is the last thread
+        if (i == threads.size() - 1)
+        {
+            // have it do remaining edges to check
+            endEdge = getNumEdges() - 1;
+        }
+        errorCheckTotalEdges += (endEdge - startEdge);
+
+        if (verbose)
+            std::cout << "Thread " << i << " has edges from " << startEdge << " to " << endEdge << std::endl;
+
+        base::SpaceInformationPtr si(new base::SpaceInformation(si_->getStateSpace()));
+        si->setStateValidityChecker(si_->getStateValidityChecker());
+        si->setMotionValidator(si_->getMotionValidator());
+
+        threads[i] = new boost::thread(
+            boost::bind(&og::BoltDB::checkEdgesThread, this, startEdge, endEdge, si, unvalidatedEdges));
+        startEdge += edgesPerThread;
+    }
+
+    // Join threads
+    for (std::size_t i = 0; i < threads.size(); ++i)
+    {
+        threads[i]->join();
+        delete threads[i];
+    }
+
+    // Error check
+    if (errorCheckTotalEdges == getNumEdges())
+    {
+        OMPL_ERROR("Incorrect number of edges were processed");
+        exit(-1);
+    }
+
+    // Make sure all remaining edges were validated
+    BOOST_FOREACH (const Edge e, boost::edges(g_))
+    {
+        if (edgeCollisionStateProperty_[e] != BoltDB::FREE)
+        {
+            OMPL_ERROR("Remaining edge %u has not been marked free", e);
+        }
+    }
+}
+
+void og::BoltDB::checkEdgesThread(std::size_t startEdge, std::size_t endEdge, base::SpaceInformationPtr si,
+                                  const std::vector<Edge> &unvalidatedEdges)
+{
+    // Process [startEdge, endEdge] inclusive
+    for (std::size_t edgeID = startEdge; edgeID <= endEdge; ++edgeID)
+    {
+        const Edge &e = unvalidatedEdges[edgeID];
+
+        const Vertex &v1 = boost::source(e, g_);
+        const Vertex &v2 = boost::target(e, g_);
+
+        // Remove any edges that are in collision
+        if (!si->checkMotion(stateProperty_[v1], stateProperty_[v2]))
+        {
+            //edgeCollisionStateProperty_[e] = BoltDB::IN_COLLISION;
+            boost::remove_edge(v1, v2, g_);
+        }
+        else
+        {
+            edgeCollisionStateProperty_[e] = BoltDB::FREE;
+        }
+    }
 }
 
 void og::BoltDB::recursiveDiscretization(std::vector<double> &values, std::size_t joint_id, std::size_t desired_depth)
@@ -720,8 +933,16 @@ void og::BoltDB::recursiveDiscretization(std::vector<double> &values, std::size_
     {
         values[joint_id] = value;
 
-        //std::copy(values.begin(), values.end(), std::ostream_iterator<double>(std::cout, ", "));
-        //std::cout << std::endl;
+        // Use feedback
+        if (joint_id == 0)
+        {
+            const double percent =
+                (value - bounds.low[joint_id]) / (bounds.high[joint_id] - bounds.low[joint_id]) * 100.0;
+            std::cout << "Vertex generation progress: " << percent << " % Total vertices: " << getNumVertices() << std::endl;
+        }
+
+        // std::copy(values.begin(), values.end(), std::ostream_iterator<double>(std::cout, ", "));
+        // std::cout << std::endl;
 
         // Check if we are at the end of the recursion
         if (joint_id < desired_depth - 1)
@@ -729,7 +950,7 @@ void og::BoltDB::recursiveDiscretization(std::vector<double> &values, std::size_
             // Keep recursing
             recursiveDiscretization(values, joint_id + 1, desired_depth);
         }
-        else // this is the end of recursion, create a new state
+        else  // this is the end of recursion, create a new state
         {
             // TODO(davetcoleman): way to not allocState if in collision?
             next_disc_state_ = si_->getStateSpace()->allocState();
@@ -740,25 +961,96 @@ void og::BoltDB::recursiveDiscretization(std::vector<double> &values, std::size_
             // Collision check
             if (!si_->isValid(next_disc_state_))
             {
-                //OMPL_ERROR("Found a state that is not valid! ");
+                // OMPL_ERROR("Found a state that is not valid! ");
                 continue;
             }
 
             // Add vertex to graph
-            GuardType type = START; // TODO(davetcoleman): type START is dummy
+            GuardType type = START;  // TODO(davetcoleman): type START is dummy
             addVertex(next_disc_state_, type);
 
             // Visualize
-            //if (getNumVertices() % 7 == 0)
+            if (visualizeGridGeneration_)
             {
-                //std::cout << "visualizing state " << getNumVertices() << std::endl;
-                viz2StateCallback(next_disc_state_, 5, 1); // Candidate node has already (just) been added
-                //viz2TriggerCallback();
-                //usleep(0.01 * 1000000);
+                viz2StateCallback(next_disc_state_, 5, 1);  // Candidate node has already (just) been added
+                // viz2TriggerCallback();
+                // usleep(0.01 * 1000000);
             }
 
             // Prepare for next new state by allocating now
-            //next_disc_state_ = si_->getStateSpace()->allocState();
+            // next_disc_state_ = si_->getStateSpace()->allocState();
+        }
+    }
+}
+
+void og::BoltDB::checkVerticesThreaded(const std::vector<Vertex> &unvalidatedVertices)
+{
+    // TODO(davetcoleman): have not tested this functionality
+    bool verbose = true;
+
+    // Setup threading
+    static const std::size_t numThreads = boost::thread::hardware_concurrency();
+    OMPL_INFORM("Collision checking %u generated vertices using %u threads", unvalidatedVertices.size(), numThreads);
+
+    std::vector<boost::thread *> threads(numThreads);
+    std::size_t verticesPerThread = getNumVertices() / numThreads;  // rounds down
+    std::size_t startVertex = 0;
+    std::size_t endVertex;
+    std::size_t errorCheckTotalVertices = 0;
+
+    // For each thread
+    for (std::size_t i = 0; i < threads.size(); ++i)
+    {
+        endVertex = startVertex + verticesPerThread - 1;
+
+        // Check if this is the last thread
+        if (i == threads.size() - 1)
+        {
+            // have it do remaining vertices to check
+            endVertex = getNumVertices() - 1;
+        }
+        errorCheckTotalVertices += (endVertex - startVertex);
+
+        if (verbose)
+            std::cout << "Thread " << i << " has vertices from " << startVertex << " to " << endVertex << std::endl;
+
+        base::SpaceInformationPtr si(new base::SpaceInformation(si_->getStateSpace()));
+        si->setStateValidityChecker(si_->getStateValidityChecker());
+        //si->setMotionValidator(si_->getMotionValidator());
+
+        threads[i] = new boost::thread(
+            boost::bind(&og::BoltDB::checkVerticesThread, this, startVertex, endVertex, si, unvalidatedVertices));
+        startVertex += verticesPerThread;
+    }
+
+    // Join threads
+    for (std::size_t i = 0; i < threads.size(); ++i)
+    {
+        threads[i]->join();
+        delete threads[i];
+    }
+
+    // Error check
+    if (errorCheckTotalVertices == getNumVertices())
+    {
+        OMPL_ERROR("Incorrect number of vertices were processed");
+        exit(-1);
+    }
+}
+
+void og::BoltDB::checkVerticesThread(std::size_t startVertex, std::size_t endVertex, base::SpaceInformationPtr si,
+                                     const std::vector<Vertex> &unvalidatedVertices)
+{
+    // Process [startVertex, endVertex] inclusive
+    for (std::size_t vertexID = startVertex; vertexID <= endVertex; ++vertexID)
+    {
+        const Vertex &v = unvalidatedVertices[vertexID];
+
+        // Remove any vertices that are in collision
+        if (!si_->isValid(stateProperty_[v]))
+        {
+            boost::remove_vertex(v, g_);
+            std::cout << "found vertex in collision " << std::endl;
         }
     }
 }
@@ -788,6 +1080,24 @@ void og::BoltDB::displayDatabase()
     viz2TriggerCallback();
 }
 
+void og::BoltDB::setVizCallbacks(ompl::base::VizStateCallback vizStateCallback,
+                                 ompl::base::VizEdgeCallback vizEdgeCallback,
+                                 ompl::base::VizTriggerCallback vizTriggerCallback)
+{
+    vizStateCallback_ = vizStateCallback;
+    vizEdgeCallback_ = vizEdgeCallback;
+    vizTriggerCallback_ = vizTriggerCallback;
+}
+
+void og::BoltDB::setViz2Callbacks(ompl::base::VizStateCallback vizStateCallback,
+                                  ompl::base::VizEdgeCallback vizEdgeCallback,
+                                  ompl::base::VizTriggerCallback vizTriggerCallback)
+{
+    viz2StateCallback_ = vizStateCallback;
+    viz2EdgeCallback_ = vizEdgeCallback;
+    viz2TriggerCallback_ = vizTriggerCallback;
+}
+
 void og::BoltDB::normalizeGraphEdgeWeights()
 {
     if (!popularityBias_)
@@ -810,11 +1120,11 @@ void og::BoltDB::normalizeGraphEdgeWeights()
     {
         double avg_cost_diff = desired_avg_cost - avg_cost;
         std::cout << "avg_cost_diff: " << avg_cost_diff << std::endl;
-        double per_edge_reduction = avg_cost_diff; // / getNumEdges();
-        OMPL_INFORM("Increasing each edge's cost by %f", per_edge_reduction);
+        double perEdge_reduction = avg_cost_diff;  // / getNumEdges();
+        OMPL_INFORM("Increasing each edge's cost by %f", perEdge_reduction);
         BOOST_FOREACH (Edge e, boost::edges(g_))
         {
-            edgeWeightProperty_[e] = std::min(edgeWeightProperty_[e] + per_edge_reduction, 100.0);
+            edgeWeightProperty_[e] = std::min(edgeWeightProperty_[e] + perEdge_reduction, 100.0);
         }
     }
     else
@@ -847,10 +1157,10 @@ og::BoltDB::Edge og::BoltDB::addEdge(const Vertex &v1, const Vertex &v2, const d
     // Create the new edge
     Edge e = (boost::add_edge(v1, v2, g_)).first;
 
-    //std::cout << "Adding cost: " << weight << std::endl;
+    // std::cout << "Adding cost: " << weight << std::endl;
 
     // Add associated properties to the edge
-    edgeWeightProperty_[e] = weight; //distanceFunction(v1, v2);
+    edgeWeightProperty_[e] = weight;  // distanceFunction(v1, v2);
     edgeCollisionStateProperty_[e] = NOT_CHECKED;
 
     return e;

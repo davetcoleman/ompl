@@ -115,8 +115,6 @@ base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCond
     const base::State *startState = pis_.nextStart(); // PlannerInputStates
     const base::State *goalState = pis_.nextGoal(ptc);
 
-    std::cout << "pis_.getSampledGoalsCount();: " << pis_.getSampledGoalsCount() << std::endl;
-
     // Create solution path struct
     BoltDB::CandidateSolution candidateSolution;
 
@@ -275,11 +273,22 @@ bool BoltRetrieveRepair::getPathOnGraph(const std::vector<BoltDB::Vertex> &candi
     // Try every combination of nearby start and goal pairs
     BOOST_FOREACH (BoltDB::Vertex start, candidateStarts)
     {
+        vizStateCallback(boltDB_->stateProperty_[start], 5, 1);
+        vizEdgeCallback(actualStart, boltDB_->stateProperty_[start], 100);
+        vizTriggerCallback();
+        usleep(1000000);
+
+
         // Check if this start is visible from the actual start
         if (!si_->checkMotion(actualStart, boltDB_->stateProperty_[start]))
         {
             if (verbose_)
+            {
                 OMPL_WARN("FOUND CANDIDATE START THAT IS NOT VISIBLE ");
+
+                //std::cout << "exiting early " << std::endl;
+                //exit(0);
+            }
             continue;  // this is actually not visible
         }
 
@@ -547,10 +556,10 @@ bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<BoltDB::Vertex
     {
         // Ensure graph doesn't get too popular
         boltDB_->normalizeGraphEdgeWeights();
-    }
 
-    // Mark as needing to be saved to file
-    boltDB_->graphUnsaved_ = true;
+        // Mark as needing to be saved to file
+        boltDB_->graphUnsaved_ = true;
+    }
 
     return true;
 }

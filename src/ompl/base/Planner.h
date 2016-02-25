@@ -72,14 +72,14 @@ namespace ompl
          * \param type - different modes/colors/sizes for visualizing the state
          * \param neighborRadius - special extra data for showing a range around a state
          */
-        typedef boost::function<void(ompl::base::State* v, std::size_t type, double neighborRadius)> VizStateCallback;
+        typedef boost::function<void(const ompl::base::State* v, std::size_t type, double neighborRadius)> VizStateCallback;
         /**
          * \brief Visualization callback hook for external debugging of edges
          * \param v1 - from state that marks beginning of edge
          * \param v2 - to state that marks end of edge
          * \param cost - signifies the weight of the edge using color
          */
-        typedef boost::function<void(ompl::base::State* v1, ompl::base::State* v2, double cost)> VizEdgeCallback;
+        typedef boost::function<void(const ompl::base::State* v1, const ompl::base::State* v2, double cost)> VizEdgeCallback;
         /**
          * \brief Visualization callback hook for external debugging that triggers the visualizer to render/publish
          */
@@ -387,7 +387,7 @@ namespace ompl
 
             /** \brief Visualize a planner's data during runtime, externally, using a function callback
              *         This could be called whenever the graph changes */
-            virtual void vizStateCallback(ompl::base::State* state, std::size_t type, double neighborRadius)
+            virtual void vizStateCallback(const ompl::base::State* state, std::size_t type, double neighborRadius)
             {
                 if (vizStateCallback_)
                     vizStateCallback_(state, type, neighborRadius);
@@ -395,7 +395,7 @@ namespace ompl
 
             /** \brief Visualize a planner's data during runtime, externally, using a function callback
              *         This could be called whenever the graph changes */
-            virtual void vizEdgeCallback(ompl::base::State* stateA, ompl::base::State* stateB, double cost)
+            virtual void vizEdgeCallback(const ompl::base::State* stateA, const ompl::base::State* stateB, double cost)
             {
                 if (vizEdgeCallback_)
                     vizEdgeCallback_(stateA, stateB, cost);

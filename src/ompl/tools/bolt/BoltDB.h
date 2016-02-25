@@ -296,7 +296,9 @@ class BoltDB
                                             > > > > VertexProperties;
 
     /** Wrapper for the double assigned to an edge as its weight property. */
-    typedef boost::property<boost::edge_weight_t, double, boost::property<edge_collision_state_t, int> > EdgeProperties;
+    typedef boost::property<boost::edge_weight_t, double,
+                            boost::property<edge_collision_state_t, int> > EdgeProperties;
+
 
     /** The underlying boost graph type (undirected weighted-edge adjacency list with above properties). */
     typedef boost::adjacency_list<boost::vecS,  // store in std::vector
@@ -515,6 +517,32 @@ class BoltDB
      */
     void generateGrid();
 
+    /** \brief Recursively discretize
+     *  \param values - the joint positions currently searching over
+     *  \param joint_id - the dimension currently on
+     *  \param desired_depth - how many dimensions to discretize to
+     */
+    void recursiveDiscretization(std::vector<double>& values, std::size_t joint_id, std::size_t desired_depth);
+
+    /** \brief Faster method for collision checking vertices */
+    void checkVerticesThreaded(const std::vector<Vertex> &unvalidatedVertices);
+    void checkVerticesThread(std::size_t startVertex, std::size_t endVertex, base::SpaceInformationPtr si,
+        const std::vector<Vertex> &unvalidatedVertices);
+
+    /**
+     * \brief Connect vertices wherever possible
+     */
+    void generateEdges();
+
+    /** \brief Collision check edges */
+    void checkEdges();
+
+    /** \brief Collision check edges using threading */
+    void checkEdgesThreaded(const std::vector<Edge> &unvalidatedEdges);
+
+    /** \brief Collision check edges in vector from [startEdge, endEdge] inclusive */
+    void checkEdgesThread(std::size_t startEdge, std::size_t endEdge, base::SpaceInformationPtr si, const std::vector<Edge> &unvalidatedEdges);
+
     /** \brief Free all the memory allocated by the database */
     void freeMemory();
 
@@ -524,13 +552,6 @@ class BoltDB
     /** \brief Compute distance between two milestones (this is simply distance between the states of the milestones) */
     double distanceFunction(const Vertex a, const Vertex b) const;
 
-    /** \brief Recursively discretize
-     *  \param values - the joint positions currently searching over
-     *  \param joint_id - the dimension currently on
-     *  \param desired_depth - how many dimensions to discretize to
-     */
-    void recursiveDiscretization(std::vector<double> &values, std::size_t joint_id, std::size_t desired_depth);
-
     /** \brief Clear all past edge state information about in collision or not */
     void clearEdgeCollisionStates();
 
@@ -539,17 +560,15 @@ class BoltDB
 
     /** \brief Visualize a planner's data during runtime, externally, using a function callback
      *         This could be called whenever the graph changes */
-    void vizStateCallback(ompl::base::State* state, std::size_t type, double neighborRadius)
+    void vizStateCallback(const ompl::base::State* state, std::size_t type, double neighborRadius)
     {
         if (vizStateCallback_)
             vizStateCallback_(state, type, neighborRadius);
-        else
-            OMPL_ERROR("No viz state callback");
     }
 
     /** \brief Visualize a planner's data during runtime, externally, using a function callback
      *         This could be called whenever the graph changes */
-    void vizEdgeCallback(ompl::base::State* stateA, ompl::base::State* stateB, double cost)
+    void vizEdgeCallback(const ompl::base::State* stateA, const ompl::base::State* stateB, double cost)
     {
         if (vizEdgeCallback_)
             vizEdgeCallback_(stateA, stateB, cost);
@@ -564,16 +583,11 @@ class BoltDB
 
     /** \brief Set the callback to visualize/publish a planner's progress */
     void setVizCallbacks(ompl::base::VizStateCallback vizStateCallback, ompl::base::VizEdgeCallback vizEdgeCallback,
-                         ompl::base::VizTriggerCallback vizTriggerCallback)
-    {
-        vizStateCallback_ = vizStateCallback;
-        vizEdgeCallback_ = vizEdgeCallback;
-        vizTriggerCallback_ = vizTriggerCallback;
-    }
+                         ompl::base::VizTriggerCallback vizTriggerCallback);
 
     /** \brief Visualize a planner's data during runtime, externally, using a function callback
      *         This could be called whenever the graph changes */
-    void viz2StateCallback(ompl::base::State* state, std::size_t type, double neighborRadius)
+    void viz2StateCallback(const ompl::base::State* state, std::size_t type, double neighborRadius)
     {
         if (viz2StateCallback_)
             viz2StateCallback_(state, type, neighborRadius);
@@ -581,7 +595,7 @@ class BoltDB
 
     /** \brief Visualize a planner's data during runtime, externally, using a function callback
      *         This could be called whenever the graph changes */
-    void viz2EdgeCallback(ompl::base::State* stateA, ompl::base::State* stateB, double cost)
+    void viz2EdgeCallback(const ompl::base::State* stateA, const ompl::base::State* stateB, double cost)
     {
         if (viz2EdgeCallback_)
             viz2EdgeCallback_(stateA, stateB, cost);
@@ -596,22 +610,16 @@ class BoltDB
 
     /** \brief Set the callback to visualize/publish a planner's progress */
     void setViz2Callbacks(ompl::base::VizStateCallback vizStateCallback, ompl::base::VizEdgeCallback vizEdgeCallback,
-                         ompl::base::VizTriggerCallback vizTriggerCallback)
-    {
-        std::cout << "setting viz 2 callbacks " << std::endl;
-        viz2StateCallback_ = vizStateCallback;
-        viz2EdgeCallback_ = vizEdgeCallback;
-        viz2TriggerCallback_ = vizTriggerCallback;
-    }
+                          ompl::base::VizTriggerCallback vizTriggerCallback);
 
     /** \brief Keep graph evenly weighted */
     void normalizeGraphEdgeWeights();
 
-    /** \brief Helper for creating/loading graph verticies */
-    Vertex addVertex(base::State *state, const GuardType &type);
+    /** \brief Helper for creating/loading graph vertices */
+    Vertex addVertex(base::State* state, const GuardType& type);
 
     /** \brief Helper for creating/loading graph edges */
-    Edge addEdge(const Vertex &v1, const Vertex &v2, const double weight);
+    Edge addEdge(const Vertex& v1, const Vertex& v2, const double weight);
 
     /** \brief Get whether to bias search using popularity of edges */
     bool getPopularityBiasEnabled()
@@ -626,7 +634,6 @@ class BoltDB
     }
 
   protected:
-
     /** \brief The created space information */
     base::SpaceInformationPtr si_;
 
@@ -641,9 +648,6 @@ class BoltDB
 
     /** \brief Allow the database to save to file (new experiences) */
     bool savingEnabled_;
-
-    /** \brief Whether to bias search using popularity of edges */
-    bool popularityBias_;
 
     /** \brief Nearest neighbors data structure */
     boost::shared_ptr<NearestNeighbors<Vertex> > nn_;
@@ -666,6 +670,9 @@ class BoltDB
     /** \brief Access to the SPARS vertex type for the vertices */
     boost::property_map<Graph, vertex_type_t>::type typeProperty_;
 
+    /** \brief Whether to bias search using popularity of edges */
+    bool popularityBias_;
+
     /** \brief Option to enable debugging output */
     bool verbose_;
 
@@ -680,15 +687,15 @@ class BoltDB
     ompl::base::VizTriggerCallback viz2TriggerCallback_;
 
     /** \brief Discretization helper */
-    base::State *next_disc_state_;
+    base::State* next_disc_state_;
 
-public:
-    /** \brief Whether to show astar search in progress */
+  public:
+    /** \brief Various options for visualizing the algorithmns performance */
     bool visualizeAstar_;
+    bool visualizeGridGeneration_;
 
     /** \brief Distance between grid points (discretization level) */
     double sparseDelta_;
-
 
 };  // end of class BoltDB
 
