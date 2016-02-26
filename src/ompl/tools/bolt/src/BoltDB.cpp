@@ -555,11 +555,7 @@ void og::BoltDB::setPlannerData(const base::PlannerData &data)
     initializeQueryState();
 
     // Add all vertices
-    if (verbose_)
-    {
-        OMPL_INFORM("BOLTDB::setPlannerData: numVertices=%d", data.numVertices());
-    }
-    OMPL_INFORM("Loading PlannerData into BoltDB");
+    OMPL_INFORM("  Loading %u vertices into BoltDB", data.numVertices());
 
     std::vector<Vertex> idToVertex;
 
@@ -568,7 +564,6 @@ void og::BoltDB::setPlannerData(const base::PlannerData &data)
     verbose_ = false;
 
     // Add the nodes to the graph
-    OMPL_INFORM("Loading %u vertices", data.numVertices());
     for (std::size_t vertexID = 0; vertexID < data.numVertices(); ++vertexID)
     {
         // Get the state from loaded planner data
@@ -582,7 +577,7 @@ void og::BoltDB::setPlannerData(const base::PlannerData &data)
         idToVertex.push_back(addVertex(state, type));
     }
 
-    OMPL_INFORM("Loading edges");
+    OMPL_INFORM("  Loading %u edges into BoltDB", data.numEdges());
     // Add the corresponding edges to the graph
     std::vector<unsigned int> edgeList;
     for (unsigned int fromVertex = 0; fromVertex < data.numVertices(); ++fromVertex)
@@ -616,6 +611,7 @@ void og::BoltDB::setPlannerData(const base::PlannerData &data)
             addEdge(v1, v2, weight->value());
         }
     }  // for
+    OMPL_INFORM("  Finished loading %u edges", getNumEdges());
 
     // Re-enable verbose mode, if necessary
     verbose_ = wasVerbose;
@@ -1066,6 +1062,7 @@ void og::BoltDB::displayDatabase()
     OMPL_INFORM("Displaying database");
 
     // Loop through each edge
+    std::size_t count = 0;
     BOOST_FOREACH (Edge e, boost::edges(g_))
     {
         const Vertex &v1 = boost::source(e, g_);
@@ -1076,8 +1073,11 @@ void og::BoltDB::displayDatabase()
 
         // Add edge
         viz2EdgeCallback(stateProperty_[v1], stateProperty_[v2], intensity);
+        if (count % 100 == 0)
+            viz2TriggerCallback();
+
+        count++;
     }
-    viz2TriggerCallback();
 }
 
 void og::BoltDB::setVizCallbacks(ompl::base::VizStateCallback vizStateCallback,
