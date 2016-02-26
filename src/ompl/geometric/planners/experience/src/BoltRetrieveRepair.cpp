@@ -36,12 +36,10 @@
 
 // OMPL
 #include <ompl/geometric/planners/experience/BoltRetrieveRepair.h>
-//#include <ompl/geometric/planners/rrt/RRTConnect.h>
 #include <ompl/base/goals/GoalState.h>
 #include <ompl/base/goals/GoalSampleableRegion.h>
 #include <ompl/tools/config/SelfConfig.h>
 #include <ompl/util/Console.h>
-//#include "ompl/tools/config/MagicConstants.h"
 
 // Boost
 #include <boost/thread.hpp>
@@ -125,7 +123,7 @@ base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCond
         return base::PlannerStatus::TIMEOUT;  // The planner failed to find a solution
     }
 
-    OMPL_INFORM("BoltRetrieveRepair::getPathOffGraph() returned true - found a solution of size %d",
+    OMPL_INFORM("getPathOffGraph() found a solution of size %d",
                 candidateSolution.getStateCount());
 
     // Save this for future debugging
@@ -153,10 +151,7 @@ base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCond
     pdef_->addSolutionPath(candidateSolution.path_, approximate, approxdif, getName());
     solved = true;
 
-    OMPL_INFORM("-------------------------------------------------------");
-    OMPL_INFORM("Finished solve()");
-    OMPL_INFORM("-------------------------------------------------------");
-
+    OMPL_INFORM("  Finished BoltRetrieveRepair.solve()");
     return base::PlannerStatus(solved, approximate);
 }
 
@@ -220,17 +215,17 @@ bool BoltRetrieveRepair::getPathOffGraph(const base::State *start, const base::S
         return false;
     }
     if (verbose_)
-        OMPL_INFORM("Found %d nodes near start", startVertexCandidateNeighbors_.size());
+        OMPL_INFORM("  Found %d nodes near start", startVertexCandidateNeighbors_.size());
 
     // Goal
-    OMPL_INFORM("Looking for a node near the problem goal");
+    OMPL_INFORM("  Looking for a node near the problem goal");
     if (!findGraphNeighbors(goal, goalVertexCandidateNeighbors_))
     {
         OMPL_INFORM("No graph neighbors found for goal");
         return false;
     }
     if (verbose_)
-        OMPL_INFORM("Found %d nodes near goal", goalVertexCandidateNeighbors_.size());
+        OMPL_INFORM("    Found %d nodes near goal", goalVertexCandidateNeighbors_.size());
 
     // Get paths between start and goal
     bool result = getPathOnGraph(startVertexCandidateNeighbors_, goalVertexCandidateNeighbors_, start, goal,
@@ -273,12 +268,6 @@ bool BoltRetrieveRepair::getPathOnGraph(const std::vector<BoltDB::Vertex> &candi
     // Try every combination of nearby start and goal pairs
     BOOST_FOREACH (BoltDB::Vertex start, candidateStarts)
     {
-        vizStateCallback(boltDB_->stateProperty_[start], 5, 1);
-        vizEdgeCallback(actualStart, boltDB_->stateProperty_[start], 100);
-        vizTriggerCallback();
-        usleep(1000000);
-
-
         // Check if this start is visible from the actual start
         if (!si_->checkMotion(actualStart, boltDB_->stateProperty_[start]))
         {
@@ -286,8 +275,10 @@ bool BoltRetrieveRepair::getPathOnGraph(const std::vector<BoltDB::Vertex> &candi
             {
                 OMPL_WARN("FOUND CANDIDATE START THAT IS NOT VISIBLE ");
 
-                //std::cout << "exiting early " << std::endl;
-                //exit(0);
+                vizStateCallback(boltDB_->stateProperty_[start], 3, 1);
+                vizEdgeCallback(actualStart, boltDB_->stateProperty_[start], 100);
+                vizTriggerCallback();
+                usleep(1000000);
             }
             continue;  // this is actually not visible
         }
@@ -295,7 +286,7 @@ bool BoltRetrieveRepair::getPathOnGraph(const std::vector<BoltDB::Vertex> &candi
         BOOST_FOREACH (BoltDB::Vertex goal, candidateGoals)
         {
             if (verbose_)
-                OMPL_INFORM("  foreach_goal: Checking motion from  %d to %d", actualGoal,
+                OMPL_INFORM("    foreach_goal: Checking motion from  %d to %d", actualGoal,
                             boltDB_->stateProperty_[goal]);
 
             // Check if our planner is out of time
@@ -353,7 +344,7 @@ bool BoltRetrieveRepair::lazyCollisionSearch(const BoltDB::Vertex &start, const 
     while (true)
     {
         if (verbose_)
-            OMPL_INFORM("      while true: look for valid paths between start and goal");
+            OMPL_INFORM("      while: looking for valid paths between start and goal");
 
         // Check if our planner is out of time
         if (ptc == true)
@@ -375,7 +366,7 @@ bool BoltRetrieveRepair::lazyCollisionSearch(const BoltDB::Vertex &start, const 
 
         if (verbose_)
         {
-            OMPL_INFORM("        has at least a partial solution, maybe exact solution");
+            OMPL_INFORM("        Has at least a partial solution, maybe exact solution");
             OMPL_INFORM("        Solution has %d vertices", vertexPath.size());
         }
 
@@ -384,7 +375,7 @@ bool BoltRetrieveRepair::lazyCollisionSearch(const BoltDB::Vertex &start, const 
         {
             if (verbose_)
             {
-                OMPL_INFORM("Lazy collision check returned valid ");
+                OMPL_INFORM("  Lazy collision check returned valid ");
             }
 
             // the path is valid, we are done!
@@ -454,7 +445,7 @@ bool BoltRetrieveRepair::lazyCollisionCheck(std::vector<BoltDB::Vertex> &vertexP
         fromVertex = toVertex;
     }
 
-    OMPL_INFORM("Done lazy collision checking");
+    OMPL_INFORM("  Done lazy collision checking");
 
     // Only return true if nothing was found invalid
     return !hasInvalidEdges;
@@ -462,6 +453,9 @@ bool BoltRetrieveRepair::lazyCollisionCheck(std::vector<BoltDB::Vertex> &vertexP
 
 bool BoltRetrieveRepair::findGraphNeighbors(const base::State *state, std::vector<BoltDB::Vertex> &graphNeighborhood)
 {
+    // Benchmark runtime
+    time::point startTime = time::now();
+
     // Reset
     graphNeighborhood.clear();
 
@@ -477,11 +471,13 @@ bool BoltRetrieveRepair::findGraphNeighbors(const base::State *state, std::vecto
     boltDB_->stateProperty_[boltDB_->queryVertex_] = NULL;
 
     // Check if no neighbors found
-    if (!graphNeighborhood.size())
-    {
-        return false;
-    }
-    return true;
+    bool result = graphNeighborhood.size();
+
+    // Benchmark runtime
+    double duration = time::seconds(time::now() - startTime);
+    OMPL_INFORM(" - findGraphNeighbors() took %f seconds (%f hz)", duration, 1.0/duration);
+
+    return result;
 }
 
 bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<BoltDB::Vertex> &vertexPath,

@@ -171,10 +171,17 @@ base::PlannerStatus Bolt::solve(const base::PlannerTerminationCondition &ptc)
     }
     else
     {
-        OMPL_INFORM("Bolt Solve: Possible solution found in %f seconds", planTime_);
+        OMPL_INFORM("-----------------------------------------------------------");
+        std::cout << "should be here " << std::endl;
+        OMPL_INFORM("-----------------------------------------------------------");
+        OMPL_DEBUG("debug-----------------------------------------------------------");
+        OMPL_INFORM("-----------------------------------------------------------");
+        OMPL_INFORM("Bolt Finished - solution found in ****%f seconds****", planTime_);
+        OMPL_INFORM("-----------------------------------------------------------");
 
         // Smooth the result
-        simplifySolution(ptc);
+        OMPL_INFORM("Disabled smoothing in Bolt.cpp");
+        //simplifySolution(ptc);
 
         og::PathGeometric solutionPath = og::SimpleSetup::getSolutionPath(); // copied so that it is non-const
         OMPL_INFORM("Solution path has %d states and was generated from planner %s", solutionPath.getStateCount(), getSolutionPlannerName().c_str());
@@ -201,8 +208,6 @@ base::PlannerStatus Bolt::solve(const base::PlannerTerminationCondition &ptc)
         }
         else
         {
-            OMPL_INFORM("Adding path frequency to database");
-
             // Queue the solution path for future insertion into experience database (post-processing)
             queuedSolutionPaths_.push_back(solutionPath);
         }
@@ -363,7 +368,7 @@ geometric::BoltDBPtr Bolt::getExperienceDB()
 
 bool Bolt::doPostProcessing()
 {
-    OMPL_WARN("Post processing does not work yet, perhaps unsolvable in current form");
+    //OMPL_WARN("Post processing does not work yet, perhaps unsolvable in current form");
     queuedSolutionPaths_.clear();
     return true;
 
