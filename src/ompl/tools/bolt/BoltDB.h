@@ -552,6 +552,9 @@ class BoltDB
     /** \brief Compute distance between two milestones (this is simply distance between the states of the milestones) */
     double distanceFunction(const Vertex a, const Vertex b) const;
 
+    /** \brief Compute distance between two milestones (this is simply distance between the states of the milestones) */
+    double distanceFunction2(const Vertex a, const Vertex b) const;
+
     /** \brief Clear all past edge state information about in collision or not */
     void clearEdgeCollisionStates();
 

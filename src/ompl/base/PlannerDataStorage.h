@@ -217,6 +217,8 @@ namespace ompl
                 std::vector<unsigned char> state (space->getSerializationLength());
                 for (unsigned int i = 0; i < pd.numVertices(); ++i)
                 {
+                    if (i % 100 == 0)
+                        OMPL_INFORM("Adding vertex %u", i);
                     PlannerDataVertexData vertexData;
 
                     // Serializing all data in the vertex (except the state)
@@ -255,6 +257,49 @@ namespace ompl
 
             /// \brief Serialize and store all edges in \e pd to the binary archive.
             virtual void storeEdges(const PlannerData &pd, boost::archive::binary_oarchive &oa)
+            {
+                std::vector<unsigned int> edgeList;
+                std::size_t debugFrequency = pd.numVertices() / 10;
+                for (unsigned int fromVertex = 0; fromVertex < pd.numVertices(); ++fromVertex)
+                {
+                    if (fromVertex % debugFrequency == 0)
+                        OMPL_INFORM("    %f percent edges saved", fromVertex / double(pd.numVertices()) * 100.0);
+
+                    edgeList.clear();
+
+                    // Get the edges
+                    pd.getEdges(fromVertex, edgeList);  // returns the id of each edge
+
+                    //Vertex v1 = idToVertex[fromVertex];
+
+                    // Process edges
+                    for (std::size_t edgeId = 0; edgeId < edgeList.size(); ++edgeId)
+                    {
+                        unsigned int toVertex = edgeList[edgeId];
+                        //Vertex v2 = idToVertex[toVertex];
+
+                        // Add the edge to the graph
+                        //OMPL_INFORM("    Adding edge from vertex id %d to id %d into edgeList", fromVertex, toVertex);
+                        //OMPL_INFORM("      Vertex %d to %d", v1, v2);
+
+                        // Get cost
+                        base::Cost weight;
+                        if (!pd.getEdgeWeight(fromVertex, toVertex, &weight))
+                            OMPL_ERROR("Unable to get edge weight");
+
+                        // Convert to new structure
+                        PlannerDataEdgeData edgeData;
+                        edgeData.e_ = &pd.getEdge(fromVertex, toVertex);
+                        edgeData.endpoints_.first = fromVertex;
+                        edgeData.endpoints_.second = toVertex;
+                        edgeData.weight_ = weight.value();
+                        oa << edgeData;
+
+                    } // for each edge
+                }  // for each vertex
+            }
+
+            virtual void storeEdgesSlow(const PlannerData &pd, boost::archive::binary_oarchive &oa)
             {
                 for (unsigned int i = 0; i < pd.numVertices(); ++i)
                     for (unsigned int j = 0; j < pd.numVertices(); ++j)
