@@ -273,12 +273,12 @@ bool BoltRetrieveRepair::getPathOnGraph(const std::vector<BoltDB::Vertex> &candi
         {
             if (verbose_)
             {
-                OMPL_WARN("FOUND CANDIDATE START THAT IS NOT VISIBLE ");
+                OMPL_WARN("FOUND START CANDIDATE THAT IS NOT VISIBLE ");
 
-                vizStateCallback(boltDB_->stateProperty_[start], 3, 1);
-                vizEdgeCallback(actualStart, boltDB_->stateProperty_[start], 100);
-                vizTriggerCallback();
-                usleep(1000000);
+                // vizStateCallback(boltDB_->stateProperty_[start], 3, 1);
+                // vizEdgeCallback(actualStart, boltDB_->stateProperty_[start], 100);
+                // vizTriggerCallback();
+                // usleep(1000000);
             }
             continue;  // this is actually not visible
         }
@@ -300,7 +300,15 @@ bool BoltRetrieveRepair::getPathOnGraph(const std::vector<BoltDB::Vertex> &candi
             if (!si_->checkMotion(actualGoal, boltDB_->stateProperty_[goal]))
             {
                 if (verbose_)
-                    OMPL_INFORM("FOUND CANDIDATE GOAL THAT IS NOT VISIBLE! ");
+                {
+                    OMPL_WARN("FOUND GOAL CANDIDATE THAT IS NOT VISIBLE! ");
+
+                    // vizStateCallback(boltDB_->stateProperty_[goal], 3, 1);
+                    // vizEdgeCallback(actualGoal, boltDB_->stateProperty_[goal], 100);
+                    // vizTriggerCallback();
+                    // usleep(1000000);
+                }
+
                 continue;  // this is actually not visible
             }
 
@@ -464,7 +472,7 @@ bool BoltRetrieveRepair::findGraphNeighbors(const base::State *state, std::vecto
     boltDB_->stateProperty_[boltDB_->queryVertex_] = stateCopy;
 
     // Search
-    static const double FIND_NEAREST_K_NEIGHBORS = 4;
+    static const double FIND_NEAREST_K_NEIGHBORS = 30;
     boltDB_->nn_->nearestK(boltDB_->queryVertex_, FIND_NEAREST_K_NEIGHBORS, graphNeighborhood);
 
     // Reset
@@ -558,6 +566,82 @@ bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<BoltDB::Vertex
     }
 
     return true;
+}
+
+bool BoltRetrieveRepair::canConnect(const base::State *randomState, const base::PlannerTerminationCondition &ptc)
+{
+    std::vector<BoltDB::Vertex> candidateNeighbors;
+
+    // Find neighbors to rand state
+    OMPL_INFORM("Looking for a node near the random state");
+    if (!findGraphNeighbors(randomState, candidateNeighbors))
+    {
+        OMPL_INFORM("No graph neighbors found for randomState");
+        return false;
+    }
+    OMPL_INFORM("  Found %d nodes near randomState", candidateNeighbors.size());
+
+    // Try every combination of nearby start and goal pairs
+    std::size_t count = 0;
+    BOOST_FOREACH (BoltDB::Vertex nearState, candidateNeighbors)
+    {
+        const base::State* s1 = randomState;
+        const base::State* s2 = boltDB_->stateProperty_[nearState];
+
+        // Check if this nearState is visible from the random state
+        if (!si_->checkMotion(s1, s2))
+        {
+            OMPL_WARN("NEIGHBOR %u NOT VISIBLE ", count++);
+
+            if (false)
+            {
+                vizStateCallback(s2, 2, 1); // BLUE
+                vizEdgeCallback(s1, s2, 100);
+                vizTriggerCallback();
+                usleep(1000000);
+            }
+
+            if (false)
+            {
+                std::cout << "checking path " << std::endl;
+                std::vector<base::State*> states;
+                unsigned int count = si_->getStateSpace()->validSegmentCount(s1, s2);
+                //std::cout << "count: " << count << std::endl;
+
+                bool endpoints = false;
+                bool alloc = true;
+                si_->getMotionStates(s1, s2, states, count, endpoints, alloc);
+                //std::cout << "state size: " << states.size() << std::endl;
+
+                BOOST_FOREACH (base::State *interState, states)
+                {
+                    // Check if our planner is out of time
+                    if (ptc == true)
+                    {
+                        OMPL_INFORM("Quit requested");
+                        return false;
+                    }
+
+                    if (!si_->isValid(interState))
+                    {
+                        vizStateCallback(interState, 3, 1); // RED
+                        vizTriggerCallback();
+                        usleep(2000000);
+                    }
+                    else
+                    {
+                        //vizStateCallback(interState, 1, 1); // GREEN
+                    }
+                }
+            }
+        }
+        else
+        {
+            OMPL_INFORM("Has connection");
+            return true;
+        }
+    }
+    return false;
 }
 
 }  // namespace geometric

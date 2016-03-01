@@ -171,13 +171,11 @@ base::PlannerStatus Bolt::solve(const base::PlannerTerminationCondition &ptc)
     }
     else
     {
-        OMPL_INFORM("-----------------------------------------------------------");
-        std::cout << "should be here " << std::endl;
-        OMPL_INFORM("-----------------------------------------------------------");
-        OMPL_DEBUG("debug-----------------------------------------------------------");
-        OMPL_INFORM("-----------------------------------------------------------");
-        OMPL_INFORM("Bolt Finished - solution found in ****%f seconds****", planTime_);
-        OMPL_INFORM("-----------------------------------------------------------");
+        std::cout << ANSI_COLOR_BLUE;
+        std::cout << "-----------------------------------------------------------" << std::endl;
+        std::cout << "Bolt Finished - solution found in " << planTime_ << " seconds" << std::endl;
+        std::cout << "-----------------------------------------------------------" << std::endl;
+        std::cout << ANSI_COLOR_RESET;
 
         // Smooth the result
         OMPL_INFORM("Disabled smoothing in Bolt.cpp");

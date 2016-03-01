@@ -297,6 +297,7 @@ bool ompl::base::RealVectorStateSpace::populateState(State *state, const std::ve
   }
   //memcpy((void *) &values[0], state->as<ModelBasedStateSpace::StateType>()->values,
   //values.size() * sizeof(double));
+  return true;
 }
 
 double* ompl::base::RealVectorStateSpace::getValueAddressAtIndex(State *state, const unsigned int index) const

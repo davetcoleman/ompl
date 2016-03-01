@@ -315,6 +315,13 @@ namespace ompl
                 metric if isMetricSpace() is true, and its return value will always be between 0 and getMaximumExtent() */
             virtual double distance(const State *state1, const State *state2) const = 0;
 
+            /** \brief Computes distance between two states. This function satisfies the properties of a
+                metric if isMetricSpace() is true, and its return value will always be between 0 and getMaximumExtent() */
+            virtual double distance2(const State *state1, const State *state2) const
+            {
+                return 0; // default implementation
+            }
+
             /** \brief Get the number of chars in the serialization of a state in this space */
             virtual unsigned int getSerializationLength() const;
 

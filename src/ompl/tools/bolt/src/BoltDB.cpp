@@ -73,13 +73,19 @@ double og::BoltDB::edgeWeightMap::get(Edge e) const
     if (collisionStates_[e] == IN_COLLISION)
         return std::numeric_limits<double>::infinity();
 
+    // Method 1
     double weight = boost::get(boost::edge_weight, g_, e);
+
+    // Method 2
     // if (popularityBias_)
     // {
     //     static const double popularity_bias = 10;
     //     weight = boost::get(boost::edge_weight, g_, e) / 100.0 * popularity_bias;
     // }
     // else
+
+    // Method 3
+    //double weight = boost::get(boost::edge_weight, g_, e) * weighted_astar;
 
     // std::cout << "getting weight of edge " << e << " with value " << weight << std::endl;
 
@@ -429,7 +435,7 @@ bool og::BoltDB::astarSearch(const Vertex start, const Vertex goal, std::vector<
         // Note: could not get astar_search to compile within BoltRetrieveRepair class because of namespacing issues
         boost::astar_search(g_,                                                          // graph
                             start,                                                       // start state
-                            boost::bind(&og::BoltDB::distanceFunction, this, _1, goal),  // the heuristic
+                            boost::bind(&og::BoltDB::distanceFunction2, this, _1, goal),  // the heuristic
                             // ability to disable edges (set cost to inifinity):
                             boost::weight_map(edgeWeightMap(g_, edgeCollisionStateProperty_))
                                 .predecessor_map(vertexPredecessors)
@@ -502,9 +508,18 @@ void og::BoltDB::debugState(const ompl::base::State *state)
 
 double og::BoltDB::distanceFunction(const Vertex a, const Vertex b) const
 {
-    // std::cout << "getting distance from " << a << " to " << b << " of value "
-    //<< si_->distance(stateProperty_[a], stateProperty_[b]) << std::endl;
+    // const double dist = si_->distance(stateProperty_[a], stateProperty_[b]);
+    // std::cout << "getting distance from " << a << " to " << b << " of value " << dist << std::endl;
+    // return dist;
     return si_->distance(stateProperty_[a], stateProperty_[b]);
+}
+
+double og::BoltDB::distanceFunction2(const Vertex a, const Vertex b) const
+{
+    // const double dist = si_->getStateSpace()->distance2(stateProperty_[a], stateProperty_[b]);
+    // std::cout << "getting distance from " << a << " to " << b << " of value " << dist << std::endl;
+    // return dist;
+    return si_->getStateSpace()->distance2(stateProperty_[a], stateProperty_[b]);
 }
 
 void og::BoltDB::initializeQueryState()
@@ -552,7 +567,7 @@ void og::BoltDB::getPlannerData(base::PlannerData &data) const
 void og::BoltDB::setPlannerData(const base::PlannerData &data)
 {
     // Check that the query vertex is initialized (used for internal nearest neighbor searches)
-    initializeQueryState();
+    //initializeQueryState();
 
     // Add all vertices
     OMPL_INFORM("  Loading %u vertices into BoltDB", data.numVertices());
@@ -562,10 +577,14 @@ void og::BoltDB::setPlannerData(const base::PlannerData &data)
     // Temp disable verbose mode for loading database
     bool wasVerbose = verbose_;
     verbose_ = false;
+    std::size_t debugFrequency = data.numVertices() / 10;
 
     // Add the nodes to the graph
     for (std::size_t vertexID = 0; vertexID < data.numVertices(); ++vertexID)
     {
+        if (vertexID % debugFrequency == 0)
+            OMPL_INFORM("    %f percent loaded", vertexID / double(data.numVertices()) * 100.0);
+
         // Get the state from loaded planner data
         const base::State *oldState = data.getVertex(vertexID).getState();
         base::State *state = si_->cloneState(oldState);
@@ -582,6 +601,9 @@ void og::BoltDB::setPlannerData(const base::PlannerData &data)
     std::vector<unsigned int> edgeList;
     for (unsigned int fromVertex = 0; fromVertex < data.numVertices(); ++fromVertex)
     {
+        if (fromVertex % debugFrequency == 0)
+            OMPL_INFORM("    %f percent loaded", fromVertex / double(data.numVertices()) * 100.0);
+
         edgeList.clear();
 
         // Get the edges
@@ -602,16 +624,19 @@ void og::BoltDB::setPlannerData(const base::PlannerData &data)
                 OMPL_INFORM("      Vertex %d to %d", v1, v2);
             }
 
-            base::Cost *weight = new base::Cost();
-            if (!data.getEdgeWeight(fromVertex, toVertex, weight))
+            base::Cost weight;
+            if (!data.getEdgeWeight(fromVertex, toVertex, &weight))
             {
                 OMPL_ERROR("Unable to get edge weight");
             }
 
-            addEdge(v1, v2, weight->value());
+            addEdge(v1, v2, weight.value());
         }
     }  // for
     OMPL_INFORM("  Finished loading %u edges", getNumEdges());
+
+    OMPL_WARN("temp save when load graph from file");
+    graphUnsaved_ = true;
 
     // Re-enable verbose mode, if necessary
     verbose_ = wasVerbose;
@@ -790,7 +815,7 @@ void og::BoltDB::generateEdges()
         double cost = 100;
         if (!popularityBias_)
         {
-            cost = distanceFunction(v1, v2);
+            cost = distanceFunction2(v1, v2);
         }
         edgeWeightProperty_[e] = cost;
         errorCheckCounter++;
@@ -1160,7 +1185,8 @@ og::BoltDB::Edge og::BoltDB::addEdge(const Vertex &v1, const Vertex &v2, const d
     // std::cout << "Adding cost: " << weight << std::endl;
 
     // Add associated properties to the edge
-    edgeWeightProperty_[e] = weight;  // distanceFunction(v1, v2);
+    //edgeWeightProperty_[e] = weight;
+    edgeWeightProperty_[e] = distanceFunction(v1, v2);
     edgeCollisionStateProperty_[e] = NOT_CHECKED;
 
     return e;

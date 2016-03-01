@@ -177,6 +177,9 @@ class BoltRetrieveRepair : public base::Planner
     /** \brief Check recalled path for collision and disable as needed */
     bool lazyCollisionCheck(std::vector<BoltDB::Vertex> &vertexPath, const base::PlannerTerminationCondition &ptc);
 
+    /** \brief Test if the passed in random state can connect to a nearby vertex in the graph */
+    bool canConnect(const base::State *randomState, const base::PlannerTerminationCondition &ptc);
+
   protected:
     /**
      * \brief Count the number of states along the discretized path that are in collision

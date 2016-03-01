@@ -158,7 +158,7 @@ void ompl::geometric::SimpleSetup::simplifySolution(const base::PlannerTerminati
             std::size_t numStates = path.getStateCount();
             psk_->simplify(path, ptc);
             simplifyTime_ = time::seconds(time::now() - start);
-            OMPL_INFORM("SimpleSetup: Path simplification took %f seconds and changed from %d to %d states",
+            OMPL_INFORM("SimpleSetup(ptc): Path simplification took %f seconds and changed from %d to %d states",
                         simplifyTime_, numStates, path.getStateCount());
             return;
         }
@@ -181,7 +181,7 @@ void ompl::geometric::SimpleSetup::simplifySolution(double duration)
             else
                 psk_->simplify(static_cast<PathGeometric&>(*p), duration);
             simplifyTime_ = time::seconds(time::now() - start);
-            OMPL_INFORM("SimpleSetup: Path simplification took %f seconds and changed from %d to %d states",
+            OMPL_INFORM("SimpleSetup(duration): Path simplification took %f seconds and changed from %d to %d states",
                         simplifyTime_, numStates, path.getStateCount());
             return;
         }
