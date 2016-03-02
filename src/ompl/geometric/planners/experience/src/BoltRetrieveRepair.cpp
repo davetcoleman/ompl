@@ -352,7 +352,7 @@ bool BoltRetrieveRepair::lazyCollisionSearch(const BoltDB::Vertex &start, const 
     while (true)
     {
         if (verbose_)
-            OMPL_INFORM("      while: looking for valid paths between start and goal");
+            OMPL_INFORM("AStar: looking for path through graph between start and goal");
 
         // Check if our planner is out of time
         if (ptc == true)

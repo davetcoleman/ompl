@@ -510,7 +510,7 @@ class BoltDB
      * \brief Set the sparse graph from file
      * \param a pre-built graph
      */
-    void setPlannerData(const base::PlannerData& data);
+    void loadFromPlannerData(const base::PlannerData& data);
 
     /**
      * \brief Discretize the space into a simple grid
