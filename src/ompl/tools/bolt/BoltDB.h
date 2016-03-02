@@ -636,6 +636,9 @@ class BoltDB
         popularityBias_ = enable;
     }
 
+    /** \brief Testing code */
+    void addCartPath();
+
   protected:
     /** \brief The created space information */
     base::SpaceInformationPtr si_;

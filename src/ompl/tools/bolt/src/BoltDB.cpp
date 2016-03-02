@@ -120,7 +120,7 @@ void og::BoltDB::CustomAstarVisitor::examine_vertex(Vertex v, const Graph &) con
     {
         parent_->vizStateCallback(parent_->stateProperty_[v], 5, 1);
         parent_->vizTriggerCallback();
-        // usleep(50000);
+        usleep(0.01 * 1000000);
     }
 
     if (v == goal_)
@@ -424,6 +424,7 @@ bool og::BoltDB::save(const std::string &fileName)
 
 bool og::BoltDB::astarSearch(const Vertex start, const Vertex goal, std::vector<Vertex> &vertexPath)
 {
+    // Hold a list of the shortest path parent to each vertex
     Vertex *vertexPredecessors = new Vertex[getNumVertices()];
     // boost::vector_property_map<Vertex> vertexPredecessors(getNumVertices());
 
@@ -433,7 +434,7 @@ bool og::BoltDB::astarSearch(const Vertex start, const Vertex goal, std::vector<
 
     try
     {
-        // Note: could not get astar_search to compile within BoltRetrieveRepair class because of namespacing issues
+        // Note: could not get astar_search to compile within BoltRetrieveRepair.cpp class because of namespacing issues
         boost::astar_search(g_,                                                          // graph
                             start,                                                       // start state
             //boost::bind(&og::BoltDB::distanceFunction2, this, _1, goal),  // the heuristic
@@ -484,7 +485,22 @@ bool og::BoltDB::astarSearch(const Vertex start, const Vertex goal, std::vector<
         }
     }
 
-    // delete[] vertexPredecessors;
+    // Show all predecessors
+    if (visualizeAstar_)
+    {
+        OMPL_INFORM("Show all predecessors");
+        for (std::size_t i = 1; i < getNumVertices(); ++i) // skip vertex 0 b/c that is the search vertex
+        {
+            const Vertex v1 = i;
+            const Vertex v2 = vertexPredecessors[v1];
+            //std::cout << "Edge " << v1 << " to " << v2 << std::endl;
+            vizEdgeCallback(stateProperty_[v1], stateProperty_[v2], 10);
+        }
+        viz2TriggerCallback();
+    }
+
+    // Unload
+    delete[] vertexPredecessors;
     delete[] vertexDistances;
 
     // No solution found from start to goal
@@ -1237,4 +1253,74 @@ og::BoltDB::Edge og::BoltDB::addEdge(const Vertex &v1, const Vertex &v2, const d
     edgeCollisionStateProperty_[e] = NOT_CHECKED;
 
     return e;
+}
+
+void og::BoltDB::addCartPath()
+{
+    // Make all other edges more costly
+    BOOST_FOREACH (const Edge e, boost::edges(g_))
+    {
+        edgeWeightProperty_[e] += 100;
+    }
+
+    // State 1 --------------------------------------
+    std::vector<double> values1;
+    values1.push_back(21.4);
+    values1.push_back(30);
+
+    // Fill a new state with values
+    base::State* newState1 = si_->getStateSpace()->allocState();
+    si_->getStateSpace()->populateState(newState1, values1);
+
+    // Get nearby state
+    stateProperty_[queryVertex_] = newState1;
+    Vertex nearVertex1 = nn_->nearest(queryVertex_);
+
+    // Add vertex
+    Vertex v1 = addVertex(newState1, START);
+
+    // Add edge
+    double cost1 = distanceFunction(nearVertex1, v1);
+    addEdge(nearVertex1, v1, cost1);
+
+    // Visualize state 1
+    vizStateCallback(newState1, 4, 5);
+    vizStateCallback(stateProperty_[nearVertex1], 2, 0);
+    vizEdgeCallback(stateProperty_[nearVertex1], newState1, 1);
+
+
+
+    // State 2 --------------------------------------
+    std::vector<double> values2;
+    values2.push_back(21.4);
+    values2.push_back(20);
+
+    // Fill a new state with values
+    base::State* newState2 = si_->getStateSpace()->allocState();
+    si_->getStateSpace()->populateState(newState2, values2);
+
+    // Get nearby state
+    stateProperty_[queryVertex_] = newState2;
+    Vertex nearVertex2 = nn_->nearest(queryVertex_);
+
+    // Add vertex
+    Vertex v2 = addVertex(newState2, START);
+
+    // Add edge
+    double cost2 = distanceFunction(nearVertex2, v2);
+    addEdge(nearVertex2, v2, cost2);
+
+    // Visualize state 2
+    vizStateCallback(newState2, 4, 5);
+    vizStateCallback(stateProperty_[nearVertex2], 2, 0);
+    vizEdgeCallback(stateProperty_[nearVertex2], newState2, 1);
+
+
+    // Combine two states ---------------------------------------
+    double cost = distanceFunction(v1, v2);
+    addEdge(v1, v2, cost);
+    vizEdgeCallback(newState1, newState2, 1);
+
+    // Display ---------------------------------------
+    vizTriggerCallback();
 }
