@@ -679,7 +679,7 @@ void og::BoltDB::generateGrid()
     std::vector<double> values(si_->getStateSpace()->getDimension(), 0);
 
     // Choose first state to discretize
-    next_disc_state_ =
+    nextDiscretizedState_ =
         si_->getStateSpace()->allocState();  // Note: it is currently possible the last state is never freed
 
     const std::size_t starting_joint_id = 0;
@@ -690,6 +690,12 @@ void og::BoltDB::generateGrid()
     {
         OMPL_INFORM("Truncated discretization depth to 5");
         desired_depth = 5;
+    }
+    else if (desired_depth == 3)
+    {
+        // This is for the 2D case where the third dimension is task
+        OMPL_INFORM("Truncated discretization depth to 2");
+        desired_depth = 2;
     }
 
     // Create vertices
@@ -719,10 +725,88 @@ void og::BoltDB::generateGrid()
     OMPL_INFORM("Average degree: %i", average_degree);
 
     // Display
-    viz2TriggerCallback();
+    if (visualizeGridGeneration_)
+        viz2TriggerCallback();
 
     // Mark the graph as ready to be saved
     graphUnsaved_ = true;
+
+    // Optionally add task space
+    if (si_->getStateSpace()->getDimension() == 3)
+        generateTaskSpace();
+}
+
+void og::BoltDB::generateTaskSpace()
+{
+    OMPL_INFORM("Generating task space");
+    std::vector<Vertex> vertexToNewVertex(getNumVertices());
+
+
+    OMPL_INFORM("Adding task space vertices");
+    BOOST_FOREACH (Vertex v, boost::vertices(g_))
+    {
+        if (!stateProperty_[v])
+        {
+            OMPL_INFORM("Null state at %u", v);
+            continue;
+        }
+
+        // Clone the state
+        base::State* newState = si_->cloneState(stateProperty_[v]);
+
+        const ob::RealVectorStateSpace::StateType* realState =
+            static_cast<const ob::RealVectorStateSpace::StateType*>(newState);
+        realState->values[2] = 2; // finished task
+
+        // Add the state back
+        Vertex vNew = addVertex(newState, START);
+
+        // Map old vertex to new vertex
+        vertexToNewVertex[v] = vNew;
+
+        // Visualize
+        if (visualizeGridGeneration_)
+        {
+            viz2StateCallback(newState, 5, 1);  // Candidate node has already (just) been added
+            viz2TriggerCallback();
+            usleep(0.005 * 1000000);
+        }
+    }
+
+    // Add Edges
+    OMPL_INFORM("Adding task space edges");
+
+    // Cache all current edges before adding new ones
+    std::vector<Edge> edges(getNumEdges());
+    std::size_t edgeID = 0;
+    BOOST_FOREACH (const Edge e, boost::edges(g_))
+    {
+        edges[edgeID++] = e;
+    }
+
+    for (std::size_t i = 0; i < edges.size(); ++i)
+    {
+        const Edge &e = edges[i];
+
+        const Vertex v1 = boost::source(e, g_);
+        const Vertex v2 = boost::target(e, g_);
+
+        std::cout << "v1: " << v1 << " v2: " << v2 << std::endl;
+        std::cout << "v1': " << vertexToNewVertex[v1] << " v2': " << vertexToNewVertex[v2] << std::endl;
+
+        Edge newE = addEdge(vertexToNewVertex[v1], vertexToNewVertex[v2], edgeWeightProperty_[e]);
+
+        // Visualize
+        viz2Edge(newE);
+        if (i % 100 == 0)
+        {
+            viz2TriggerCallback();
+            usleep(0.01 * 1000000);
+        }
+    }
+    viz2TriggerCallback();
+
+    OMPL_INFORM("Done generating task space graph");
 }
 
 void og::BoltDB::generateEdges()
@@ -762,12 +846,20 @@ void og::BoltDB::generateEdges()
         //time::point startTime = time::now();
 
         // in 2D this created the regular square with diagonals of 8 edges
-        // add one to the end because the NN tree always returns itself
-        const std::size_t numSameVerticiesFound = 1;
-        const std::size_t findNearestKNeighbors = si_->getStateSpace()->getDimension() * 4 + numSameVerticiesFound;
+
+        std::size_t findNearestKNeighbors;
+        if (si_->getStateSpace()->getDimension() == 3)
+        {
+            findNearestKNeighbors = 8;
+        }
+        else // full robot
+        {
+            findNearestKNeighbors = si_->getStateSpace()->getDimension() * 2;
+        }
         //OMPL_INFORM("Finding %u nearest neighbors for each vertex", findNearestKNeighbors);
 
-        nn_->nearestK(queryVertex_, findNearestKNeighbors, graphNeighborhood);
+        const std::size_t numSameVerticiesFound = 1; // add 1 to the end because the NN tree always returns itself
+        nn_->nearestK(queryVertex_, findNearestKNeighbors + numSameVerticiesFound, graphNeighborhood);
         stateProperty_[queryVertex_] = NULL;
         if (verbose)
             OMPL_INFORM("Found %u neighbors", graphNeighborhood.size());
@@ -776,8 +868,9 @@ void og::BoltDB::generateEdges()
         //double duration = time::seconds(time::now() - startTime) * 1000;
         //OMPL_INFORM("NN Total time: %f milliseconds (%f hz)", duration, 1.0 / duration);
 
-        if (visualizeGridGeneration_)
-            viz2StateCallback(stateProperty_[v1], 0, 1);
+        // Clear all visuals
+        // if (visualizeGridGeneration_)
+        //     viz2StateCallback(stateProperty_[v1], 0, 1);
 
         // For each nearby vertex, add an edge
         std::size_t errorCheckNumSameVerticies = 0;
@@ -826,7 +919,7 @@ void og::BoltDB::generateEdges()
         if (visualizeGridGeneration_)
         {
             viz2TriggerCallback();
-            usleep(0.1 * 1000000);
+            usleep(0.01 * 1000000);
         }
 
     }      // for each v1
@@ -991,6 +1084,7 @@ void og::BoltDB::checkEdgesThread(std::size_t startEdge, std::size_t endEdge, ba
         // Remove any edges that are in collision
         if (!si->checkMotion(stateProperty_[v1], stateProperty_[v2]))
         {
+            std::cout << "Removing edge " << e << std::endl;
             boost::remove_edge(v1, v2, g_);
         }
         else
@@ -1032,13 +1126,13 @@ void og::BoltDB::recursiveDiscretization(std::vector<double> &values, std::size_
         else  // this is the end of recursion, create a new state
         {
             // TODO(davetcoleman): way to not allocState if in collision?
-            next_disc_state_ = si_->getStateSpace()->allocState();
+            nextDiscretizedState_ = si_->getStateSpace()->allocState();
 
             // Fill the state with current values
-            si_->getStateSpace()->populateState(next_disc_state_, values);
+            si_->getStateSpace()->populateState(nextDiscretizedState_, values);
 
             // Collision check
-            if (!si_->isValid(next_disc_state_))
+            if (!si_->isValid(nextDiscretizedState_))
             {
                 // OMPL_ERROR("Found a state that is not valid! ");
                 continue;
@@ -1046,18 +1140,18 @@ void og::BoltDB::recursiveDiscretization(std::vector<double> &values, std::size_
 
             // Add vertex to graph
             GuardType type = START;  // TODO(davetcoleman): type START is dummy
-            addVertex(next_disc_state_, type);
+            addVertex(nextDiscretizedState_, type);
 
             // Visualize
             if (visualizeGridGeneration_)
             {
-                viz2StateCallback(next_disc_state_, 5, 1);  // Candidate node has already (just) been added
+                viz2StateCallback(nextDiscretizedState_, 5, 1);  // Candidate node has already (just) been added
                 viz2TriggerCallback();
                 usleep(0.005 * 1000000);
             }
 
             // Prepare for next new state by allocating now
-            // next_disc_state_ = si_->getStateSpace()->allocState();
+            // nextDiscretizedState_ = si_->getStateSpace()->allocState();
         }
     }
 }
@@ -1258,23 +1352,24 @@ og::BoltDB::Edge og::BoltDB::addEdge(const Vertex &v1, const Vertex &v2, const d
 void og::BoltDB::addCartPath()
 {
     // Make all other edges more costly
-    BOOST_FOREACH (const Edge e, boost::edges(g_))
-    {
-        edgeWeightProperty_[e] += 100;
-    }
+    // BOOST_FOREACH (const Edge e, boost::edges(g_))
+    // {
+    //     edgeWeightProperty_[e] += 100;
+    // }
 
     // State 1 --------------------------------------
     std::vector<double> values1;
     values1.push_back(21.4);
     values1.push_back(30);
+    values1.push_back(1);
 
     // Fill a new state with values
     base::State* newState1 = si_->getStateSpace()->allocState();
     si_->getStateSpace()->populateState(newState1, values1);
 
     // Get nearby state
-    stateProperty_[queryVertex_] = newState1;
-    Vertex nearVertex1 = nn_->nearest(queryVertex_);
+    std::size_t level0 = 0;
+    Vertex nearVertex1 = getNeighborAtLevel(values1, level0);
 
     // Add vertex
     Vertex v1 = addVertex(newState1, START);
@@ -1294,14 +1389,15 @@ void og::BoltDB::addCartPath()
     std::vector<double> values2;
     values2.push_back(21.4);
     values2.push_back(20);
+    values2.push_back(1);
 
     // Fill a new state with values
     base::State* newState2 = si_->getStateSpace()->allocState();
     si_->getStateSpace()->populateState(newState2, values2);
 
     // Get nearby state
-    stateProperty_[queryVertex_] = newState2;
-    Vertex nearVertex2 = nn_->nearest(queryVertex_);
+    std::size_t level2 = 2;
+    Vertex nearVertex2 = getNeighborAtLevel(values2, level2);
 
     // Add vertex
     Vertex v2 = addVertex(newState2, START);
@@ -1323,4 +1419,37 @@ void og::BoltDB::addCartPath()
 
     // Display ---------------------------------------
     vizTriggerCallback();
+
+    // TODO: free states
+}
+
+og::BoltDB::Vertex og::BoltDB::getNeighborAtLevel(std::vector<double> values, std::size_t level)
+{
+    // Set level to 0 or 2
+    values[2] = level;
+
+    // Fill a new state with values
+    base::State* newState = si_->getStateSpace()->allocState();
+    si_->getStateSpace()->populateState(newState, values);
+
+    // Get nearby state
+    stateProperty_[queryVertex_] = newState;
+    Vertex nearVertex = nn_->nearest(queryVertex_);
+    stateProperty_[queryVertex_] = NULL;
+
+    // TODO collision check and check multiple neighbors
+
+    // Cleanup
+    si_->getStateSpace()->freeState(newState);
+
+    return nearVertex;
+}
+
+void og::BoltDB::viz2Edge(Edge &e)
+{
+    const Vertex &v1 = boost::source(e, g_);
+    const Vertex &v2 = boost::target(e, g_);
+
+    // Visualize
+    viz2EdgeCallback(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
 }
