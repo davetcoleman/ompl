@@ -529,6 +529,9 @@ class BoltDB
     void checkVerticesThread(std::size_t startVertex, std::size_t endVertex, base::SpaceInformationPtr si,
         const std::vector<Vertex> &unvalidatedVertices);
 
+    /** \brief Testing functionality */
+    void generateTaskSpace();
+
     /**
      * \brief Connect vertices wherever possible
      */
@@ -636,8 +639,14 @@ class BoltDB
         popularityBias_ = enable;
     }
 
-    /** \brief Testing code */
+    /** \brief Testing code for integrating Decarte */
     void addCartPath();
+
+    /** \brief Get a nearby neighbor at a certain level */
+    Vertex getNeighborAtLevel(std::vector<double> values, std::size_t level);
+
+    /** \brief Shortcut for visualizing an edge */
+    void viz2Edge(Edge &e);
 
   protected:
     /** \brief The created space information */
@@ -693,7 +702,7 @@ class BoltDB
     ompl::base::VizTriggerCallback viz2TriggerCallback_;
 
     /** \brief Discretization helper */
-    base::State* next_disc_state_;
+    base::State* nextDiscretizedState_;
 
   public:
     /** \brief Various options for visualizing the algorithmns performance */
