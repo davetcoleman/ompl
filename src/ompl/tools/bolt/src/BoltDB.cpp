@@ -1349,14 +1349,110 @@ og::BoltDB::Edge og::BoltDB::addEdge(const Vertex &v1, const Vertex &v2, const d
     return e;
 }
 
+void og::BoltDB::addCartPath(base::State* cartPathStart, base::State* cartPathGoal)
+{
+    const std::size_t kNeighbors = 1; // TODO(davetcoleman): increase this num
+    std::vector<Vertex> neighbors;
+
+    // Add cartesian path to mid level graph --------------------
+    Vertex v1 = addVertex(cartPathStart, START);
+    Vertex v2 = addVertex(cartPathGoal, START);
+    double cost = distanceFunction(v1, v2);
+    addEdge(v1, v2, cost);
+    vizEdgeCallback(cartPathStart, cartPathGoal, 1);
+
+    // Connect Start to graph --------------------------------------
+
+    // Get nearby states to start
+    const std::size_t level0 = 0;
+    getNeighborsAtLevel(cartPathStart, level0, kNeighbors, neighbors);
+
+    // Loop through each neighbor
+    BOOST_FOREACH(Vertex v0, neighbors)
+    {
+        // Add edge from nearby graph vertex to cart path start
+        double startConnectorCost = distanceFunction(v0, v1);
+        addEdge(v0, v1, startConnectorCost);
+
+        // Visualize connection to start of cartesian path
+        vizEdgeCallback(stateProperty_[v0], cartPathStart, 1);
+    }
+
+    // Connect goal to graph --------------------------------------
+
+    // Get nearby states to goal
+    const std::size_t level2 = 2;
+    neighbors.clear();
+    getNeighborsAtLevel(cartPathGoal, level2, kNeighbors, neighbors);
+
+    // Loop through each neighbor
+    BOOST_FOREACH(Vertex v3, neighbors)
+    {
+        // Add edge from nearby graph vertex to cart path goal
+        double goalConnectorCost = distanceFunction(v2, v3);
+        addEdge(v2, v3, goalConnectorCost);
+
+        // Visualize connection to goal of cartesian path
+        vizEdgeCallback(stateProperty_[v3], cartPathGoal, 1);
+    }
+
+    // Display ---------------------------------------
+    vizTriggerCallback();
+}
+
+void og::BoltDB::getNeighborsAtLevel(const base::State* origState, const std::size_t level,
+    const std::size_t kNeighbors, std::vector<Vertex>& neighbors)
+{
+    const std::size_t TASK_DIMENSION = 2; // TODO(davetcoleman): do not hardcode which is the task's dimension
+    neighbors.clear();
+
+    // Clone the state and change its level
+    base::State* searchState = si_->cloneState(origState);
+
+    const ob::RealVectorStateSpace::StateType* realState =
+        static_cast<const ob::RealVectorStateSpace::StateType*>(searchState);
+    realState->values[TASK_DIMENSION] = level; // search within proper level
+
+    // Get nearby state
+    stateProperty_[queryVertex_] = searchState;
+    nn_->nearestK(queryVertex_, kNeighbors, neighbors);
+
+    // Cleanup
+    stateProperty_[queryVertex_] = NULL;
+    si_->getStateSpace()->freeState(searchState);
+
+    // Run various checks
+    for (std::size_t i = 0; i < neighbors.size(); ++i)
+    {
+        const Vertex& nearVertex = neighbors[i];
+        std::cout << "checking neighbor " << nearVertex << ",  i=" << i << std::endl;
+
+        // Make sure state is on correct level
+        const ob::RealVectorStateSpace::StateType* neighborRealState =
+            static_cast<const ob::RealVectorStateSpace::StateType*>(stateProperty_[nearVertex]);
+        if (neighborRealState->values[TASK_DIMENSION] != level)
+        {
+            std::cout << "ERASING neighbor " << nearVertex << ", i=" << i << " because wrong level" << std::endl;
+            neighbors.erase(neighbors.begin() + i);
+            i--;
+            continue;
+        }
+
+        // Collision check
+        if (!si_->checkMotion(origState, stateProperty_[nearVertex])) // is valid motion
+        {
+            std::cout << "ERASING neighbor " << nearVertex << ", i=" << i << " because invalid motion" << std::endl;
+            neighbors.erase(neighbors.begin() + i);
+            i--;
+            continue;
+        }
+
+        std::cout << "neighbor is a keeper! " << std::endl;
+    }
+}
+
 void og::BoltDB::addCartPath()
 {
-    // Make all other edges more costly
-    // BOOST_FOREACH (const Edge e, boost::edges(g_))
-    // {
-    //     edgeWeightProperty_[e] += 100;
-    // }
-
     // State 1 --------------------------------------
     std::vector<double> values1;
     values1.push_back(21.4);
