@@ -99,6 +99,7 @@ class BoltDB
         CONNECTIVITY,
         INTERFACE,
         QUALITY,
+        CARTESIAN
     };
 
     ////////////////////////////////////////////////////////////////////////////////////////
@@ -501,12 +502,6 @@ class BoltDB
     }
 
     /**
-     * \brief Get the sparse graph to save to file
-     * \param data - where to convert the data into
-     */
-    virtual void getPlannerData(base::PlannerData& data) const;
-
-    /**
      * \brief Set the sparse graph from file
      * \param a pre-built graph
      */
@@ -549,14 +544,26 @@ class BoltDB
     /** \brief Free all the memory allocated by the database */
     void freeMemory();
 
-    /** \brief Check that the query vertex is initialized (used for internal nearest neighbor searches) */
-    void initializeQueryState();
-
     /** \brief Compute distance between two milestones (this is simply distance between the states of the milestones) */
     double distanceFunction(const Vertex a, const Vertex b) const;
 
     /** \brief Compute distance between two milestones (this is simply distance between the states of the milestones) */
     double distanceFunction2(const Vertex a, const Vertex b) const;
+
+    /** \brief Compute the heuristic distance between the current node and the next goal */
+    double distanceFunctionTasks(const Vertex a, const Vertex b) const;
+
+    /** \brief Helper for getting the task level value from a state */
+    std::size_t getTaskLevel(const Vertex& v) const;
+
+    /** \brief Check that the query vertex is initialized (used for internal nearest neighbor searches) */
+    void initializeQueryState();
+
+    /**
+     * \brief Get the sparse graph to save to file
+     * \param data - where to convert the data into
+     */
+    virtual void getPlannerData(base::PlannerData& data) const;
 
     /** \brief Clear all past edge state information about in collision or not */
     void clearEdgeCollisionStates();
@@ -639,18 +646,15 @@ class BoltDB
         popularityBias_ = enable;
     }
 
+    /** \brief Remove parts of graph that were intended to be temporary */
+    void cleanupTemporaryVerticies();
+
     /** \brief Testing code for integrating Decartes */
     void addCartPath(base::State* cartPathStart, base::State* cartPathGoal);
 
     /** \brief Get k number of neighbors near a state at a certain level that have valid motions */
     void getNeighborsAtLevel(const base::State* origState, const std::size_t level, const std::size_t kNeighbors,
         std::vector<Vertex>& neighbors);
-
-    /** \brief Testing code for integrating Decartes */
-    void addCartPath();
-
-    /** \brief Get a nearby neighbor at a certain level */
-    Vertex getNeighborAtLevel(std::vector<double> values, std::size_t level);
 
     /** \brief Shortcut for visualizing an edge */
     void viz2Edge(Edge &e);
@@ -711,6 +715,13 @@ class BoltDB
     /** \brief Discretization helper */
     base::State* nextDiscretizedState_;
 
+    /** \brief Track vertex for later removal if temporary */
+    std::vector<Vertex> tempVerticies_;
+    bool hasCartesianDistances_;
+    Vertex startConnectorVertex_;
+    Vertex endConnectorVertex_;
+    double distanceAcrossCartesian_;
+
   public:
     /** \brief Various options for visualizing the algorithmns performance */
     bool visualizeAstar_;
@@ -718,6 +729,9 @@ class BoltDB
 
     /** \brief Distance between grid points (discretization level) */
     double sparseDelta_;
+
+    /** \brief Visualization speed of astar search, num of seconds to show each vertex */
+    double visualizeAstarSpeed_;
 
 };  // end of class BoltDB
 
