@@ -639,7 +639,14 @@ class BoltDB
         popularityBias_ = enable;
     }
 
-    /** \brief Testing code for integrating Decarte */
+    /** \brief Testing code for integrating Decartes */
+    void addCartPath(base::State* cartPathStart, base::State* cartPathGoal);
+
+    /** \brief Get k number of neighbors near a state at a certain level that have valid motions */
+    void getNeighborsAtLevel(const base::State* origState, const std::size_t level, const std::size_t kNeighbors,
+        std::vector<Vertex>& neighbors);
+
+    /** \brief Testing code for integrating Decartes */
     void addCartPath();
 
     /** \brief Get a nearby neighbor at a certain level */
