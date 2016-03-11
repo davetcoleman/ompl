@@ -77,7 +77,7 @@ double og::BoltDB::edgeWeightMap::get(Edge e) const
         return std::numeric_limits<double>::infinity();
 
     // Method 1
-    //double weight = boost::get(boost::edge_weight, g_, e);
+    // double weight = boost::get(boost::edge_weight, g_, e);
 
     // Method 2
     // if (popularityBias_)
@@ -443,11 +443,11 @@ bool og::BoltDB::astarSearch(const Vertex start, const Vertex goal, std::vector<
     try
     {
         // Note: could not get astar_search to compile within BoltRetrieveRepair.cpp class because of namespacing issues
-        boost::astar_search(g_,                                                          // graph
-                            start,                                                       // start state
-            //boost::bind(&og::BoltDB::distanceFunction2, this, _1, goal),  // the heuristic
-            //boost::bind(&og::BoltDB::distanceFunction, this, _1, goal),  // the heuristic
-            boost::bind(&og::BoltDB::distanceFunctionTasks, this, _1, goal),  // the heuristic
+        boost::astar_search(g_,     // graph
+                            start,  // start state
+                            // boost::bind(&og::BoltDB::distanceFunction2, this, _1, goal),  // the heuristic
+                            // boost::bind(&og::BoltDB::distanceFunction, this, _1, goal),  // the heuristic
+                            boost::bind(&og::BoltDB::distanceFunctionTasks, this, _1, goal),  // the heuristic
                             // ability to disable edges (set cost to inifinity):
                             boost::weight_map(edgeWeightMap(g_, edgeCollisionStateProperty_))
                                 .predecessor_map(vertexPredecessors)
@@ -497,11 +497,11 @@ bool og::BoltDB::astarSearch(const Vertex start, const Vertex goal, std::vector<
     if (visualizeAstar_)
     {
         OMPL_INFORM("        Show all predecessors");
-        for (std::size_t i = 1; i < getNumVertices(); ++i) // skip vertex 0 b/c that is the search vertex
+        for (std::size_t i = 1; i < getNumVertices(); ++i)  // skip vertex 0 b/c that is the search vertex
         {
             const Vertex v1 = i;
             const Vertex v2 = vertexPredecessors[v1];
-            //std::cout << "Edge " << v1 << " to " << v2 << std::endl;
+            // std::cout << "Edge " << v1 << " to " << v2 << std::endl;
             vizEdgeCallback(stateProperty_[v1], stateProperty_[v2], 10);
         }
         viz2TriggerCallback();
@@ -558,34 +558,35 @@ double og::BoltDB::distanceFunctionTasks(const Vertex a, const Vertex b) const
     std::size_t taskLevel = getTaskLevel(a);
     switch (taskLevel)
     {
-        case 0: // our goal is the bottom of the first connector
-            dist = si_->distance(stateProperty_[a], stateProperty_[startConnectorVertex_])
-                + distanceAcrossCartesian_
-                + si_->distance(stateProperty_[endConnectorVertex_], stateProperty_[b]);
+        case 0:  // our goal is the bottom of the first connector
+            assert(getTaskLevel(startConnectorVertex_) == 0);
+            assert(getTaskLevel(endConnectorVertex_) == 2);
 
-            std::cout << "startConnectorVertex_ vertex level: " << getTaskLevel(startConnectorVertex_) << std::endl;
-            std::cout << "endConnectorVertex_ vertex level: " << getTaskLevel(endConnectorVertex_) << std::endl;
+            dist = si_->distance(stateProperty_[a], stateProperty_[startConnectorVertex_]) + distanceAcrossCartesian_ +
+                   si_->distance(stateProperty_[endConnectorVertex_], stateProperty_[b]);
             break;
-        case 1: // our goal is the top of the second connector
-            dist = si_->distance(stateProperty_[a], stateProperty_[endConnectorVertex_])
-                 + si_->distance(stateProperty_[endConnectorVertex_], stateProperty_[b]);
+        case 1:  // our goal is the top of the second connector
+            assert(getTaskLevel(endConnectorVertex_) == 2);
+
+            dist = si_->distance(stateProperty_[a], stateProperty_[endConnectorVertex_]) +
+                   si_->distance(stateProperty_[endConnectorVertex_], stateProperty_[b]);
             break;
-        case 2: // our goal is the original goal
+        case 2:  // our goal is the original goal
             dist = si_->distance(stateProperty_[a], stateProperty_[b]);
             break;
         default:
             OMPL_ERROR("Unknown option in case statement");
     }
 
-    std::cout << "Level " << taskLevel << " has distance " << dist << std::endl;
+    // std::cout << "Level " << taskLevel << " has distance " << dist << std::endl;
     return dist;
 }
 
-std::size_t og::BoltDB::getTaskLevel(const Vertex& v) const
+std::size_t og::BoltDB::getTaskLevel(const Vertex &v) const
 {
     static const std::size_t TASK_LEVEL = 2;
-    const ob::RealVectorStateSpace::StateType* realState =
-        static_cast<const ob::RealVectorStateSpace::StateType*>(stateProperty_[v]);
+    const ob::RealVectorStateSpace::StateType *realState =
+        static_cast<const ob::RealVectorStateSpace::StateType *>(stateProperty_[v]);
     return static_cast<int>(realState->values[TASK_LEVEL]);
 }
 
@@ -702,8 +703,8 @@ void og::BoltDB::loadFromPlannerData(const base::PlannerData &data)
     }  // for
     OMPL_INFORM("  Finished loading %u edges", getNumEdges());
 
-    //OMPL_WARN("temp save when load graph from file");
-    //graphUnsaved_ = true;
+    // OMPL_WARN("temp save when load graph from file");
+    // graphUnsaved_ = true;
 
     // Re-enable verbose mode, if necessary
     verbose_ = wasVerbose;
@@ -754,11 +755,10 @@ void og::BoltDB::generateGrid()
     recursiveDiscretization(values, starting_joint_id, desired_depth);
     OMPL_INFORM("Generated %i vertices.", getNumVertices());
 
-
     // Remove vertices in collision using multithreading
     // TODO enable
-    //std::vector<Vertex> unvalidatedVertices;
-    //checkVerticesThreaded(unvalidatedVertices);
+    // std::vector<Vertex> unvalidatedVertices;
+    // checkVerticesThreaded(unvalidatedVertices);
 
     {
         // Benchmark runtime
@@ -793,7 +793,6 @@ void og::BoltDB::generateTaskSpace()
     OMPL_INFORM("Generating task space");
     std::vector<Vertex> vertexToNewVertex(getNumVertices());
 
-
     OMPL_INFORM("Adding task space vertices");
     BOOST_FOREACH (Vertex v, boost::vertices(g_))
     {
@@ -804,18 +803,11 @@ void og::BoltDB::generateTaskSpace()
         }
 
         // Clone the state
-        base::State* newState = si_->cloneState(stateProperty_[v]);
-        //base::State* newState = si_->allocState();
+        base::State *newState = si_->cloneState(stateProperty_[v]);
 
-        //const ob::RealVectorStateSpace::StateType* realState1 =
-        //static_cast<const ob::RealVectorStateSpace::StateType*>(stateProperty_[v]);
-        const ob::RealVectorStateSpace::StateType* realState2 =
-            static_cast<const ob::RealVectorStateSpace::StateType*>(newState);
-
-        // Copy state
-        //realState2->values[0] = realState1->values[0];
-        //realState2->values[1] = realState1->values[1];
-        realState2->values[2] = 2; // finished task
+        const ob::RealVectorStateSpace::StateType *realState2 =
+            static_cast<const ob::RealVectorStateSpace::StateType *>(newState);
+        realState2->values[2] = 2;  // finished task
 
         // Add the state back
         Vertex vNew = addVertex(newState, START);
@@ -851,8 +843,8 @@ void og::BoltDB::generateTaskSpace()
         const Vertex v1 = boost::source(e, g_);
         const Vertex v2 = boost::target(e, g_);
 
-        //std::cout << "v1: " << v1 << " v2: " << v2 << std::endl;
-        //std::cout << "v1': " << vertexToNewVertex[v1] << " v2': " << vertexToNewVertex[v2] << std::endl;
+        // std::cout << "v1: " << v1 << " v2: " << v2 << std::endl;
+        // std::cout << "v1': " << vertexToNewVertex[v1] << " v2': " << vertexToNewVertex[v2] << std::endl;
 
         Edge newE = addEdge(vertexToNewVertex[v1], vertexToNewVertex[v2], edgeWeightProperty_[e]);
 
@@ -903,7 +895,7 @@ void og::BoltDB::generateEdges()
 
         //{
         // Benchmark runtime
-        //time::point startTime = time::now();
+        // time::point startTime = time::now();
 
         // in 2D this created the regular square with diagonals of 8 edges
 
@@ -912,21 +904,21 @@ void og::BoltDB::generateEdges()
         {
             findNearestKNeighbors = 8;
         }
-        else // full robot
+        else  // full robot
         {
             findNearestKNeighbors = si_->getStateSpace()->getDimension() * 2;
         }
-        //OMPL_INFORM("Finding %u nearest neighbors for each vertex", findNearestKNeighbors);
+        // OMPL_INFORM("Finding %u nearest neighbors for each vertex", findNearestKNeighbors);
 
-        const std::size_t numSameVerticiesFound = 1; // add 1 to the end because the NN tree always returns itself
+        const std::size_t numSameVerticiesFound = 1;  // add 1 to the end because the NN tree always returns itself
         nn_->nearestK(queryVertex_, findNearestKNeighbors + numSameVerticiesFound, graphNeighborhood);
         stateProperty_[queryVertex_] = NULL;
         if (verbose)
             OMPL_INFORM("Found %u neighbors", graphNeighborhood.size());
 
         // Benchmark runtime
-        //double duration = time::seconds(time::now() - startTime) * 1000;
-        //OMPL_INFORM("NN Total time: %f milliseconds (%f hz)", duration, 1.0 / duration);
+        // double duration = time::seconds(time::now() - startTime) * 1000;
+        // OMPL_INFORM("NN Total time: %f milliseconds (%f hz)", duration, 1.0 / duration);
 
         // Clear all visuals
         // if (visualizeGridGeneration_)
@@ -982,7 +974,7 @@ void og::BoltDB::generateEdges()
             usleep(0.01 * 1000000);
         }
 
-    }      // for each v1
+    }  // for each v1
 
     OMPL_INFORM("Generated %i edges. Finished generating grid.", getNumEdges());
 
@@ -1020,7 +1012,7 @@ void og::BoltDB::generateEdges()
         }
         else
         {
-            //cost = distanceFunction2(v1, v2);
+            // cost = distanceFunction2(v1, v2);
             cost = distanceFunction(v1, v2);
         }
         edgeWeightProperty_[e] = cost;
@@ -1038,7 +1030,6 @@ void og::BoltDB::generateEdges()
         }
     }
     assert(errorCheckCounter == numEdgesAfterCheck);
-
 }
 
 void og::BoltDB::checkEdges()
@@ -1075,7 +1066,7 @@ void og::BoltDB::checkEdgesThreaded(const std::vector<Edge> &unvalidatedEdges)
     OMPL_INFORM("Collision checking %u generated edges using %u threads", unvalidatedEdges.size(), numThreads);
 
     std::vector<boost::thread *> threads(numThreads);
-    std::size_t numEdges = getNumEdges(); // we copy this number, because it might start shrinking when threads spin up
+    std::size_t numEdges = getNumEdges();  // we copy this number, because it might start shrinking when threads spin up
     std::size_t edgesPerThread = numEdges / numThreads;  // rounds down
     std::size_t startEdge = 0;
     std::size_t endEdge;
@@ -1153,8 +1144,7 @@ void og::BoltDB::checkEdgesThread(std::size_t startEdge, std::size_t endEdge, ba
     }
 }
 
-void og::BoltDB::recursiveDiscretization(std::vector<double> &values, std::size_t joint_id,
-                                         std::size_t desired_depth)
+void og::BoltDB::recursiveDiscretization(std::vector<double> &values, std::size_t joint_id, std::size_t desired_depth)
 {
     ob::RealVectorBounds bounds = si_->getStateSpace()->getBounds();
 
@@ -1173,7 +1163,8 @@ void og::BoltDB::recursiveDiscretization(std::vector<double> &values, std::size_
         {
             const double percent =
                 (value - bounds.low[joint_id]) / (bounds.high[joint_id] - bounds.low[joint_id]) * 100.0;
-            std::cout << "Vertex generation progress: " << percent << " % Total vertices: " << getNumVertices() << std::endl;
+            std::cout << "Vertex generation progress: " << percent << " % Total vertices: " << getNumVertices()
+                      << std::endl;
         }
 
         // Check if we are at the end of the recursion
@@ -1248,7 +1239,7 @@ void og::BoltDB::checkVerticesThreaded(const std::vector<Vertex> &unvalidatedVer
 
         base::SpaceInformationPtr si(new base::SpaceInformation(si_->getStateSpace()));
         si->setStateValidityChecker(si_->getStateValidityChecker());
-        //si->setMotionValidator(si_->getMotionValidator());
+        // si->setMotionValidator(si_->getMotionValidator());
 
         threads[i] = new boost::thread(
             boost::bind(&og::BoltDB::checkVerticesThread, this, startVertex, endVertex, si, unvalidatedVertices));
@@ -1401,8 +1392,8 @@ og::BoltDB::Edge og::BoltDB::addEdge(const Vertex &v1, const Vertex &v2, const d
 
     // Add associated properties to the edge
     edgeWeightProperty_[e] = weight;
-    //edgeWeightProperty_[e] = distanceFunction2(v1, v2);
-    //edgeWeightProperty_[e] = distanceFunction(v1, v2);
+    // edgeWeightProperty_[e] = distanceFunction2(v1, v2);
+    // edgeWeightProperty_[e] = distanceFunction(v1, v2);
     edgeCollisionStateProperty_[e] = NOT_CHECKED;
 
     return e;
@@ -1410,6 +1401,8 @@ og::BoltDB::Edge og::BoltDB::addEdge(const Vertex &v1, const Vertex &v2, const d
 
 void og::BoltDB::cleanupTemporaryVerticies()
 {
+    const bool verbose = false;
+
     if (tempVerticies_.empty())
     {
         OMPL_INFORM("Skipping verticies cleanup - no temp vertices found");
@@ -1417,21 +1410,34 @@ void og::BoltDB::cleanupTemporaryVerticies()
     }
 
     OMPL_INFORM("Cleaning up temp verticies - vertex count: %u, edge count: %u", getNumVertices(), getNumEdges());
-    BOOST_FOREACH(Vertex v, tempVerticies_)
+    BOOST_REVERSE_FOREACH(Vertex v, tempVerticies_)
     {
-        std::cout << "trying vertex " << v << std::endl;
+        if (verbose)
+            std::cout << "removing vertex " << v << std::endl;
+        if (verbose)
+            std::cout << "remove from nearest neighbor " << std::endl;
+        nn_->remove(v);
+        if (verbose)
+            std::cout << "free state " << std::endl;
         si_->freeState(stateProperty_[v]);
+        if (verbose)
+            std::cout << "setting to null " << std::endl;
         stateProperty_[v] = NULL;
+        if (verbose)
+            std::cout << "clear vertex" << std::endl;
         // Remove all edges to and from vertex
         boost::clear_vertex(v, g_);
+        if (verbose)
+            std::cout << "remove vertex " << std::endl;
         // Remove vertex
         boost::remove_vertex(v, g_);
-        OMPL_INFORM("Removed, updated - vertex count: %u, edge count: %u", getNumVertices(), getNumEdges());
+        OMPL_DEBUG("Removed, updated - vertex count: %u, edge count: %u", getNumVertices(), getNumEdges());
     }
+    tempVerticies_.clear();
     OMPL_INFORM("Finished cleaning up temp verticies");
 }
 
-void og::BoltDB::addCartPath(base::State* cartPathStart, base::State* cartPathGoal)
+void og::BoltDB::addCartPath(base::State *cartPathStart, base::State *cartPathGoal)
 {
     // TODO: check for validity
 
@@ -1439,8 +1445,8 @@ void og::BoltDB::addCartPath(base::State* cartPathStart, base::State* cartPathGo
     std::vector<Vertex> neighbors;
 
     // Clone both the states
-    base::State* startState = si_->cloneState(cartPathStart);
-    base::State* goalState = si_->cloneState(cartPathGoal);
+    base::State *startState = si_->cloneState(cartPathStart);
+    base::State *goalState = si_->cloneState(cartPathGoal);
 
     // Add cartesian path to mid level graph --------------------
     Vertex v1 = addVertex(startState, CARTESIAN);
@@ -1462,7 +1468,7 @@ void og::BoltDB::addCartPath(base::State* cartPathStart, base::State* cartPathGo
 
     // Loop through each neighbor
     double minStartConnectorCost = std::numeric_limits<double>::infinity();
-    BOOST_FOREACH(Vertex v0, neighbors)
+    BOOST_FOREACH (Vertex v0, neighbors)
     {
         // Add edge from nearby graph vertex to cart path start
         double startConnectorCost = distanceFunction(v0, v1);
@@ -1482,7 +1488,7 @@ void og::BoltDB::addCartPath(base::State* cartPathStart, base::State* cartPathGo
 
     // Record meta data for smart distance function later
     if (!hasCartesianDistances_)
-        distanceAcrossCartesian_ += 1.0; //minStartConnectorCost;
+        distanceAcrossCartesian_ += 1.0;  // minStartConnectorCost;
 
     // Connect goal to graph --------------------------------------
 
@@ -1494,7 +1500,7 @@ void og::BoltDB::addCartPath(base::State* cartPathStart, base::State* cartPathGo
 
     // Loop through each neighbor
     double minGoalConnectorCost = std::numeric_limits<double>::infinity();
-    BOOST_FOREACH(Vertex v3, neighbors)
+    BOOST_FOREACH (Vertex v3, neighbors)
     {
         // Add edge from nearby graph vertex to cart path goal
         double goalConnectorCost = distanceFunction(v2, v3);
@@ -1515,26 +1521,26 @@ void og::BoltDB::addCartPath(base::State* cartPathStart, base::State* cartPathGo
     // Record meta data for smart distance function later
     if (!hasCartesianDistances_)
     {
-        distanceAcrossCartesian_ += 1.0; //minGoalConnectorCost;
-        hasCartesianDistances_ = true; // this prevents future cart paths from overwritting current data
-   }
+        distanceAcrossCartesian_ += 1.0;  // minGoalConnectorCost;
+        hasCartesianDistances_ = true;  // this prevents future cart paths from overwritting current data
+    }
 
     // Display ---------------------------------------
     vizTriggerCallback();
 }
 
-void og::BoltDB::getNeighborsAtLevel(const base::State* origState, const std::size_t level,
-    const std::size_t kNeighbors, std::vector<Vertex>& neighbors)
+void og::BoltDB::getNeighborsAtLevel(const base::State *origState, const std::size_t level,
+                                     const std::size_t kNeighbors, std::vector<Vertex> &neighbors)
 {
-    const std::size_t TASK_DIMENSION = 2; // TODO(davetcoleman): do not hardcode which is the task's dimension
+    const std::size_t TASK_DIMENSION = 2;  // TODO(davetcoleman): do not hardcode which is the task's dimension
     neighbors.clear();
 
     // Clone the state and change its level
-    base::State* searchState = si_->cloneState(origState);
+    base::State *searchState = si_->cloneState(origState);
 
-    const ob::RealVectorStateSpace::StateType* realState =
-        static_cast<const ob::RealVectorStateSpace::StateType*>(searchState);
-    realState->values[TASK_DIMENSION] = level; // search within proper level
+    const ob::RealVectorStateSpace::StateType *realState =
+        static_cast<const ob::RealVectorStateSpace::StateType *>(searchState);
+    realState->values[TASK_DIMENSION] = level;  // search within proper level
 
     // Get nearby state
     stateProperty_[queryVertex_] = searchState;
@@ -1549,23 +1555,25 @@ void og::BoltDB::getNeighborsAtLevel(const base::State* origState, const std::si
     // Run various checks
     for (std::size_t i = 0; i < neighbors.size(); ++i)
     {
-        const Vertex& nearVertex = neighbors[i];
+        const Vertex &nearVertex = neighbors[i];
 
         // Make sure state is on correct level
-        const ob::RealVectorStateSpace::StateType* neighborRealState =
-            static_cast<const ob::RealVectorStateSpace::StateType*>(stateProperty_[nearVertex]);
+        const ob::RealVectorStateSpace::StateType *neighborRealState =
+            static_cast<const ob::RealVectorStateSpace::StateType *>(stateProperty_[nearVertex]);
         if (neighborRealState->values[TASK_DIMENSION] != level)
         {
-            std::cout << "      ERASING neighbor " << nearVertex << ", i=" << i << " because wrong level: " << neighborRealState->values[TASK_DIMENSION] << std::endl;
+            std::cout << "      ERASING neighbor " << nearVertex << ", i=" << i
+                      << " because wrong level: " << neighborRealState->values[TASK_DIMENSION] << std::endl;
             neighbors.erase(neighbors.begin() + i);
             i--;
             continue;
         }
 
         // Collision check
-        if (!si_->checkMotion(origState, stateProperty_[nearVertex])) // is valid motion
+        if (!si_->checkMotion(origState, stateProperty_[nearVertex]))  // is valid motion
         {
-            std::cout << "      ERASING neighbor " << nearVertex << ", i=" << i << " because invalid motion" << std::endl;
+            std::cout << "      ERASING neighbor " << nearVertex << ", i=" << i << " because invalid motion"
+                      << std::endl;
             neighbors.erase(neighbors.begin() + i);
             i--;
             continue;
