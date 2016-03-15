@@ -446,8 +446,8 @@ bool og::BoltDB::astarSearch(const Vertex start, const Vertex goal, std::vector<
         boost::astar_search(g_,     // graph
                             start,  // start state
                             // boost::bind(&og::BoltDB::distanceFunction2, this, _1, goal),  // the heuristic
-                            // boost::bind(&og::BoltDB::distanceFunction, this, _1, goal),  // the heuristic
-                            boost::bind(&og::BoltDB::distanceFunctionTasks, this, _1, goal),  // the heuristic
+                             boost::bind(&og::BoltDB::distanceFunction, this, _1, goal),  // the heuristic
+            //boost::bind(&og::BoltDB::distanceFunctionTasks, this, _1, goal),  // the heuristic
                             // ability to disable edges (set cost to inifinity):
                             boost::weight_map(edgeWeightMap(g_, edgeCollisionStateProperty_))
                                 .predecessor_map(vertexPredecessors)
