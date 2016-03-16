@@ -77,7 +77,7 @@ double og::BoltDB::edgeWeightMap::get(Edge e) const
         return std::numeric_limits<double>::infinity();
 
     // Method 1
-    // double weight = boost::get(boost::edge_weight, g_, e);
+    const double weight = boost::get(boost::edge_weight, g_, e);
 
     // Method 2
     // if (popularityBias_)
@@ -85,11 +85,10 @@ double og::BoltDB::edgeWeightMap::get(Edge e) const
     //     static const double popularity_bias = 10;
     //     weight = boost::get(boost::edge_weight, g_, e) / 100.0 * popularity_bias;
     // }
-    // else
 
     // Method 3 - less optimal but faster planning time
-    const double weighted_astar = 0.8;
-    double weight = boost::get(boost::edge_weight, g_, e) * weighted_astar;
+    //const double weighted_astar = 0.8;
+    //const double weight = boost::get(boost::edge_weight, g_, e) * weighted_astar;
 
     // std::cout << "getting weight of edge " << e << " with value " << weight << std::endl;
 
@@ -738,8 +737,8 @@ void og::BoltDB::generateGrid()
     // TODO: This is a custom dimensionality reduction hack, that maybe should not be in this location
     if (desired_depth > 5)
     {
-        OMPL_INFORM("Truncated discretization depth to 5");
-        desired_depth = 5;
+        //OMPL_INFORM("Truncated discretization depth to 5");
+        desired_depth = 6;
     }
     else if (desired_depth == 3)
     {
