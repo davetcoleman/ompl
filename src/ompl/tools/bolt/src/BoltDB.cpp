@@ -87,8 +87,8 @@ double og::BoltDB::edgeWeightMap::get(Edge e) const
     // }
 
     // Method 3 - less optimal but faster planning time
-    //const double weighted_astar = 0.8;
-    //const double weight = boost::get(boost::edge_weight, g_, e) * weighted_astar;
+    // const double weighted_astar = 0.8;
+    // const double weight = boost::get(boost::edge_weight, g_, e) * weighted_astar;
 
     // std::cout << "getting weight of edge " << e << " with value " << weight << std::endl;
 
@@ -444,9 +444,9 @@ bool og::BoltDB::astarSearch(const Vertex start, const Vertex goal, std::vector<
         // Note: could not get astar_search to compile within BoltRetrieveRepair.cpp class because of namespacing issues
         boost::astar_search(g_,     // graph
                             start,  // start state
-                            // boost::bind(&og::BoltDB::distanceFunction2, this, _1, goal),  // the heuristic
-                             boost::bind(&og::BoltDB::distanceFunction, this, _1, goal),  // the heuristic
-            //boost::bind(&og::BoltDB::distanceFunctionTasks, this, _1, goal),  // the heuristic
+                                    // boost::bind(&og::BoltDB::distanceFunction2, this, _1, goal),  // the heuristic
+                            boost::bind(&og::BoltDB::distanceFunction, this, _1, goal),  // the heuristic
+                            // boost::bind(&og::BoltDB::distanceFunctionTasks, this, _1, goal),  // the heuristic
                             // ability to disable edges (set cost to inifinity):
                             boost::weight_map(edgeWeightMap(g_, edgeCollisionStateProperty_))
                                 .predecessor_map(vertexPredecessors)
@@ -583,10 +583,7 @@ double og::BoltDB::distanceFunctionTasks(const Vertex a, const Vertex b) const
 
 std::size_t og::BoltDB::getTaskLevel(const Vertex &v) const
 {
-    static const std::size_t TASK_LEVEL = 2;
-    const ob::RealVectorStateSpace::StateType *realState =
-        static_cast<const ob::RealVectorStateSpace::StateType *>(stateProperty_[v]);
-    return static_cast<int>(realState->values[TASK_LEVEL]);
+    return si_->getStateSpace()->getLevel(stateProperty_[v]);
 }
 
 void og::BoltDB::initializeQueryState()
@@ -707,6 +704,9 @@ void og::BoltDB::loadFromPlannerData(const base::PlannerData &data)
 
     // Re-enable verbose mode, if necessary
     verbose_ = wasVerbose;
+
+    // Clone the graph to have second and third layers for task planning then free space planning
+    generateTaskSpace();
 }
 
 void og::BoltDB::generateGrid()
@@ -737,7 +737,7 @@ void og::BoltDB::generateGrid()
     // TODO: This is a custom dimensionality reduction hack, that maybe should not be in this location
     if (desired_depth > 5)
     {
-        //OMPL_INFORM("Truncated discretization depth to 5");
+        // OMPL_INFORM("Truncated discretization depth to 5");
         desired_depth = 6;
     }
     else if (desired_depth == 3)
@@ -804,9 +804,8 @@ void og::BoltDB::generateTaskSpace()
         // Clone the state
         base::State *newState = si_->cloneState(stateProperty_[v]);
 
-        const ob::RealVectorStateSpace::StateType *realState2 =
-            static_cast<const ob::RealVectorStateSpace::StateType *>(newState);
-        realState2->values[2] = 2;  // finished task
+        const std::size_t level = 2;
+        si_->getStateSpace()->setLevel(newState, level);
 
         // Add the state back
         Vertex vNew = addVertex(newState, START);
@@ -814,7 +813,7 @@ void og::BoltDB::generateTaskSpace()
         // Map old vertex to new vertex
         vertexToNewVertex[v] = vNew;
 
-        // Visualize
+        // Visualize - only do this for 2/3D environments
         if (visualizeGridGeneration_)
         {
             viz2StateCallback(newState, 5, 1);  // Candidate node has already (just) been added
@@ -848,14 +847,20 @@ void og::BoltDB::generateTaskSpace()
         Edge newE = addEdge(vertexToNewVertex[v1], vertexToNewVertex[v2], edgeWeightProperty_[e]);
 
         // Visualize
-        viz2Edge(newE);
-        if (i % 100 == 0)
+        if (visualizeGridGeneration_)
         {
-            viz2TriggerCallback();
-            usleep(0.01 * 1000000);
+            viz2Edge(newE);
+            if (i % 100 == 0)
+            {
+                viz2TriggerCallback();
+                usleep(0.01 * 1000000);
+            }
         }
     }
-    viz2TriggerCallback();
+
+    // Visualize
+    if (visualizeGridGeneration_)
+        viz2TriggerCallback();
 
     OMPL_INFORM("Done generating task space graph");
 }
@@ -1404,7 +1409,7 @@ void og::BoltDB::cleanupTemporaryVerticies()
 
     if (tempVerticies_.empty())
     {
-        OMPL_INFORM("Skipping verticies cleanup - no temp vertices found");
+        OMPL_INFORM("Skipping verticies cleanup - no old middle cartesian layer verticies found");
         return;
     }
 
@@ -1436,110 +1441,121 @@ void og::BoltDB::cleanupTemporaryVerticies()
     OMPL_INFORM("Finished cleaning up temp verticies");
 }
 
-void og::BoltDB::addCartPath(base::State *cartPathStart, base::State *cartPathGoal)
+void og::BoltDB::addCartPath(std::vector<base::State *> path)
 {
     // TODO: check for validity
 
-    const std::size_t kNeighbors = 4;
-    std::vector<Vertex> neighbors;
-
-    // Clone both the states
-    base::State *startState = si_->cloneState(cartPathStart);
-    base::State *goalState = si_->cloneState(cartPathGoal);
-
-    // Add cartesian path to mid level graph --------------------
-    Vertex v1 = addVertex(startState, CARTESIAN);
-    Vertex v2 = addVertex(goalState, CARTESIAN);
-    double cost = distanceFunction(v1, v2);
-    addEdge(v1, v2, cost);
-    vizEdgeCallback(startState, goalState, 0);
-
-    // Record meta data for smart distance function later
-    if (!hasCartesianDistances_)
-        distanceAcrossCartesian_ += cost;
+    // Create verticies for the extremas
+    Vertex startVertex = addVertex(path.front(), CARTESIAN);
+    Vertex goalVertex = addVertex(path.back(), CARTESIAN);
 
     // Connect Start to graph --------------------------------------
-
-    // Get nearby states to start
     std::cout << "  start connector ---------" << std::endl;
     const std::size_t level0 = 0;
-    getNeighborsAtLevel(startState, level0, kNeighbors, neighbors);
+    connectStateToNeighborsAtLevel(startVertex, level0, startConnectorVertex_);
 
-    // Loop through each neighbor
-    double minStartConnectorCost = std::numeric_limits<double>::infinity();
-    BOOST_FOREACH (Vertex v0, neighbors)
-    {
-        // Add edge from nearby graph vertex to cart path start
-        double startConnectorCost = distanceFunction(v0, v1);
-        addEdge(v0, v1, startConnectorCost);
-
-        // Get min cost
-        if (!hasCartesianDistances_)
-            if (startConnectorCost < minStartConnectorCost)
-            {
-                minStartConnectorCost = startConnectorCost;
-                startConnectorVertex_ = v0;
-            }
-
-        // Visualize connection to start of cartesian path
-        vizEdgeCallback(stateProperty_[v0], startState, 50);
-    }
+    usleep(4 * 1000000);
 
     // Record meta data for smart distance function later
-    if (!hasCartesianDistances_)
-        distanceAcrossCartesian_ += 1.0;  // minStartConnectorCost;
+    // TODO
+    // if (!hasCartesianDistances_)
+    // distanceAcrossCartesian_ += 1.0;  // minStartConnectorCost;
 
     // Connect goal to graph --------------------------------------
-
-    // Get nearby states to goal
     std::cout << "  goal connector ----------------" << std::endl;
     const std::size_t level2 = 2;
-    neighbors.clear();
-    getNeighborsAtLevel(cartPathGoal, level2, kNeighbors, neighbors);
+    connectStateToNeighborsAtLevel(goalVertex, level2, endConnectorVertex_);
+
+    // Add cartesian path to mid level graph --------------------
+    Vertex v1 = startVertex;
+    Vertex v2;
+    for (std::size_t i = 1; i < path.size(); ++i)
+    {
+        // Check if we are on the goal vertex
+        if (i == path.size() - 1)
+        {
+            v2 = goalVertex;  // Do not create the goal vertex twice
+        }
+        else
+        {
+            v2 = addVertex(path[i], CARTESIAN);
+        }
+        double cost = distanceFunction(v1, v2);
+        addEdge(v1, v2, cost);
+        v1 = v2;
+
+        // Visualize
+        vizEdgeCallback(path[i - 1], path[i], 0);
+        vizStateCallback(path[i], 1, 1);
+        vizTriggerCallback();
+        usleep(0.1 * 1000000);
+
+        // Record meta data for smart distance function later
+        if (!hasCartesianDistances_)
+            distanceAcrossCartesian_ += cost;
+    }
+}
+
+bool og::BoltDB::connectStateToNeighborsAtLevel(const Vertex &fromVertex, const std::size_t level,
+                                                Vertex &minConnectorVertex)
+{
+    // Get nearby states to goal
+    std::vector<Vertex> neighbors;
+    const std::size_t kNeighbors = 20;
+    getNeighborsAtLevel(stateProperty_[fromVertex], level, kNeighbors, neighbors);
+
+    // Error check
+    if (neighbors.empty())
+    {
+        OMPL_ERROR("No neighbors found when connecting cartesian path");
+        return false;
+    }
+    else
+        OMPL_INFORM("Found %u neighbors on level %u", neighbors.size(), level);
 
     // Loop through each neighbor
-    double minGoalConnectorCost = std::numeric_limits<double>::infinity();
-    BOOST_FOREACH (Vertex v3, neighbors)
+    double minConnectorCost = std::numeric_limits<double>::infinity();
+    BOOST_FOREACH (Vertex v, neighbors)
     {
         // Add edge from nearby graph vertex to cart path goal
-        double goalConnectorCost = distanceFunction(v2, v3);
-        addEdge(v2, v3, goalConnectorCost);
+        double connectorCost = distanceFunction(fromVertex, v);
+        addEdge(fromVertex, v, connectorCost);
 
         // Get min cost
         if (!hasCartesianDistances_)
-            if (goalConnectorCost < minGoalConnectorCost)
+            if (connectorCost < minConnectorCost)
             {
-                minGoalConnectorCost = goalConnectorCost;
-                endConnectorVertex_ = v3;
+                minConnectorCost = connectorCost;
+                minConnectorVertex = v;
             }
 
         // Visualize connection to goal of cartesian path
-        vizEdgeCallback(stateProperty_[v3], cartPathGoal, 110);
+        const double cost = (level == 0 ? 100 : 50);
+        vizEdgeCallback(stateProperty_[v], stateProperty_[fromVertex], cost);
+        vizStateCallback(stateProperty_[v], 1, 1);
+        vizTriggerCallback();
+        usleep(1.0 * 1000000);
     }
 
     // Record meta data for smart distance function later
     if (!hasCartesianDistances_)
     {
-        distanceAcrossCartesian_ += 1.0;  // minGoalConnectorCost;
-        hasCartesianDistances_ = true;  // this prevents future cart paths from overwritting current data
+        distanceAcrossCartesian_ += 1.0;  // minConnectorCost;
+        hasCartesianDistances_ = true;    // this prevents future cart paths from overwritting current data
     }
 
     // Display ---------------------------------------
     vizTriggerCallback();
+
+    return true;
 }
 
 void og::BoltDB::getNeighborsAtLevel(const base::State *origState, const std::size_t level,
                                      const std::size_t kNeighbors, std::vector<Vertex> &neighbors)
 {
-    const std::size_t TASK_DIMENSION = 2;  // TODO(davetcoleman): do not hardcode which is the task's dimension
-    neighbors.clear();
-
     // Clone the state and change its level
     base::State *searchState = si_->cloneState(origState);
-
-    const ob::RealVectorStateSpace::StateType *realState =
-        static_cast<const ob::RealVectorStateSpace::StateType *>(searchState);
-    realState->values[TASK_DIMENSION] = level;  // search within proper level
+    si_->getStateSpace()->setLevel(searchState, level);
 
     // Get nearby state
     stateProperty_[queryVertex_] = searchState;
@@ -1549,20 +1565,17 @@ void og::BoltDB::getNeighborsAtLevel(const base::State *origState, const std::si
     stateProperty_[queryVertex_] = NULL;
     si_->getStateSpace()->freeState(searchState);
 
-    std::cout << "    found neighbors: " << neighbors.size() << std::endl;
-
     // Run various checks
     for (std::size_t i = 0; i < neighbors.size(); ++i)
     {
         const Vertex &nearVertex = neighbors[i];
 
         // Make sure state is on correct level
-        const ob::RealVectorStateSpace::StateType *neighborRealState =
-            static_cast<const ob::RealVectorStateSpace::StateType *>(stateProperty_[nearVertex]);
-        if (neighborRealState->values[TASK_DIMENSION] != level)
+        if (getTaskLevel(nearVertex) != level)
         {
-            std::cout << "      ERASING neighbor " << nearVertex << ", i=" << i
-                      << " because wrong level: " << neighborRealState->values[TASK_DIMENSION] << std::endl;
+            std::cout << "      Skipping neighbor " << nearVertex << ", i=" << i
+                      << ", because wrong level: " << getTaskLevel(nearVertex) << ", desired level: " << level
+                      << std::endl;
             neighbors.erase(neighbors.begin() + i);
             i--;
             continue;
@@ -1571,14 +1584,14 @@ void og::BoltDB::getNeighborsAtLevel(const base::State *origState, const std::si
         // Collision check
         if (!si_->checkMotion(origState, stateProperty_[nearVertex]))  // is valid motion
         {
-            std::cout << "      ERASING neighbor " << nearVertex << ", i=" << i << " because invalid motion"
-                      << std::endl;
+            std::cout << "      Skipping neighbor " << nearVertex << ", i=" << i
+                      << ", at level=" << getTaskLevel(nearVertex) << " because invalid motion" << std::endl;
             neighbors.erase(neighbors.begin() + i);
             i--;
             continue;
         }
 
-        std::cout << "      neighbor is a keeper! " << std::endl;
+        std::cout << "      Neighbor " << nearVertex << " is a keeper! " << std::endl;
     }
 }
 
