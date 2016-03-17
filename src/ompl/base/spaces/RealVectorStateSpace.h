@@ -188,6 +188,12 @@ namespace ompl
 
             virtual void setup();
 
+            /** \brief Get the mode (for hybrid task planning) of this state */
+            virtual int getLevel(const ompl::base::State *state) const;
+
+            /** \brief Set the mode (for hybrid task planning) of this state */
+            virtual void setLevel(ompl::base::State *state, int level);
+
         protected:
 
             /** \brief The dimension of the space */

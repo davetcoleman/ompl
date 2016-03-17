@@ -347,3 +347,16 @@ void ompl::base::RealVectorStateSpace::printSettings(std::ostream &out) const
         out << std::endl;
     }
 }
+
+int ompl::base::RealVectorStateSpace::getLevel(const ompl::base::State *state) const
+{
+    // The level is stored in the last value of the state
+    return static_cast<int>(state->as<StateType>()->values[dimension_ - 1]);
+
+}
+
+void ompl::base::RealVectorStateSpace::setLevel(ompl::base::State *state, int level)
+{
+    // The level is stored in the last value of the state
+    state->as<StateType>()->values[dimension_ - 1] = static_cast<double>(level);
+}

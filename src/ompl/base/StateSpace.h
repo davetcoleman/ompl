@@ -288,6 +288,19 @@ namespace ompl
                 return bounds_;
             }
 
+            /** \brief Get the mode (for hybrid task planning) of this state */
+            virtual int getLevel(const State *state) const
+            {
+                OMPL_ERROR("No level function implemented, unable to get level");
+                return 0;
+            }
+
+            /** \brief Set the mode (for hybrid task planning) of this state */
+            virtual void setLevel(State *state, int level)
+            {
+                OMPL_ERROR("No level function implemented, unable to set level");
+            }
+
             /** \brief Get the maximum value a call to distance() can return (or an upper bound).
                 For unbounded state spaces, this function can return infinity.
 
