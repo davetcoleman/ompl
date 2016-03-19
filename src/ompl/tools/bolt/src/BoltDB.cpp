@@ -248,9 +248,8 @@ bool og::BoltDB::load(const std::string &fileName)
     // Note: the StateStorage class checks if the states match for us
     plannerDataStorage_.load(iStream, *plannerData.get());
 
-    OMPL_INFORM("BoltDB: Loaded planner data with \n  %d vertices\n  %d edges\n  %d start states\n  %d goal states",
-        plannerData->numVertices(), plannerData->numEdges(), plannerData->numStartVertices(),
-        plannerData->numGoalVertices());
+    OMPL_INFORM("BoltDB: Loaded planner data with \n  %d vertices\n  %d edges",
+        plannerData->numVertices(), plannerData->numEdges());
 
     // Add to db
     OMPL_INFORM("Adding plannerData to database.");
@@ -260,7 +259,7 @@ bool og::BoltDB::load(const std::string &fileName)
     iStream.close();
 
     double loadTime = time::seconds(time::now() - start);
-    OMPL_INFORM("File load took **** %f sec ****", loadTime);
+    OMPL_INFORM("Loading from file took %f sec", loadTime);
     return true;
 }
 
@@ -447,12 +446,12 @@ bool og::BoltDB::astarSearch(const Vertex start, const Vertex goal, std::vector<
     if (getTaskLevel(start) != 0)
     {
         OMPL_ERROR("astarSearch: start level is %u", getTaskLevel(start));
-        //exit(-1);
+        exit(-1);
     }
     if (getTaskLevel(goal) != 2)
     {
         OMPL_ERROR("astarSearch: goal level is %u", getTaskLevel(goal));
-        //exit(-1);
+        exit(-1);
     }
 
     OMPL_INFORM("Beginning AStar Search");
@@ -528,7 +527,6 @@ bool og::BoltDB::astarSearch(const Vertex start, const Vertex goal, std::vector<
     delete[] vertexDistances;
 
     // No solution found from start to goal
-    std::cout << "returning foundGoal " << std::endl;
     return foundGoal;
 }
 
@@ -745,7 +743,7 @@ void og::BoltDB::loadFromPlannerData(const base::PlannerData &data)
     // Add the nodes to the graph
     for (std::size_t vertexID = 0; vertexID < data.numVertices(); ++vertexID)
     {
-        if (vertexID % debugFrequency == 0)
+        if ((vertexID + 1) % debugFrequency == 0)
             OMPL_INFORM("    %f percent loaded", vertexID / double(data.numVertices()) * 100.0);
 
         // Get the state from loaded planner data
@@ -764,7 +762,7 @@ void og::BoltDB::loadFromPlannerData(const base::PlannerData &data)
     std::vector<unsigned int> edgeList;
     for (unsigned int fromVertex = 0; fromVertex < data.numVertices(); ++fromVertex)
     {
-        if (fromVertex % debugFrequency == 0)
+        if ((fromVertex + 1) % debugFrequency == 0)
             OMPL_INFORM("    %f percent loaded", fromVertex / double(data.numVertices()) * 100.0);
 
         edgeList.clear();
@@ -894,9 +892,9 @@ void og::BoltDB::generateTaskSpace()
     OMPL_INFORM("Adding task space vertices");
     BOOST_FOREACH (Vertex v, boost::vertices(g_))
     {
+        // The first vertex (id=0) should have a NULL state because it is used for searching
         if (!stateProperty_[v])
         {
-            OMPL_INFORM("Skipping state copy because has value NULL at %u", v);
             continue;
         }
 
@@ -1539,7 +1537,7 @@ void og::BoltDB::cleanupTemporaryVerticies()
 
     if (tempVerticies_.empty())
     {
-        OMPL_INFORM("Skipping verticies cleanup - no old middle cartesian layer verticies found");
+        OMPL_INFORM("Skipping verticies cleanup - no middle cartesian layer verticies found");
         return;
     }
 
@@ -1646,6 +1644,10 @@ bool og::BoltDB::connectStateToNeighborsAtLevel(const Vertex &fromVertex, const 
         OMPL_ERROR("No neighbors found when connecting cartesian path");
         return false;
     }
+    else if (neighbors.size() < 3)
+    {
+        OMPL_WARN("Only %u neighbors found on level %u", neighbors.size(), level);
+    }
     else
         OMPL_INFORM("Found %u neighbors on level %u", neighbors.size(), level);
 
@@ -1725,7 +1727,7 @@ void og::BoltDB::getNeighborsAtLevel(const base::State *origState, const std::si
             continue;
         }
 
-        std::cout << "      Neighbor " << nearVertex << " is a keeper! " << std::endl;
+        std::cout << "      Keeping neighbor " << nearVertex << std::endl;
     }
 }
 

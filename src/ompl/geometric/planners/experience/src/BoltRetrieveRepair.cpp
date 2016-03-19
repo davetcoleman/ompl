@@ -109,7 +109,7 @@ base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCond
     // Restart the Planner Input States so that the first start and goal state can be fetched
     pis_.restart();  // PlannerInputStates
 
-    // Get a single start and goal state TODO: more than one
+    // Get a single start and goal state
     OMPL_INFORM("Getting OMPL start state");
     const base::State *startState = pis_.nextStart();  // PlannerInputStates
     OMPL_INFORM("Getting OMPL goal state");
@@ -222,7 +222,8 @@ bool BoltRetrieveRepair::getPathOffGraph(const base::State *start, const base::S
 
     // Start
     OMPL_INFORM("Looking for a node near the problem start");
-    if (!findGraphNeighbors(start, startVertexCandidateNeighbors_))
+    const int level0 = 0;
+    if (!findGraphNeighbors(start, startVertexCandidateNeighbors_, level0))
     {
         OMPL_INFORM("No graph neighbors found for start");
         return false;
@@ -232,7 +233,8 @@ bool BoltRetrieveRepair::getPathOffGraph(const base::State *start, const base::S
 
     // Goal
     OMPL_INFORM("  Looking for a node near the problem goal");
-    if (!findGraphNeighbors(goal, goalVertexCandidateNeighbors_))
+    const int level2 = 2;
+    if (!findGraphNeighbors(goal, goalVertexCandidateNeighbors_, level2))
     {
         OMPL_INFORM("No graph neighbors found for goal");
         return false;
@@ -368,10 +370,31 @@ bool BoltRetrieveRepair::lazyCollisionSearch(const BoltDB::Vertex &start, const 
     if (start == goal)
     {
         if (verbose_)
-            OMPL_INFORM("    Start equals goal, skipping ");
-        return false;  // TODO(davetcoleman): should this be skipped, or maybe returned as the solution?
+            OMPL_INFORM("    Start equals goal, creating simple solution ");
+
+        assert(false); // just because im curious if this ever happens TODO(davetcoleman): remove
+
+        // Check path between states
+        if (si_->checkMotion(boltDB_->stateProperty_[start], boltDB_->stateProperty_[goal]))
+        {
+          vertexPath.push_back(start);
+          vertexPath.push_back(goal);
+
+          if (verbose_)
+          {
+            OMPL_INFORM("  Collision check returned valid ");
+          }
+
+          // the path is valid, we are done!
+          convertVertexPathToStatePath(vertexPath, actualStart, actualGoal, candidateSolution);
+
+          return true;
+        }
+
+        return false;
     }
 
+    // Error check all states are non-NULL
     assert(actualStart);
     assert(actualGoal);
     assert(boltDB_->stateProperty_[start]);
@@ -529,25 +552,7 @@ bool BoltRetrieveRepair::findGraphNeighbors(const base::State *state, std::vecto
     // Filter neighbors based on level
     if (requiredLevel >= 0)
     {
-
-        /*
-            // Remove edges based on layer
-            for (std::size_t i = 0; i < graphNeighborhood.size(); ++i)
-            {
-                const Vertex &nearVertex = graphNeighborhood[i];
-
-                // Make sure state is on correct level
-                if (getTaskLevel(nearVertex) != level)
-                {
-                    std::cout << "      Skipping neighbor " << nearVertex << ", i=" << i
-                              << ", because wrong level: " << getTaskLevel(nearVertex) << ", desired level: " << level
-                              << std::endl;
-                    graphNeighborhood.erase(graphNeighborhood.begin() + i);
-                    i--;
-                    continue;
-                }
-            }
-        */
+      removeVerticesNotOnLevel(graphNeighborhood, requiredLevel);
     }
 
     // Check if no neighbors found
@@ -555,12 +560,38 @@ bool BoltRetrieveRepair::findGraphNeighbors(const base::State *state, std::vecto
 
     // Benchmark runtime
     double duration = time::seconds(time::now() - startTime);
-    OMPL_INFORM(" - findGraphNeighbors() took %f seconds (%f hz)", duration, 1.0 / duration);
+    OMPL_INFORM(" - findGraphNeighbors() took %f seconds", duration);
 
     // Free memory
     si_->getStateSpace()->freeState(stateCopy);
 
     return result;
+}
+
+bool BoltRetrieveRepair::removeVerticesNotOnLevel(std::vector<BoltDB::Vertex> &graphNeighborhood, int level)
+{
+    std::size_t original_size = graphNeighborhood.size();
+
+    // Remove edges based on layer
+    for (std::size_t i = 0; i < graphNeighborhood.size(); ++i)
+    {
+        const BoltDB::Vertex &nearVertex = graphNeighborhood[i];
+
+        // Make sure state is on correct level
+        if (boltDB_->getTaskLevel(nearVertex) != level)
+        {
+            std::cout << "      Skipping neighbor " << nearVertex << ", i=" << i
+                      << ", because wrong level: " << boltDB_->getTaskLevel(nearVertex) << ", desired level: " << level
+                      << std::endl;
+            graphNeighborhood.erase(graphNeighborhood.begin() + i);
+            i--;
+            continue;
+        }
+    }
+    OMPL_INFORM("removeVerticesNotOnLevel(): states require level %d, removed: %u, remaining: %u",
+        level, original_size - graphNeighborhood.size(), graphNeighborhood.size());
+
+    return true;
 }
 
 bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<BoltDB::Vertex> &vertexPath,

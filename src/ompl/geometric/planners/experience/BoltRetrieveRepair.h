@@ -140,6 +140,9 @@ class BoltRetrieveRepair : public base::Planner
     bool getPathOffGraph(const base::State *start, const base::State *goal,
                          BoltDB::CandidateSolution &candidateSolution, const base::PlannerTerminationCondition &ptc);
 
+    /** \brief Clear verticies not on the specified level */
+    bool removeVerticesNotOnLevel(std::vector<BoltDB::Vertex> &graphNeighborhood, int level);
+
     /**
      * \brief Convert astar results to correctly ordered path
      * \param vertexPath - in reverse
