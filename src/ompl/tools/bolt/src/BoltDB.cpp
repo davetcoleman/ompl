@@ -1,7 +1,7 @@
 /*********************************************************************
  * Software License Agreement (BSD License)
  *
- *  Copyright (c) 2014, JSK, The University of Tokyo.
+ *  Copyright (c) 2016, University of Colorado, Boulder
  *  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
@@ -14,7 +14,7 @@
  *     copyright notice, this list of conditions and the following
  *     disclaimer in the documentation and/or other materials provided
  *     with the distribution.
- *   * Neither the name of the JSK, The University of Tokyo nor the names of its
+ *   * Neither the name of the Univ of CO, Boulder nor the names of its
  *     contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -31,6 +31,10 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
+
+/* Author: Dave Coleman <dave@dav.ee>
+   Desc:
+*/
 
 /* Author: Dave Coleman */
 
@@ -66,7 +70,7 @@ BOOST_CONCEPT_ASSERT(
     (boost::ReadablePropertyMapConcept<ompl::geometric::BoltDB::edgeWeightMap, ompl::geometric::BoltDB::Edge>));
 
 og::BoltDB::edgeWeightMap::edgeWeightMap(const Graph &graph, const EdgeCollisionStateMap &collisionStates)
-  : g_(graph), collisionStates_(collisionStates)
+    : g_(graph), collisionStates_(collisionStates)
 {
 }
 
@@ -97,10 +101,10 @@ double og::BoltDB::edgeWeightMap::get(Edge e) const
 
 namespace boost
 {
-double get(const og::BoltDB::edgeWeightMap &m, const og::BoltDB::Edge &e)
-{
-    return m.get(e);
-}
+    double get(const og::BoltDB::edgeWeightMap &m, const og::BoltDB::Edge &e)
+    {
+        return m.get(e);
+    }
 }
 
 // CustomAstarVisitor methods ////////////////////////////////////////////////////////////////////////////
@@ -133,24 +137,25 @@ void og::BoltDB::CustomAstarVisitor::examine_vertex(Vertex v, const Graph &) con
 // Actual class ////////////////////////////////////////////////////////////////////////////
 
 og::BoltDB::BoltDB(base::SpaceInformationPtr si)
-  : si_(si)
-  , graphUnsaved_(false)
-  , savingEnabled_(true)
-  // Property accessors of edges
-  , edgeWeightProperty_(boost::get(boost::edge_weight, g_))
-  , edgeCollisionStateProperty_(boost::get(edge_collision_state_t(), g_))
-  // Property accessors of vertices
-  , stateProperty_(boost::get(vertex_state_t(), g_))
-  , typeProperty_(boost::get(vertex_type_t(), g_))
-  // interfaceDataProperty_(boost::get(vertex_interface_data_t(), g_)),
-  , popularityBias_(false)
-  , verbose_(true)
-  , hasCartesianDistances_(false)
-  , distanceAcrossCartesian_(0.0)
-  , visualizeAstar_(false)
-  , visualizeGridGeneration_(false)
-  , sparseDelta_(2.0)
-  , visualizeAstarSpeed_(0.1)
+    : si_(si)
+    , graphUnsaved_(false)
+    , savingEnabled_(true)
+      // Property accessors of edges
+    , edgeWeightProperty_(boost::get(boost::edge_weight, g_))
+    , edgeCollisionStateProperty_(boost::get(edge_collision_state_t(), g_))
+      // Property accessors of vertices
+    , stateProperty_(boost::get(vertex_state_t(), g_))
+    , typeProperty_(boost::get(vertex_type_t(), g_))
+      // interfaceDataProperty_(boost::get(vertex_interface_data_t(), g_)),
+    , popularityBias_(false)
+    , verbose_(true)
+    , distanceAcrossCartesian_(0.0)
+    , visualizeAstar_(false)
+    , visualizeGridGeneration_(false)
+    , visualizeCartNeighbors_(false)
+    , visualizeCartPath_(false)
+    , sparseDelta_(2.0)
+    , visualizeAstarSpeed_(0.1)
 {
     if (!nn_)
     {
@@ -244,8 +249,8 @@ bool og::BoltDB::load(const std::string &fileName)
     plannerDataStorage_.load(iStream, *plannerData.get());
 
     OMPL_INFORM("BoltDB: Loaded planner data with \n  %d vertices\n  %d edges\n  %d start states\n  %d goal states",
-                plannerData->numVertices(), plannerData->numEdges(), plannerData->numStartVertices(),
-                plannerData->numGoalVertices());
+        plannerData->numVertices(), plannerData->numEdges(), plannerData->numStartVertices(),
+        plannerData->numGoalVertices());
 
     // Add to db
     OMPL_INFORM("Adding plannerData to database.");
@@ -270,85 +275,85 @@ bool og::BoltDB::postProcessesPath(og::PathGeometric &solutionPath, double &inse
 
     bool result = true;
     /*
-    double seconds = 120;  // 10; // a large number, should never need to use this
-    ompl::base::PlannerTerminationCondition ptc = ompl::base::timedPlannerTerminationCondition(seconds, 0.1);
+      double seconds = 120;  // 10; // a large number, should never need to use this
+      ompl::base::PlannerTerminationCondition ptc = ompl::base::timedPlannerTerminationCondition(seconds, 0.1);
 
-    // Get starting state
-    base::State *currentState = solutionPath.getStates()[0];
+      // Get starting state
+      base::State *currentState = solutionPath.getStates()[0];
 
-    // Find starting state's vertex
-    stateProperty_[queryVertex_] = currentState;
-    Vertex currentVertex = nn_->nearest(queryVertex_);
+      // Find starting state's vertex
+      stateProperty_[queryVertex_] = currentState;
+      Vertex currentVertex = nn_->nearest(queryVertex_);
 
-    // Walk through whole trajectory
-    for (std::size_t i = 1; i < solutionPath.getStates().size(); ++i)
-    {
-        base::State *nextState = solutionPath.getStates()[i];
+      // Walk through whole trajectory
+      for (std::size_t i = 1; i < solutionPath.getStates().size(); ++i)
+      {
+      base::State *nextState = solutionPath.getStates()[i];
 
-        vizStateCallback(currentState, 5, 1);
-        vizStateCallback(nextState, 1, 1);
-        vizTriggerCallback();
-        usleep(1000000);
+      vizStateCallback(currentState, 5, 1);
+      vizStateCallback(nextState, 1, 1);
+      vizTriggerCallback();
+      usleep(1000000);
 
-        // Check if we are close to where a new node is to be expected
-        static const double percentSparse = 0.9;  // if within 90%
-        double distance = si_->distance(currentState, nextState);
-        double distThresh = sparseDelta_ * percentSparse;
-        if (distance > distThresh)
-        {
-            std::cout << "---- FOUND CLOSE ENOUGH " << std::endl;
-            // Find the nearest node
-            stateProperty_[queryVertex_] = nextState;
-            Vertex nearVertex = nn_->nearest(queryVertex_);
+      // Check if we are close to where a new node is to be expected
+      static const double percentSparse = 0.9;  // if within 90%
+      double distance = si_->distance(currentState, nextState);
+      double distThresh = sparseDelta_ * percentSparse;
+      if (distance > distThresh)
+      {
+      std::cout << "---- FOUND CLOSE ENOUGH " << std::endl;
+      // Find the nearest node
+      stateProperty_[queryVertex_] = nextState;
+      Vertex nearVertex = nn_->nearest(queryVertex_);
 
-            base::State *nearState = stateProperty_[nearVertex];
-            vizStateCallback(nearState, 2, 1);
-            vizTriggerCallback();
-            usleep(1000);
+      base::State *nearState = stateProperty_[nearVertex];
+      vizStateCallback(nearState, 2, 1);
+      vizTriggerCallback();
+      usleep(1000);
 
-            // Check if path is not obstructed from nearest
-            if (!si_->checkMotion(currentState, nearState))
-            {
-                OMPL_ERROR("Nearest vertex is in collision - have not accounted for this yet");
-            }
+      // Check if path is not obstructed from nearest
+      if (!si_->checkMotion(currentState, nearState))
+      {
+      OMPL_ERROR("Nearest vertex is in collision - have not accounted for this yet");
+      }
 
-            // Check if these vertices share an edge
-            std::pair<BoltDB::Edge, bool> edge_result = boost::edge(currentVertex, nearVertex, g_);
-            if (!edge_result.second)
-            {
-                OMPL_ERROR("Found two vertices that do not share an edge");
-            }
+      // Check if these vertices share an edge
+      std::pair<BoltDB::Edge, bool> edge_result = boost::edge(currentVertex, nearVertex, g_);
+      if (!edge_result.second)
+      {
+      OMPL_ERROR("Found two vertices that do not share an edge");
+      }
 
-            // reduce cost of this edge because it was just used
-            if (popularityBias_)
-            {
-                static const double REDUCTION_AMOUNT = 10;
-                edgeWeightProperty_[edge_result.first] =
-                    std::max(edgeWeightProperty_[edge_result.first] - REDUCTION_AMOUNT, 0.0);
-            }
+      // reduce cost of this edge because it was just used
+      if (popularityBias_)
+      {
+      static const double REDUCTION_AMOUNT = 10;
+      edgeWeightProperty_[edge_result.first] =
+      std::max(edgeWeightProperty_[edge_result.first] - REDUCTION_AMOUNT, 0.0);
+      }
 
-            // We have a valid near vertex
-            // Visualize
-            vizEdgeCallback(currentState, nearState, 100);
-            vizTriggerCallback();
-            usleep(500000);
+      // We have a valid near vertex
+      // Visualize
+      vizEdgeCallback(currentState, nearState, 100);
+      vizTriggerCallback();
+      usleep(500000);
 
-            // Set the starting state to the new state
-            currentState = nearState;
-            currentVertex = nearVertex;
-        }
-        else
-        {
-            std::cout << "Not close enough: " << distance << " need " << distThresh << std::endl;
-        }
-    }
+      // Set the starting state to the new state
+      currentState = nearState;
+      currentVertex = nearVertex;
+      }
+      else
+      {
+      std::cout << "Not close enough: " << distance << " need " << distThresh << std::endl;
+      }
+      }
 
-    if (popularityBias_)
-    {
-        OMPL_ERROR("popularity bias enabled");
-        // Record this new addition
-        graphUnsaved_ = true;
-    }
+      if (popularityBias_)
+      {
+      OMPL_ERROR("popularity bias enabled");
+      // Record this new addition
+      graphUnsaved_ = true;
+      }
     */
     return result;
 }
@@ -395,7 +400,7 @@ bool og::BoltDB::save(const std::string &fileName)
     base::PlannerDataPtr data(new base::PlannerData(si_));
     getPlannerData(*data);
     OMPL_INFORM("Saving PlannerData with \n  %d vertices\n  %d edges\n  %d start states\n  %d goal states",
-                data->numVertices(), data->numEdges(), data->numStartVertices(), data->numGoalVertices());
+        data->numVertices(), data->numEdges(), data->numStartVertices(), data->numGoalVertices());
 
     // Write the number of paths we will be saving
     double numPaths = 1;
@@ -438,20 +443,32 @@ bool og::BoltDB::astarSearch(const Vertex start, const Vertex goal, std::vector<
 
     double *vertexDistances = new double[getNumVertices()];
 
+    // Error check
+    if (getTaskLevel(start) != 0)
+    {
+        OMPL_ERROR("astarSearch: start level is %u", getTaskLevel(start));
+        //exit(-1);
+    }
+    if (getTaskLevel(goal) != 2)
+    {
+        OMPL_ERROR("astarSearch: goal level is %u", getTaskLevel(goal));
+        //exit(-1);
+    }
+
     OMPL_INFORM("Beginning AStar Search");
     try
     {
         // Note: could not get astar_search to compile within BoltRetrieveRepair.cpp class because of namespacing issues
         boost::astar_search(g_,     // graph
-                            start,  // start state
-                                    // boost::bind(&og::BoltDB::distanceFunction2, this, _1, goal),  // the heuristic
-                            boost::bind(&og::BoltDB::distanceFunction, this, _1, goal),  // the heuristic
-                            // boost::bind(&og::BoltDB::distanceFunctionTasks, this, _1, goal),  // the heuristic
-                            // ability to disable edges (set cost to inifinity):
-                            boost::weight_map(edgeWeightMap(g_, edgeCollisionStateProperty_))
-                                .predecessor_map(vertexPredecessors)
-                                .distance_map(&vertexDistances[0])
-                                .visitor(CustomAstarVisitor(goal, this)));
+            start,  // start state
+            // boost::bind(&og::BoltDB::distanceFunction2, this, _1, goal),  // the heuristic
+            //boost::bind(&og::BoltDB::distanceFunction, this, _1, goal),  // the heuristic
+            boost::bind(&og::BoltDB::distanceFunctionTasks, this, _1, goal),  // the heuristic
+            // ability to disable edges (set cost to inifinity):
+            boost::weight_map(edgeWeightMap(g_, edgeCollisionStateProperty_))
+            .predecessor_map(vertexPredecessors)
+            .distance_map(&vertexDistances[0])
+            .visitor(CustomAstarVisitor(goal, this)));
     }
     catch (foundGoalException &)
     {
@@ -459,10 +476,10 @@ bool og::BoltDB::astarSearch(const Vertex start, const Vertex goal, std::vector<
         OMPL_INFORM("astarSearch: Astar found goal vertex. distance to goal: %f", vertexDistances[goal]);
 
         if (vertexDistances[goal] > 1.7e+308)  // TODO(davetcoleman): fix terrible hack for detecting infinity
-        // double diff = d[goal] - std::numeric_limits<double>::infinity();
-        // if ((diff < std::numeric_limits<double>::epsilon()) && (-diff < std::numeric_limits<double>::epsilon()))
-        // check if the distance to goal is inifinity. if so, it is unreachable
-        // if (d[goal] >= std::numeric_limits<double>::infinity())
+            // double diff = d[goal] - std::numeric_limits<double>::infinity();
+            // if ((diff < std::numeric_limits<double>::epsilon()) && (-diff < std::numeric_limits<double>::epsilon()))
+            // check if the distance to goal is inifinity. if so, it is unreachable
+            // if (d[goal] >= std::numeric_limits<double>::infinity())
         {
             if (verbose_)
                 OMPL_INFORM("Distance to goal is infinity");
@@ -550,40 +567,122 @@ double og::BoltDB::distanceFunction2(const Vertex a, const Vertex b) const
 
 double og::BoltDB::distanceFunctionTasks(const Vertex a, const Vertex b) const
 {
-    // Change Vertex b to reflect our current task level
-    double dist;
-
-    // TODO(davetcoleman): we could cache the distance from endConnectorVertex_ to b (goal)
-    std::size_t taskLevel = getTaskLevel(a);
-    switch (taskLevel)
+  const bool verbose = false;
+    // Reorder a & b so that we are sure that a.level <= b.level
+    std::size_t taskLevelA = getTaskLevel(a);
+    std::size_t taskLevelB = getTaskLevel(b);
+    if (taskLevelA > taskLevelB)
     {
-        case 0:  // our goal is the bottom of the first connector
-            assert(getTaskLevel(startConnectorVertex_) == 0);
-            assert(getTaskLevel(endConnectorVertex_) == 2);
-
-            dist = si_->distance(stateProperty_[a], stateProperty_[startConnectorVertex_]) + distanceAcrossCartesian_ +
-                   si_->distance(stateProperty_[endConnectorVertex_], stateProperty_[b]);
-            break;
-        case 1:  // our goal is the top of the second connector
-            assert(getTaskLevel(endConnectorVertex_) == 2);
-
-            dist = si_->distance(stateProperty_[a], stateProperty_[endConnectorVertex_]) +
-                   si_->distance(stateProperty_[endConnectorVertex_], stateProperty_[b]);
-            break;
-        case 2:  // our goal is the original goal
-            dist = si_->distance(stateProperty_[a], stateProperty_[b]);
-            break;
-        default:
-            OMPL_ERROR("Unknown option in case statement");
+        // Call itself again, this time switching ordering
+      if (verbose)
+        OMPL_INFORM("Switched ordering for distanceFunctionTasks()");
+        return distanceFunctionTasks(b, a);
     }
 
-    // std::cout << "Level " << taskLevel << " has distance " << dist << std::endl;
+    double dist; // the result
+    static const double TASK_LEVEL_COST = 1.0; // cost to change levels/tasks
+
+    // Error check
+    assert(stateProperty_[a]);
+    assert(stateProperty_[b]);
+    assert(stateProperty_[startConnectorVertex_]);
+    assert(stateProperty_[endConnectorVertex_]);
+
+    if (taskLevelA == 0)
+    {
+        if (taskLevelB == 0) // regular distance for bottom level
+        {
+      if (verbose)
+            std::cout << "a ";
+            dist = si_->distance(stateProperty_[a], stateProperty_[b]);
+        }
+        else if (taskLevelB == 1)
+        {
+      if (verbose)
+            std::cout << "b ";
+            dist = si_->distance(stateProperty_[a], stateProperty_[startConnectorVertex_])
+                + TASK_LEVEL_COST
+                + si_->distance(stateProperty_[startConnectorVertex_], stateProperty_[b]);
+        }
+        else if (taskLevelB == 2)
+        {
+      if (verbose)
+            std::cout << "c ";
+            dist = si_->distance(stateProperty_[a], stateProperty_[startConnectorVertex_])
+                + TASK_LEVEL_COST
+                + distanceAcrossCartesian_
+                + TASK_LEVEL_COST
+                + si_->distance(stateProperty_[endConnectorVertex_], stateProperty_[b]);
+        }
+        else
+        {
+            OMPL_ERROR("Unknown task level mode");
+            exit(-1);
+        }
+    }
+    else if (taskLevelA == 1)
+    {
+        if (taskLevelB == 0)
+        {
+            OMPL_ERROR("Unknown task level mode");
+            exit(-1);
+        }
+        else if (taskLevelB == 1)
+        {
+      if (verbose)
+            std::cout << "d ";
+            dist = si_->distance(stateProperty_[a], stateProperty_[b]);
+        }
+        else if (taskLevelB == 2)
+        {
+      if (verbose)
+            std::cout << "e ";
+            dist = si_->distance(stateProperty_[a], stateProperty_[endConnectorVertex_])
+                + TASK_LEVEL_COST
+                + si_->distance(stateProperty_[endConnectorVertex_], stateProperty_[b]);
+        }
+        else
+        {
+            OMPL_WARN("Unknown task level mode");
+        }
+    }
+    else if (taskLevelA == 2)
+    {
+        if (taskLevelB == 0 || taskLevelB == 1)
+        {
+            OMPL_ERROR("Unknown task level mode");
+            exit(-1);
+        }
+        else if (taskLevelB == 2)
+        {
+      if (verbose)
+            std::cout << "f ";
+            dist = si_->distance(stateProperty_[a], stateProperty_[b]);
+        }
+        else
+        {
+            OMPL_WARN("Unknown task level mode");
+        }
+    }
+    else
+    {
+        OMPL_WARN("Unknown task level mode");
+    }
+
+      if (verbose)
+    std::cout << "State " << a << " @level " << taskLevelA << " to State " << b << " @level " << taskLevelB
+              <<  " has distance " << dist << std::endl;
     return dist;
 }
 
 std::size_t og::BoltDB::getTaskLevel(const Vertex &v) const
 {
     return si_->getStateSpace()->getLevel(stateProperty_[v]);
+}
+
+std::size_t og::BoltDB::getTaskLevel(const base::State* state) const
+{
+    return si_->getStateSpace()->getLevel(state);
 }
 
 void og::BoltDB::initializeQueryState()
@@ -607,8 +706,8 @@ void og::BoltDB::getPlannerData(base::PlannerData &data) const
             const Vertex v2 = boost::target(e, g_);
 
             if (!data.addEdge(base::PlannerDataVertex(stateProperty_[v1], (int)typeProperty_[v1]),
-                              base::PlannerDataVertex(stateProperty_[v2], (int)typeProperty_[v2]),
-                              base::PlannerDataEdge(), base::Cost(edgeWeightProperty_[e])))
+                    base::PlannerDataVertex(stateProperty_[v2], (int)typeProperty_[v2]),
+                    base::PlannerDataEdge(), base::Cost(edgeWeightProperty_[e])))
             {
                 OMPL_ERROR("Unable to add edge");
             }
@@ -1126,7 +1225,7 @@ void og::BoltDB::checkEdgesThreaded(const std::vector<Edge> &unvalidatedEdges)
 }
 
 void og::BoltDB::checkEdgesThread(std::size_t startEdge, std::size_t endEdge, base::SpaceInformationPtr si,
-                                  const std::vector<Edge> &unvalidatedEdges)
+    const std::vector<Edge> &unvalidatedEdges)
 {
     // Process [startEdge, endEdge] inclusive
     for (std::size_t edgeID = startEdge; edgeID <= endEdge; ++edgeID)
@@ -1266,7 +1365,7 @@ void og::BoltDB::checkVerticesThreaded(const std::vector<Vertex> &unvalidatedVer
 }
 
 void og::BoltDB::checkVerticesThread(std::size_t startVertex, std::size_t endVertex, base::SpaceInformationPtr si,
-                                     const std::vector<Vertex> &unvalidatedVertices)
+    const std::vector<Vertex> &unvalidatedVertices)
 {
     // Process [startVertex, endVertex] inclusive
     for (std::size_t vertexID = startVertex; vertexID <= endVertex; ++vertexID)
@@ -1292,26 +1391,57 @@ void og::BoltDB::displayDatabase()
 {
     OMPL_INFORM("Displaying database");
 
+    /*
+    // Loop through each vertex
+    std::size_t count = 0;
+    std::size_t debugFrequency = getNumVertices() / 10;
+    BOOST_FOREACH (Vertex v, boost::vertices(g_))
+    {
+        // Check for null states
+        if (stateProperty_[v])
+        {
+            viz2StateCallback(stateProperty_[v], 6, 1);
+        }
+
+        // Prevent cache from getting too big
+        if (count % debugFrequency == 0)
+        {
+            OMPL_INFORM("Displaying %f %% of database", (static_cast<double>(count+1) / getNumVertices()) * 100.0);
+            viz2TriggerCallback();
+        }
+        count++;
+    }
+*/
     // Loop through each edge
     std::size_t count = 0;
+    std::size_t debugFrequency = getNumEdges() / 20;
     BOOST_FOREACH (Edge e, boost::edges(g_))
     {
         // Add edge
-        viz2Edge(e);
+        const Vertex &v1 = boost::source(e, g_);
+        const Vertex &v2 = boost::target(e, g_);
+
+        // Visualize
+        viz2EdgeCallback(stateProperty_[v1], stateProperty_[v2], 110);
 
         // Prevent cache from getting too big
-        if (count % 1000 == 0)
+        if (count % debugFrequency == 0)
+        {
+            OMPL_INFORM("Displaying %f %% of database", (static_cast<double>(count+1) / getNumEdges()) * 100.0);
             viz2TriggerCallback();
+        }
 
         count++;
     }
+
+
     // Publish remaining edges
     viz2TriggerCallback();
 }
 
 void og::BoltDB::setVizCallbacks(ompl::base::VizStateCallback vizStateCallback,
-                                 ompl::base::VizEdgeCallback vizEdgeCallback,
-                                 ompl::base::VizTriggerCallback vizTriggerCallback)
+    ompl::base::VizEdgeCallback vizEdgeCallback,
+    ompl::base::VizTriggerCallback vizTriggerCallback)
 {
     vizStateCallback_ = vizStateCallback;
     vizEdgeCallback_ = vizEdgeCallback;
@@ -1319,8 +1449,8 @@ void og::BoltDB::setVizCallbacks(ompl::base::VizStateCallback vizStateCallback,
 }
 
 void og::BoltDB::setViz2Callbacks(ompl::base::VizStateCallback vizStateCallback,
-                                  ompl::base::VizEdgeCallback vizEdgeCallback,
-                                  ompl::base::VizTriggerCallback vizTriggerCallback)
+    ompl::base::VizEdgeCallback vizEdgeCallback,
+    ompl::base::VizTriggerCallback vizTriggerCallback)
 {
     viz2StateCallback_ = vizStateCallback;
     viz2EdgeCallback_ = vizEdgeCallback;
@@ -1435,13 +1565,14 @@ void og::BoltDB::cleanupTemporaryVerticies()
             std::cout << "remove vertex " << std::endl;
         // Remove vertex
         boost::remove_vertex(v, g_);
-        OMPL_DEBUG("Removed, updated - vertex count: %u, edge count: %u", getNumVertices(), getNumEdges());
+        if (verbose)
+            OMPL_DEBUG("Removed, updated - vertex count: %u, edge count: %u", getNumVertices(), getNumEdges());
     }
     tempVerticies_.clear();
     OMPL_INFORM("Finished cleaning up temp verticies");
 }
 
-void og::BoltDB::addCartPath(std::vector<base::State *> path)
+bool og::BoltDB::addCartPath(std::vector<base::State *> path)
 {
     // TODO: check for validity
 
@@ -1452,19 +1583,23 @@ void og::BoltDB::addCartPath(std::vector<base::State *> path)
     // Connect Start to graph --------------------------------------
     std::cout << "  start connector ---------" << std::endl;
     const std::size_t level0 = 0;
-    connectStateToNeighborsAtLevel(startVertex, level0, startConnectorVertex_);
+    if (!connectStateToNeighborsAtLevel(startVertex, level0, startConnectorVertex_))
+    {
+        OMPL_ERROR("Failed to connect start of cartesian path");
+        return false;
+    }
 
-    usleep(4 * 1000000);
-
-    // Record meta data for smart distance function later
-    // TODO
-    // if (!hasCartesianDistances_)
-    // distanceAcrossCartesian_ += 1.0;  // minStartConnectorCost;
+    // Record min cost for cost-to-go heurstic distance function later
+    distanceAcrossCartesian_ = distanceFunction(startVertex, goalVertex);
 
     // Connect goal to graph --------------------------------------
     std::cout << "  goal connector ----------------" << std::endl;
     const std::size_t level2 = 2;
-    connectStateToNeighborsAtLevel(goalVertex, level2, endConnectorVertex_);
+    if (!connectStateToNeighborsAtLevel(goalVertex, level2, endConnectorVertex_))
+    {
+        OMPL_ERROR("Failed to connect goal of cartesian path");
+        return false;
+    }
 
     // Add cartesian path to mid level graph --------------------
     Vertex v1 = startVertex;
@@ -1485,19 +1620,20 @@ void og::BoltDB::addCartPath(std::vector<base::State *> path)
         v1 = v2;
 
         // Visualize
-        vizEdgeCallback(path[i - 1], path[i], 0);
-        vizStateCallback(path[i], 1, 1);
-        vizTriggerCallback();
-        usleep(0.1 * 1000000);
-
-        // Record meta data for smart distance function later
-        if (!hasCartesianDistances_)
-            distanceAcrossCartesian_ += cost;
+        if (visualizeCartPath_)
+        {
+            vizEdgeCallback(path[i - 1], path[i], 0);
+            vizStateCallback(path[i], 1, 1);
+            vizTriggerCallback();
+            usleep(0.1 * 1000000);
+        }
     }
+
+    return true;
 }
 
 bool og::BoltDB::connectStateToNeighborsAtLevel(const Vertex &fromVertex, const std::size_t level,
-                                                Vertex &minConnectorVertex)
+    Vertex &minConnectorVertex)
 {
     // Get nearby states to goal
     std::vector<Vertex> neighbors;
@@ -1513,45 +1649,43 @@ bool og::BoltDB::connectStateToNeighborsAtLevel(const Vertex &fromVertex, const 
     else
         OMPL_INFORM("Found %u neighbors on level %u", neighbors.size(), level);
 
-    // Loop through each neighbor
+    // Find the shortest connector out of all the options
     double minConnectorCost = std::numeric_limits<double>::infinity();
+
+    // Loop through each neighbor
     BOOST_FOREACH (Vertex v, neighbors)
     {
         // Add edge from nearby graph vertex to cart path goal
         double connectorCost = distanceFunction(fromVertex, v);
         addEdge(fromVertex, v, connectorCost);
 
-        // Get min cost
-        if (!hasCartesianDistances_)
-            if (connectorCost < minConnectorCost)
-            {
-                minConnectorCost = connectorCost;
-                minConnectorVertex = v;
-            }
+        // Get min cost connector
+        if (connectorCost < minConnectorCost)
+        {
+            minConnectorCost = connectorCost; // TODO(davetcoleman): should we save the cost, or just use 1.0?
+            minConnectorVertex = v;
+        }
 
         // Visualize connection to goal of cartesian path
         const double cost = (level == 0 ? 100 : 50);
-        vizEdgeCallback(stateProperty_[v], stateProperty_[fromVertex], cost);
-        vizStateCallback(stateProperty_[v], 1, 1);
-        vizTriggerCallback();
-        usleep(1.0 * 1000000);
-    }
-
-    // Record meta data for smart distance function later
-    if (!hasCartesianDistances_)
-    {
-        distanceAcrossCartesian_ += 1.0;  // minConnectorCost;
-        hasCartesianDistances_ = true;    // this prevents future cart paths from overwritting current data
+        if (visualizeCartNeighbors_)
+        {
+            vizEdgeCallback(stateProperty_[v], stateProperty_[fromVertex], cost);
+            vizStateCallback(stateProperty_[v], 1, 1);
+            vizTriggerCallback();
+            usleep(1.0 * 1000000);
+        }
     }
 
     // Display ---------------------------------------
-    vizTriggerCallback();
+    if (visualizeCartNeighbors_)
+        vizTriggerCallback();
 
     return true;
 }
 
 void og::BoltDB::getNeighborsAtLevel(const base::State *origState, const std::size_t level,
-                                     const std::size_t kNeighbors, std::vector<Vertex> &neighbors)
+    const std::size_t kNeighbors, std::vector<Vertex> &neighbors)
 {
     // Clone the state and change its level
     base::State *searchState = si_->cloneState(origState);

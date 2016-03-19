@@ -1,7 +1,7 @@
 /*********************************************************************
  * Software License Agreement (BSD License)
  *
- *  Copyright (c) 2014, JSK, The University of Tokyo.
+ *  Copyright (c) 2016, University of Colorado, Boulder
  *  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
@@ -14,7 +14,7 @@
  *     copyright notice, this list of conditions and the following
  *     disclaimer in the documentation and/or other materials provided
  *     with the distribution.
- *   * Neither the name of the JSK, The University of Tokyo nor the names of its
+ *   * Neither the name of the Univ of CO, Boulder nor the names of its
  *     contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -555,6 +555,7 @@ namespace ompl
 
             /** \brief Helper for getting the task level value from a state */
             std::size_t getTaskLevel(const Vertex& v) const;
+            std::size_t getTaskLevel(const base::State* state) const;
 
             /** \brief Check that the query vertex is initialized (used for internal nearest neighbor searches) */
             void initializeQueryState();
@@ -650,7 +651,7 @@ namespace ompl
             void cleanupTemporaryVerticies();
 
             /** \brief Testing code for integrating Decartes */
-            void addCartPath(std::vector<base::State*> path);
+            bool addCartPath(std::vector<base::State*> path);
 
             /**
              * \brief Helper for connecting both sides of a cartesian path into a dual level graph
@@ -727,7 +728,6 @@ namespace ompl
 
             /** \brief Track vertex for later removal if temporary */
             std::vector<Vertex> tempVerticies_;
-            bool hasCartesianDistances_;
             Vertex startConnectorVertex_;
             Vertex endConnectorVertex_;
             double distanceAcrossCartesian_;
@@ -736,6 +736,8 @@ namespace ompl
             /** \brief Various options for visualizing the algorithmns performance */
             bool visualizeAstar_;
             bool visualizeGridGeneration_;
+            bool visualizeCartNeighbors_;
+            bool visualizeCartPath_;
 
             /** \brief Distance between grid points (discretization level) */
             double sparseDelta_;
