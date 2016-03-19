@@ -1,7 +1,7 @@
 /*********************************************************************
  * Software License Agreement (BSD License)
  *
- *  Copyright (c) 2013, University of Colorado, Boulder
+ *  Copyright (c) 2016, University of Colorado, Boulder
  *  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
@@ -154,9 +154,11 @@ class BoltRetrieveRepair : public base::Planner
     /**
      * \brief Finds nodes in the graph near state NOTE: note tested for visibility
      * \param state - vertex to find neighbors around
+     * \param graphNeighborhood - result vector
+     * \param requiredLevel - if -1, allows states from all levels, otherwise only returns states from a certain level
      * \return false is no neighbors found
      */
-    bool findGraphNeighbors(const base::State *state, std::vector<BoltDB::Vertex> &graphNeighborhood);
+    bool findGraphNeighbors(const base::State *state, std::vector<BoltDB::Vertex> &graphNeighborhood, int requiredLevel = -1);
 
     /** \brief Check if there exists a solution, i.e., there exists a pair of milestones such that the
         first is in \e start and the second is in \e goal, and the two milestones are in the same

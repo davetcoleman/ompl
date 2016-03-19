@@ -1,7 +1,7 @@
 /*********************************************************************
  * Software License Agreement (BSD License)
  *
- *  Copyright (c) 2013, University of Colorado, Boulder
+ *  Copyright (c) 2016, University of Colorado, Boulder
  *  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
@@ -92,7 +92,7 @@ void BoltRetrieveRepair::freeMemory(void)
 base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCondition &ptc)
 {
     OMPL_INFORM("-------------------------------------------------------");
-    OMPL_INFORM("BoltRetriveRepair::solve()");
+    OMPL_INFORM("BoltRetrieveRepair::solve()");
     OMPL_INFORM("-------------------------------------------------------");
 
     bool solved = false;
@@ -107,11 +107,25 @@ base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCond
     }
 
     // Restart the Planner Input States so that the first start and goal state can be fetched
-    pis_.restart(); // PlannerInputStates
+    pis_.restart();  // PlannerInputStates
 
     // Get a single start and goal state TODO: more than one
-    const base::State *startState = pis_.nextStart(); // PlannerInputStates
+    OMPL_INFORM("Getting OMPL start state");
+    const base::State *startState = pis_.nextStart();  // PlannerInputStates
+    OMPL_INFORM("Getting OMPL goal state");
     const base::State *goalState = pis_.nextGoal(ptc);
+
+    // Error check
+    if (boltDB_->getTaskLevel(startState) != 0)
+    {
+        OMPL_ERROR("solve: start level is %u", boltDB_->getTaskLevel(startState));
+        exit(-1);
+    }
+    if (boltDB_->getTaskLevel(goalState) != 2)
+    {
+        OMPL_ERROR("solve: goal level is %u", boltDB_->getTaskLevel(goalState));
+        exit(-1);
+    }
 
     // Create solution path struct
     BoltDB::CandidateSolution candidateSolution;
@@ -123,8 +137,7 @@ base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCond
         return base::PlannerStatus::TIMEOUT;  // The planner failed to find a solution
     }
 
-    OMPL_INFORM("getPathOffGraph() found a solution of size %d",
-                candidateSolution.getStateCount());
+    OMPL_INFORM("getPathOffGraph() found a solution of size %d", candidateSolution.getStateCount());
 
     // Save this for future debugging
     foundPath_.reset(new PathGeometric(candidateSolution.getGeometricPath()));
@@ -268,6 +281,13 @@ bool BoltRetrieveRepair::getPathOnGraph(const std::vector<BoltDB::Vertex> &candi
     // Try every combination of nearby start and goal pairs
     BOOST_FOREACH (BoltDB::Vertex start, candidateStarts)
     {
+        if (actualStart == boltDB_->stateProperty_[start])
+        {
+            OMPL_ERROR("Comparing same start state");
+            exit(-1);  // just curious if this ever happens, no need to actually exit
+            continue;
+        }
+
         // Check if this start is visible from the actual start
         if (!si_->checkMotion(actualStart, boltDB_->stateProperty_[start]))
         {
@@ -285,6 +305,12 @@ bool BoltRetrieveRepair::getPathOnGraph(const std::vector<BoltDB::Vertex> &candi
 
         BOOST_FOREACH (BoltDB::Vertex goal, candidateGoals)
         {
+            if (actualGoal == boltDB_->stateProperty_[goal])
+            {
+                OMPL_ERROR("Comparing same goal state");
+                continue;
+            }
+
             if (verbose_)
                 OMPL_INFORM("    foreach_goal: Checking motion from  %d to %d", actualGoal,
                             boltDB_->stateProperty_[goal]);
@@ -344,6 +370,29 @@ bool BoltRetrieveRepair::lazyCollisionSearch(const BoltDB::Vertex &start, const 
         if (verbose_)
             OMPL_INFORM("    Start equals goal, skipping ");
         return false;  // TODO(davetcoleman): should this be skipped, or maybe returned as the solution?
+    }
+
+    assert(actualStart);
+    assert(actualGoal);
+    assert(boltDB_->stateProperty_[start]);
+    assert(boltDB_->stateProperty_[goal]);
+
+    // Visualize start vertex
+    const bool visualize = false;
+    if (visualize)
+    {
+      OMPL_INFORM("viz start -----------------------------");
+      vizStateCallback(boltDB_->stateProperty_[start], 4, 1);
+      vizEdgeCallback(actualStart, boltDB_->stateProperty_[start], 30);
+      vizTriggerCallback();
+      usleep(5 * 1000000);
+
+      // Visualize goal vertex
+      OMPL_INFORM("viz goal ------------------------------");
+      vizStateCallback(boltDB_->stateProperty_[goal], 4, 1);
+      vizEdgeCallback(actualGoal, boltDB_->stateProperty_[goal], 0);
+      vizTriggerCallback();
+      usleep(5 * 1000000);
     }
 
     // Keep looking for paths between chosen start and goal until one is found that is valid,
@@ -457,7 +506,8 @@ bool BoltRetrieveRepair::lazyCollisionCheck(std::vector<BoltDB::Vertex> &vertexP
     return !hasInvalidEdges;
 }
 
-bool BoltRetrieveRepair::findGraphNeighbors(const base::State *state, std::vector<BoltDB::Vertex> &graphNeighborhood)
+bool BoltRetrieveRepair::findGraphNeighbors(const base::State *state, std::vector<BoltDB::Vertex> &graphNeighborhood,
+                                            int requiredLevel)
 {
     // Benchmark runtime
     time::point startTime = time::now();
@@ -476,12 +526,39 @@ bool BoltRetrieveRepair::findGraphNeighbors(const base::State *state, std::vecto
     // Reset
     boltDB_->stateProperty_[boltDB_->queryVertex_] = NULL;
 
+    // Filter neighbors based on level
+    if (requiredLevel >= 0)
+    {
+
+        /*
+            // Remove edges based on layer
+            for (std::size_t i = 0; i < graphNeighborhood.size(); ++i)
+            {
+                const Vertex &nearVertex = graphNeighborhood[i];
+
+                // Make sure state is on correct level
+                if (getTaskLevel(nearVertex) != level)
+                {
+                    std::cout << "      Skipping neighbor " << nearVertex << ", i=" << i
+                              << ", because wrong level: " << getTaskLevel(nearVertex) << ", desired level: " << level
+                              << std::endl;
+                    graphNeighborhood.erase(graphNeighborhood.begin() + i);
+                    i--;
+                    continue;
+                }
+            }
+        */
+    }
+
     // Check if no neighbors found
     bool result = graphNeighborhood.size();
 
     // Benchmark runtime
     double duration = time::seconds(time::now() - startTime);
-    OMPL_INFORM(" - findGraphNeighbors() took %f seconds (%f hz)", duration, 1.0/duration);
+    OMPL_INFORM(" - findGraphNeighbors() took %f seconds (%f hz)", duration, 1.0 / duration);
+
+    // Free memory
+    si_->getStateSpace()->freeState(stateCopy);
 
     return result;
 }
@@ -583,8 +660,8 @@ bool BoltRetrieveRepair::canConnect(const base::State *randomState, const base::
     std::size_t count = 0;
     BOOST_FOREACH (BoltDB::Vertex nearState, candidateNeighbors)
     {
-        const base::State* s1 = randomState;
-        const base::State* s2 = boltDB_->stateProperty_[nearState];
+        const base::State *s1 = randomState;
+        const base::State *s2 = boltDB_->stateProperty_[nearState];
 
         // Check if this nearState is visible from the random state
         if (!si_->checkMotion(s1, s2))
@@ -593,7 +670,7 @@ bool BoltRetrieveRepair::canConnect(const base::State *randomState, const base::
 
             if (false)
             {
-                vizStateCallback(s2, 2, 1); // BLUE
+                vizStateCallback(s2, 2, 1);  // BLUE
                 vizEdgeCallback(s1, s2, 100);
                 vizTriggerCallback();
                 usleep(1000000);
@@ -602,14 +679,14 @@ bool BoltRetrieveRepair::canConnect(const base::State *randomState, const base::
             if (false)
             {
                 std::cout << "checking path " << std::endl;
-                std::vector<base::State*> states;
+                std::vector<base::State *> states;
                 unsigned int count = si_->getStateSpace()->validSegmentCount(s1, s2);
-                //std::cout << "count: " << count << std::endl;
+                // std::cout << "count: " << count << std::endl;
 
                 bool endpoints = false;
                 bool alloc = true;
                 si_->getMotionStates(s1, s2, states, count, endpoints, alloc);
-                //std::cout << "state size: " << states.size() << std::endl;
+                // std::cout << "state size: " << states.size() << std::endl;
 
                 BOOST_FOREACH (base::State *interState, states)
                 {
@@ -622,13 +699,13 @@ bool BoltRetrieveRepair::canConnect(const base::State *randomState, const base::
 
                     if (!si_->isValid(interState))
                     {
-                        vizStateCallback(interState, 3, 1); // RED
+                        vizStateCallback(interState, 3, 1);  // RED
                         vizTriggerCallback();
                         usleep(2000000);
                     }
                     else
                     {
-                        //vizStateCallback(interState, 1, 1); // GREEN
+                        // vizStateCallback(interState, 1, 1); // GREEN
                     }
                 }
             }
