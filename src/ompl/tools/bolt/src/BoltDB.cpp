@@ -1572,11 +1572,20 @@ void og::BoltDB::cleanupTemporaryVerticies()
 
 bool og::BoltDB::addCartPath(std::vector<base::State *> path)
 {
+    // Error check
+    if (path.size() < 2)
+    {
+        OMPL_ERROR("Invalid cartesian path - too few states");
+        exit(-1);
+    }
     // TODO: check for validity
 
     // Create verticies for the extremas
     Vertex startVertex = addVertex(path.front(), CARTESIAN);
     Vertex goalVertex = addVertex(path.back(), CARTESIAN);
+
+    // Record min cost for cost-to-go heurstic distance function later
+    distanceAcrossCartesian_ = distanceFunction(startVertex, goalVertex);
 
     // Connect Start to graph --------------------------------------
     std::cout << "  start connector ---------" << std::endl;
@@ -1586,9 +1595,6 @@ bool og::BoltDB::addCartPath(std::vector<base::State *> path)
         OMPL_ERROR("Failed to connect start of cartesian path");
         return false;
     }
-
-    // Record min cost for cost-to-go heurstic distance function later
-    distanceAcrossCartesian_ = distanceFunction(startVertex, goalVertex);
 
     // Connect goal to graph --------------------------------------
     std::cout << "  goal connector ----------------" << std::endl;
@@ -1623,7 +1629,7 @@ bool og::BoltDB::addCartPath(std::vector<base::State *> path)
             vizEdgeCallback(path[i - 1], path[i], 0);
             vizStateCallback(path[i], 1, 1);
             vizTriggerCallback();
-            usleep(0.1 * 1000000);
+            usleep(0.001 * 1000000);
         }
     }
 
@@ -1675,7 +1681,7 @@ bool og::BoltDB::connectStateToNeighborsAtLevel(const Vertex &fromVertex, const 
             vizEdgeCallback(stateProperty_[v], stateProperty_[fromVertex], cost);
             vizStateCallback(stateProperty_[v], 1, 1);
             vizTriggerCallback();
-            usleep(1.0 * 1000000);
+            usleep(0.001 * 1000000);
         }
     }
 
@@ -1738,4 +1744,94 @@ void og::BoltDB::viz2Edge(Edge &e)
 
     // Visualize
     viz2EdgeCallback(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
+}
+
+bool og::BoltDB::checkTaskPathSolution(og::PathGeometric &path, ob::State* start, ob::State* goal)
+{
+  bool error = false;
+  int current_level = 0;
+
+  for (std::size_t i = 0; i < path.getStateCount(); ++i)
+  {
+    int level = si_->getStateSpace()->getLevel(path.getState(i));
+
+    // Check if start state is correct
+    if (i == 0)
+    {
+      if (!si_->getStateSpace()->equalStates(path.getState(i), start))
+      {
+        OMPL_ERROR("Start state of path is not same as original problem");
+        error = true;
+      }
+
+      if (level != 0)
+      {
+        OMPL_ERROR("Start state is not at level 0, instead %i", level);
+        error = true;
+      }
+    }
+
+    // Check if goal state is correct
+    if (i == path.getStateCount() - 1)
+    {
+      if (!si_->getStateSpace()->equalStates(path.getState(i), goal))
+      {
+        OMPL_ERROR("Goal state of path is not same as original problem");
+        error = true;
+      }
+
+      if (level != 2)
+      {
+        OMPL_ERROR("Goal state is not at level 2, instead %i", level);
+        error = true;
+      }
+    }
+
+    // Ensure that level is always increasing
+    if (level < current_level)
+    {
+      OMPL_ERROR("State decreased in level (%i) from previous level of ", current_level);
+      error = true;
+    }
+    current_level = level;
+
+  }  // for loop
+
+  // Show more data if error
+  if (error)
+  {
+    OMPL_ERROR("Showing data on path:");
+    for (std::size_t i = 0; i < path.getStateCount(); ++i)
+    {
+      int level = si_->getStateSpace()->getLevel(path.getState(i));
+      OMPL_INFORM(" - Path state %i has level %i", i, level);
+    }
+  }
+
+  return error;
+}
+
+void og::BoltDB::checkStateType()
+{
+    std::size_t count = 0;
+    BOOST_FOREACH (const Vertex v, boost::vertices(g_))
+    {
+        // The first vertex (id=0) should have a NULL state because it is used for searching
+        if (!stateProperty_[v])
+        {
+            if (count != 0)
+            {
+                OMPL_ERROR("Null state found for vertex that is not zero");
+            }
+            continue;
+        }
+
+        std::size_t level = getTaskLevel(stateProperty_[v]);
+        if (level < 0 || level > 2)
+        {
+            OMPL_ERROR("State is on wrong level: %u", level);
+            exit(-1);
+        }
+    }
+    OMPL_INFORM("All states checked for task level");
 }

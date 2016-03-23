@@ -543,8 +543,12 @@ bool BoltRetrieveRepair::findGraphNeighbors(const base::State *state, std::vecto
     boltDB_->stateProperty_[boltDB_->queryVertex_] = stateCopy;
 
     // Search
-    static const double FIND_NEAREST_K_NEIGHBORS = 30;
-    boltDB_->nn_->nearestK(boltDB_->queryVertex_, FIND_NEAREST_K_NEIGHBORS, graphNeighborhood);
+    double find_nearest_k_neighbors;
+    if (si_->getStateSpace()->getDimension() == 3)
+        find_nearest_k_neighbors = 10;
+    else
+        find_nearest_k_neighbors = 30;
+    boltDB_->nn_->nearestK(boltDB_->queryVertex_, find_nearest_k_neighbors, graphNeighborhood);
 
     // Reset
     boltDB_->stateProperty_[boltDB_->queryVertex_] = NULL;
@@ -578,7 +582,7 @@ bool BoltRetrieveRepair::removeVerticesNotOnLevel(std::vector<BoltDB::Vertex> &g
         const BoltDB::Vertex &nearVertex = graphNeighborhood[i];
 
         // Make sure state is on correct level
-        if (boltDB_->getTaskLevel(nearVertex) != level)
+        if (boltDB_->getTaskLevel(nearVertex) != static_cast<std::size_t>(level))
         {
             std::cout << "      Skipping neighbor " << nearVertex << ", i=" << i
                       << ", because wrong level: " << boltDB_->getTaskLevel(nearVertex) << ", desired level: " << level
