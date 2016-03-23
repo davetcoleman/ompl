@@ -670,6 +670,12 @@ namespace ompl
             /** \brief Shortcut for visualizing an edge */
             void viz2Edge(Edge &e);
 
+            /** \brief Error checking function to ensure solution has correct task path/level changes */
+            bool checkTaskPathSolution(geometric::PathGeometric &path, base::State* start, base::State* goal);
+
+            /** \brief Check that all states are the correct type */
+            void checkStateType();
+
         protected:
             /** \brief The created space information */
             base::SpaceInformationPtr si_;
