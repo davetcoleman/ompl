@@ -177,9 +177,12 @@ base::PlannerStatus Bolt::solve(const base::PlannerTerminationCondition &ptc)
         std::cout << "-----------------------------------------------------------" << std::endl;
         std::cout << ANSI_COLOR_RESET;
 
-        // Smooth the result
-        OMPL_INFORM("Disabled smoothing in Bolt.cpp");
-        //simplifySolution(ptc);
+        // TEMP
+        // const base::PathPtr &p = pdef_->getSolutionPath();
+        // if (!p)
+        //     OMPL_ERROR("No solution path");
+        // og::PathGeometric &path = static_cast<og::PathGeometric&>(*p);
+        //og::PathGeometric solutionPath = path;
 
         og::PathGeometric solutionPath = og::SimpleSetup::getSolutionPath(); // copied so that it is non-const
         OMPL_INFORM("Solution path has %d states and was generated from planner %s", solutionPath.getStateCount(), getSolutionPlannerName().c_str());
@@ -337,28 +340,6 @@ void Bolt::convertPlannerData(const ob::PlannerDataPtr plannerData, og::PathGeom
         path.append(plannerData->getVertex(i).getState());
 }
 
-bool Bolt::reversePathIfNecessary(og::PathGeometric &path1, og::PathGeometric &path2)
-{
-    // Reverse path2 if it matches better
-    const ob::State* s1 = path1.getState(0);
-    const ob::State* s2 = path2.getState(0);
-    const ob::State* g1 = path1.getState(path1.getStateCount()-1);
-    const ob::State* g2 = path2.getState(path2.getStateCount()-1);
-
-    double regularDistance  = si_->distance(s1,s2) + si_->distance(g1,g2);
-    double reversedDistance = si_->distance(s1,g2) + si_->distance(s2,g1);
-
-    // Check if path is reversed from normal [start->goal] direction
-    if ( regularDistance > reversedDistance )
-    {
-        // needs to be reversed
-        path2.reverse();
-        return true;
-    }
-
-    return false;
-}
-
 geometric::BoltDBPtr Bolt::getExperienceDB()
 {
     return boltDB_;
@@ -366,12 +347,11 @@ geometric::BoltDBPtr Bolt::getExperienceDB()
 
 bool Bolt::doPostProcessing()
 {
-    //OMPL_WARN("Post processing does not work yet, perhaps unsolvable in current form");
     queuedSolutionPaths_.clear();
-    return true;
 
     OMPL_INFORM("Performing post-processing for %i queued solution paths", queuedSolutionPaths_.size());
 
+    /*
     for (std::size_t i = 0; i < queuedSolutionPaths_.size(); ++i)
     {
         // Time to add a path to experience database
@@ -385,12 +365,14 @@ bool Bolt::doPostProcessing()
         OMPL_INFORM("Finished inserting experience path in %f seconds", insertionTime);
         stats_.totalInsertionTime_ += insertionTime; // used for averaging
     }
+    */
 
     // Remove all inserted paths from the queue
     queuedSolutionPaths_.clear();
 
     // Ensure graph doesn't get too popular
-    boltDB_->normalizeGraphEdgeWeights();
+    if (boltDB_->getPopularityBiasEnabled())
+        boltDB_->normalizeGraphEdgeWeights();
 
     return true;
 }

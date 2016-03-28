@@ -169,14 +169,6 @@ namespace ompl
             /** \brief Convert PlannerData to PathGeometric. Assume ordering of verticies is order of path */
             void convertPlannerData(const base::PlannerDataPtr plannerData, geometric::PathGeometric &path);
 
-            /**
-             * \brief If path1 and path2 have a better start/goal match when reverse, then reverse path2
-             * \param path to test against
-             * \param path to reverse
-             * \return true if reverse was necessary
-             */
-            bool reversePathIfNecessary(geometric::PathGeometric &path1, geometric::PathGeometric &path2);
-
             /** \brief Hook for getting access to debug data */
             geometric::BoltDBPtr getExperienceDB();
 
