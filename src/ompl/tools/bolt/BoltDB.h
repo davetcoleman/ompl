@@ -244,6 +244,7 @@ namespace ompl
 
             ////////////////////////////////////////////////////////////////////////////////////////
             /** \brief Struct for passing around partially solved solutions */
+            /*
             struct CandidateSolution
             {
                 base::PathPtr path_;
@@ -261,7 +262,7 @@ namespace ompl
                     return static_cast<ompl::geometric::PathGeometric&>(*path_);
                 }
             };
-
+            */
             ////////////////////////////////////////////////////////////////////////////////////////
             /**
                \brief The underlying roadmap graph.
@@ -676,6 +677,19 @@ namespace ompl
             /** \brief Check that all states are the correct type */
             void checkStateType();
 
+            /** \brief Getter for using task planning flag */
+            const bool& getUseTaskPlanning() const
+            {
+                return useTaskPlanning_;
+            }
+
+            /** \brief Setter for using task planning flag */
+
+            void setUseTaskPlanning(const bool& useTaskPlanning)
+            {
+                useTaskPlanning_ = useTaskPlanning;
+            }
+
         protected:
             /** \brief The created space information */
             base::SpaceInformationPtr si_;
@@ -737,6 +751,9 @@ namespace ompl
             Vertex startConnectorVertex_;
             Vertex endConnectorVertex_;
             double distanceAcrossCartesian_;
+
+            /** \brief Are we task planning i.e. for hybrid cartesian paths? */
+            bool useTaskPlanning_;
 
         public:
             /** \brief Various options for visualizing the algorithmns performance */

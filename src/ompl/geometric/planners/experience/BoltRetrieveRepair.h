@@ -138,7 +138,7 @@ class BoltRetrieveRepair : public base::Planner
      * \return
      */
     bool getPathOffGraph(const base::State *start, const base::State *goal,
-                         BoltDB::CandidateSolution &candidateSolution, const base::PlannerTerminationCondition &ptc);
+                         ompl::geometric::PathGeometric &geometricSolution, const base::PlannerTerminationCondition &ptc);
 
     /** \brief Clear verticies not on the specified level */
     bool removeVerticesNotOnLevel(std::vector<BoltDB::Vertex> &graphNeighborhood, int level);
@@ -152,7 +152,7 @@ class BoltRetrieveRepair : public base::Planner
      * \return true on success
      */
     bool convertVertexPathToStatePath(std::vector<BoltDB::Vertex> &vertexPath, const base::State *actualStart,
-        const base::State *actualGoal, BoltDB::CandidateSolution &candidateSolution);
+        const base::State *actualGoal, ompl::geometric::PathGeometric &geometricSolution);
 
     /**
      * \brief Finds nodes in the graph near state NOTE: note tested for visibility
@@ -168,7 +168,7 @@ class BoltRetrieveRepair : public base::Planner
         connected component. If a solution is found, the path is saved. */
     bool getPathOnGraph(const std::vector<BoltDB::Vertex> &candidateStarts,
                         const std::vector<BoltDB::Vertex> &candidateGoals, const base::State *actualStart,
-                        const base::State *actualGoal, BoltDB::CandidateSolution &candidateSolution,
+                        const base::State *actualGoal, ompl::geometric::PathGeometric &geometricSolution,
                         const base::PlannerTerminationCondition &ptc);
 
     /**
@@ -176,7 +176,7 @@ class BoltRetrieveRepair : public base::Planner
      * \return true if a valid path is found
      */
     bool lazyCollisionSearch(const BoltDB::Vertex &start, const BoltDB::Vertex &goal, const base::State *actualStart,
-                             const base::State *actualGoal, BoltDB::CandidateSolution &candidateSolution,
+                             const base::State *actualGoal, ompl::geometric::PathGeometric &geometricSolution,
                              const base::PlannerTerminationCondition &ptc);
 
     /** \brief Check recalled path for collision and disable as needed */
@@ -201,7 +201,7 @@ class BoltRetrieveRepair : public base::Planner
     BoltDBPtr boltDB_;
 
     /** \brief Save the recalled path before smoothing for introspection later */
-    boost::shared_ptr<PathGeometric> foundPath_;
+    boost::shared_ptr<PathGeometric> originalSolutionPath_;
 
     /** \brief The instance of the path simplifier */
     PathSimplifierPtr path_simplifier_;
