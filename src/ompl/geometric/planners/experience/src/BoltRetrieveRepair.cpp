@@ -605,13 +605,12 @@ bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<BoltDB::Vertex
     }
 
     // Error check that no consequtive verticies are the same
-    std::cout << "-------------------------------------------------------" << std::endl;
-    std::cout << "Vertices: " << std::endl;
+    /*std::cout << "BoltRetrieveRepair.Vertices: ";
     for (std::size_t i = vertexPath.size(); i > 0; --i)
     {
         std::cout << vertexPath[i - 1] << ", ";
     }
-    std::cout << std::endl;
+    std::cout << std::endl;*/
 
     // Reverse the vertexPath and convert to state path
     for (std::size_t i = vertexPath.size(); i > 0; --i)
@@ -622,6 +621,7 @@ bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<BoltDB::Vertex
         if (vertexPath[i - 1] == vertexPath[i - 2])
         {
             OMPL_ERROR("Found repeated vertices %u to %u on index %u", vertexPath[i - 1], vertexPath[i - 2], i);
+            exit(-1);
         }
 
         // Add the edge status
@@ -629,6 +629,7 @@ bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<BoltDB::Vertex
         {
             BoltDB::Edge edge = boost::edge(vertexPath[i - 1], vertexPath[i - 2], boltDB_->g_).first;
 
+            /* This functionality has moved to BoltDB
             if (boltDB_->getPopularityBiasEnabled())
             {
                 // reduce cost of this edge because it was just used
@@ -639,6 +640,7 @@ bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<BoltDB::Vertex
                     std::max(boltDB_->edgeWeightProperty_[edge] - REDUCTION_AMOUNT, 0.0);
                 std::cout << " new: " << boltDB_->edgeWeightProperty_[edge] << std::endl;
             }
+            */
 
             // Check if any edges in path are not free (then it an approximate path)
             if (boltDB_->edgeCollisionStateProperty_[edge] == BoltDB::IN_COLLISION)
