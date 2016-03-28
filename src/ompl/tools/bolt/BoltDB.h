@@ -330,6 +330,7 @@ namespace ompl
                 const Graph& g_;  // Graph used
                 const EdgeCollisionStateMap& collisionStates_;
                 const double popularityBias_;
+                const bool popularityBiasEnabled_;
 
             public:
                 /** Map key type. */
@@ -345,7 +346,8 @@ namespace ompl
                  * Construct map for certain constraints.
                  * \param graph         Graph to use
                  */
-                edgeWeightMap(const Graph& graph, const EdgeCollisionStateMap& collisionStates, const double& popularityBias);
+                edgeWeightMap(const Graph& graph, const EdgeCollisionStateMap& collisionStates,
+                    const double& popularityBias, const bool popularityBiasEnabled);
 
                 /**
                  * Get the weight of an edge.
@@ -431,6 +433,18 @@ namespace ompl
              * \return true on success
              */
             bool postProcessPath(ompl::geometric::PathGeometric& solutionPath, double& insertionTime);
+
+            /**
+             * \brief Call itself recursively for each point in the trajectory, looking for vertices on the graph to connect to
+             * \param inputPath - smoothed trajectory that we want to now convert into a 'snapped' trajectory
+             * \param roadmapPath - resulting path that is 'snapped' onto the pre-existing roadmap
+             * \param currVertexIndex - index in inputPath (smoothed path) that we are trying to connect to
+             * \param prevGraphVertex - vertex we are trying to connect to
+             * \param allValid - flag to determine if any of the edges were never found to be valdi
+             * \return true on success
+             */
+            bool recurseSnapWaypoints(ompl::geometric::PathGeometric& inputPath, std::vector<Vertex>& roadmapPath,
+                std::size_t currVertexIndex, const Vertex& prevGraphVertex, bool& allValid);
 
             /**
              * \brief Save loaded database to file, except skips saving if no paths have been added
@@ -628,6 +642,33 @@ namespace ompl
             void setViz2Callbacks(ompl::base::VizStateCallback vizStateCallback, ompl::base::VizEdgeCallback vizEdgeCallback,
                 ompl::base::VizTriggerCallback vizTriggerCallback);
 
+            /** \brief Visualize a planner's data during runtime, externally, using a function callback
+             *         This could be called whenever the graph changes */
+            void viz3StateCallback(const ompl::base::State* state, std::size_t type, double neighborRadius)
+            {
+                if (viz3StateCallback_)
+                    viz3StateCallback_(state, type, neighborRadius);
+            }
+
+            /** \brief Visualize a planner's data during runtime, externally, using a function callback
+             *         This could be called whenever the graph changes */
+            void viz3EdgeCallback(const ompl::base::State* stateA, const ompl::base::State* stateB, double cost)
+            {
+                if (viz3EdgeCallback_)
+                    viz3EdgeCallback_(stateA, stateB, cost);
+            }
+
+            /** \brief Trigger visualizer to publish graphics */
+            void viz3TriggerCallback()
+            {
+                if (viz3TriggerCallback_)
+                    viz3TriggerCallback_();
+            }
+
+            /** \brief Set the callback to visualize/publish a planner's progress */
+            void setViz3Callbacks(ompl::base::VizStateCallback vizStateCallback, ompl::base::VizEdgeCallback vizEdgeCallback,
+                ompl::base::VizTriggerCallback vizTriggerCallback);
+
             /** \brief Keep graph evenly weighted */
             void normalizeGraphEdgeWeights();
 
@@ -752,6 +793,11 @@ namespace ompl
             ompl::base::VizStateCallback viz2StateCallback_;
             ompl::base::VizEdgeCallback viz2EdgeCallback_;
             ompl::base::VizTriggerCallback viz2TriggerCallback_;
+
+            /** \brief Optional third callbacks to allow easy introspection of database */
+            ompl::base::VizStateCallback viz3StateCallback_;
+            ompl::base::VizEdgeCallback viz3EdgeCallback_;
+            ompl::base::VizTriggerCallback viz3TriggerCallback_;
 
             /** \brief Discretization helper */
             base::State* nextDiscretizedState_;

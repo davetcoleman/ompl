@@ -617,16 +617,16 @@ bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<BoltDB::Vertex
     {
         geometricSolution.append(boltDB_->stateProperty_[vertexPath[i - 1]]);
 
-        // Error check that no consequtive verticies are the same
-        if (vertexPath[i - 1] == vertexPath[i - 2])
-        {
-            OMPL_ERROR("Found repeated vertices %u to %u on index %u", vertexPath[i - 1], vertexPath[i - 2], i);
-            exit(-1);
-        }
-
         // Add the edge status
         if (i > 1)  // skip the last vertex (its reversed)
         {
+            // Error check that no consequtive verticies are the same
+            if (vertexPath[i - 1] == vertexPath[i - 2])
+            {
+                OMPL_ERROR("Found repeated vertices %u to %u on index %u", vertexPath[i - 1], vertexPath[i - 2], i);
+                exit(-1);
+            }
+
             BoltDB::Edge edge = boost::edge(vertexPath[i - 1], vertexPath[i - 2], boltDB_->g_).first;
 
             /* This functionality has moved to BoltDB

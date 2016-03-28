@@ -70,8 +70,8 @@ BOOST_CONCEPT_ASSERT(
     (boost::ReadablePropertyMapConcept<ompl::geometric::BoltDB::edgeWeightMap, ompl::geometric::BoltDB::Edge>));
 
 og::BoltDB::edgeWeightMap::edgeWeightMap(const Graph &graph, const EdgeCollisionStateMap &collisionStates,
-                                         const double &popularityBias)
-  : g_(graph), collisionStates_(collisionStates), popularityBias_(popularityBias)
+    const double &popularityBias, const bool popularityBiasEnabled)
+    : g_(graph), collisionStates_(collisionStates), popularityBias_(popularityBias), popularityBiasEnabled_(popularityBiasEnabled)
 {
 }
 
@@ -85,16 +85,15 @@ double og::BoltDB::edgeWeightMap::get(Edge e) const
         return std::numeric_limits<double>::infinity();
 
     double weight;
-    if (popularityBias_ == 0.0)
-    {
-        // Method 1
-        weight = boost::get(boost::edge_weight, g_, e);
-    }
-    else  // Method 2
+    if (popularityBiasEnabled_)
     {
         // static const double popularityBias = 10;
         weight = boost::get(boost::edge_weight, g_, e) / MAX_POPULARITY_WEIGHT * popularityBias_;
-        // std::cout << "getting popularity weight of edge " << e << " with value " << weight << std::endl;
+        //std::cout << "getting popularity weight of edge " << e << " with value " << weight << std::endl;
+    }
+    else
+    {
+        weight = boost::get(boost::edge_weight, g_, e);
     }
 
     // Method 3 - less optimal but faster planning time
@@ -108,10 +107,10 @@ double og::BoltDB::edgeWeightMap::get(Edge e) const
 
 namespace boost
 {
-double get(const og::BoltDB::edgeWeightMap &m, const og::BoltDB::Edge &e)
-{
-    return m.get(e);
-}
+    double get(const og::BoltDB::edgeWeightMap &m, const og::BoltDB::Edge &e)
+    {
+        return m.get(e);
+    }
 }
 
 // CustomAstarVisitor methods ////////////////////////////////////////////////////////////////////////////
@@ -144,25 +143,25 @@ void og::BoltDB::CustomAstarVisitor::examine_vertex(Vertex v, const Graph &) con
 // Actual class ////////////////////////////////////////////////////////////////////////////
 
 og::BoltDB::BoltDB(base::SpaceInformationPtr si)
-  : si_(si)
-  , graphUnsaved_(false)
-  , savingEnabled_(true)
-  // Property accessors of edges
-  , edgeWeightProperty_(boost::get(boost::edge_weight, g_))
-  , edgeCollisionStateProperty_(boost::get(edge_collision_state_t(), g_))
-  // Property accessors of vertices
-  , stateProperty_(boost::get(vertex_state_t(), g_))
-  , typeProperty_(boost::get(vertex_type_t(), g_))
-  // interfaceDataProperty_(boost::get(vertex_interface_data_t(), g_)),
-  , popularityBiasEnabled_(false)
-  , verbose_(true)
-  , distanceAcrossCartesian_(0.0)
-  , visualizeAstar_(false)
-  , visualizeGridGeneration_(false)
-  , visualizeCartNeighbors_(false)
-  , visualizeCartPath_(false)
-  , sparseDelta_(2.0)
-  , visualizeAstarSpeed_(0.1)
+    : si_(si)
+    , graphUnsaved_(false)
+    , savingEnabled_(true)
+      // Property accessors of edges
+    , edgeWeightProperty_(boost::get(boost::edge_weight, g_))
+    , edgeCollisionStateProperty_(boost::get(edge_collision_state_t(), g_))
+      // Property accessors of vertices
+    , stateProperty_(boost::get(vertex_state_t(), g_))
+    , typeProperty_(boost::get(vertex_type_t(), g_))
+      // interfaceDataProperty_(boost::get(vertex_interface_data_t(), g_)),
+    , popularityBiasEnabled_(false)
+    , verbose_(true)
+    , distanceAcrossCartesian_(0.0)
+    , visualizeAstar_(false)
+    , visualizeGridGeneration_(false)
+    , visualizeCartNeighbors_(false)
+    , visualizeCartPath_(false)
+    , sparseDelta_(2.0)
+    , visualizeAstarSpeed_(0.1)
 {
     if (!nn_)
     {
@@ -256,7 +255,13 @@ bool og::BoltDB::load(const std::string &fileName)
     plannerDataStorage_.load(iStream, *plannerData.get());
 
     OMPL_INFORM("BoltDB: Loaded planner data with \n  %d vertices\n  %d edges", plannerData->numVertices(),
-                plannerData->numEdges());
+        plannerData->numEdges());
+
+    if (!plannerData->numVertices() || !plannerData->numEdges())
+    {
+        OMPL_ERROR("Corrupted planner data loaded, skipping building graph");
+        return false;
+    }
 
     // Add to db
     OMPL_INFORM("Adding plannerData to database.");
@@ -272,6 +277,8 @@ bool og::BoltDB::load(const std::string &fileName)
 
 bool og::BoltDB::postProcessPath(og::PathGeometric &solutionPath, double &insertionTime)
 {
+    bool verbose = false;
+
     // Prevent inserting into database
     if (!savingEnabled_)
     {
@@ -279,96 +286,35 @@ bool og::BoltDB::postProcessPath(og::PathGeometric &solutionPath, double &insert
         return false;
     }
 
-    // Add more points to path
-    solutionPath.interpolate();
-
-    // Get starting state
-    base::State *currentPathState = solutionPath.getStates()[0];
-
     // Clear all visuals
     //viz2StateCallback(currentPathState, 0, 1);
 
+    // Get starting state
+    base::State *currentPathState = solutionPath.getStates()[0];
+    std::size_t currVertexIndex = 1;
+
     // Find starting state's vertex
+    // TODO(davetcoleman): loop through all possible start vertices
     stateProperty_[queryVertex_] = currentPathState;
     Vertex prevGraphVertex = nn_->nearest(queryVertex_);
     vizStateCallback(stateProperty_[prevGraphVertex], 1, 1);
-
-    // Remember if any connections failed
-    bool allValid = true;
-
-    // Find multiple nearby nodes on the graph
-    std::vector<Vertex> graphNeighborhood;
 
     // Create new path that is 'snapped' onto the roadmap
     std::vector<Vertex> roadmapPath;
     roadmapPath.push_back(prevGraphVertex);
 
-    // Walk through whole trajectory
-    for (std::size_t i = 1; i < solutionPath.getStates().size(); ++i)
+    // Remember if any connections failed
+    bool allValid = true;
+
+    // Start recursive function
+    if (!recurseSnapWaypoints(solutionPath, roadmapPath, currVertexIndex, prevGraphVertex, allValid))
     {
-        currentPathState = solutionPath.getState(i);
-
-        // Find multiple nearby nodes on the graph
-        stateProperty_[queryVertex_] = currentPathState;
-        std::size_t findNearestKNeighbors = 10;
-        const std::size_t numSameVerticiesFound = 1;  // add 1 to the end because the NN tree always returns itself
-        graphNeighborhood.clear();
-        nn_->nearestK(queryVertex_, findNearestKNeighbors + numSameVerticiesFound, graphNeighborhood);
-
-        // Loop through each neighbor until one is found that connects to the previous vertex
-        bool foundValidConnToPrevious = false;
-        Vertex currGraphVertex;
-        for (std::size_t neighborID = 0; neighborID < graphNeighborhood.size(); ++neighborID)
-        {
-            // Find next state's vertex
-            currGraphVertex = graphNeighborhood[neighborID];
-
-            // Check if next vertex is same as previous
-            if (prevGraphVertex == currGraphVertex)
-            {
-                // Do not do anything, we are done here
-                foundValidConnToPrevious = true;
-                OMPL_INFORM("Previous vertex is same as current vertex, skipping current vertex");
-                break;
-            }
-
-            // Visualize nearby state
-            vizStateCallback(stateProperty_[currGraphVertex], 1, 1);
-            vizEdgeCallback(currentPathState, stateProperty_[currGraphVertex], 50);
-
-            // Check for collision
-            bool isValid = si_->checkMotion(stateProperty_[prevGraphVertex], stateProperty_[currGraphVertex]);
-            double color = isValid ? 0 : 100;
-
-            // Visualize
-            vizEdgeCallback(stateProperty_[prevGraphVertex], stateProperty_[currGraphVertex], color);
-
-            // Remember if any connections failed
-            if (isValid)
-            {
-                roadmapPath.push_back(currGraphVertex);
-
-                if (neighborID > 0)
-                {
-                    //OMPL_WARN("Found case where double loop fixed the problem");
-                    //vizTriggerCallback();
-                    //usleep(6*1000000);
-                }
-                foundValidConnToPrevious = true;
-                break;
-            }
-        }
-
-        if (!foundValidConnToPrevious)
-        {
-            OMPL_ERROR("Unable to find valid connection to previous");
-            allValid = false;
-        }
-
-        // Loop around
-        prevGraphVertex = currGraphVertex;
+        // TODO
+        OMPL_ERROR("Could not connect to second point in trajectory - TODO loop through first point neighbors");
+        return false;
     }
 
+    // Visualize
     vizTriggerCallback();
     usleep(0.1 * 1000000);
 
@@ -401,29 +347,29 @@ bool og::BoltDB::postProcessPath(og::PathGeometric &solutionPath, double &insert
         if (!edgeResult.second)
         {
             OMPL_ERROR("No edge found on snapped path at index %u", vertexID);
-
-            std::cout << "Visualizing missing edge: " << std::endl;
-            std::cout << "Vertex: " << roadmapPath[vertexID - 1] << std::endl;
-            std::cout << "Vertex: " << roadmapPath[vertexID] << std::endl;
-            std::cout << "State: " << stateProperty_[roadmapPath[vertexID - 1]] << std::endl;
-            std::cout << "State: " << stateProperty_[roadmapPath[vertexID]] << std::endl;
-            std::cout << std::endl;
-
-            //viz2EdgeCallback(stateProperty_[roadmapPath[vertexID - 1]], stateProperty_[roadmapPath[vertexID]], 0);
-            //viz2TriggerCallback();
-            //usleep(4*1000000);
+            viz3EdgeCallback(stateProperty_[roadmapPath[vertexID - 1]], stateProperty_[roadmapPath[vertexID]], 0);
+            viz3TriggerCallback();
+            usleep(4*1000000);
         }
         else
         {
             // reduce cost of this edge because it was just used (increase popularity)
             // Note: 100 is an *unpopular* edge, and 0 is a super highway
             static const double REDUCTION_AMOUNT = 10;
-            std::cout << "Edge weight for vertex " << vertexID << " of edge " << edge << std::endl;
-            std::cout << "    old: " << edgeWeightProperty_[edge];
+            if (verbose)
+            {
+                std::cout << "Edge weight for vertex " << vertexID << " of edge " << edge << std::endl;
+                std::cout << "    old: " << edgeWeightProperty_[edge];
+            }
             edgeWeightProperty_[edge] = std::max(edgeWeightProperty_[edge] - REDUCTION_AMOUNT, 0.0);
-            std::cout << " new: " << edgeWeightProperty_[edge] << std::endl;
+            if (verbose)
+                std::cout << " new: " << edgeWeightProperty_[edge] << std::endl;
+
+            // Visualize
+            viz3EdgeCallback(stateProperty_[roadmapPath[vertexID - 1]], stateProperty_[roadmapPath[vertexID]], 100);
         }
     }
+    viz3TriggerCallback();
 
     // Record this new addition
     graphUnsaved_ = true;
@@ -432,6 +378,136 @@ bool og::BoltDB::postProcessPath(og::PathGeometric &solutionPath, double &insert
     stateProperty_[queryVertex_] = NULL;
 
     return true;
+}
+
+bool og::BoltDB::recurseSnapWaypoints(og::PathGeometric& inputPath, std::vector<Vertex>& roadmapPath,
+    std::size_t currVertexIndex, const Vertex& prevGraphVertex, bool& allValid)
+
+{
+    bool verbose = false;
+
+    if (verbose)
+    {
+        std::cout << std::endl;
+        std::cout << std::string(currVertexIndex, ' ') + "recurseSnapWaypoints() -------" << std::endl;
+    }
+
+    // Find multiple nearby nodes on the graph
+    std::vector<Vertex> graphNeighborhood;
+
+    // Get the next state
+    base::State *currentPathState = inputPath.getState(currVertexIndex);
+
+    // Find multiple nearby nodes on the graph
+    stateProperty_[queryVertex_] = currentPathState;
+    std::size_t findNearestKNeighbors = 10;
+    const std::size_t numSameVerticiesFound = 1;  // add 1 to the end because the NN tree always returns itself
+    nn_->nearestK(queryVertex_, findNearestKNeighbors + numSameVerticiesFound, graphNeighborhood);
+
+    // Loop through each neighbor until one is found that connects to the previous vertex
+    bool foundValidConnToPrevious = false;
+    Vertex currGraphVertex;
+    for (std::size_t neighborID = 0; neighborID < graphNeighborhood.size(); ++neighborID)
+    {
+        bool isValid = false;
+        bool isRepeatOfPrevWaypoint = false; // don't add current waypoint if same as last one
+
+        // Developer feedback - help tune variable findNearestKNeighbors
+        if (neighborID > 4)
+        {
+            OMPL_WARN("Using a neighbor ID as high as %u", neighborID);
+        }
+
+        // Find next state's vertex
+        currGraphVertex = graphNeighborhood[neighborID];
+
+        // Check if next vertex is same as previous
+        if (prevGraphVertex == currGraphVertex)
+        {
+            // Do not do anything, we are done here
+            foundValidConnToPrevious = true;
+            if (verbose)
+                std::cout << std::string(currVertexIndex, ' ') <<
+                    "Previous vertex is same as current vertex, skipping current vertex" << std::endl;
+            isValid = true;
+            isRepeatOfPrevWaypoint = true;
+        }
+        else
+        {
+            // Visualize nearby state
+            vizStateCallback(stateProperty_[currGraphVertex], 1, 1);
+            vizEdgeCallback(currentPathState, stateProperty_[currGraphVertex], 30);
+
+            // Check for collision
+            isValid = si_->checkMotion(stateProperty_[prevGraphVertex], stateProperty_[currGraphVertex]);
+            double color = isValid ? 0 : 60;
+
+            // Visualize
+            vizEdgeCallback(stateProperty_[prevGraphVertex], stateProperty_[currGraphVertex], color);
+        }
+
+        // Remember if any connections failed
+        if (isValid)
+        {
+            if (verbose)
+                std::cout << std::string(currVertexIndex, ' ') + "Loop " << neighborID << " valid" << std::endl;
+            if (neighborID > 0)
+            {
+                OMPL_WARN("Found case where double loop fixed the problem - loop %u", neighborID);
+                //vizTriggerCallback();
+                //usleep(6*1000000);
+            }
+            foundValidConnToPrevious = true;
+
+            // Add this waypoint solution
+            if (!isRepeatOfPrevWaypoint)
+                roadmapPath.push_back(currGraphVertex);
+
+            // Check if there are more points to process
+            if (currVertexIndex + 1 >= inputPath.getStateCount())
+            {
+                if (verbose)
+                    std::cout << std::string(currVertexIndex, ' ') + "End reached" << std::endl;
+                return true;
+            }
+            else
+            {
+                // Recurisvely call next level
+                if (recurseSnapWaypoints(inputPath, roadmapPath, currVertexIndex + 1, currGraphVertex, allValid))
+                {
+                    return true;
+                }
+                else
+                {
+                    // Keep trying to find a working neighbor
+                    // remove last roadmapPath node
+                    roadmapPath.pop_back();
+                }
+            }
+        }
+        else
+        {
+            if (verbose)
+                std::cout << std::string(currVertexIndex, ' ') + "Loop " << neighborID << " not valid" << std::endl;
+        }
+    }
+
+    if (!foundValidConnToPrevious)
+    {
+        OMPL_ERROR("Unable to find valid connection to previous");
+        allValid = false;
+
+        // Visualize
+        vizTriggerCallback();
+        usleep(1 * 1000000);
+
+        return false;
+    }
+
+    // This should not happen?
+    OMPL_WARN("This should not happen");
+    exit(-1);
+    return false;
 }
 
 bool og::BoltDB::saveIfChanged(const std::string &fileName)
@@ -476,7 +552,7 @@ bool og::BoltDB::save(const std::string &fileName)
     base::PlannerDataPtr data(new base::PlannerData(si_));
     getPlannerData(*data);
     OMPL_INFORM("Saving PlannerData with \n  %d vertices\n  %d edges\n  %d start states\n  %d goal states",
-                data->numVertices(), data->numEdges(), data->numStartVertices(), data->numGoalVertices());
+        data->numVertices(), data->numEdges(), data->numStartVertices(), data->numGoalVertices());
 
     // Write the number of paths we will be saving
     double numPaths = 1;
@@ -538,15 +614,15 @@ bool og::BoltDB::astarSearch(const Vertex start, const Vertex goal, std::vector<
     {
         // Note: could not get astar_search to compile within BoltRetrieveRepair.cpp class because of namespacing issues
         boost::astar_search(g_,     // graph
-                            start,  // start state
-                                    // boost::bind(&og::BoltDB::distanceFunction2, this, _1, goal),  // the heuristic
-                            // boost::bind(&og::BoltDB::distanceFunction, this, _1, goal),  // the heuristic
-                            boost::bind(&og::BoltDB::distanceFunctionTasks, this, _1, goal),  // the heuristic
-                            // ability to disable edges (set cost to inifinity):
-                            boost::weight_map(edgeWeightMap(g_, edgeCollisionStateProperty_, popularityBias_))
-                                .predecessor_map(vertexPredecessors)
-                                .distance_map(&vertexDistances[0])
-                                .visitor(CustomAstarVisitor(goal, this)));
+            start,  // start state
+            // boost::bind(&og::BoltDB::distanceFunction2, this, _1, goal),  // the heuristic
+            // boost::bind(&og::BoltDB::distanceFunction, this, _1, goal),  // the heuristic
+            boost::bind(&og::BoltDB::distanceFunctionTasks, this, _1, goal),  // the heuristic
+            // ability to disable edges (set cost to inifinity):
+            boost::weight_map(edgeWeightMap(g_, edgeCollisionStateProperty_, popularityBias_, popularityBiasEnabled_))
+            .predecessor_map(vertexPredecessors)
+            .distance_map(&vertexDistances[0])
+            .visitor(CustomAstarVisitor(goal, this)));
     }
     catch (foundGoalException &)
     {
@@ -555,9 +631,9 @@ bool og::BoltDB::astarSearch(const Vertex start, const Vertex goal, std::vector<
 
         if (vertexDistances[goal] > 1.7e+308)  // TODO(davetcoleman): fix terrible hack for detecting infinity
                                                // double diff = d[goal] - std::numeric_limits<double>::infinity();
-        // if ((diff < std::numeric_limits<double>::epsilon()) && (-diff < std::numeric_limits<double>::epsilon()))
-        // check if the distance to goal is inifinity. if so, it is unreachable
-        // if (d[goal] >= std::numeric_limits<double>::infinity())
+            // if ((diff < std::numeric_limits<double>::epsilon()) && (-diff < std::numeric_limits<double>::epsilon()))
+            // check if the distance to goal is inifinity. if so, it is unreachable
+            // if (d[goal] >= std::numeric_limits<double>::infinity())
         {
             if (verbose_)
                 OMPL_INFORM("Distance to goal is infinity");
@@ -595,8 +671,11 @@ bool og::BoltDB::astarSearch(const Vertex start, const Vertex goal, std::vector<
         {
             const Vertex v1 = i;
             const Vertex v2 = vertexPredecessors[v1];
-            // std::cout << "Edge " << v1 << " to " << v2 << std::endl;
-            vizEdgeCallback(stateProperty_[v1], stateProperty_[v2], 10);
+            if (v1 != v2)
+            {
+                //std::cout << "Edge " << v1 << " to " << v2 << std::endl;
+                vizEdgeCallback(stateProperty_[v1], stateProperty_[v2], 10);
+            }
         }
         viz2TriggerCallback();
     }
@@ -682,15 +761,15 @@ double og::BoltDB::distanceFunctionTasks(const Vertex a, const Vertex b) const
             if (verbose)
                 std::cout << "b ";
             dist = si_->distance(stateProperty_[a], stateProperty_[startConnectorVertex_]) + TASK_LEVEL_COST +
-                   si_->distance(stateProperty_[startConnectorVertex_], stateProperty_[b]);
+                si_->distance(stateProperty_[startConnectorVertex_], stateProperty_[b]);
         }
         else if (taskLevelB == 2)
         {
             if (verbose)
                 std::cout << "c ";
             dist = si_->distance(stateProperty_[a], stateProperty_[startConnectorVertex_]) + TASK_LEVEL_COST +
-                   distanceAcrossCartesian_ + TASK_LEVEL_COST +
-                   si_->distance(stateProperty_[endConnectorVertex_], stateProperty_[b]);
+                distanceAcrossCartesian_ + TASK_LEVEL_COST +
+                si_->distance(stateProperty_[endConnectorVertex_], stateProperty_[b]);
         }
         else
         {
@@ -716,7 +795,7 @@ double og::BoltDB::distanceFunctionTasks(const Vertex a, const Vertex b) const
             if (verbose)
                 std::cout << "e ";
             dist = si_->distance(stateProperty_[a], stateProperty_[endConnectorVertex_]) + TASK_LEVEL_COST +
-                   si_->distance(stateProperty_[endConnectorVertex_], stateProperty_[b]);
+                si_->distance(stateProperty_[endConnectorVertex_], stateProperty_[b]);
         }
         else
         {
@@ -783,8 +862,8 @@ void og::BoltDB::getPlannerData(base::PlannerData &data) const
             const Vertex v2 = boost::target(e, g_);
 
             if (!data.addEdge(base::PlannerDataVertex(stateProperty_[v1], (int)typeProperty_[v1]),
-                              base::PlannerDataVertex(stateProperty_[v2], (int)typeProperty_[v2]),
-                              base::PlannerDataEdge(), base::Cost(edgeWeightProperty_[e])))
+                    base::PlannerDataVertex(stateProperty_[v2], (int)typeProperty_[v2]),
+                    base::PlannerDataEdge(), base::Cost(edgeWeightProperty_[e])))
             {
                 OMPL_ERROR("Unable to add edge");
             }
@@ -820,10 +899,11 @@ void og::BoltDB::loadFromPlannerData(const base::PlannerData &data)
     std::size_t debugFrequency = data.numVertices() / 10;
 
     // Add the nodes to the graph
+    std::cout << "Vertices loaded: ";
     for (std::size_t vertexID = 0; vertexID < data.numVertices(); ++vertexID)
     {
         if ((vertexID + 1) % debugFrequency == 0)
-            OMPL_INFORM("    %f percent loaded", vertexID / double(data.numVertices()) * 100.0);
+            std::cout << std::fixed << std::setprecision(0) << (vertexID / double(data.numVertices())) * 100.0 << "% ";
 
         // Get the state from loaded planner data
         const base::State *oldState = data.getVertex(vertexID).getState();
@@ -835,14 +915,16 @@ void og::BoltDB::loadFromPlannerData(const base::PlannerData &data)
         // ADD GUARD
         idToVertex.push_back(addVertex(state, type));
     }
+    std::cout << std::endl;
 
     OMPL_INFORM("  Loading %u edges into BoltDB", data.numEdges());
     // Add the corresponding edges to the graph
     std::vector<unsigned int> edgeList;
+    std::cout << "Edges loaded: ";
     for (unsigned int fromVertex = 0; fromVertex < data.numVertices(); ++fromVertex)
     {
         if ((fromVertex + 1) % debugFrequency == 0)
-            OMPL_INFORM("    %f percent loaded", fromVertex / double(data.numVertices()) * 100.0);
+            std::cout << std::fixed << std::setprecision(0) << fromVertex / double(data.numVertices()) * 100.0 << "% ";
 
         edgeList.clear();
 
@@ -873,6 +955,7 @@ void og::BoltDB::loadFromPlannerData(const base::PlannerData &data)
             addEdge(v1, v2, weight.value());
         }
     }  // for
+    std::cout << std::endl;
     OMPL_INFORM("  Finished loading %u edges", getNumEdges());
 
     // OMPL_WARN("temp save when load graph from file");
@@ -1295,7 +1378,7 @@ void og::BoltDB::checkEdgesThreaded(const std::vector<Edge> &unvalidatedEdges)
 }
 
 void og::BoltDB::checkEdgesThread(std::size_t startEdge, std::size_t endEdge, base::SpaceInformationPtr si,
-                                  const std::vector<Edge> &unvalidatedEdges)
+    const std::vector<Edge> &unvalidatedEdges)
 {
     // Process [startEdge, endEdge] inclusive
     for (std::size_t edgeID = startEdge; edgeID <= endEdge; ++edgeID)
@@ -1435,7 +1518,7 @@ void og::BoltDB::checkVerticesThreaded(const std::vector<Vertex> &unvalidatedVer
 }
 
 void og::BoltDB::checkVerticesThread(std::size_t startVertex, std::size_t endVertex, base::SpaceInformationPtr si,
-                                     const std::vector<Vertex> &unvalidatedVertices)
+    const std::vector<Vertex> &unvalidatedVertices)
 {
     // Process [startVertex, endVertex] inclusive
     for (std::size_t vertexID = startVertex; vertexID <= endVertex; ++vertexID)
@@ -1517,8 +1600,8 @@ void og::BoltDB::displayDatabase(bool showVertices)
 }
 
 void og::BoltDB::setVizCallbacks(ompl::base::VizStateCallback vizStateCallback,
-                                 ompl::base::VizEdgeCallback vizEdgeCallback,
-                                 ompl::base::VizTriggerCallback vizTriggerCallback)
+    ompl::base::VizEdgeCallback vizEdgeCallback,
+    ompl::base::VizTriggerCallback vizTriggerCallback)
 {
     vizStateCallback_ = vizStateCallback;
     vizEdgeCallback_ = vizEdgeCallback;
@@ -1526,12 +1609,21 @@ void og::BoltDB::setVizCallbacks(ompl::base::VizStateCallback vizStateCallback,
 }
 
 void og::BoltDB::setViz2Callbacks(ompl::base::VizStateCallback vizStateCallback,
-                                  ompl::base::VizEdgeCallback vizEdgeCallback,
-                                  ompl::base::VizTriggerCallback vizTriggerCallback)
+    ompl::base::VizEdgeCallback vizEdgeCallback,
+    ompl::base::VizTriggerCallback vizTriggerCallback)
 {
     viz2StateCallback_ = vizStateCallback;
     viz2EdgeCallback_ = vizEdgeCallback;
     viz2TriggerCallback_ = vizTriggerCallback;
+}
+
+void og::BoltDB::setViz3Callbacks(ompl::base::VizStateCallback vizStateCallback,
+    ompl::base::VizEdgeCallback vizEdgeCallback,
+    ompl::base::VizTriggerCallback vizTriggerCallback)
+{
+    viz3StateCallback_ = vizStateCallback;
+    viz3EdgeCallback_ = vizEdgeCallback;
+    viz3TriggerCallback_ = vizTriggerCallback;
 }
 
 void og::BoltDB::normalizeGraphEdgeWeights()
@@ -1719,7 +1811,7 @@ bool og::BoltDB::addCartPath(std::vector<base::State *> path)
 }
 
 bool og::BoltDB::connectStateToNeighborsAtLevel(const Vertex &fromVertex, const std::size_t level,
-                                                Vertex &minConnectorVertex)
+    Vertex &minConnectorVertex)
 {
     // Get nearby states to goal
     std::vector<Vertex> neighbors;
@@ -1775,7 +1867,7 @@ bool og::BoltDB::connectStateToNeighborsAtLevel(const Vertex &fromVertex, const 
 }
 
 void og::BoltDB::getNeighborsAtLevel(const base::State *origState, const std::size_t level,
-                                     const std::size_t kNeighbors, std::vector<Vertex> &neighbors)
+    const std::size_t kNeighbors, std::vector<Vertex> &neighbors)
 {
     // Clone the state and change its level
     base::State *searchState = si_->cloneState(origState);
