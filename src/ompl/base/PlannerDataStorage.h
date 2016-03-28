@@ -44,6 +44,7 @@
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/utility.hpp>
 #include <fstream>
+#include <iomanip>
 
 namespace ompl
 {
@@ -216,10 +217,11 @@ namespace ompl
                 const StateSpacePtr &space = pd.getSpaceInformation()->getStateSpace();
                 std::vector<unsigned char> state (space->getSerializationLength());
                 std::size_t feedbackDisplayFrequency = pd.numVertices() / 10;
+                std::cout << "Saving vertices: ";
                 for (unsigned int i = 0; i < pd.numVertices(); ++i)
                 {
                     if (i % feedbackDisplayFrequency == 0)
-                        OMPL_INFORM("  Storing verticies %f percent complete", i / double(pd.numVertices()) * 100.0);
+                        std::cout << std::fixed << std::setprecision(0) << (i / double(pd.numVertices()) * 100.0) << "% ";
                     PlannerDataVertexData vertexData;
 
                     // Serializing all data in the vertex (except the state)
@@ -239,6 +241,7 @@ namespace ompl
 
                     oa << vertexData;
                 }
+                std::cout << std::endl;
             }
 
             /// \brief Read \e numEdges from the binary input \e ia and store them as PlannerData.
@@ -261,10 +264,11 @@ namespace ompl
             {
                 std::vector<unsigned int> edgeList;
                 std::size_t debugFrequency = pd.numVertices() / 10;
+                std::cout << "Saving edges: ";
                 for (unsigned int fromVertex = 0; fromVertex < pd.numVertices(); ++fromVertex)
                 {
                     if (fromVertex % debugFrequency == 0)
-                        OMPL_INFORM("    %f percent edges saved", fromVertex / double(pd.numVertices()) * 100.0);
+                        std::cout << std::fixed << std::setprecision(0) << (fromVertex / double(pd.numVertices()) * 100.0) << "% ";
 
                     edgeList.clear();
 
@@ -291,6 +295,7 @@ namespace ompl
 
                     } // for each edge
                 }  // for each vertex
+                std::cout << std::endl;
             }
         };
     }
