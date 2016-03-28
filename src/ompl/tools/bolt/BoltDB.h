@@ -329,6 +329,7 @@ namespace ompl
             private:
                 const Graph& g_;  // Graph used
                 const EdgeCollisionStateMap& collisionStates_;
+                const double popularityBias_;
 
             public:
                 /** Map key type. */
@@ -344,7 +345,7 @@ namespace ompl
                  * Construct map for certain constraints.
                  * \param graph         Graph to use
                  */
-                edgeWeightMap(const Graph& graph, const EdgeCollisionStateMap& collisionStates);
+                edgeWeightMap(const Graph& graph, const EdgeCollisionStateMap& collisionStates, const double& popularityBias);
 
                 /**
                  * Get the weight of an edge.
@@ -429,7 +430,7 @@ namespace ompl
              * \param returned insertion time to add to db
              * \return true on success
              */
-            bool postProcessesPath(ompl::geometric::PathGeometric& solutionPath, double& insertionTime);
+            bool postProcessPath(ompl::geometric::PathGeometric& solutionPath, double& insertionTime);
 
             /**
              * \brief Save loaded database to file, except skips saving if no paths have been added
@@ -571,7 +572,7 @@ namespace ompl
             void clearEdgeCollisionStates();
 
             /** \brief Visualize the stored database in an external program using callbacks */
-            void displayDatabase();
+            void displayDatabase(bool showVertices = false);
 
             /** \brief Visualize a planner's data during runtime, externally, using a function callback
              *         This could be called whenever the graph changes */
@@ -645,7 +646,13 @@ namespace ompl
             /** \brief Set whether to bias search using popularity of edges */
             void setPopularityBiasEnabled(bool enable)
             {
-                popularityBias_ = enable;
+                popularityBiasEnabled_ = enable;
+            }
+
+            /** \brief Set how much to bias search using popularity of edges */
+            void setPopularityBias(double popularityBias)
+            {
+                popularityBias_ = popularityBias;
             }
 
             /** \brief Remove parts of graph that were intended to be temporary */
@@ -728,7 +735,10 @@ namespace ompl
             boost::property_map<Graph, vertex_type_t>::type typeProperty_;
 
             /** \brief Whether to bias search using popularity of edges */
-            bool popularityBias_;
+            bool popularityBiasEnabled_;
+
+            /** \brief How much influence should the popularity costs have over the admissible heuristic */
+            double popularityBias_;
 
             /** \brief Option to enable debugging output */
             bool verbose_;

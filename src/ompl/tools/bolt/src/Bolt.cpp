@@ -129,7 +129,7 @@ base::PlannerStatus Bolt::solve(const base::PlannerTerminationCondition &ptc)
     // Warn if there are queued paths that have not been added to the experience database
     if (!queuedSolutionPaths_.empty())
     {
-        OMPL_WARN("Previous solved paths are currently uninserted into the experience database and are in the post-proccessing queue");
+        OMPL_INFORM("Previous solved paths are currently uninserted into the experience database and are in the post-proccessing queue");
     }
 
     // SOLVE
@@ -176,13 +176,6 @@ base::PlannerStatus Bolt::solve(const base::PlannerTerminationCondition &ptc)
         std::cout << "Bolt Finished - solution found in " << planTime_ << " seconds" << std::endl;
         std::cout << "-----------------------------------------------------------" << std::endl;
         std::cout << ANSI_COLOR_RESET;
-
-        // TEMP
-        // const base::PathPtr &p = pdef_->getSolutionPath();
-        // if (!p)
-        //     OMPL_ERROR("No solution path");
-        // og::PathGeometric &path = static_cast<og::PathGeometric&>(*p);
-        //og::PathGeometric solutionPath = path;
 
         og::PathGeometric solutionPath = og::SimpleSetup::getSolutionPath(); // copied so that it is non-const
         OMPL_INFORM("Solution path has %d states and was generated from planner %s", solutionPath.getStateCount(), getSolutionPlannerName().c_str());
@@ -349,7 +342,7 @@ bool Bolt::doPostProcessing()
 {
     queuedSolutionPaths_.clear();
 
-    OMPL_INFORM("Performing post-processing for %i queued solution paths", queuedSolutionPaths_.size());
+    OMPL_WARN("Performing post-processing for %i queued solution paths", queuedSolutionPaths_.size());
 
     /*
     for (std::size_t i = 0; i < queuedSolutionPaths_.size(); ++i)
@@ -357,7 +350,7 @@ bool Bolt::doPostProcessing()
         // Time to add a path to experience database
         double insertionTime;
 
-        if (!boltDB_->postProcessesPath(queuedSolutionPaths_[i], insertionTime))
+        if (!boltDB_->postProcessPath(queuedSolutionPaths_[i], insertionTime))
         {
             OMPL_ERROR("Unable to save path");
         }
