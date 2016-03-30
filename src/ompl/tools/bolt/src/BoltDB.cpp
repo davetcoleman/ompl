@@ -57,6 +57,7 @@
 
 // C++
 #include <limits>
+#include <queue>
 
 // Allow hooks for visualizing planner
 #define OMPL_BOLT_DEBUG
@@ -161,13 +162,13 @@ og::BoltDB::BoltDB(base::SpaceInformationPtr si)
     , visualizeCartNeighbors_(false)
     , visualizeCartPath_(false)
     , sparseDelta_(2.0)
+    , discretization_(2.0)
     , visualizeAstarSpeed_(0.1)
 {
-    if (!nn_)
-    {
-        nn_.reset(new NearestNeighborsGNATNoThreadSafety<Vertex>());
-    }
+    nn_.reset(new NearestNeighborsGNATNoThreadSafety<Vertex>());
     nn_->setDistanceFunction(boost::bind(&og::BoltDB::distanceFunction, this, _1, _2));
+    sparse_nn_.reset(new NearestNeighborsGNATNoThreadSafety<Vertex>());
+    sparse_nn_->setDistanceFunction(boost::bind(&og::BoltDB::distanceFunction, this, _1, _2));
 }
 
 og::BoltDB::~BoltDB(void)
@@ -191,6 +192,8 @@ void og::BoltDB::freeMemory()
 
     if (nn_)
         nn_->clear();
+    if (sparse_nn_)
+        sparse_nn_->clear();
 
     sampler_.reset();
 }
@@ -297,6 +300,9 @@ bool og::BoltDB::postProcessPath(og::PathGeometric &solutionPath, double &insert
     // TODO(davetcoleman): loop through all possible start vertices
     stateProperty_[queryVertex_] = currentPathState;
     Vertex prevGraphVertex = nn_->nearest(queryVertex_);
+    stateProperty_[queryVertex_] = NULL; // Set search vertex to NULL to prevent segfault on class unload of memory
+
+    // Visualize
     vizStateCallback(stateProperty_[prevGraphVertex], 1, 1);
 
     // Create new path that is 'snapped' onto the roadmap
@@ -355,7 +361,7 @@ bool og::BoltDB::postProcessPath(og::PathGeometric &solutionPath, double &insert
         {
             // reduce cost of this edge because it was just used (increase popularity)
             // Note: 100 is an *unpopular* edge, and 0 is a super highway
-            static const double REDUCTION_AMOUNT = 10;
+            static const double REDUCTION_AMOUNT = 5;
             if (verbose)
             {
                 std::cout << "Edge weight for vertex " << vertexID << " of edge " << edge << std::endl;
@@ -373,9 +379,6 @@ bool og::BoltDB::postProcessPath(og::PathGeometric &solutionPath, double &insert
 
     // Record this new addition
     graphUnsaved_ = true;
-
-    // Set search vertex to NULL to prevent segfault on class unload of memory
-    stateProperty_[queryVertex_] = NULL;
 
     return true;
 }
@@ -1168,7 +1171,8 @@ void og::BoltDB::generateEdges()
 
         const std::size_t numSameVerticiesFound = 1;  // add 1 to the end because the NN tree always returns itself
         nn_->nearestK(queryVertex_, findNearestKNeighbors + numSameVerticiesFound, graphNeighborhood);
-        stateProperty_[queryVertex_] = NULL;
+        stateProperty_[queryVertex_] = NULL; // Set search vertex to NULL to prevent segfault on class unload of memory
+
         if (verbose)
             OMPL_INFORM("Found %u neighbors", graphNeighborhood.size());
 
@@ -1410,7 +1414,7 @@ void og::BoltDB::recursiveDiscretization(std::vector<double> &values, std::size_
     assert(joint_id < values.size());
 
     // Loop thorugh current joint
-    for (double value = bounds.low[joint_id]; value <= bounds.high[joint_id]; value += sparseDelta_)
+    for (double value = bounds.low[joint_id]; value <= bounds.high[joint_id]; value += discretization_)
     {
         values[joint_id] = value;
 
@@ -1876,9 +1880,7 @@ void og::BoltDB::getNeighborsAtLevel(const base::State *origState, const std::si
     // Get nearby state
     stateProperty_[queryVertex_] = searchState;
     nn_->nearestK(queryVertex_, kNeighbors, neighbors);
-
-    // Cleanup
-    stateProperty_[queryVertex_] = NULL;
+    stateProperty_[queryVertex_] = NULL; // Set search vertex to NULL to prevent segfault on class unload of memory
     si_->getStateSpace()->freeState(searchState);
 
     // Run various checks
@@ -2009,3 +2011,557 @@ void og::BoltDB::checkStateType()
     }
     OMPL_INFORM("All states checked for task level");
 }
+
+// Create SPARs graph using popularity
+void og::BoltDB::createSPARS()
+{
+    bool verbose = false;
+
+    // Sort the verticies by popularity in a queue
+    std::priority_queue<WeightedVertex, std::vector<WeightedVertex>, CompareWeightedVertex> pqueue;
+
+    // Loop through each popular edge in the dense graph
+    BOOST_FOREACH (Vertex v, boost::vertices(g_))
+    {
+        // Do not process the search vertex, it is null
+        if (v == 0)
+            continue;
+
+        if (verbose)
+            std::cout << "Vertex: " << v << std::endl;
+        double popularity = 0;
+        // std::pair<out_edge_iterator, out_edge_iterator> edge
+        BOOST_FOREACH (Edge edge, boost::out_edges(v, g_))
+        {
+            if (verbose)
+                std::cout << "  Edge: " << edge << std::endl;
+            popularity += (100 - edgeWeightProperty_[edge]);
+        }
+        if (verbose)
+            std::cout << "  Total popularity: " << popularity << std::endl;
+        pqueue.push(WeightedVertex(v, popularity));
+    }
+
+    double largestWeight = pqueue.top().weight_;
+
+    // Output the vertices in order
+    while (!pqueue.empty())
+    {
+        Vertex v = pqueue.top().v_;
+        std::cout << "  Visualizing vertex " << v << " with popularity " << pqueue.top().weight_
+                  << " queue remaining size " << pqueue.size() << std::endl;
+
+        // Visualize
+        const double visualWeight = pqueue.top().weight_ / largestWeight;
+        vizStateCallback(stateProperty_[v], 7, visualWeight);
+        vizTriggerCallback();
+        usleep(0.01*1000000);
+
+        // Attempt to insert into SPARS graph
+        double seconds = 1000;
+        ob::PlannerTerminationCondition ptc = ob::timedPlannerTerminationCondition(seconds, 0.1);
+        if (!addStateToRoadmap(ptc, stateProperty_[v]))
+            OMPL_INFORM("Failed to add state to roadmap");
+
+        // Remove from priority queue
+        pqueue.pop();
+    } // end while
+
+}
+
+bool og::BoltDB::addStateToRoadmap(const base::PlannerTerminationCondition &ptc, base::State *newState)
+{
+    bool stateAdded = false;
+
+    // Deep copy
+    base::State *qNew = si_->cloneState(newState); // TODO(davetcoleman): do i need to clone it?
+    base::State *workState = si_->allocState(); // TODO(davetcoleman): do i need this state?
+
+    /* Nodes near our newState */
+    std::vector<Vertex> graphNeighborhood;
+    /* Visible nodes near our newState */
+    std::vector<Vertex> visibleNeighborhood;
+
+    // Find nearby nodes
+    findGraphNeighbors(qNew, graphNeighborhood, visibleNeighborhood);
+
+    // Always add a node if no other nodes around it are visible (GUARD)
+    if (checkAddCoverage(qNew, visibleNeighborhood))
+    {
+        stateAdded = true;
+    }
+    else if (checkAddConnectivity(qNew, visibleNeighborhood)) // Connectivity criterion
+    {
+        stateAdded = true;
+    }
+
+    /*
+    else if (checkAddInterface(qNew, graphNeighborhood, visibleNeighborhood))
+    {
+        stateAdded = true;
+    }
+    else
+    {
+        if (verbose_)
+            OMPL_INFORM(" ---- Ensure SPARS asymptotic optimality");
+        if (visibleNeighborhood.size() > 0)
+        {
+            std::map<Vertex, base::State*> closeRepresentatives;
+            if (verbose_)
+                OMPL_INFORM(" ----- findCloseRepresentatives()");
+
+            findCloseRepresentatives(workState, qNew, visibleNeighborhood[0], closeRepresentatives, ptc);
+            if (verbose_)
+                OMPL_INFORM("------ Found %d close representatives", closeRepresentatives.size());
+
+            for (std::map<Vertex, base::State*>::iterator it = closeRepresentatives.begin(); it != closeRepresentatives.end(); ++it)
+            {
+                if (verbose_)
+                    OMPL_INFORM(" ------ Looping through close representatives");
+                updatePairPoints(visibleNeighborhood[0], qNew, it->first, it->second);
+                updatePairPoints(it->first, it->second, visibleNeighborhood[0], qNew);
+            }
+            if (verbose_)
+                OMPL_INFORM(" ------ checkAddPath()");
+            if (checkAddPath(visibleNeighborhood[0]))
+            {
+                if (verbose_)
+                {
+                    OMPL_INFORM("nearest visible neighbor added ");
+                }
+            }
+
+            for (std::map<Vertex, base::State*>::iterator it = closeRepresentatives.begin(); it != closeRepresentatives.end(); ++it)
+            {
+                if (verbose_)
+                    OMPL_INFORM(" ------- Looping through close representatives to add path");
+                checkAddPath(it->first);
+                si_->freeState(it->second);
+            }
+            if (verbose_)
+                OMPL_INFORM("------ Done with inner most loop ");
+        }
+    }
+    */
+
+    si_->freeState(workState);
+    si_->freeState(qNew);
+
+    return stateAdded;
+}
+
+og::BoltDB::Vertex og::BoltDB::addSparseVertex(base::State *state, const GuardType &type)
+{
+    // Create vertex
+    //Vertex v1 = boost::add_vertex(g_);
+
+    // Add properties
+    //typeProperty_[v1] = type;
+    //stateProperty_[v1] = state;
+
+    // Temp hack
+    stateProperty_[queryVertex_] = state;
+    Vertex v1 = nn_->nearest( queryVertex_ );
+    stateProperty_[queryVertex_] = NULL;
+
+    // Add vertex to nearest neighbor structure
+    sparse_nn_->add(v1);
+
+    return v1;
+}
+
+bool og::BoltDB::checkAddCoverage(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood)
+{
+    if (verbose_)
+        OMPL_INFORM(" - checkAddCoverage() Are other nodes around it visible?");
+
+    if (visibleNeighborhood.size() > 0)
+        return false; // has visible neighbors
+
+    // No free paths means we add for coverage
+    if (verbose_)
+        OMPL_INFORM(" --- Adding node for COVERAGE ");
+
+    Vertex v = addSparseVertex(si_->cloneState(qNew), COVERAGE);
+    // Note: we do not connect this node with any edges because we have already determined
+    // it is too far away from any nearby nodes
+
+    // Visualize
+    viz3StateCallback(stateProperty_[v], 4, sparseDelta_);
+    viz3TriggerCallback();
+    usleep(0.01*1000000);
+
+    return true;
+}
+
+bool og::BoltDB::checkAddConnectivity(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood)
+{
+    if (verbose_)
+        OMPL_INFORM(" -- checkAddConnectivity() Does this node connect neighboring nodes that are not connected? ");
+
+    // Error check
+    if (visibleNeighborhood.size() < 2)
+    {
+        // if less than 2 there is no way to find a pair of nodes in different connected components
+        return false;
+    }
+
+    // Identify visibile nodes around our new state that are unconnected (in different connected components)
+    // and connect them
+    std::vector<Vertex> statesInDiffConnectedComponents;
+
+    //For each neighbor
+    for (std::size_t i = 0; i < visibleNeighborhood.size(); ++i)
+    {
+        //For each other neighbor
+        for (std::size_t j = i + 1; j < visibleNeighborhood.size(); ++j)
+        {
+            //If they are in different components
+            if (!sameComponent(visibleNeighborhood[i], visibleNeighborhood[j]))
+            {
+                statesInDiffConnectedComponents.push_back(visibleNeighborhood[i]);
+                statesInDiffConnectedComponents.push_back(visibleNeighborhood[j]);
+            }
+        }
+    }
+
+    // Were any diconnected states found?
+    if (statesInDiffConnectedComponents.size() > 0)
+    {
+        if (verbose_)
+            OMPL_INFORM(" --- Adding node for CONNECTIVITY ");
+        //Add the node
+        Vertex newVertex = addSparseVertex(si_->cloneState(qNew), CONNECTIVITY);
+
+        for (std::size_t i = 0; i < statesInDiffConnectedComponents.size() ; ++i)
+        {
+            //If there's no edge between the two new states
+            // DTC: this should actually never happen - we just created the new vertex so
+            // why would it be connected to anything?
+            if (!boost::edge(newVertex, statesInDiffConnectedComponents[i], g_).second)
+            {
+                //The components haven't been united by previous links
+                if (!sameComponent(statesInDiffConnectedComponents[i], newVertex))
+                    connectGuards(newVertex, statesInDiffConnectedComponents[i]);
+            }
+        }
+
+        return true;
+    }
+
+    return false;
+}
+/*
+bool og::BoltDB::checkAddInterface(const base::State *qNew, std::vector<Vertex> &graphNeighborhood, std::vector<Vertex> &visibleNeighborhood)
+{
+        if (verbose_)
+            OMPL_INFORM(" --- checkAddInterface() Does this node's neighbor's need it to better connect them? ");
+
+    //If we have at least 2 neighbors
+    if (visibleNeighborhood.size() > 1)
+    {
+        // If the two closest nodes are also visible
+        if (graphNeighborhood[0] == visibleNeighborhood[0] && graphNeighborhood[1] == visibleNeighborhood[1])
+        {
+            // If our two closest neighbors don't share an edge
+            if (!boost::edge(visibleNeighborhood[0], visibleNeighborhood[1], g_).second)
+            {
+                //If they can be directly connected
+                if (si_->checkMotion(stateProperty_[visibleNeighborhood[0]], stateProperty_[visibleNeighborhood[1]]))
+                {
+                    //Connect them
+                    if (verbose_)
+                        OMPL_INFORM(" ---   INTERFACE: directly connected nodes ");
+                    connectGuards(visibleNeighborhood[0], visibleNeighborhood[1]);
+                    //And report that we added to the roadmap
+                    resetFailures();
+                    //Report success
+                    return true;
+                }
+                else
+                {
+                    //Add the new node to the graph, to bridge the interface
+                    if (verbose_)
+                        OMPL_INFORM(" --- Adding node for INTERFACE  ");
+                    Vertex v = addSparseVertex(si_->cloneState(qNew), INTERFACE);
+                    connectGuards(v, visibleNeighborhood[0]);
+                    connectGuards(v, visibleNeighborhood[1]);
+                    if (verbose_)
+                        OMPL_INFORM(" ---   INTERFACE: connected two neighbors through new interface node ");
+                    //Report success
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+bool og::BoltDB::checkAddPath( Vertex v )
+{
+    bool spannerPropertyWasViolated = false;
+
+    std::vector< Vertex > rs;
+    foreach( Vertex r, boost::adjacent_vertices( v, g_ ) )
+        rs.push_back(r);
+
+    // Candidate x vertices as described in the method, filled by function computeX().
+    std::vector<Vertex> Xs;
+
+    // Candidate v" vertices as described in the method, filled by function computeVPP().
+    std::vector<Vertex> VPPs;
+
+    for (std::size_t i = 0; i < rs.size() && !spannerPropertyWasViolated; ++i)
+    {
+        Vertex r = rs[i];
+        computeVPP(v, r, VPPs);
+        foreach (Vertex rp, VPPs)
+        {
+            //First, compute the longest path through the graph
+            computeX(v, r, rp, Xs);
+            double rm_dist = 0.0;
+            foreach( Vertex rpp, Xs)
+            {
+                double tmp_dist = (si_->distance( stateProperty_[r], stateProperty_[v] )
+                                   + si_->distance( stateProperty_[v], stateProperty_[rpp] ) )/2.0;
+                if( tmp_dist > rm_dist )
+                    rm_dist = tmp_dist;
+            }
+
+            InterfaceData& d = getData( v, r, rp );
+
+            //Then, if the spanner property is violated
+            if (rm_dist > stretchFactor_ * d.last_distance_)
+            {
+                spannerPropertyWasViolated = true; //Report that we added for the path
+                if (si_->checkMotion(stateProperty_[r], stateProperty_[rp]))
+                    connectGuards(r, rp);
+                else
+                {
+                    PathGeometric *p = new PathGeometric( si_ );
+                    if (r < rp)
+                    {
+                        p->append(d.sigmaA_);
+                        p->append(d.pointA_);
+                        p->append(stateProperty_[v]);
+                        p->append(d.pointB_);
+                        p->append(d.sigmaB_);
+                    }
+                    else
+                    {
+                        p->append(d.sigmaB_);
+                        p->append(d.pointB_);
+                        p->append(stateProperty_[v]);
+                        p->append(d.pointA_);
+                        p->append(d.sigmaA_);
+                    }
+
+                    psimp_->reduceVertices(*p, 10);
+                    psimp_->shortcutPath(*p, 50);
+
+                    if (p->checkAndRepair(100).second)
+                    {
+                        Vertex prior = r;
+                        Vertex vnew;
+                        std::vector<base::State*>& states = p->getStates();
+
+                        foreach (base::State *st, states)
+                        {
+                            // no need to clone st, since we will destroy p; we just copy the pointer
+                            if (verbose_)
+                                OMPL_INFORM(" --- Adding node for QUALITY");
+                            vnew = addSparseVertex(st , QUALITY);
+
+                            connectGuards(prior, vnew);
+                            prior = vnew;
+                        }
+                        // clear the states, so memory is not freed twice
+                        states.clear();
+                        connectGuards(prior, rp);
+                    }
+
+                    delete p;
+                }
+            }
+        }
+    }
+
+    if (!spannerPropertyWasViolated)
+    {
+        if (verbose_)
+        {
+            OMPL_INFORM(" ------- Spanner property was NOT violated, SKIPPING");
+        }
+    }
+
+    return spannerPropertyWasViolated;
+}
+*/
+void og::BoltDB::findGraphNeighbors(base::State *state, std::vector<Vertex> &graphNeighborhood,
+    std::vector<Vertex> &visibleNeighborhood)
+{
+    visibleNeighborhood.clear();
+
+    // Search
+    stateProperty_[queryVertex_] = state;
+    sparse_nn_->nearestR( queryVertex_, sparseDelta_, graphNeighborhood);
+    stateProperty_[queryVertex_] = NULL;
+
+    // Now that we got the neighbors from the NN, we must remove any we can't see
+    for (std::size_t i = 0; i < graphNeighborhood.size() ; ++i )
+    {
+        if (si_->checkMotion(state, stateProperty_[graphNeighborhood[i]]))
+        {
+            visibleNeighborhood.push_back(graphNeighborhood[i]);
+        }
+    }
+
+    if (verbose_)
+    {
+        OMPL_INFORM(" Graph neighborhood: %u | visible neighborhood: %u", graphNeighborhood.size(),
+            visibleNeighborhood.size());
+    }
+
+}
+/*
+og::BoltDB::Vertex og::BoltDB::findGraphRepresentative(base::State *st)
+{
+    std::vector<Vertex> nbh;
+    stateProperty_[ queryVertex_ ] = st;
+    sparse_nn_->nearestR( queryVertex_, sparseDelta_, nbh);
+    stateProperty_[queryVertex_] = NULL;
+
+    if (verbose_)
+        OMPL_INFORM(" ------- findGraphRepresentative found %d nearest neighbors of distance %f",
+                    nbh.size(), sparseDelta_);
+
+    Vertex result = boost::graph_traits<Graph>::null_vertex();
+
+    for (std::size_t i = 0 ; i< nbh.size() ; ++i)
+    {
+        if (verbose_)
+            OMPL_INFORM(" -------- Checking motion of graph rep candidate %d", i);
+        if (si_->checkMotion(st, stateProperty_[nbh[i]]))
+        {
+            if (verbose_)
+                OMPL_INFORM(" --------- VALID ");
+            result = nbh[i];
+            break;
+        }
+    }
+    return result;
+}
+
+void og::BoltDB::findCloseRepresentatives(base::State *workState, const base::State *qNew, const Vertex qRep,
+                                                        std::map<Vertex, base::State*> &closeRepresentatives,
+                                                        const base::PlannerTerminationCondition &ptc)
+{
+    // Properly clear the vector by also deleting previously sampled unused states
+    for (std::map<Vertex, base::State*>::iterator it = closeRepresentatives.begin(); it != closeRepresentatives.end(); ++it)
+        si_->freeState(it->second);
+    closeRepresentatives.clear();
+
+    //denseDelta_ = 0.25 * sparseDelta_;
+    nearSamplePoints_ /= 10; // HACK - this makes it look for the same number of samples as dimensions
+
+    if (verbose_)
+        OMPL_INFORM(" ----- nearSamplePoints: %f, denseDelta: %f", nearSamplePoints_, denseDelta_);
+
+    // Then, begin searching the space around new potential state qNew
+    for (unsigned int i = 0 ; i < nearSamplePoints_ && ptc == false ; ++i)
+    {
+        do
+        {
+            sampler_->sampleNear(workState, qNew, denseDelta_);
+
+#ifdef OMPL_THUNDER_DEBUG
+                vizStateCallback(workState, 3, sparseDelta_);
+                sleep(0.1);
+#endif
+
+            if (verbose_)
+            {
+                OMPL_INFORM(" ------ findCloseRepresentatives sampled state ");
+
+                if (!si_->isValid(workState))
+                {
+                    OMPL_INFORM(" ------ isValid ");
+                }
+                if (si_->distance(qNew, workState) > denseDelta_)
+                {
+                    OMPL_INFORM(" ------ Distance too far ");
+                }
+                if (!si_->checkMotion(qNew, workState))
+                {
+                    OMPL_INFORM(" ------ Motion invalid ");
+                }
+            }
+
+        } while ((!si_->isValid(workState) || si_->distance(qNew, workState) > denseDelta_ || !si_->checkMotion(qNew, workState)) && ptc == false);
+
+        // if we were not successful at sampling a desirable state, we are out of time
+        if (ptc == true)
+        {
+            if (verbose_)
+                OMPL_INFORM(" ------ We are out of time ");
+            break;
+        }
+
+        if (verbose_)
+            OMPL_INFORM(" ------ Find graph representative ");
+
+        // Compute who his graph neighbors are
+        Vertex representative = findGraphRepresentative(workState);
+
+        // Assuming this sample is actually seen by somebody (which he should be in all likelihood)
+        if (representative != boost::graph_traits<Graph>::null_vertex())
+        {
+
+            if (verbose_)
+                OMPL_INFORM(" ------ Representative is not null ");
+
+            //If his representative is different than qNew
+            if (qRep != representative)
+            {
+                if (verbose_)
+                    OMPL_INFORM(" ------ qRep != representative ");
+
+                //And we haven't already tracked this representative
+                if (closeRepresentatives.find(representative) == closeRepresentatives.end())
+                {
+                    if (verbose_)
+                        OMPL_INFORM(" ------ Track the representative");
+                    //Track the representativen
+                    closeRepresentatives[representative] = si_->cloneState(workState);
+                }
+            }
+            else
+            {
+                if (verbose_)
+                    OMPL_INFORM(" ------ qRep == representative, no good ");
+            }
+        }
+        else
+        {
+            if (verbose_)
+                OMPL_INFORM(" ------ Rep is null ");
+
+            //This guy can't be seen by anybody, so we should take this opportunity to add him
+            if (verbose_)
+                OMPL_INFORM(" --- Adding node for COVERAGE");
+            addSparseVertex(si_->cloneState(workState), COVERAGE);
+
+            if (verbose_)
+            {
+                OMPL_INFORM(" ------ STOP EFFORS TO ADD A DENSE PATH");
+            }
+
+            //We should also stop our efforts to add a dense path
+            for (std::map<Vertex, base::State*>::iterator it = closeRepresentatives.begin(); it != closeRepresentatives.end(); ++it)
+                si_->freeState(it->second);
+            closeRepresentatives.clear();
+            break;
+        }
+    } // for loop
+}
+*/
