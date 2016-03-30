@@ -33,23 +33,23 @@
  *********************************************************************/
 
 /* Author: Dave Coleman <dave@dav.ee>
-   Desc:   Experience database for storing and reusing past path plans
+   Desc:   Sparse experience database for storing and reusing past path plans
 */
 
-#ifndef OMPL_TOOLS_BOLT_BOLTDB_
-#define OMPL_TOOLS_BOLT_BOLTDB_
+#ifndef OMPL_TOOLS_BOLT_SPARSEDB_
+#define OMPL_TOOLS_BOLT_SPARSEDB_
 
 #include <ompl/base/StateSpace.h>
 #include <ompl/geometric/PathGeometric.h>
 #include <ompl/base/Planner.h>
-#include <ompl/base/PlannerData.h>
-#include <ompl/base/PlannerDataStorage.h>
+//#include <ompl/base/PlannerData.h>
+//#include <ompl/base/PlannerDataStorage.h>
 #include <ompl/base/State.h>
 #include <ompl/base/SpaceInformation.h>
 #include <ompl/datastructures/NearestNeighbors.h>
 #include <ompl/base/PlannerTerminationCondition.h>
 #include <ompl/tools/bolt/Visualizer.h>
-#include <ompl/tools/bolt/SparseDB.h>
+#include <ompl/tools/bolt/BoltDB.h>
 
 // Boost
 #include <boost/range/adaptor/map.hpp>
@@ -70,25 +70,23 @@ namespace ompl
     namespace geometric // TODO(davetcoleman): tools
     {
         /**
-           @anchor BoltDB
+           @anchor SparsDB
            @par Short description
            Database for storing and retrieving past plans
         */
 
         /// @cond IGNORE
-        OMPL_CLASS_FORWARD(BoltDB);
         OMPL_CLASS_FORWARD(SparseDB);
-        // OMPL_CLASS_FORWARD(BoltRetrieveRepair);
+        OMPL_CLASS_FORWARD(BoltDB);
         /// @endcond
 
-        /** \class ompl::geometric::BoltDBPtr
-            \brief A boost shared pointer wrapper for ompl::tools::BoltDB */
+        /** \class ompl::geometric::SparseDBPtr
+            \brief A boost shared pointer wrapper for ompl::tools::SparseDB */
 
         /** \brief Save and load entire paths from file */
-        class BoltDB
+        class SparseDB
         {
-            friend class BoltRetrieveRepair;
-            friend class SparseDB;
+            //friend class BoltRetrieveRepair;
 
         public:
             ////////////////////////////////////////////////////////////////////////////////////////
@@ -363,14 +361,14 @@ namespace ompl
             {
             private:
                 Vertex goal_;  // Goal Vertex of the search
-                BoltDB* parent_;
+                SparseDB* parent_;
 
             public:
                 /**
                  * Construct a visitor for a given search.
                  * \param goal  goal vertex of the search
                  */
-                CustomAstarVisitor(Vertex goal, BoltDB* parent);
+                CustomAstarVisitor(Vertex goal, SparseDB* parent);
 
                 /**
                  * \brief Invoked when a vertex is first discovered and is added to the OPEN list.
@@ -391,85 +389,20 @@ namespace ompl
                 void examine_vertex(Vertex v, const Graph& g) const;
             };
 
-            /** \brief Custom storage class */
-            class WeightedVertex
-            {
-            public:
-                WeightedVertex(Vertex v, double weight)
-                    : v_(v), weight_(weight)
-                {
-                }
-
-                Vertex v_;
-                double weight_;
-            };
-
-            /** \brief Custom comparator class */
-            class CompareWeightedVertex
-            {
-            public:
-                bool operator() (WeightedVertex a, WeightedVertex b)
-                {
-                    return a.weight_ < b.weight_; // TODO(davetcoleman): which direction should the sign go?
-                }
-            };
-
             ////////////////////////////////////////////////////////////////////////////////////////
-            // BoltDB MEMBER FUNCTIONS
+            // SparseDB MEMBER FUNCTIONS
             ////////////////////////////////////////////////////////////////////////////////////////
 
             /** \brief Constructor needs the state space used for planning.
              *  \param space - state space
              */
-            BoltDB(base::SpaceInformationPtr si, tools::VisualizerPtr visual);
+            SparseDB(base::SpaceInformationPtr si, BoltDB* boltDB, tools::VisualizerPtr visual);
 
             /** \brief Deconstructor */
-            virtual ~BoltDB(void);
+            virtual ~SparseDB(void);
 
             /** \brief Initialize database */
             bool setup();
-
-            /**
-             * \brief Load database from file
-             * \param fileName - name of database file
-             * \return true if file loaded successfully
-             */
-            bool load(const std::string& fileName);
-
-            /**
-             * \brief Add a new solution path to our database. Des not actually save to file so
-             *        experience will be lost if save() is not called
-             * \param new path - must be non-const because will be interpolated
-             * \param returned insertion time to add to db
-             * \return true on success
-             */
-            bool postProcessPath(ompl::geometric::PathGeometric& solutionPath, double& insertionTime);
-
-            /**
-             * \brief Call itself recursively for each point in the trajectory, looking for vertices on the graph to connect to
-             * \param inputPath - smoothed trajectory that we want to now convert into a 'snapped' trajectory
-             * \param roadmapPath - resulting path that is 'snapped' onto the pre-existing roadmap
-             * \param currVertexIndex - index in inputPath (smoothed path) that we are trying to connect to
-             * \param prevGraphVertex - vertex we are trying to connect to
-             * \param allValid - flag to determine if any of the edges were never found to be valdi
-             * \return true on success
-             */
-            bool recurseSnapWaypoints(ompl::geometric::PathGeometric& inputPath, std::vector<Vertex>& roadmapPath,
-                std::size_t currVertexIndex, const Vertex& prevGraphVertex, bool& allValid);
-
-            /**
-             * \brief Save loaded database to file, except skips saving if no paths have been added
-             * \param fileName - name of database file
-             * \return true if file saved successfully
-             */
-            bool saveIfChanged(const std::string& fileName);
-
-            /**
-             * \brief Save loaded database to file
-             * \param fileName - name of database file
-             * \return true if file saved successfully
-             */
-            bool save(const std::string& fileName);
 
             /** \brief Given two milestones from the same connected component, construct a path connecting them and set it as
              * the solution
@@ -478,38 +411,11 @@ namespace ompl
              *  \param vertexPath
              *  \return true if candidate solution found
              */
-            bool astarSearch(const BoltDB::Vertex start, const BoltDB::Vertex goal, std::vector<BoltDB::Vertex>& vertexPath);
-
-            /**
-             * \brief Get a vector of all the planner datas in the database
-             */
-            // TODO(davetcoleman): remove the vector of plannerdatas, because really its just one
-            void getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr>& plannerDatas) const;
+            bool astarSearch(const SparseDB::Vertex start, const SparseDB::Vertex goal, std::vector<SparseDB::Vertex>& vertexPath);
 
             /** \brief Print info to screen */
             void debugVertex(const ompl::base::PlannerDataVertex& vertex);
             void debugState(const ompl::base::State* state);
-
-            /** \brief Getter for enabling experience database saving */
-            bool getSavingEnabled()
-            {
-                return savingEnabled_;
-            }
-
-            /** \brief Setter for enabling experience database saving */
-            void setSavingEnabled(bool savingEnabled)
-            {
-                savingEnabled_ = savingEnabled;
-            }
-
-            /**
-             * \brief Check if anything has been loaded into DB
-             * \return true if has no nodes
-             */
-            bool isEmpty()
-            {
-                return !getNumVertices();
-            }
 
             /** \brief Retrieve the computed roadmap. */
             const Graph& getRoadmap() const
@@ -529,178 +435,41 @@ namespace ompl
                 return boost::num_edges(g_);
             }
 
-            /**
-             * \brief Set the sparse graph from file
-             * \param a pre-built graph
-             */
-            void loadFromPlannerData(const base::PlannerData& data);
-
-            /**
-             * \brief Discretize the space into a simple grid
-             */
-            void generateGrid();
-
-            /** \brief Recursively discretize
-             *  \param values - the joint positions currently searching over
-             *  \param joint_id - the dimension currently on
-             *  \param desired_depth - how many dimensions to discretize to
-             */
-            void recursiveDiscretization(std::vector<double>& values, std::size_t joint_id, std::size_t desired_depth);
-
-            /** \brief Faster method for collision checking vertices */
-            void checkVerticesThreaded(const std::vector<Vertex> &unvalidatedVertices);
-            void checkVerticesThread(std::size_t startVertex, std::size_t endVertex, base::SpaceInformationPtr si,
-                const std::vector<Vertex> &unvalidatedVertices);
-
-            /** \brief Clone the graph to have second and third layers for task planning then free space planning */
-            void generateTaskSpace();
-
-            /**
-             * \brief Connect vertices wherever possible
-             */
-            void generateEdges();
-
-            /** \brief Collision check edges */
-            void checkEdges();
-
-            /** \brief Collision check edges using threading */
-            void checkEdgesThreaded(const std::vector<Edge> &unvalidatedEdges);
-
-            /** \brief Collision check edges in vector from [startEdge, endEdge] inclusive */
-            void checkEdgesThread(std::size_t startEdge, std::size_t endEdge, base::SpaceInformationPtr si, const std::vector<Edge> &unvalidatedEdges);
-
             /** \brief Free all the memory allocated by the database */
             void freeMemory();
 
             /** \brief Compute distance between two milestones (this is simply distance between the states of the milestones) */
             double distanceFunction(const Vertex a, const Vertex b) const;
 
-            /** \brief Compute distance between two milestones (this is simply distance between the states of the milestones) */
-            double distanceFunction2(const Vertex a, const Vertex b) const;
-
-            /** \brief Compute the heuristic distance between the current node and the next goal */
-            double distanceFunctionTasks(const Vertex a, const Vertex b) const;
-
-            /** \brief Helper for getting the task level value from a state */
-            std::size_t getTaskLevel(const Vertex& v) const;
-            std::size_t getTaskLevel(const base::State* state) const;
-
             /** \brief Check that the query vertex is initialized (used for internal nearest neighbor searches) */
             void initializeQueryState();
-
-            /**
-             * \brief Get the sparse graph to save to file
-             * \param data - where to convert the data into
-             */
-            virtual void getPlannerData(base::PlannerData& data) const;
 
             /** \brief Clear all past edge state information about in collision or not */
             void clearEdgeCollisionStates();
 
-            /** \brief Visualize the stored database in an external program using callbacks */
-            void displayDatabase(bool showVertices = false);
+            /** \brief Create a SPARS graph from the discretized dense graph and its popularity metric */
+            void createSPARS();
 
-            /** \brief Keep graph evenly weighted */
-            void normalizeGraphEdgeWeights();
-
-            /** \brief Helper for creating/loading graph vertices */
-            Vertex addVertex(base::State* state, const GuardType& type);
-
-            /** \brief Helper for creating/loading graph edges */
-            Edge addEdge(const Vertex& v1, const Vertex& v2, const double weight);
-
-            /** \brief Get whether to bias search using popularity of edges */
-            bool getPopularityBiasEnabled()
-            {
-                return popularityBias_;
-            }
-
-            /** \brief Set whether to bias search using popularity of edges */
-            void setPopularityBiasEnabled(bool enable)
-            {
-                popularityBiasEnabled_ = enable;
-            }
-
-            /** \brief Set how much to bias search using popularity of edges */
-            void setPopularityBias(double popularityBias)
-            {
-                popularityBias_ = popularityBias;
-            }
-
-            /** \brief Remove parts of graph that were intended to be temporary */
-            void cleanupTemporaryVerticies();
-
-            /** \brief Testing code for integrating Decartes */
-            bool addCartPath(std::vector<base::State*> path);
-
-            /**
-             * \brief Helper for connecting both sides of a cartesian path into a dual level graph
-             * \param fromState - the endpoint (start or goal) we are connecting from the cartesian path to the graph
-             * \param level - what task level we are connecting to - either 0 or 2 (bottom layer or top layer)
-             * \param minConnectorVertex - the vertex on the main graph that has the shortest path to connecting to the cartesian path
-             * \return true on success
-             */
-            bool connectStateToNeighborsAtLevel(const Vertex& fromVertex, const std::size_t level,
-                Vertex& minConnectorVertex);
-
-            /** \brief Get k number of neighbors near a state at a certain level that have valid motions */
-            void getNeighborsAtLevel(const base::State* origState, const std::size_t level, const std::size_t kNeighbors,
-                std::vector<Vertex>& neighbors);
-
-            /** \brief Shortcut for visualizing an edge */
-            void vizDBEdge(Edge &e);
-
-            /** \brief Error checking function to ensure solution has correct task path/level changes */
-            bool checkTaskPathSolution(geometric::PathGeometric &path, base::State* start, base::State* goal);
-
-            /** \brief Check that all states are the correct type */
-            void checkStateType();
-
-            /** \brief Getter for using task planning flag */
-            const bool& getUseTaskPlanning() const
-            {
-                return useTaskPlanning_;
-            }
-
-            /** \brief Setter for using task planning flag */
-            void setUseTaskPlanning(const bool& useTaskPlanning)
-            {
-                useTaskPlanning_ = useTaskPlanning;
-            }
-
-            /** \brief Get class for managing various visualization features */
-            tools::VisualizerPtr getVisual()
-            {
-                return visual_;
-            }
-
-            /** \brief Get class that contains the sparse DB */
-            SparseDBPtr getSparseDB()
-            {
-                return sparseDB_;
-            }
+            /* ----------------------------------------------------------------------------------------*/
+            /** \brief SPARS-related functions */
+            bool addStateToRoadmap(const base::PlannerTerminationCondition &ptc, base::State *newState);
+            geometric::SparseDB::Vertex addVertex(base::State *state, const GuardType &type);
+            void addEdge(Vertex v1, Vertex v2, std::size_t coutIndent);
+            bool checkAddCoverage(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood);
+            bool checkAddConnectivity(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood);
+            void findGraphNeighbors(base::State *state, std::vector<Vertex> &graphNeighborhood,
+                std::vector<Vertex> &visibleNeighborhood, std::size_t coutIndent);
+            bool sameComponent(Vertex m1, Vertex m2);
 
         protected:
             /** \brief The created space information */
             base::SpaceInformationPtr si_;
 
+            /** \brief The database of motions to search through */
+            BoltDB* boltDB_;
+
             /** \brief Class for managing various visualization features */
             tools::VisualizerPtr visual_;
-
-            /** \brief Class to store lighter version of graph */
-            SparseDBPtr sparseDB_;
-
-            /** \brief Sampler user for generating valid samples in the state space */
-            base::ValidStateSamplerPtr sampler_; // TODO(davetcoleman): remove this unused sampler
-
-            /** \brief Determine if a save is required */
-            bool graphUnsaved_;
-
-            /** \brief Helper class for storing each plannerData instance */
-            ompl::base::PlannerDataStorage plannerDataStorage_;
-
-            /** \brief Allow the database to save to file (new experiences) */
-            bool savingEnabled_;
 
             /** \brief Nearest neighbors data structure */
             boost::shared_ptr<NearestNeighbors<Vertex> > nn_;
@@ -712,53 +481,38 @@ namespace ompl
             Vertex queryVertex_;
 
             /** \brief Access to the weights of each Edge */
-            boost::property_map<Graph, boost::edge_weight_t>::type edgeWeightProperty_;
+            boost::property_map<Graph, boost::edge_weight_t>::type edgeWeightPropertySparse_;
 
             /** \brief Access to the collision checking state of each Edge */
-            EdgeCollisionStateMap edgeCollisionStateProperty_;
+            EdgeCollisionStateMap edgeCollisionStatePropertySparse_;
 
             /** \brief Access to the internal base::state at each Vertex */
-            boost::property_map<Graph, vertex_state_t>::type stateProperty_;
+            boost::property_map<Graph, vertex_state_t>::type statePropertySparse_;
 
             /** \brief Access to the SPARS vertex type for the vertices */
-            boost::property_map<Graph, vertex_type_t>::type typeProperty_;
+            boost::property_map<Graph, vertex_type_t>::type typePropertySparse_;
 
-            /** \brief Whether to bias search using popularity of edges */
-            bool popularityBiasEnabled_;
-
-            /** \brief How much influence should the popularity costs have over the admissible heuristic */
-            double popularityBias_;
+            /** \brief Data structure that maintains the connected components */
+            boost::disjoint_sets<
+                boost::property_map<Graph, boost::vertex_rank_t>::type,
+                boost::property_map<Graph, boost::vertex_predecessor_t>::type > disjointSets_;
 
             /** \brief Option to enable debugging output */
             bool verbose_;
 
-            /** \brief Discretization helper */
-            base::State* nextDiscretizedState_;
-
-            /** \brief Track vertex for later removal if temporary */
-            std::vector<Vertex> tempVerticies_;
-            Vertex startConnectorVertex_;
-            Vertex endConnectorVertex_;
-            double distanceAcrossCartesian_;
-
-            /** \brief Are we task planning i.e. for hybrid cartesian paths? */
-            bool useTaskPlanning_;
-
         public:
             /** \brief Various options for visualizing the algorithmns performance */
             bool visualizeAstar_;
-            bool visualizeGridGeneration_;
-            bool visualizeCartNeighbors_;
-            bool visualizeCartPath_;
 
-            /** \brief Distance between grid points (discretization level) */
-            double discretization_;
+            /** \brief Amount of sub-optimality allowed */
+            double sparseDelta_;
 
             /** \brief Visualization speed of astar search, num of seconds to show each vertex */
             double visualizeAstarSpeed_;
 
-        };  // end of class BoltDB
+        };  // end of class SparseDB
 
-    }  // namespace geometric
+    }  // namespace tools
 }  // namespace ompl
-#endif
+
+#endif // OMPL_TOOLS_BOLT_SPARSEDB_

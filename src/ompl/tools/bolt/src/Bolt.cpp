@@ -1,5 +1,5 @@
 /*********************************************************************
- * Software License Agreement (BSD License)
+ * Software License Agreement (SBD License)
  *
  *  Copyright (c) 2016, University of Colorado, Boulder
  *  All rights reserved.
@@ -64,15 +64,18 @@ void Bolt::initialize()
 {
     OMPL_INFORM("Initializing Bolt Framework");
 
+    // Initalize visualizer class
+    visual_.reset(new Visualizer());
+
     recallEnabled_ = true;
     scratchEnabled_ = true;
     filePath_ = "unloaded";
 
     // Load the experience database
-    boltDB_.reset(new geometric::BoltDB(si_));
+    boltDB_.reset(new geometric::BoltDB(si_, visual_));
 
     // Load the Retrieve repair database. We do it here so that setRepairPlanner() works
-    boltPlanner_ = ob::PlannerPtr(new og::BoltRetrieveRepair(si_, boltDB_));
+    boltPlanner_ = ob::PlannerPtr(new og::BoltRetrieveRepair(si_, boltDB_)); // TODO(davetcoleman): pass in visual_
 
     OMPL_INFORM("Bolt Framework initialized.");
 }
