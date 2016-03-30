@@ -57,6 +57,7 @@
 #include <boost/graph/graph_utility.hpp>
 #include <boost/graph/astar_search.hpp>
 #include <boost/graph/connected_components.hpp>
+#include <boost/graph/subgraph.hpp>
 #include <boost/property_map/property_map.hpp>
 #include <boost/pending/disjoint_sets.hpp>
 #include <boost/function.hpp>
@@ -292,15 +293,19 @@ namespace ompl
                 vertex_state_t, base::State*,
                 boost::property<
                     boost::vertex_predecessor_t, VertexIndexType,
-                    boost::property<boost::vertex_rank_t, VertexIndexType,
-                                    boost::property<vertex_type_t, GuardType  //,
-                                                    // boost::property < vertex_interface_data_t, InterfaceHashStruct >
-                                                    > > > > VertexProperties;
+                    boost::property<
+                        boost::vertex_rank_t, VertexIndexType,
+                        boost::property<
+                            vertex_type_t, GuardType  //,
+                            // boost::property < vertex_interface_data_t, InterfaceHashStruct >
+                            > > > > VertexProperties;
 
             /** Wrapper for the double assigned to an edge as its weight property. */
-            typedef boost::property<boost::edge_weight_t, double,
-                                    boost::property<edge_collision_state_t, int> > EdgeProperties;
-
+            typedef boost::property<
+                boost::edge_weight_t, double,
+                boost::property<
+                    edge_collision_state_t, int
+                    > > EdgeProperties;
 
             /** The underlying boost graph type (undirected weighted-edge adjacency list with above properties). */
             typedef boost::adjacency_list<boost::vecS,  // store in std::vector
@@ -401,6 +406,30 @@ namespace ompl
                  * \throw foundGoalException if \a u is the goal
                  */
                 void examine_vertex(Vertex v, const Graph& g) const;
+            };
+
+            /** \brief Custom storage class */
+            class WeightedVertex
+            {
+            public:
+                WeightedVertex(Vertex v, double weight)
+                    : v_(v), weight_(weight)
+                {
+                }
+
+                Vertex v_;
+                double weight_;
+            };
+
+            /** \brief Custom comparator class */
+            class CompareWeightedVertex
+            {
+            public:
+                bool operator() (WeightedVertex a, WeightedVertex b)
+                {
+                    return a.weight_ < b.weight_; // TODO(davetcoleman): which direction should the sign go?
+                }
+
             };
 
             ////////////////////////////////////////////////////////////////////////////////////////
@@ -732,11 +761,23 @@ namespace ompl
             }
 
             /** \brief Setter for using task planning flag */
-
             void setUseTaskPlanning(const bool& useTaskPlanning)
             {
                 useTaskPlanning_ = useTaskPlanning;
             }
+
+            /** \brief Create a SPARS graph from the discretized dense graph and its popularity metric */
+            void createSPARS();
+
+            /* ----------------------------------------------------------------------------------------*/
+            /** \brief SPARS-related functions */
+            bool addStateToRoadmap(const base::PlannerTerminationCondition &ptc, base::State *newState);
+            geometric::BoltDB::Vertex addSparseVertex(base::State *state, const GuardType &type);
+            bool checkAddCoverage(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood);
+            bool checkAddConnectivity(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood);
+            void findGraphNeighbors(base::State *state, std::vector<Vertex> &graphNeighborhood,
+                std::vector<Vertex> &visibleNeighborhood);
+
 
         protected:
             /** \brief The created space information */
@@ -756,9 +797,11 @@ namespace ompl
 
             /** \brief Nearest neighbors data structure */
             boost::shared_ptr<NearestNeighbors<Vertex> > nn_;
+            boost::shared_ptr<NearestNeighbors<Vertex> > sparse_nn_;
 
             /** \brief Connectivity graph */
             Graph g_;
+            Graph sparseG_;
 
             /** \brief Vertex for performing nearest neighbor queries. */
             Vertex queryVertex_;
@@ -794,7 +837,7 @@ namespace ompl
             ompl::base::VizEdgeCallback viz2EdgeCallback_;
             ompl::base::VizTriggerCallback viz2TriggerCallback_;
 
-            /** \brief Optional third callbacks to allow easy introspection of database */
+            /** \brief Optional third callbacks for other data */
             ompl::base::VizStateCallback viz3StateCallback_;
             ompl::base::VizEdgeCallback viz3EdgeCallback_;
             ompl::base::VizTriggerCallback viz3TriggerCallback_;
@@ -819,6 +862,9 @@ namespace ompl
             bool visualizeCartPath_;
 
             /** \brief Distance between grid points (discretization level) */
+            double discretization_;
+
+            /** \brief Amount of sub-optimality allowed */
             double sparseDelta_;
 
             /** \brief Visualization speed of astar search, num of seconds to show each vertex */
