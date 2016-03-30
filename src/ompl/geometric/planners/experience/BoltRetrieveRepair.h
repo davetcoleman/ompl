@@ -57,11 +57,11 @@ namespace ompl
 {
 namespace geometric
 {
-OMPL_CLASS_FORWARD(BoltDB);
 
 /// @cond IGNORE
 /** \brief Forward declaration of ompl::base::BoltRetrieveRepair */
 OMPL_CLASS_FORWARD(BoltRetrieveRepair);
+OMPL_CLASS_FORWARD(BoltDB);
 /// @endcond
 
 /** \class ompl::base::BoltRetrieveRepairPtr

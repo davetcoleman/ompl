@@ -41,6 +41,7 @@
 #include <ompl/tools/experience/ExperienceSetup.h> // the parent class
 
 #include <ompl/tools/bolt/BoltDB.h>
+#include <ompl/tools/bolt/Visualizer.h>
 #include <ompl/geometric/planners/experience/BoltRetrieveRepair.h>
 
 #include <ompl/base/Planner.h>
@@ -175,7 +176,16 @@ namespace ompl
             /** \brief Allow accumlated experiences to be processed */
             bool doPostProcessing();
 
+            /** \brief Get class for managing various visualization features */
+            tools::VisualizerPtr getVisual()
+            {
+                return visual_;
+            }
+
         protected:
+
+            /** \brief Class for managing various visualization features */
+            tools::VisualizerPtr visual_;
 
             /**  The maintained experience planner instance */
             base::PlannerPtr boltPlanner_;

@@ -33,10 +33,8 @@
  *********************************************************************/
 
 /* Author: Dave Coleman <dave@dav.ee>
-   Desc:
+   Desc:   Experience database for storing and reusing past path plans
 */
-
-/* Author: Dave Coleman */
 
 // OMPL
 #include <ompl/tools/bolt/BoltDB.h>
@@ -71,8 +69,11 @@ BOOST_CONCEPT_ASSERT(
     (boost::ReadablePropertyMapConcept<ompl::geometric::BoltDB::edgeWeightMap, ompl::geometric::BoltDB::Edge>));
 
 og::BoltDB::edgeWeightMap::edgeWeightMap(const Graph &graph, const EdgeCollisionStateMap &collisionStates,
-    const double &popularityBias, const bool popularityBiasEnabled)
-    : g_(graph), collisionStates_(collisionStates), popularityBias_(popularityBias), popularityBiasEnabled_(popularityBiasEnabled)
+                                         const double &popularityBias, const bool popularityBiasEnabled)
+  : g_(graph)
+  , collisionStates_(collisionStates)
+  , popularityBias_(popularityBias)
+  , popularityBiasEnabled_(popularityBiasEnabled)
 {
 }
 
@@ -90,7 +91,7 @@ double og::BoltDB::edgeWeightMap::get(Edge e) const
     {
         // static const double popularityBias = 10;
         weight = boost::get(boost::edge_weight, g_, e) / MAX_POPULARITY_WEIGHT * popularityBias_;
-        //std::cout << "getting popularity weight of edge " << e << " with value " << weight << std::endl;
+        // std::cout << "getting popularity weight of edge " << e << " with value " << weight << std::endl;
     }
     else
     {
@@ -108,10 +109,10 @@ double og::BoltDB::edgeWeightMap::get(Edge e) const
 
 namespace boost
 {
-    double get(const og::BoltDB::edgeWeightMap &m, const og::BoltDB::Edge &e)
-    {
-        return m.get(e);
-    }
+double get(const og::BoltDB::edgeWeightMap &m, const og::BoltDB::Edge &e)
+{
+    return m.get(e);
+}
 }
 
 // CustomAstarVisitor methods ////////////////////////////////////////////////////////////////////////////
@@ -125,15 +126,15 @@ og::BoltDB::CustomAstarVisitor::CustomAstarVisitor(Vertex goal, BoltDB *parent) 
 void og::BoltDB::CustomAstarVisitor::discover_vertex(Vertex v, const Graph &) const
 {
     if (parent_->visualizeAstar_)
-        parent_->vizStateCallback(parent_->stateProperty_[v], 1, 1);
+        parent_->getVisual()->viz1StateCallback(parent_->stateProperty_[v], /*mode=*/ 1, 1);
 }
 
 void og::BoltDB::CustomAstarVisitor::examine_vertex(Vertex v, const Graph &) const
 {
     if (parent_->visualizeAstar_)
     {
-        parent_->vizStateCallback(parent_->stateProperty_[v], 5, 1);
-        parent_->vizTriggerCallback();
+        parent_->getVisual()->viz1StateCallback(parent_->stateProperty_[v], /*mode=*/ 5, 1);
+        parent_->getVisual()->viz1TriggerCallback();
         usleep(parent_->visualizeAstarSpeed_ * 1000000);
     }
 
@@ -143,32 +144,34 @@ void og::BoltDB::CustomAstarVisitor::examine_vertex(Vertex v, const Graph &) con
 
 // Actual class ////////////////////////////////////////////////////////////////////////////
 
-og::BoltDB::BoltDB(base::SpaceInformationPtr si)
-    : si_(si)
-    , graphUnsaved_(false)
-    , savingEnabled_(true)
-      // Property accessors of edges
-    , edgeWeightProperty_(boost::get(boost::edge_weight, g_))
-    , edgeCollisionStateProperty_(boost::get(edge_collision_state_t(), g_))
-      // Property accessors of vertices
-    , stateProperty_(boost::get(vertex_state_t(), g_))
-    , typeProperty_(boost::get(vertex_type_t(), g_))
-      // interfaceDataProperty_(boost::get(vertex_interface_data_t(), g_)),
-    , popularityBiasEnabled_(false)
-    , verbose_(true)
-    , distanceAcrossCartesian_(0.0)
-    , visualizeAstar_(false)
-    , visualizeGridGeneration_(false)
-    , visualizeCartNeighbors_(false)
-    , visualizeCartPath_(false)
-    , sparseDelta_(2.0)
-    , discretization_(2.0)
-    , visualizeAstarSpeed_(0.1)
+og::BoltDB::BoltDB(base::SpaceInformationPtr si, tools::VisualizerPtr visual)
+  : si_(si)
+  , visual_(visual)
+  , graphUnsaved_(false)
+  , savingEnabled_(true)
+  // Property accessors of edges
+  , edgeWeightProperty_(boost::get(boost::edge_weight, g_))
+  , edgeCollisionStateProperty_(boost::get(edge_collision_state_t(), g_))
+  // Property accessors of vertices
+  , stateProperty_(boost::get(vertex_state_t(), g_))
+  , typeProperty_(boost::get(vertex_type_t(), g_))
+  // interfaceDataProperty_(boost::get(vertex_interface_data_t(), g_)),
+  , popularityBiasEnabled_(false)
+  , verbose_(true)
+  , distanceAcrossCartesian_(0.0)
+  , visualizeAstar_(false)
+  , visualizeGridGeneration_(false)
+  , visualizeCartNeighbors_(false)
+  , visualizeCartPath_(false)
+  , discretization_(2.0)
+  , visualizeAstarSpeed_(0.1)
 {
+    // Initialize sparse database
+    sparseDB_.reset(new SparseDB(si_, this, visual_));
+
+    // Initialize nearest neighbor datastructure
     nn_.reset(new NearestNeighborsGNATNoThreadSafety<Vertex>());
     nn_->setDistanceFunction(boost::bind(&og::BoltDB::distanceFunction, this, _1, _2));
-    sparse_nn_.reset(new NearestNeighborsGNATNoThreadSafety<Vertex>());
-    sparse_nn_->setDistanceFunction(boost::bind(&og::BoltDB::distanceFunction, this, _1, _2));
 }
 
 og::BoltDB::~BoltDB(void)
@@ -192,8 +195,6 @@ void og::BoltDB::freeMemory()
 
     if (nn_)
         nn_->clear();
-    if (sparse_nn_)
-        sparse_nn_->clear();
 
     sampler_.reset();
 }
@@ -258,7 +259,7 @@ bool og::BoltDB::load(const std::string &fileName)
     plannerDataStorage_.load(iStream, *plannerData.get());
 
     OMPL_INFORM("BoltDB: Loaded planner data with \n  %d vertices\n  %d edges", plannerData->numVertices(),
-        plannerData->numEdges());
+                plannerData->numEdges());
 
     if (!plannerData->numVertices() || !plannerData->numEdges())
     {
@@ -290,7 +291,7 @@ bool og::BoltDB::postProcessPath(og::PathGeometric &solutionPath, double &insert
     }
 
     // Clear all visuals
-    //viz2StateCallback(currentPathState, 0, 1);
+    // visual_->vizDBStateCallback(currentPathState, 0, 1);
 
     // Get starting state
     base::State *currentPathState = solutionPath.getStates()[0];
@@ -300,10 +301,10 @@ bool og::BoltDB::postProcessPath(og::PathGeometric &solutionPath, double &insert
     // TODO(davetcoleman): loop through all possible start vertices
     stateProperty_[queryVertex_] = currentPathState;
     Vertex prevGraphVertex = nn_->nearest(queryVertex_);
-    stateProperty_[queryVertex_] = NULL; // Set search vertex to NULL to prevent segfault on class unload of memory
+    stateProperty_[queryVertex_] = NULL;  // Set search vertex to NULL to prevent segfault on class unload of memory
 
     // Visualize
-    vizStateCallback(stateProperty_[prevGraphVertex], 1, 1);
+    visual_->viz1StateCallback(stateProperty_[prevGraphVertex], /*mode=*/ 1, 1);
 
     // Create new path that is 'snapped' onto the roadmap
     std::vector<Vertex> roadmapPath;
@@ -321,14 +322,14 @@ bool og::BoltDB::postProcessPath(og::PathGeometric &solutionPath, double &insert
     }
 
     // Visualize
-    vizTriggerCallback();
+    visual_->viz1TriggerCallback();
     usleep(0.1 * 1000000);
 
     // Error check
     if (!allValid)
     {
         OMPL_ERROR("Found case where unable to connect");
-        exit(-1); // TODO(davetcoleman): gracefully fail - just ignore that path
+        exit(-1);  // TODO(davetcoleman): gracefully fail - just ignore that path
     }
 
     // Error check
@@ -340,22 +341,23 @@ bool og::BoltDB::postProcessPath(og::PathGeometric &solutionPath, double &insert
             OMPL_ERROR("Trajectory completely empty!");
             exit(-1);
         }
-        // It is possible to have a path of [actualStart, middlePoint, actualGoal], in which case we can't save any experience from it
+        // It is possible to have a path of [actualStart, middlePoint, actualGoal], in which case we can't save any
+        // experience from it
     }
 
     // Update edge weights based on this newly created path
     for (std::size_t vertexID = 1; vertexID < roadmapPath.size(); ++vertexID)
     {
         std::pair<BoltDB::Edge, bool> edgeResult = boost::edge(roadmapPath[vertexID - 1], roadmapPath[vertexID], g_);
-        BoltDB::Edge& edge = edgeResult.first;
+        BoltDB::Edge &edge = edgeResult.first;
 
         // Error check
         if (!edgeResult.second)
         {
             OMPL_ERROR("No edge found on snapped path at index %u", vertexID);
-            viz3EdgeCallback(stateProperty_[roadmapPath[vertexID - 1]], stateProperty_[roadmapPath[vertexID]], 0);
-            viz3TriggerCallback();
-            usleep(4*1000000);
+            visual_->viz2EdgeCallback(stateProperty_[roadmapPath[vertexID - 1]], stateProperty_[roadmapPath[vertexID]], 0);
+            visual_->viz2TriggerCallback();
+            usleep(4 * 1000000);
         }
         else
         {
@@ -372,10 +374,10 @@ bool og::BoltDB::postProcessPath(og::PathGeometric &solutionPath, double &insert
                 std::cout << " new: " << edgeWeightProperty_[edge] << std::endl;
 
             // Visualize
-            viz3EdgeCallback(stateProperty_[roadmapPath[vertexID - 1]], stateProperty_[roadmapPath[vertexID]], 100);
+            visual_->viz2EdgeCallback(stateProperty_[roadmapPath[vertexID - 1]], stateProperty_[roadmapPath[vertexID]], 100);
         }
     }
-    viz3TriggerCallback();
+    visual_->viz2TriggerCallback();
 
     // Record this new addition
     graphUnsaved_ = true;
@@ -383,8 +385,8 @@ bool og::BoltDB::postProcessPath(og::PathGeometric &solutionPath, double &insert
     return true;
 }
 
-bool og::BoltDB::recurseSnapWaypoints(og::PathGeometric& inputPath, std::vector<Vertex>& roadmapPath,
-    std::size_t currVertexIndex, const Vertex& prevGraphVertex, bool& allValid)
+bool og::BoltDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vector<Vertex> &roadmapPath,
+                                      std::size_t currVertexIndex, const Vertex &prevGraphVertex, bool &allValid)
 
 {
     bool verbose = false;
@@ -413,7 +415,7 @@ bool og::BoltDB::recurseSnapWaypoints(og::PathGeometric& inputPath, std::vector<
     for (std::size_t neighborID = 0; neighborID < graphNeighborhood.size(); ++neighborID)
     {
         bool isValid = false;
-        bool isRepeatOfPrevWaypoint = false; // don't add current waypoint if same as last one
+        bool isRepeatOfPrevWaypoint = false;  // don't add current waypoint if same as last one
 
         // Developer feedback - help tune variable findNearestKNeighbors
         if (neighborID > 4)
@@ -430,23 +432,23 @@ bool og::BoltDB::recurseSnapWaypoints(og::PathGeometric& inputPath, std::vector<
             // Do not do anything, we are done here
             foundValidConnToPrevious = true;
             if (verbose)
-                std::cout << std::string(currVertexIndex, ' ') <<
-                    "Previous vertex is same as current vertex, skipping current vertex" << std::endl;
+                std::cout << std::string(currVertexIndex, ' ') << "Previous vertex is same as current vertex, skipping "
+                                                                  "current vertex" << std::endl;
             isValid = true;
             isRepeatOfPrevWaypoint = true;
         }
         else
         {
             // Visualize nearby state
-            vizStateCallback(stateProperty_[currGraphVertex], 1, 1);
-            vizEdgeCallback(currentPathState, stateProperty_[currGraphVertex], 30);
+            visual_->viz1StateCallback(stateProperty_[currGraphVertex], /*mode=*/ 1, 1);
+            visual_->viz1EdgeCallback(currentPathState, stateProperty_[currGraphVertex], 30);
 
             // Check for collision
             isValid = si_->checkMotion(stateProperty_[prevGraphVertex], stateProperty_[currGraphVertex]);
             double color = isValid ? 0 : 60;
 
             // Visualize
-            vizEdgeCallback(stateProperty_[prevGraphVertex], stateProperty_[currGraphVertex], color);
+            visual_->viz1EdgeCallback(stateProperty_[prevGraphVertex], stateProperty_[currGraphVertex], color);
         }
 
         // Remember if any connections failed
@@ -457,8 +459,8 @@ bool og::BoltDB::recurseSnapWaypoints(og::PathGeometric& inputPath, std::vector<
             if (neighborID > 0)
             {
                 OMPL_WARN("Found case where double loop fixed the problem - loop %u", neighborID);
-                //vizTriggerCallback();
-                //usleep(6*1000000);
+                // visual_->viz1TriggerCallback();
+                // usleep(6*1000000);
             }
             foundValidConnToPrevious = true;
 
@@ -501,7 +503,7 @@ bool og::BoltDB::recurseSnapWaypoints(og::PathGeometric& inputPath, std::vector<
         allValid = false;
 
         // Visualize
-        vizTriggerCallback();
+        visual_->viz1TriggerCallback();
         usleep(1 * 1000000);
 
         return false;
@@ -555,7 +557,7 @@ bool og::BoltDB::save(const std::string &fileName)
     base::PlannerDataPtr data(new base::PlannerData(si_));
     getPlannerData(*data);
     OMPL_INFORM("Saving PlannerData with \n  %d vertices\n  %d edges\n  %d start states\n  %d goal states",
-        data->numVertices(), data->numEdges(), data->numStartVertices(), data->numGoalVertices());
+                data->numVertices(), data->numEdges(), data->numStartVertices(), data->numGoalVertices());
 
     // Write the number of paths we will be saving
     double numPaths = 1;
@@ -616,16 +618,17 @@ bool og::BoltDB::astarSearch(const Vertex start, const Vertex goal, std::vector<
     try
     {
         // Note: could not get astar_search to compile within BoltRetrieveRepair.cpp class because of namespacing issues
-        boost::astar_search(g_,     // graph
+        boost::astar_search(
+            g_,     // graph
             start,  // start state
             // boost::bind(&og::BoltDB::distanceFunction2, this, _1, goal),  // the heuristic
             // boost::bind(&og::BoltDB::distanceFunction, this, _1, goal),  // the heuristic
             boost::bind(&og::BoltDB::distanceFunctionTasks, this, _1, goal),  // the heuristic
             // ability to disable edges (set cost to inifinity):
             boost::weight_map(edgeWeightMap(g_, edgeCollisionStateProperty_, popularityBias_, popularityBiasEnabled_))
-            .predecessor_map(vertexPredecessors)
-            .distance_map(&vertexDistances[0])
-            .visitor(CustomAstarVisitor(goal, this)));
+                .predecessor_map(vertexPredecessors)
+                .distance_map(&vertexDistances[0])
+                .visitor(CustomAstarVisitor(goal, this)));
     }
     catch (foundGoalException &)
     {
@@ -634,9 +637,9 @@ bool og::BoltDB::astarSearch(const Vertex start, const Vertex goal, std::vector<
 
         if (vertexDistances[goal] > 1.7e+308)  // TODO(davetcoleman): fix terrible hack for detecting infinity
                                                // double diff = d[goal] - std::numeric_limits<double>::infinity();
-            // if ((diff < std::numeric_limits<double>::epsilon()) && (-diff < std::numeric_limits<double>::epsilon()))
-            // check if the distance to goal is inifinity. if so, it is unreachable
-            // if (d[goal] >= std::numeric_limits<double>::infinity())
+        // if ((diff < std::numeric_limits<double>::epsilon()) && (-diff < std::numeric_limits<double>::epsilon()))
+        // check if the distance to goal is inifinity. if so, it is unreachable
+        // if (d[goal] >= std::numeric_limits<double>::infinity())
         {
             if (verbose_)
                 OMPL_INFORM("Distance to goal is infinity");
@@ -676,11 +679,11 @@ bool og::BoltDB::astarSearch(const Vertex start, const Vertex goal, std::vector<
             const Vertex v2 = vertexPredecessors[v1];
             if (v1 != v2)
             {
-                //std::cout << "Edge " << v1 << " to " << v2 << std::endl;
-                vizEdgeCallback(stateProperty_[v1], stateProperty_[v2], 10);
+                // std::cout << "Edge " << v1 << " to " << v2 << std::endl;
+                visual_->viz1EdgeCallback(stateProperty_[v1], stateProperty_[v2], 10);
             }
         }
-        viz2TriggerCallback();
+        visual_->viz1TriggerCallback();
     }
 
     // Unload
@@ -764,15 +767,15 @@ double og::BoltDB::distanceFunctionTasks(const Vertex a, const Vertex b) const
             if (verbose)
                 std::cout << "b ";
             dist = si_->distance(stateProperty_[a], stateProperty_[startConnectorVertex_]) + TASK_LEVEL_COST +
-                si_->distance(stateProperty_[startConnectorVertex_], stateProperty_[b]);
+                   si_->distance(stateProperty_[startConnectorVertex_], stateProperty_[b]);
         }
         else if (taskLevelB == 2)
         {
             if (verbose)
                 std::cout << "c ";
             dist = si_->distance(stateProperty_[a], stateProperty_[startConnectorVertex_]) + TASK_LEVEL_COST +
-                distanceAcrossCartesian_ + TASK_LEVEL_COST +
-                si_->distance(stateProperty_[endConnectorVertex_], stateProperty_[b]);
+                   distanceAcrossCartesian_ + TASK_LEVEL_COST +
+                   si_->distance(stateProperty_[endConnectorVertex_], stateProperty_[b]);
         }
         else
         {
@@ -798,7 +801,7 @@ double og::BoltDB::distanceFunctionTasks(const Vertex a, const Vertex b) const
             if (verbose)
                 std::cout << "e ";
             dist = si_->distance(stateProperty_[a], stateProperty_[endConnectorVertex_]) + TASK_LEVEL_COST +
-                si_->distance(stateProperty_[endConnectorVertex_], stateProperty_[b]);
+                   si_->distance(stateProperty_[endConnectorVertex_], stateProperty_[b]);
         }
         else
         {
@@ -865,8 +868,8 @@ void og::BoltDB::getPlannerData(base::PlannerData &data) const
             const Vertex v2 = boost::target(e, g_);
 
             if (!data.addEdge(base::PlannerDataVertex(stateProperty_[v1], (int)typeProperty_[v1]),
-                    base::PlannerDataVertex(stateProperty_[v2], (int)typeProperty_[v2]),
-                    base::PlannerDataEdge(), base::Cost(edgeWeightProperty_[e])))
+                              base::PlannerDataVertex(stateProperty_[v2], (int)typeProperty_[v2]),
+                              base::PlannerDataEdge(), base::Cost(edgeWeightProperty_[e])))
             {
                 OMPL_ERROR("Unable to add edge");
             }
@@ -1036,7 +1039,7 @@ void og::BoltDB::generateGrid()
 
     // Display
     if (visualizeGridGeneration_)
-        viz2TriggerCallback();
+        visual_->vizDBTriggerCallback();
 
     // Mark the graph as ready to be saved
     graphUnsaved_ = true;
@@ -1071,8 +1074,8 @@ void og::BoltDB::generateTaskSpace()
         // Visualize - only do this for 2/3D environments
         if (visualizeGridGeneration_)
         {
-            viz2StateCallback(newState, 5, 1);  // Candidate node has already (just) been added
-            viz2TriggerCallback();
+            visual_->vizDBStateCallback(newState, 5, 1);  // Candidate node has already (just) been added
+            visual_->vizDBTriggerCallback();
             usleep(0.005 * 1000000);
         }
     }
@@ -1104,10 +1107,10 @@ void og::BoltDB::generateTaskSpace()
         // Visualize
         if (visualizeGridGeneration_)
         {
-            viz2Edge(newE);
+            vizDBEdge(newE);
             if (i % 100 == 0)
             {
-                viz2TriggerCallback();
+                visual_->vizDBTriggerCallback();
                 usleep(0.01 * 1000000);
             }
         }
@@ -1115,7 +1118,7 @@ void og::BoltDB::generateTaskSpace()
 
     // Visualize
     if (visualizeGridGeneration_)
-        viz2TriggerCallback();
+        visual_->vizDBTriggerCallback();
 
     OMPL_INFORM("Done generating task space graph");
 }
@@ -1171,7 +1174,7 @@ void og::BoltDB::generateEdges()
 
         const std::size_t numSameVerticiesFound = 1;  // add 1 to the end because the NN tree always returns itself
         nn_->nearestK(queryVertex_, findNearestKNeighbors + numSameVerticiesFound, graphNeighborhood);
-        stateProperty_[queryVertex_] = NULL; // Set search vertex to NULL to prevent segfault on class unload of memory
+        stateProperty_[queryVertex_] = NULL;  // Set search vertex to NULL to prevent segfault on class unload of memory
 
         if (verbose)
             OMPL_INFORM("Found %u neighbors", graphNeighborhood.size());
@@ -1182,7 +1185,7 @@ void og::BoltDB::generateEdges()
 
         // Clear all visuals
         // if (visualizeGridGeneration_)
-        //     viz2StateCallback(stateProperty_[v1], 0, 1);
+        //     visual_->vizDBStateCallback(stateProperty_[v1], 0, 1);
 
         // For each nearby vertex, add an edge
         std::size_t errorCheckNumSameVerticies = 0;
@@ -1202,7 +1205,7 @@ void og::BoltDB::generateEdges()
 
             // Debug: display edge
             if (visualizeGridGeneration_)
-                viz2EdgeCallback(stateProperty_[v1], stateProperty_[v2], 1);
+                visual_->vizDBEdgeCallback(stateProperty_[v1], stateProperty_[v2], 1);
 
             // Check if these vertices already share an edge
             {
@@ -1230,7 +1233,7 @@ void og::BoltDB::generateEdges()
 
         if (visualizeGridGeneration_)
         {
-            viz2TriggerCallback();
+            visual_->vizDBTriggerCallback();
             usleep(0.01 * 1000000);
         }
 
@@ -1281,10 +1284,10 @@ void og::BoltDB::generateEdges()
         // Debug in Rviz
         if (visualizeGridGeneration_)
         {
-            viz2EdgeCallback(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
+            visual_->vizDBEdgeCallback(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
             if (errorCheckCounter % 100 == 0)
             {
-                viz2TriggerCallback();
+                visual_->vizDBTriggerCallback();
                 usleep(0.01 * 1000000);
             }
         }
@@ -1382,7 +1385,7 @@ void og::BoltDB::checkEdgesThreaded(const std::vector<Edge> &unvalidatedEdges)
 }
 
 void og::BoltDB::checkEdgesThread(std::size_t startEdge, std::size_t endEdge, base::SpaceInformationPtr si,
-    const std::vector<Edge> &unvalidatedEdges)
+                                  const std::vector<Edge> &unvalidatedEdges)
 {
     // Process [startEdge, endEdge] inclusive
     for (std::size_t edgeID = startEdge; edgeID <= endEdge; ++edgeID)
@@ -1455,8 +1458,8 @@ void og::BoltDB::recursiveDiscretization(std::vector<double> &values, std::size_
             // Visualize
             if (visualizeGridGeneration_)
             {
-                viz2StateCallback(nextDiscretizedState_, 5, 1);  // Candidate node has already (just) been added
-                viz2TriggerCallback();
+                visual_->vizDBStateCallback(nextDiscretizedState_, 5, 1);  // Candidate node has already (just) been added
+                visual_->vizDBTriggerCallback();
                 usleep(0.005 * 1000000);
             }
 
@@ -1522,7 +1525,7 @@ void og::BoltDB::checkVerticesThreaded(const std::vector<Vertex> &unvalidatedVer
 }
 
 void og::BoltDB::checkVerticesThread(std::size_t startVertex, std::size_t endVertex, base::SpaceInformationPtr si,
-    const std::vector<Vertex> &unvalidatedVertices)
+                                     const std::vector<Vertex> &unvalidatedVertices)
 {
     // Process [startVertex, endVertex] inclusive
     for (std::size_t vertexID = startVertex; vertexID <= endVertex; ++vertexID)
@@ -1559,14 +1562,15 @@ void og::BoltDB::displayDatabase(bool showVertices)
             // Check for null states
             if (stateProperty_[v])
             {
-                viz2StateCallback(stateProperty_[v], 6, 1);
+                visual_->vizDBStateCallback(stateProperty_[v], 6, 1);
             }
 
             // Prevent cache from getting too big
             if (count % debugFrequency == 0)
             {
-                std::cout << std::fixed << std::setprecision(0) << (static_cast<double>(count+1) / getNumVertices()) * 100.0 << "% ";
-                viz2TriggerCallback();
+                std::cout << std::fixed << std::setprecision(0)
+                          << (static_cast<double>(count + 1) / getNumVertices()) * 100.0 << "% ";
+                visual_->vizDBTriggerCallback();
             }
             count++;
         }
@@ -1585,13 +1589,14 @@ void og::BoltDB::displayDatabase(bool showVertices)
             const Vertex &v2 = boost::target(e, g_);
 
             // Visualize
-            viz2EdgeCallback(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
+            visual_->vizDBEdgeCallback(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
 
             // Prevent cache from getting too big
             if (count % debugFrequency == 0)
             {
-                std::cout << std::fixed << std::setprecision(0) << (static_cast<double>(count+1) / getNumEdges()) * 100.0 << "% ";
-                viz2TriggerCallback();
+                std::cout << std::fixed << std::setprecision(0)
+                          << (static_cast<double>(count + 1) / getNumEdges()) * 100.0 << "% ";
+                visual_->vizDBTriggerCallback();
             }
 
             count++;
@@ -1600,34 +1605,7 @@ void og::BoltDB::displayDatabase(bool showVertices)
     }
 
     // Publish remaining edges
-    viz2TriggerCallback();
-}
-
-void og::BoltDB::setVizCallbacks(ompl::base::VizStateCallback vizStateCallback,
-    ompl::base::VizEdgeCallback vizEdgeCallback,
-    ompl::base::VizTriggerCallback vizTriggerCallback)
-{
-    vizStateCallback_ = vizStateCallback;
-    vizEdgeCallback_ = vizEdgeCallback;
-    vizTriggerCallback_ = vizTriggerCallback;
-}
-
-void og::BoltDB::setViz2Callbacks(ompl::base::VizStateCallback vizStateCallback,
-    ompl::base::VizEdgeCallback vizEdgeCallback,
-    ompl::base::VizTriggerCallback vizTriggerCallback)
-{
-    viz2StateCallback_ = vizStateCallback;
-    viz2EdgeCallback_ = vizEdgeCallback;
-    viz2TriggerCallback_ = vizTriggerCallback;
-}
-
-void og::BoltDB::setViz3Callbacks(ompl::base::VizStateCallback vizStateCallback,
-    ompl::base::VizEdgeCallback vizEdgeCallback,
-    ompl::base::VizTriggerCallback vizTriggerCallback)
-{
-    viz3StateCallback_ = vizStateCallback;
-    viz3EdgeCallback_ = vizEdgeCallback;
-    viz3TriggerCallback_ = vizTriggerCallback;
+    visual_->vizDBTriggerCallback();
 }
 
 void og::BoltDB::normalizeGraphEdgeWeights()
@@ -1804,9 +1782,9 @@ bool og::BoltDB::addCartPath(std::vector<base::State *> path)
         // Visualize
         if (visualizeCartPath_)
         {
-            vizEdgeCallback(path[i - 1], path[i], 0);
-            vizStateCallback(path[i], 1, 1);
-            vizTriggerCallback();
+            visual_->viz1EdgeCallback(path[i - 1], path[i], 0);
+            visual_->viz1StateCallback(path[i], /*mode=*/ 1, 1);
+            visual_->viz1TriggerCallback();
             usleep(0.001 * 1000000);
         }
     }
@@ -1815,7 +1793,7 @@ bool og::BoltDB::addCartPath(std::vector<base::State *> path)
 }
 
 bool og::BoltDB::connectStateToNeighborsAtLevel(const Vertex &fromVertex, const std::size_t level,
-    Vertex &minConnectorVertex)
+                                                Vertex &minConnectorVertex)
 {
     // Get nearby states to goal
     std::vector<Vertex> neighbors;
@@ -1856,22 +1834,22 @@ bool og::BoltDB::connectStateToNeighborsAtLevel(const Vertex &fromVertex, const 
         const double cost = (level == 0 ? 100 : 50);
         if (visualizeCartNeighbors_)
         {
-            vizEdgeCallback(stateProperty_[v], stateProperty_[fromVertex], cost);
-            vizStateCallback(stateProperty_[v], 1, 1);
-            vizTriggerCallback();
+            visual_->viz1EdgeCallback(stateProperty_[v], stateProperty_[fromVertex], cost);
+            visual_->viz1StateCallback(stateProperty_[v], /*mode=*/ 1, 1);
+            visual_->viz1TriggerCallback();
             usleep(0.001 * 1000000);
         }
     }
 
     // Display ---------------------------------------
     if (visualizeCartNeighbors_)
-        vizTriggerCallback();
+        visual_->viz1TriggerCallback();
 
     return true;
 }
 
 void og::BoltDB::getNeighborsAtLevel(const base::State *origState, const std::size_t level,
-    const std::size_t kNeighbors, std::vector<Vertex> &neighbors)
+                                     const std::size_t kNeighbors, std::vector<Vertex> &neighbors)
 {
     // Clone the state and change its level
     base::State *searchState = si_->cloneState(origState);
@@ -1880,7 +1858,7 @@ void og::BoltDB::getNeighborsAtLevel(const base::State *origState, const std::si
     // Get nearby state
     stateProperty_[queryVertex_] = searchState;
     nn_->nearestK(queryVertex_, kNeighbors, neighbors);
-    stateProperty_[queryVertex_] = NULL; // Set search vertex to NULL to prevent segfault on class unload of memory
+    stateProperty_[queryVertex_] = NULL;  // Set search vertex to NULL to prevent segfault on class unload of memory
     si_->getStateSpace()->freeState(searchState);
 
     // Run various checks
@@ -1913,13 +1891,13 @@ void og::BoltDB::getNeighborsAtLevel(const base::State *origState, const std::si
     }
 }
 
-void og::BoltDB::viz2Edge(Edge &e)
+void og::BoltDB::vizDBEdge(Edge &e)
 {
     const Vertex &v1 = boost::source(e, g_);
     const Vertex &v2 = boost::target(e, g_);
 
     // Visualize
-    viz2EdgeCallback(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
+    visual_->vizDBEdgeCallback(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
 }
 
 bool og::BoltDB::checkTaskPathSolution(og::PathGeometric &path, ob::State *start, ob::State *goal)
@@ -2011,557 +1989,3 @@ void og::BoltDB::checkStateType()
     }
     OMPL_INFORM("All states checked for task level");
 }
-
-// Create SPARs graph using popularity
-void og::BoltDB::createSPARS()
-{
-    bool verbose = false;
-
-    // Sort the verticies by popularity in a queue
-    std::priority_queue<WeightedVertex, std::vector<WeightedVertex>, CompareWeightedVertex> pqueue;
-
-    // Loop through each popular edge in the dense graph
-    BOOST_FOREACH (Vertex v, boost::vertices(g_))
-    {
-        // Do not process the search vertex, it is null
-        if (v == 0)
-            continue;
-
-        if (verbose)
-            std::cout << "Vertex: " << v << std::endl;
-        double popularity = 0;
-        // std::pair<out_edge_iterator, out_edge_iterator> edge
-        BOOST_FOREACH (Edge edge, boost::out_edges(v, g_))
-        {
-            if (verbose)
-                std::cout << "  Edge: " << edge << std::endl;
-            popularity += (100 - edgeWeightProperty_[edge]);
-        }
-        if (verbose)
-            std::cout << "  Total popularity: " << popularity << std::endl;
-        pqueue.push(WeightedVertex(v, popularity));
-    }
-
-    double largestWeight = pqueue.top().weight_;
-
-    // Output the vertices in order
-    while (!pqueue.empty())
-    {
-        Vertex v = pqueue.top().v_;
-        std::cout << "  Visualizing vertex " << v << " with popularity " << pqueue.top().weight_
-                  << " queue remaining size " << pqueue.size() << std::endl;
-
-        // Visualize
-        const double visualWeight = pqueue.top().weight_ / largestWeight;
-        vizStateCallback(stateProperty_[v], 7, visualWeight);
-        vizTriggerCallback();
-        usleep(0.01*1000000);
-
-        // Attempt to insert into SPARS graph
-        double seconds = 1000;
-        ob::PlannerTerminationCondition ptc = ob::timedPlannerTerminationCondition(seconds, 0.1);
-        if (!addStateToRoadmap(ptc, stateProperty_[v]))
-            OMPL_INFORM("Failed to add state to roadmap");
-
-        // Remove from priority queue
-        pqueue.pop();
-    } // end while
-
-}
-
-bool og::BoltDB::addStateToRoadmap(const base::PlannerTerminationCondition &ptc, base::State *newState)
-{
-    bool stateAdded = false;
-
-    // Deep copy
-    base::State *qNew = si_->cloneState(newState); // TODO(davetcoleman): do i need to clone it?
-    base::State *workState = si_->allocState(); // TODO(davetcoleman): do i need this state?
-
-    /* Nodes near our newState */
-    std::vector<Vertex> graphNeighborhood;
-    /* Visible nodes near our newState */
-    std::vector<Vertex> visibleNeighborhood;
-
-    // Find nearby nodes
-    findGraphNeighbors(qNew, graphNeighborhood, visibleNeighborhood);
-
-    // Always add a node if no other nodes around it are visible (GUARD)
-    if (checkAddCoverage(qNew, visibleNeighborhood))
-    {
-        stateAdded = true;
-    }
-    else if (checkAddConnectivity(qNew, visibleNeighborhood)) // Connectivity criterion
-    {
-        stateAdded = true;
-    }
-
-    /*
-    else if (checkAddInterface(qNew, graphNeighborhood, visibleNeighborhood))
-    {
-        stateAdded = true;
-    }
-    else
-    {
-        if (verbose_)
-            OMPL_INFORM(" ---- Ensure SPARS asymptotic optimality");
-        if (visibleNeighborhood.size() > 0)
-        {
-            std::map<Vertex, base::State*> closeRepresentatives;
-            if (verbose_)
-                OMPL_INFORM(" ----- findCloseRepresentatives()");
-
-            findCloseRepresentatives(workState, qNew, visibleNeighborhood[0], closeRepresentatives, ptc);
-            if (verbose_)
-                OMPL_INFORM("------ Found %d close representatives", closeRepresentatives.size());
-
-            for (std::map<Vertex, base::State*>::iterator it = closeRepresentatives.begin(); it != closeRepresentatives.end(); ++it)
-            {
-                if (verbose_)
-                    OMPL_INFORM(" ------ Looping through close representatives");
-                updatePairPoints(visibleNeighborhood[0], qNew, it->first, it->second);
-                updatePairPoints(it->first, it->second, visibleNeighborhood[0], qNew);
-            }
-            if (verbose_)
-                OMPL_INFORM(" ------ checkAddPath()");
-            if (checkAddPath(visibleNeighborhood[0]))
-            {
-                if (verbose_)
-                {
-                    OMPL_INFORM("nearest visible neighbor added ");
-                }
-            }
-
-            for (std::map<Vertex, base::State*>::iterator it = closeRepresentatives.begin(); it != closeRepresentatives.end(); ++it)
-            {
-                if (verbose_)
-                    OMPL_INFORM(" ------- Looping through close representatives to add path");
-                checkAddPath(it->first);
-                si_->freeState(it->second);
-            }
-            if (verbose_)
-                OMPL_INFORM("------ Done with inner most loop ");
-        }
-    }
-    */
-
-    si_->freeState(workState);
-    si_->freeState(qNew);
-
-    return stateAdded;
-}
-
-og::BoltDB::Vertex og::BoltDB::addSparseVertex(base::State *state, const GuardType &type)
-{
-    // Create vertex
-    //Vertex v1 = boost::add_vertex(g_);
-
-    // Add properties
-    //typeProperty_[v1] = type;
-    //stateProperty_[v1] = state;
-
-    // Temp hack
-    stateProperty_[queryVertex_] = state;
-    Vertex v1 = nn_->nearest( queryVertex_ );
-    stateProperty_[queryVertex_] = NULL;
-
-    // Add vertex to nearest neighbor structure
-    sparse_nn_->add(v1);
-
-    return v1;
-}
-
-bool og::BoltDB::checkAddCoverage(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood)
-{
-    if (verbose_)
-        OMPL_INFORM(" - checkAddCoverage() Are other nodes around it visible?");
-
-    if (visibleNeighborhood.size() > 0)
-        return false; // has visible neighbors
-
-    // No free paths means we add for coverage
-    if (verbose_)
-        OMPL_INFORM(" --- Adding node for COVERAGE ");
-
-    Vertex v = addSparseVertex(si_->cloneState(qNew), COVERAGE);
-    // Note: we do not connect this node with any edges because we have already determined
-    // it is too far away from any nearby nodes
-
-    // Visualize
-    viz3StateCallback(stateProperty_[v], 4, sparseDelta_);
-    viz3TriggerCallback();
-    usleep(0.01*1000000);
-
-    return true;
-}
-
-bool og::BoltDB::checkAddConnectivity(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood)
-{
-    if (verbose_)
-        OMPL_INFORM(" -- checkAddConnectivity() Does this node connect neighboring nodes that are not connected? ");
-
-    // Error check
-    if (visibleNeighborhood.size() < 2)
-    {
-        // if less than 2 there is no way to find a pair of nodes in different connected components
-        return false;
-    }
-
-    // Identify visibile nodes around our new state that are unconnected (in different connected components)
-    // and connect them
-    std::vector<Vertex> statesInDiffConnectedComponents;
-
-    //For each neighbor
-    for (std::size_t i = 0; i < visibleNeighborhood.size(); ++i)
-    {
-        //For each other neighbor
-        for (std::size_t j = i + 1; j < visibleNeighborhood.size(); ++j)
-        {
-            //If they are in different components
-            if (!sameComponent(visibleNeighborhood[i], visibleNeighborhood[j]))
-            {
-                statesInDiffConnectedComponents.push_back(visibleNeighborhood[i]);
-                statesInDiffConnectedComponents.push_back(visibleNeighborhood[j]);
-            }
-        }
-    }
-
-    // Were any diconnected states found?
-    if (statesInDiffConnectedComponents.size() > 0)
-    {
-        if (verbose_)
-            OMPL_INFORM(" --- Adding node for CONNECTIVITY ");
-        //Add the node
-        Vertex newVertex = addSparseVertex(si_->cloneState(qNew), CONNECTIVITY);
-
-        for (std::size_t i = 0; i < statesInDiffConnectedComponents.size() ; ++i)
-        {
-            //If there's no edge between the two new states
-            // DTC: this should actually never happen - we just created the new vertex so
-            // why would it be connected to anything?
-            if (!boost::edge(newVertex, statesInDiffConnectedComponents[i], g_).second)
-            {
-                //The components haven't been united by previous links
-                if (!sameComponent(statesInDiffConnectedComponents[i], newVertex))
-                    connectGuards(newVertex, statesInDiffConnectedComponents[i]);
-            }
-        }
-
-        return true;
-    }
-
-    return false;
-}
-/*
-bool og::BoltDB::checkAddInterface(const base::State *qNew, std::vector<Vertex> &graphNeighborhood, std::vector<Vertex> &visibleNeighborhood)
-{
-        if (verbose_)
-            OMPL_INFORM(" --- checkAddInterface() Does this node's neighbor's need it to better connect them? ");
-
-    //If we have at least 2 neighbors
-    if (visibleNeighborhood.size() > 1)
-    {
-        // If the two closest nodes are also visible
-        if (graphNeighborhood[0] == visibleNeighborhood[0] && graphNeighborhood[1] == visibleNeighborhood[1])
-        {
-            // If our two closest neighbors don't share an edge
-            if (!boost::edge(visibleNeighborhood[0], visibleNeighborhood[1], g_).second)
-            {
-                //If they can be directly connected
-                if (si_->checkMotion(stateProperty_[visibleNeighborhood[0]], stateProperty_[visibleNeighborhood[1]]))
-                {
-                    //Connect them
-                    if (verbose_)
-                        OMPL_INFORM(" ---   INTERFACE: directly connected nodes ");
-                    connectGuards(visibleNeighborhood[0], visibleNeighborhood[1]);
-                    //And report that we added to the roadmap
-                    resetFailures();
-                    //Report success
-                    return true;
-                }
-                else
-                {
-                    //Add the new node to the graph, to bridge the interface
-                    if (verbose_)
-                        OMPL_INFORM(" --- Adding node for INTERFACE  ");
-                    Vertex v = addSparseVertex(si_->cloneState(qNew), INTERFACE);
-                    connectGuards(v, visibleNeighborhood[0]);
-                    connectGuards(v, visibleNeighborhood[1]);
-                    if (verbose_)
-                        OMPL_INFORM(" ---   INTERFACE: connected two neighbors through new interface node ");
-                    //Report success
-                    return true;
-                }
-            }
-        }
-    }
-    return false;
-}
-
-bool og::BoltDB::checkAddPath( Vertex v )
-{
-    bool spannerPropertyWasViolated = false;
-
-    std::vector< Vertex > rs;
-    foreach( Vertex r, boost::adjacent_vertices( v, g_ ) )
-        rs.push_back(r);
-
-    // Candidate x vertices as described in the method, filled by function computeX().
-    std::vector<Vertex> Xs;
-
-    // Candidate v" vertices as described in the method, filled by function computeVPP().
-    std::vector<Vertex> VPPs;
-
-    for (std::size_t i = 0; i < rs.size() && !spannerPropertyWasViolated; ++i)
-    {
-        Vertex r = rs[i];
-        computeVPP(v, r, VPPs);
-        foreach (Vertex rp, VPPs)
-        {
-            //First, compute the longest path through the graph
-            computeX(v, r, rp, Xs);
-            double rm_dist = 0.0;
-            foreach( Vertex rpp, Xs)
-            {
-                double tmp_dist = (si_->distance( stateProperty_[r], stateProperty_[v] )
-                                   + si_->distance( stateProperty_[v], stateProperty_[rpp] ) )/2.0;
-                if( tmp_dist > rm_dist )
-                    rm_dist = tmp_dist;
-            }
-
-            InterfaceData& d = getData( v, r, rp );
-
-            //Then, if the spanner property is violated
-            if (rm_dist > stretchFactor_ * d.last_distance_)
-            {
-                spannerPropertyWasViolated = true; //Report that we added for the path
-                if (si_->checkMotion(stateProperty_[r], stateProperty_[rp]))
-                    connectGuards(r, rp);
-                else
-                {
-                    PathGeometric *p = new PathGeometric( si_ );
-                    if (r < rp)
-                    {
-                        p->append(d.sigmaA_);
-                        p->append(d.pointA_);
-                        p->append(stateProperty_[v]);
-                        p->append(d.pointB_);
-                        p->append(d.sigmaB_);
-                    }
-                    else
-                    {
-                        p->append(d.sigmaB_);
-                        p->append(d.pointB_);
-                        p->append(stateProperty_[v]);
-                        p->append(d.pointA_);
-                        p->append(d.sigmaA_);
-                    }
-
-                    psimp_->reduceVertices(*p, 10);
-                    psimp_->shortcutPath(*p, 50);
-
-                    if (p->checkAndRepair(100).second)
-                    {
-                        Vertex prior = r;
-                        Vertex vnew;
-                        std::vector<base::State*>& states = p->getStates();
-
-                        foreach (base::State *st, states)
-                        {
-                            // no need to clone st, since we will destroy p; we just copy the pointer
-                            if (verbose_)
-                                OMPL_INFORM(" --- Adding node for QUALITY");
-                            vnew = addSparseVertex(st , QUALITY);
-
-                            connectGuards(prior, vnew);
-                            prior = vnew;
-                        }
-                        // clear the states, so memory is not freed twice
-                        states.clear();
-                        connectGuards(prior, rp);
-                    }
-
-                    delete p;
-                }
-            }
-        }
-    }
-
-    if (!spannerPropertyWasViolated)
-    {
-        if (verbose_)
-        {
-            OMPL_INFORM(" ------- Spanner property was NOT violated, SKIPPING");
-        }
-    }
-
-    return spannerPropertyWasViolated;
-}
-*/
-void og::BoltDB::findGraphNeighbors(base::State *state, std::vector<Vertex> &graphNeighborhood,
-    std::vector<Vertex> &visibleNeighborhood)
-{
-    visibleNeighborhood.clear();
-
-    // Search
-    stateProperty_[queryVertex_] = state;
-    sparse_nn_->nearestR( queryVertex_, sparseDelta_, graphNeighborhood);
-    stateProperty_[queryVertex_] = NULL;
-
-    // Now that we got the neighbors from the NN, we must remove any we can't see
-    for (std::size_t i = 0; i < graphNeighborhood.size() ; ++i )
-    {
-        if (si_->checkMotion(state, stateProperty_[graphNeighborhood[i]]))
-        {
-            visibleNeighborhood.push_back(graphNeighborhood[i]);
-        }
-    }
-
-    if (verbose_)
-    {
-        OMPL_INFORM(" Graph neighborhood: %u | visible neighborhood: %u", graphNeighborhood.size(),
-            visibleNeighborhood.size());
-    }
-
-}
-/*
-og::BoltDB::Vertex og::BoltDB::findGraphRepresentative(base::State *st)
-{
-    std::vector<Vertex> nbh;
-    stateProperty_[ queryVertex_ ] = st;
-    sparse_nn_->nearestR( queryVertex_, sparseDelta_, nbh);
-    stateProperty_[queryVertex_] = NULL;
-
-    if (verbose_)
-        OMPL_INFORM(" ------- findGraphRepresentative found %d nearest neighbors of distance %f",
-                    nbh.size(), sparseDelta_);
-
-    Vertex result = boost::graph_traits<Graph>::null_vertex();
-
-    for (std::size_t i = 0 ; i< nbh.size() ; ++i)
-    {
-        if (verbose_)
-            OMPL_INFORM(" -------- Checking motion of graph rep candidate %d", i);
-        if (si_->checkMotion(st, stateProperty_[nbh[i]]))
-        {
-            if (verbose_)
-                OMPL_INFORM(" --------- VALID ");
-            result = nbh[i];
-            break;
-        }
-    }
-    return result;
-}
-
-void og::BoltDB::findCloseRepresentatives(base::State *workState, const base::State *qNew, const Vertex qRep,
-                                                        std::map<Vertex, base::State*> &closeRepresentatives,
-                                                        const base::PlannerTerminationCondition &ptc)
-{
-    // Properly clear the vector by also deleting previously sampled unused states
-    for (std::map<Vertex, base::State*>::iterator it = closeRepresentatives.begin(); it != closeRepresentatives.end(); ++it)
-        si_->freeState(it->second);
-    closeRepresentatives.clear();
-
-    //denseDelta_ = 0.25 * sparseDelta_;
-    nearSamplePoints_ /= 10; // HACK - this makes it look for the same number of samples as dimensions
-
-    if (verbose_)
-        OMPL_INFORM(" ----- nearSamplePoints: %f, denseDelta: %f", nearSamplePoints_, denseDelta_);
-
-    // Then, begin searching the space around new potential state qNew
-    for (unsigned int i = 0 ; i < nearSamplePoints_ && ptc == false ; ++i)
-    {
-        do
-        {
-            sampler_->sampleNear(workState, qNew, denseDelta_);
-
-#ifdef OMPL_THUNDER_DEBUG
-                vizStateCallback(workState, 3, sparseDelta_);
-                sleep(0.1);
-#endif
-
-            if (verbose_)
-            {
-                OMPL_INFORM(" ------ findCloseRepresentatives sampled state ");
-
-                if (!si_->isValid(workState))
-                {
-                    OMPL_INFORM(" ------ isValid ");
-                }
-                if (si_->distance(qNew, workState) > denseDelta_)
-                {
-                    OMPL_INFORM(" ------ Distance too far ");
-                }
-                if (!si_->checkMotion(qNew, workState))
-                {
-                    OMPL_INFORM(" ------ Motion invalid ");
-                }
-            }
-
-        } while ((!si_->isValid(workState) || si_->distance(qNew, workState) > denseDelta_ || !si_->checkMotion(qNew, workState)) && ptc == false);
-
-        // if we were not successful at sampling a desirable state, we are out of time
-        if (ptc == true)
-        {
-            if (verbose_)
-                OMPL_INFORM(" ------ We are out of time ");
-            break;
-        }
-
-        if (verbose_)
-            OMPL_INFORM(" ------ Find graph representative ");
-
-        // Compute who his graph neighbors are
-        Vertex representative = findGraphRepresentative(workState);
-
-        // Assuming this sample is actually seen by somebody (which he should be in all likelihood)
-        if (representative != boost::graph_traits<Graph>::null_vertex())
-        {
-
-            if (verbose_)
-                OMPL_INFORM(" ------ Representative is not null ");
-
-            //If his representative is different than qNew
-            if (qRep != representative)
-            {
-                if (verbose_)
-                    OMPL_INFORM(" ------ qRep != representative ");
-
-                //And we haven't already tracked this representative
-                if (closeRepresentatives.find(representative) == closeRepresentatives.end())
-                {
-                    if (verbose_)
-                        OMPL_INFORM(" ------ Track the representative");
-                    //Track the representativen
-                    closeRepresentatives[representative] = si_->cloneState(workState);
-                }
-            }
-            else
-            {
-                if (verbose_)
-                    OMPL_INFORM(" ------ qRep == representative, no good ");
-            }
-        }
-        else
-        {
-            if (verbose_)
-                OMPL_INFORM(" ------ Rep is null ");
-
-            //This guy can't be seen by anybody, so we should take this opportunity to add him
-            if (verbose_)
-                OMPL_INFORM(" --- Adding node for COVERAGE");
-            addSparseVertex(si_->cloneState(workState), COVERAGE);
-
-            if (verbose_)
-            {
-                OMPL_INFORM(" ------ STOP EFFORS TO ADD A DENSE PATH");
-            }
-
-            //We should also stop our efforts to add a dense path
-            for (std::map<Vertex, base::State*>::iterator it = closeRepresentatives.begin(); it != closeRepresentatives.end(); ++it)
-                si_->freeState(it->second);
-            closeRepresentatives.clear();
-            break;
-        }
-    } // for loop
-}
-*/
