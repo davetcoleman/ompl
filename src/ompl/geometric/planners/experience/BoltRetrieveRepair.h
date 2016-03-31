@@ -55,7 +55,9 @@
 
 namespace ompl
 {
-namespace geometric
+namespace tools
+{
+namespace bolt
 {
 
 /// @cond IGNORE
@@ -108,7 +110,7 @@ class BoltRetrieveRepair : public base::Planner
      * \brief Get the chosen path used from database for repair
      * \return PlannerData of chosen path
      */
-    const PathGeometric &getChosenRecallPath() const;
+    const geometric::PathGeometric &getChosenRecallPath() const;
 
     /** \brief Main entry function for finding a path plan */
     virtual base::PlannerStatus solve(const base::PlannerTerminationCondition &ptc);
@@ -138,10 +140,10 @@ class BoltRetrieveRepair : public base::Planner
      * \return
      */
     bool getPathOffGraph(const base::State *start, const base::State *goal,
-                         ompl::geometric::PathGeometric &geometricSolution, const base::PlannerTerminationCondition &ptc);
+                         geometric::PathGeometric &geometricSolution, const base::PlannerTerminationCondition &ptc);
 
     /** \brief Clear verticies not on the specified level */
-    bool removeVerticesNotOnLevel(std::vector<BoltDB::DenseVertex> &graphNeighborhood, int level);
+    bool removeVerticesNotOnLevel(std::vector<bolt::DenseVertex> &graphNeighborhood, int level);
 
     /**
      * \brief Convert astar results to correctly ordered path
@@ -151,8 +153,8 @@ class BoltRetrieveRepair : public base::Planner
      * \param path - returned solution
      * \return true on success
      */
-    bool convertVertexPathToStatePath(std::vector<BoltDB::DenseVertex> &vertexPath, const base::State *actualStart,
-        const base::State *actualGoal, ompl::geometric::PathGeometric &geometricSolution);
+    bool convertVertexPathToStatePath(std::vector<bolt::DenseVertex> &vertexPath, const base::State *actualStart,
+        const base::State *actualGoal, geometric::PathGeometric &geometricSolution);
 
     /**
      * \brief Finds nodes in the graph near state NOTE: note tested for visibility
@@ -161,26 +163,26 @@ class BoltRetrieveRepair : public base::Planner
      * \param requiredLevel - if -1, allows states from all levels, otherwise only returns states from a certain level
      * \return false is no neighbors found
      */
-    bool findGraphNeighbors(const base::State *state, std::vector<BoltDB::DenseVertex> &graphNeighborhood, int requiredLevel = -1);
+    bool findGraphNeighbors(const base::State *state, std::vector<bolt::DenseVertex> &graphNeighborhood, int requiredLevel = -1);
 
     /** \brief Check if there exists a solution, i.e., there exists a pair of milestones such that the
         first is in \e start and the second is in \e goal, and the two milestones are in the same
         connected component. If a solution is found, the path is saved. */
-    bool getPathOnGraph(const std::vector<BoltDB::DenseVertex> &candidateStarts,
-                        const std::vector<BoltDB::DenseVertex> &candidateGoals, const base::State *actualStart,
-                        const base::State *actualGoal, ompl::geometric::PathGeometric &geometricSolution,
+    bool getPathOnGraph(const std::vector<bolt::DenseVertex> &candidateStarts,
+                        const std::vector<bolt::DenseVertex> &candidateGoals, const base::State *actualStart,
+                        const base::State *actualGoal, geometric::PathGeometric &geometricSolution,
                         const base::PlannerTerminationCondition &ptc);
 
     /**
      * \brief Repeatidly search through graph for connection then check for collisions then repeat
      * \return true if a valid path is found
      */
-    bool lazyCollisionSearch(const BoltDB::DenseVertex &start, const BoltDB::DenseVertex &goal, const base::State *actualStart,
-                             const base::State *actualGoal, ompl::geometric::PathGeometric &geometricSolution,
+    bool lazyCollisionSearch(const bolt::DenseVertex &start, const bolt::DenseVertex &goal, const base::State *actualStart,
+                             const base::State *actualGoal, geometric::PathGeometric &geometricSolution,
                              const base::PlannerTerminationCondition &ptc);
 
     /** \brief Check recalled path for collision and disable as needed */
-    bool lazyCollisionCheck(std::vector<BoltDB::DenseVertex> &vertexPath, const base::PlannerTerminationCondition &ptc);
+    bool lazyCollisionCheck(std::vector<bolt::DenseVertex> &vertexPath, const base::PlannerTerminationCondition &ptc);
 
     /** \brief Test if the passed in random state can connect to a nearby vertex in the graph */
     bool canConnect(const base::State *randomState, const base::PlannerTerminationCondition &ptc);
@@ -201,24 +203,24 @@ class BoltRetrieveRepair : public base::Planner
     BoltDBPtr boltDB_;
 
     /** \brief Save the recalled path before smoothing for introspection later */
-    boost::shared_ptr<PathGeometric> originalSolutionPath_;
+    boost::shared_ptr<geometric::PathGeometric> originalSolutionPath_;
 
     /** \brief The instance of the path simplifier */
-    PathSimplifierPtr path_simplifier_;
+    geometric::PathSimplifierPtr path_simplifier_;
 
     /** \brief Optionally smooth retrieved and repaired paths from database */
     bool smoothingEnabled_;
 
     /** \brief Used by getPathOffGraph */
-    std::vector<BoltDB::DenseVertex> startVertexCandidateNeighbors_;
-    std::vector<BoltDB::DenseVertex> goalVertexCandidateNeighbors_;
+    std::vector<bolt::DenseVertex> startVertexCandidateNeighbors_;
+    std::vector<bolt::DenseVertex> goalVertexCandidateNeighbors_;
 
     /** \brief Output user feedback to console */
     bool verbose_;
 
 };
-
-}  // namespace geometric
+}  // namespace bolt
+}  // namespace tools
 }  // namespace ompl
 
 #endif
