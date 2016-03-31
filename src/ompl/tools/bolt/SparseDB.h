@@ -294,7 +294,7 @@ namespace ompl
                                           boost::undirectedS, VertexProperties, EdgeProperties> Graph;
 
             /** \brief Vertex in Graph */
-            typedef boost::graph_traits<Graph>::vertex_descriptor Vertex;
+            typedef boost::graph_traits<Graph>::vertex_descriptor SparseVertex;
 
             /** \brief Edge in Graph */
             typedef boost::graph_traits<Graph>::edge_descriptor Edge;
@@ -360,7 +360,7 @@ namespace ompl
             class CustomAstarVisitor : public boost::default_astar_visitor
             {
             private:
-                Vertex goal_;  // Goal Vertex of the search
+                SparseVertex goal_;  // Goal Vertex of the search
                 SparseDB* parent_;
 
             public:
@@ -368,14 +368,14 @@ namespace ompl
                  * Construct a visitor for a given search.
                  * \param goal  goal vertex of the search
                  */
-                CustomAstarVisitor(Vertex goal, SparseDB* parent);
+                CustomAstarVisitor(SparseVertex goal, SparseDB* parent);
 
                 /**
                  * \brief Invoked when a vertex is first discovered and is added to the OPEN list.
                  * \param v current Vertex
                  * \param g graph we are searching on
                  */
-                void discover_vertex(Vertex v, const Graph& g) const;
+                void discover_vertex(SparseVertex v, const Graph& g) const;
 
                 /**
                  * \brief Check if we have arrived at the goal.
@@ -386,7 +386,7 @@ namespace ompl
                  * \param g graph we are searching on
                  * \throw foundGoalException if \a u is the goal
                  */
-                void examine_vertex(Vertex v, const Graph& g) const;
+                void examine_vertex(SparseVertex v, const Graph& g) const;
             };
 
             ////////////////////////////////////////////////////////////////////////////////////////
@@ -411,7 +411,7 @@ namespace ompl
              *  \param vertexPath
              *  \return true if candidate solution found
              */
-            bool astarSearch(const SparseDB::Vertex start, const SparseDB::Vertex goal, std::vector<SparseDB::Vertex>& vertexPath);
+            bool astarSearch(const SparseDB::SparseVertex start, const SparseDB::SparseVertex goal, std::vector<SparseDB::SparseVertex>& vertexPath);
 
             /** \brief Print info to screen */
             void debugVertex(const ompl::base::PlannerDataVertex& vertex);
@@ -439,7 +439,7 @@ namespace ompl
             void freeMemory();
 
             /** \brief Compute distance between two milestones (this is simply distance between the states of the milestones) */
-            double distanceFunction(const Vertex a, const Vertex b) const;
+            double distanceFunction(const SparseVertex a, const SparseVertex b) const;
 
             /** \brief Check that the query vertex is initialized (used for internal nearest neighbor searches) */
             void initializeQueryState();
@@ -452,16 +452,18 @@ namespace ompl
 
             /* ----------------------------------------------------------------------------------------*/
             /** \brief SPARS-related functions */
-            bool addStateToRoadmap(const base::PlannerTerminationCondition &ptc, base::State *qNew);
-            Vertex addVertex(base::State *state, const GuardType &type);
+            bool addStateToRoadmap(const base::PlannerTerminationCondition &ptc); //BoltDB::DenseVertex denseVertex);
+            SparseVertex addVertex(base::State *state, const GuardType &type);
             std::size_t getVizVertexType(const GuardType &type);
-            void addEdge(Vertex v1, Vertex v2, std::size_t visualColor, std::size_t coutIndent);
-            bool checkAddCoverage(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood, std::size_t coutIndent);
-            bool checkAddConnectivity(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood, std::size_t coutIndent);
-            bool checkAddInterface(const base::State *qNew, std::vector<Vertex> &graphNeighborhood, std::vector<Vertex> &visibleNeighborhood, std::size_t coutIndent);
-            void findGraphNeighbors(base::State *state, std::vector<Vertex> &graphNeighborhood,
-                std::vector<Vertex> &visibleNeighborhood, std::size_t coutIndent);
-            bool sameComponent(Vertex m1, Vertex m2);
+            void addEdge(SparseVertex v1, SparseVertex v2, std::size_t visualColor, std::size_t coutIndent);
+            bool checkAddCoverage(const base::State *qNew, std::vector<SparseVertex> &visibleNeighborhood, std::size_t coutIndent);
+            bool checkAddConnectivity(const base::State *qNew, std::vector<SparseVertex> &visibleNeighborhood, std::size_t coutIndent);
+            bool checkAddInterface(const base::State *qNew, std::vector<SparseVertex> &graphNeighborhood, std::vector<SparseVertex> &visibleNeighborhood, std::size_t coutIndent);
+            //bool checkAsymptoticOptimal(BoltDB::DenseVertex denseVertex, std::size_t coutIndent);
+            //void getInterfaceNeighborhood(BoltDB::DenseVertex q, std::vector<BoltDB::DenseVertex> &interfaceNeighborhood);
+            void findGraphNeighbors(base::State *state, std::vector<SparseVertex> &graphNeighborhood,
+                std::vector<SparseVertex> &visibleNeighborhood, std::size_t coutIndent);
+            bool sameComponent(SparseVertex m1, SparseVertex m2);
 
         protected:
             /** \brief The created space information */
@@ -474,13 +476,13 @@ namespace ompl
             tools::VisualizerPtr visual_;
 
             /** \brief Nearest neighbors data structure */
-            boost::shared_ptr<NearestNeighbors<Vertex> > nn_;
+            boost::shared_ptr<NearestNeighbors<SparseVertex> > nn_;
 
             /** \brief Connectivity graph */
             Graph g_;
 
             /** \brief Vertex for performing nearest neighbor queries. */
-            Vertex queryVertex_;
+            SparseVertex queryVertex_;
 
             /** \brief Access to the weights of each Edge */
             boost::property_map<Graph, boost::edge_weight_t>::type edgeWeightPropertySparse_;

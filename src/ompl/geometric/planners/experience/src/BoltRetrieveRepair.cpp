@@ -276,14 +276,14 @@ bool BoltRetrieveRepair::getPathOffGraph(const base::State *start, const base::S
     return result;
 }
 
-bool BoltRetrieveRepair::getPathOnGraph(const std::vector<BoltDB::Vertex> &candidateStarts,
-                                        const std::vector<BoltDB::Vertex> &candidateGoals,
+bool BoltRetrieveRepair::getPathOnGraph(const std::vector<BoltDB::DenseVertex> &candidateStarts,
+                                        const std::vector<BoltDB::DenseVertex> &candidateGoals,
                                         const base::State *actualStart, const base::State *actualGoal,
                                         og::PathGeometric &geometricSolution,
                                         const base::PlannerTerminationCondition &ptc)
 {
     // Try every combination of nearby start and goal pairs
-    BOOST_FOREACH (BoltDB::Vertex start, candidateStarts)
+    BOOST_FOREACH (BoltDB::DenseVertex start, candidateStarts)
     {
         if (actualStart == boltDB_->stateProperty_[start])
         {
@@ -307,7 +307,7 @@ bool BoltRetrieveRepair::getPathOnGraph(const std::vector<BoltDB::Vertex> &candi
             continue;  // this is actually not visible
         }
 
-        BOOST_FOREACH (BoltDB::Vertex goal, candidateGoals)
+        BOOST_FOREACH (BoltDB::DenseVertex goal, candidateGoals)
         {
             if (actualGoal == boltDB_->stateProperty_[goal])
             {
@@ -363,13 +363,13 @@ bool BoltRetrieveRepair::getPathOnGraph(const std::vector<BoltDB::Vertex> &candi
     return false;
 }
 
-bool BoltRetrieveRepair::lazyCollisionSearch(const BoltDB::Vertex &start, const BoltDB::Vertex &goal,
+bool BoltRetrieveRepair::lazyCollisionSearch(const BoltDB::DenseVertex &start, const BoltDB::DenseVertex &goal,
                                              const base::State *actualStart, const base::State *actualGoal,
                                              og::PathGeometric &geometricSolution,
                                              const base::PlannerTerminationCondition &ptc)
 {
     // Vector to store candidate paths in before they are converted to PathPtrs
-    std::vector<BoltDB::Vertex> vertexPath;
+    std::vector<BoltDB::DenseVertex> vertexPath;
 
     // Make sure that the start and goal aren't so close together that they find the same vertex
     if (start == goal)
@@ -457,7 +457,7 @@ bool BoltRetrieveRepair::lazyCollisionSearch(const BoltDB::Vertex &start, const 
     return false;
 }
 
-bool BoltRetrieveRepair::lazyCollisionCheck(std::vector<BoltDB::Vertex> &vertexPath,
+bool BoltRetrieveRepair::lazyCollisionCheck(std::vector<BoltDB::DenseVertex> &vertexPath,
                                             const base::PlannerTerminationCondition &ptc)
 {
     OMPL_DEBUG("Starting lazy collision checking");
@@ -465,8 +465,8 @@ bool BoltRetrieveRepair::lazyCollisionCheck(std::vector<BoltDB::Vertex> &vertexP
     bool hasInvalidEdges = false;
 
     // Initialize
-    BoltDB::Vertex fromVertex = vertexPath[0];
-    BoltDB::Vertex toVertex;
+    BoltDB::DenseVertex fromVertex = vertexPath[0];
+    BoltDB::DenseVertex toVertex;
 
     // Loop through every pair of states and make sure path is valid.
     for (std::size_t toID = 1; toID < vertexPath.size(); ++toID)
@@ -519,7 +519,7 @@ bool BoltRetrieveRepair::lazyCollisionCheck(std::vector<BoltDB::Vertex> &vertexP
     return !hasInvalidEdges;
 }
 
-bool BoltRetrieveRepair::findGraphNeighbors(const base::State *state, std::vector<BoltDB::Vertex> &graphNeighborhood,
+bool BoltRetrieveRepair::findGraphNeighbors(const base::State *state, std::vector<BoltDB::DenseVertex> &graphNeighborhood,
                                             int requiredLevel)
 {
     // Benchmark runtime
@@ -562,14 +562,14 @@ bool BoltRetrieveRepair::findGraphNeighbors(const base::State *state, std::vecto
     return result;
 }
 
-bool BoltRetrieveRepair::removeVerticesNotOnLevel(std::vector<BoltDB::Vertex> &graphNeighborhood, int level)
+bool BoltRetrieveRepair::removeVerticesNotOnLevel(std::vector<BoltDB::DenseVertex> &graphNeighborhood, int level)
 {
     std::size_t original_size = graphNeighborhood.size();
 
     // Remove edges based on layer
     for (std::size_t i = 0; i < graphNeighborhood.size(); ++i)
     {
-        const BoltDB::Vertex &nearVertex = graphNeighborhood[i];
+        const BoltDB::DenseVertex &nearVertex = graphNeighborhood[i];
 
         // Make sure state is on correct level
         if (boltDB_->getTaskLevel(nearVertex) != static_cast<std::size_t>(level))
@@ -588,7 +588,7 @@ bool BoltRetrieveRepair::removeVerticesNotOnLevel(std::vector<BoltDB::Vertex> &g
     return true;
 }
 
-bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<BoltDB::Vertex> &vertexPath,
+bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<BoltDB::DenseVertex> &vertexPath,
                                                       const base::State *actualStart, const base::State *actualGoal,
                                                       og::PathGeometric &geometricSolution)
 {
@@ -674,7 +674,7 @@ bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<BoltDB::Vertex
 
 bool BoltRetrieveRepair::canConnect(const base::State *randomState, const base::PlannerTerminationCondition &ptc)
 {
-    std::vector<BoltDB::Vertex> candidateNeighbors;
+    std::vector<BoltDB::DenseVertex> candidateNeighbors;
 
     // Find neighbors to rand state
     OMPL_INFORM("Looking for a node near the random state");
@@ -687,7 +687,7 @@ bool BoltRetrieveRepair::canConnect(const base::State *randomState, const base::
 
     // Try every combination of nearby start and goal pairs
     std::size_t count = 0;
-    BOOST_FOREACH (BoltDB::Vertex nearState, candidateNeighbors)
+    BOOST_FOREACH (BoltDB::DenseVertex nearState, candidateNeighbors)
     {
         const base::State *s1 = randomState;
         const base::State *s2 = boltDB_->stateProperty_[nearState];
