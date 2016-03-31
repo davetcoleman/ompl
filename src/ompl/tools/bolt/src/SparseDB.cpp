@@ -52,6 +52,7 @@
 // #include <boost/property_map/vector_property_map.hpp>
 #include <boost/foreach.hpp>
 // #include <boost/thread.hpp>
+#include <boost/unordered_set.hpp>
 
 // C++
 #include <limits>
@@ -159,6 +160,7 @@ og::SparseDB::SparseDB(base::SpaceInformationPtr si, BoltDB* boltDB, tools::Visu
   , disjointSets_(boost::get(boost::vertex_rank, g_), boost::get(boost::vertex_predecessor, g_))
   , verbose_(true)
   , visualizeAstar_(false)
+  , visualizeSparsCreation_(false)
   , sparseDelta_(2.0)
   , visualizeAstarSpeed_(0.1)
 {
@@ -351,66 +353,111 @@ void og::SparseDB::createSPARS()
     }
 
     double largestWeight = pqueue.top().weight_;
+    std::vector<BoltDB::Vertex> failedInsertVertices;
 
     // Output the vertices in order
     while (!pqueue.empty())
     {
         BoltDB::Vertex v = pqueue.top().v_;
-        //std::cout << "  Visualizing vertex " << v << " with popularity " << pqueue.top().weight_
-                  //<< " queue remaining size " << pqueue.size() << std::endl;
 
         // Visualize
-        const double visualWeight = pqueue.top().weight_ / largestWeight;
-        visual_->viz1StateCallback(boltDB_->stateProperty_[v], /*mode=*/ 7, visualWeight);
-        visual_->viz1TriggerCallback();
-        usleep(0.01 * 1000000);
+        if (visualizeSparsCreation_)
+        {
+            const double visualWeight = pqueue.top().weight_ / largestWeight * 100.0;
+            //std::cout << "  Visualizing vertex " << v << " with popularity " << visualWeight
+            //<< " queue remaining size " << pqueue.size() << std::endl;
+            visual_->viz1StateCallback(boltDB_->stateProperty_[v], /*mode=*/ 7, visualWeight);
+            visual_->viz1TriggerCallback();
+            usleep(0.01 * 1000000);
+        }
 
         // Attempt to insert into SPARS graph
         double seconds = 1000;
         ob::PlannerTerminationCondition ptc = ob::timedPlannerTerminationCondition(seconds, 0.1);
+
+        // Run SPARS checks
         if (!addStateToRoadmap(ptc, boltDB_->stateProperty_[v]))
-            std::cout << "Failed to add state to roadmap" << std::endl;
+        {
+            std::cout << "Failed to add state to roadmap------" << std::endl;
+            failedInsertVertices.push_back(v);
+        }
 
         // Remove from priority queue
         pqueue.pop();
     }  // end while
+
+    // Attempt to re-insert the failed vertices
+    bool succeededInInserting = true;
+    std::size_t loopAttempt = 2;
+    while (succeededInInserting)
+    {
+        std::cout << "-------------------------------------------------------" << std::endl;
+        std::cout << "Attempting to re-insert " << failedInsertVertices.size() << " vertices for the " << loopAttempt << " loop" << std::endl;
+        usleep(1*1000000);
+
+        // TODO: is the wrapped while loop ever necessary? or do we just need to attempt twice?
+        assert(loopAttempt < 5); // just curious if this ever trips
+
+        succeededInInserting = false;
+        std::size_t sucessfulReinsertions = 0;
+        for (std::size_t i = 0; i < failedInsertVertices.size(); ++i)
+        {
+            // Attempt to insert into SPARS graph
+            double seconds = 1000;
+            ob::PlannerTerminationCondition ptc = ob::timedPlannerTerminationCondition(seconds, 0.1);
+
+            // Run SPARS checks
+            if (!addStateToRoadmap(ptc, boltDB_->stateProperty_[failedInsertVertices[i]]))
+            {
+                std::cout << "Failed AGAIN to add state to roadmap------" << std::endl;
+            }
+            else
+            {
+                failedInsertVertices.erase(failedInsertVertices.begin()+i);
+                i--;
+                sucessfulReinsertions++;
+                succeededInInserting = true;
+            }
+        }
+        std::cout << "Succeeded in inserting " << sucessfulReinsertions << " vertices on the " << loopAttempt << " loop" << std::endl;
+        loopAttempt++;
+    }
 }
 
-bool og::SparseDB::addStateToRoadmap(const base::PlannerTerminationCondition &ptc, base::State *newState)
+bool og::SparseDB::addStateToRoadmap(const base::PlannerTerminationCondition &ptc, base::State *qNew)
 {
+    std::size_t coutIndent = 0;
     if (verbose_)
         std::cout << "addStateToRoadmap()" << std::endl;
 
     bool stateAdded = false;
-    std::size_t coutIndent = 0;
 
     // Deep copy
-    base::State *qNew = si_->cloneState(newState);  // TODO(davetcoleman): do i need to clone it?
-    base::State *workState = si_->allocState();     // TODO(davetcoleman): do i need this state?
+    //base::State *qNew = si_->cloneState(newState);  // TODO(davetcoleman): do i need to clone it?
+    //base::State *workState = si_->allocState();     // TODO(davetcoleman): do i need this state?
 
-    /* Nodes near our newState */
+    /* Nodes near our input state */
     std::vector<Vertex> graphNeighborhood;
-    /* Visible nodes near our newState */
+    /* Visible nodes near our input state */
     std::vector<Vertex> visibleNeighborhood;
 
     // Find nearby nodes
     findGraphNeighbors(qNew, graphNeighborhood, visibleNeighborhood, coutIndent);
 
     // Always add a node if no other nodes around it are visible (GUARD)
-    if (checkAddCoverage(qNew, visibleNeighborhood))
+    if (checkAddCoverage(qNew, visibleNeighborhood, coutIndent+4))
     {
         stateAdded = true;
     }
-    else if (checkAddConnectivity(qNew, visibleNeighborhood))  // Connectivity criterion
+    else if (checkAddConnectivity(qNew, visibleNeighborhood, coutIndent+8))  // Connectivity criterion
     {
         stateAdded = true;
     }
-
+    else if (checkAddInterface(qNew, graphNeighborhood, visibleNeighborhood, coutIndent+12))
+    {
+        stateAdded = true;
+    }
     /*
-    else if (checkAddInterface(qNew, graphNeighborhood, visibleNeighborhood))
-    {
-        stateAdded = true;
-    }
     else
     {
         if (verbose_)
@@ -457,8 +504,8 @@ bool og::SparseDB::addStateToRoadmap(const base::PlannerTerminationCondition &pt
     }
     */
 
-    si_->freeState(workState);
-    si_->freeState(qNew);
+    //si_->freeState(workState);
+    //si_->freeState(qNew);
 
     return stateAdded;
 }
@@ -479,21 +526,47 @@ og::SparseDB::Vertex og::SparseDB::addVertex(base::State *state, const GuardType
     nn_->add(v);
 
     // Visualize
-    visual_->viz2StateCallback(statePropertySparse_[v], /*mode=*/ 4, sparseDelta_);
-    visual_->viz2TriggerCallback();
-    usleep(0.01 * 1000000);
+    if (visualizeSparsCreation_)
+    {
+        //visual_->viz2StateCallback(statePropertySparse_[v], /*mode=*/ getVizVertexType(type), sparseDelta_);
+        visual_->viz2StateCallback(statePropertySparse_[v], /*mode=*/ 4, sparseDelta_);
+        visual_->viz2TriggerCallback();
+        usleep(0.01 * 1000000);
+    }
 
     return v;
 }
 
-void og::SparseDB::addEdge(Vertex v1, Vertex v2, std::size_t coutIndent)
+std::size_t og::SparseDB::getVizVertexType(const GuardType &type)
+{
+    switch (type)
+    {
+        case COVERAGE:
+            return 1;
+        case CONNECTIVITY:
+            return 2;
+        case INTERFACE:
+            return 3;
+        case QUALITY:
+            return 4;
+        case START:
+        case GOAL:
+        case CARTESIAN:
+            OMPL_ERROR("Type: %u not handled yet in getVizVertexType()", type);
+            return 5;
+    }
+    OMPL_ERROR("Unknown vertex type: %u", type);
+    return 5;
+}
+
+void og::SparseDB::addEdge(Vertex v1, Vertex v2, std::size_t visualColor, std::size_t coutIndent)
 {
     assert(v1 <= getNumVertices());
     assert(v2 <= getNumVertices());
     assert(v1 != v2);
 
     if (verbose_)
-        std::cout << std::string(coutIndent+4, ' ') + "addEdge: Connecting vertex " << v1 << " to vertex " << v2 << std::endl;
+        std::cout << std::string(coutIndent, ' ') + "addEdge: Connecting vertex " << v1 << " to vertex " << v2 << std::endl;
 
     // Create the new edge
     Edge e = (boost::add_edge(v1, v2, g_)).first;
@@ -506,14 +579,21 @@ void og::SparseDB::addEdge(Vertex v1, Vertex v2, std::size_t coutIndent)
     disjointSets_.union_set(v1, v2);
 
     // Visualize
-    visual_->viz2EdgeCallback(statePropertySparse_[v1], statePropertySparse_[v2], 0);
-    visual_->viz2TriggerCallback();
-    usleep(0.01 * 1000000);
+    if (visualizeSparsCreation_)
+    {
+        /* Color Key:
+           0 - connectivity
+           50 - interface default
+           100 - interface dave modification
+        */
+        visual_->viz2EdgeCallback(statePropertySparse_[v1], statePropertySparse_[v2], visualColor);
+        visual_->viz2TriggerCallback();
+        usleep(0.01 * 1000000);
+    }
 }
 
-bool og::SparseDB::checkAddCoverage(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood)
+bool og::SparseDB::checkAddCoverage(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood, std::size_t coutIndent)
 {
-    std::size_t coutIndent = 4;
     if (verbose_)
         std::cout << std::string(coutIndent, ' ') + "checkAddCoverage() Are other nodes around it visible?" << std::endl;
 
@@ -537,9 +617,8 @@ bool og::SparseDB::checkAddCoverage(const base::State *qNew, std::vector<Vertex>
     return true;
 }
 
-bool og::SparseDB::checkAddConnectivity(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood)
+bool og::SparseDB::checkAddConnectivity(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood, std::size_t coutIndent)
 {
-    std::size_t coutIndent = 8;
     if (verbose_)
         std::cout << std::string(coutIndent, ' ') + "checkAddConnectivity() Does this node connect neighboring nodes "
                                                       "that are not connected? " << std::endl;
@@ -554,7 +633,7 @@ bool og::SparseDB::checkAddConnectivity(const base::State *qNew, std::vector<Ver
 
     // Identify visibile nodes around our new state that are unconnected (in different connected components)
     // and connect them
-    std::set<Vertex> statesInDiffConnectedComponents; // TODO(davetcoleman): in C++11 change to unordered_set for faster performance
+    boost::unordered_set<Vertex> statesInDiffConnectedComponents; // TODO(davetcoleman): in C++11 change to std::unordered_set
 
     // For each neighbor
     for (std::size_t i = 0; i < visibleNeighborhood.size(); ++i)
@@ -585,7 +664,7 @@ bool og::SparseDB::checkAddConnectivity(const base::State *qNew, std::vector<Ver
     // Add the node
     Vertex newVertex = addVertex(si_->cloneState(qNew), CONNECTIVITY);
 
-    for (std::set<Vertex>::const_iterator vertex_it = statesInDiffConnectedComponents.begin();
+    for (boost::unordered_set<Vertex>::const_iterator vertex_it = statesInDiffConnectedComponents.begin();
          vertex_it != statesInDiffConnectedComponents.end(); ++vertex_it)
     {
         if (verbose_)
@@ -609,7 +688,7 @@ bool og::SparseDB::checkAddConnectivity(const base::State *qNew, std::vector<Ver
         // The components haven't been united by previous edges created in this for loop
         if (!sameComponent(*vertex_it, newVertex))
         {
-            addEdge(newVertex, *vertex_it, coutIndent);
+            addEdge(newVertex, *vertex_it, 0, coutIndent+4);
         }
         else
         {
@@ -620,53 +699,126 @@ bool og::SparseDB::checkAddConnectivity(const base::State *qNew, std::vector<Ver
 
     return true;
 }
-/*
-bool og::SparseDB::checkAddInterface(const base::State *qNew, std::vector<Vertex> &graphNeighborhood, std::vector<Vertex>
-&visibleNeighborhood)
+
+bool og::SparseDB::checkAddInterface(const base::State *qNew, std::vector<Vertex> &graphNeighborhood, std::vector<Vertex> &visibleNeighborhood, std::size_t coutIndent)
 {
-        if (verbose_)
-            OMPL_INFORM(" --- checkAddInterface() Does this node's neighbor's need it to better connect them? ");
+    if (verbose_)
+        std::cout << std::string(coutIndent, ' ') + "checkAddInterface() Does this node's neighbor's need it to better connect them?" << std::endl;
 
     //If we have at least 2 neighbors
-    if (visibleNeighborhood.size() > 1)
+    if (visibleNeighborhood.size() < 2)
     {
-        // If the two closest nodes are also visible
-        if (graphNeighborhood[0] == visibleNeighborhood[0] && graphNeighborhood[1] == visibleNeighborhood[1])
+        return false;
+    }
+    // TODO(davetcoleman): why only the first two nodes??
+
+    std::size_t visualColor = 50;
+
+    // If the two closest nodes are also visible
+    if (graphNeighborhood[0] == visibleNeighborhood[0] && graphNeighborhood[1] == visibleNeighborhood[1])
+    {
+        // If our two closest neighbors don't share an edge
+        if (!boost::edge(visibleNeighborhood[0], visibleNeighborhood[1], g_).second)
         {
-            // If our two closest neighbors don't share an edge
-            if (!boost::edge(visibleNeighborhood[0], visibleNeighborhood[1], g_).second)
+            //If they can be directly connected
+            if (si_->checkMotion(statePropertySparse_[visibleNeighborhood[0]], statePropertySparse_[visibleNeighborhood[1]]))
             {
-                //If they can be directly connected
-                if (si_->checkMotion(statePropertySparse_[visibleNeighborhood[0]], statePropertySparse_[visibleNeighborhood[1]]))
+                if (verbose_)
+                    std::cout << std::string(coutIndent+2, ' ') + "INTERFACE: directly connected nodes" << std::endl;
+
+                //Connect them
+                addEdge(visibleNeighborhood[0], visibleNeighborhood[1], visualColor, coutIndent+4);
+            }
+            else
+            {
+                //Add the new node to the graph, to bridge the interface
+                if (verbose_)
+                    std::cout << std::string(coutIndent+2, ' ') + "Adding node for INTERFACE" << std::endl;
+
+                Vertex v = addVertex(si_->cloneState(qNew), INTERFACE);
+                addEdge(v, visibleNeighborhood[0], visualColor, coutIndent+4);
+                addEdge(v, visibleNeighborhood[1], visualColor, coutIndent+4);
+                if (verbose_)
+                    std::cout << std::string(coutIndent+2, ' ') + "INTERFACE: connected two neighbors through new interface node" << std::endl;
+            }
+            //Report success
+            return true;
+        }
+        else
+        {
+            if (verbose_)
+                std::cout << std::string(coutIndent+2, ' ') + "Two neighbors already share an edge, not connecting" << std::endl;
+        }
+    }
+    return false;
+}
+/*
+bool og::SparseDB::checkAddInterface(const base::State *qNew, std::vector<Vertex> &graphNeighborhood, std::vector<Vertex> &visibleNeighborhood, std::size_t coutIndent)
+{
+    if (verbose_)
+        std::cout << std::string(coutIndent, ' ') + "checkAddInterface() Does this node's neighbor's need it to better connect them?" << std::endl;
+
+    //If we have at least 2 neighbors
+    if (visibleNeighborhood.size() < 2)
+    {
+        if (verbose_)
+            std::cout << std::string(coutIndent+2, ' ') + "NOT adding node for interface" << std::endl;
+        return false;
+    }
+    std::size_t visualColor;
+
+    // For each pair of neighbors
+    for (std::size_t i = 0; i < visibleNeighborhood.size(); ++i)
+    {
+        // For each other neighbor
+        for (std::size_t j = i + 1; j < visibleNeighborhood.size(); ++j)
+        {
+            if (i == 0 && j == 1)
+                visualColor = 50;
+            else
+            {
+                visualColor = 100;
+                //return false;
+            }
+
+            // If our pair of neighbors don't share an edge
+            if (!boost::edge(visibleNeighborhood[i], visibleNeighborhood[j], g_).second)
+            {
+                // If they can be directly connected
+                if (si_->checkMotion(statePropertySparse_[visibleNeighborhood[i]], statePropertySparse_[visibleNeighborhood[j]]))
                 {
-                    //Connect them
                     if (verbose_)
-                        OMPL_INFORM(" ---   INTERFACE: directly connected nodes ");
-                    connectGuards(visibleNeighborhood[0], visibleNeighborhood[1]);
-                    //And report that we added to the roadmap
-                    resetFailures();
-                    //Report success
-                    return true;
+                        std::cout << std::string(coutIndent+2, ' ') + "INTERFACE: directly connected nodes" << std::endl;
+
+                    //Connect them
+                    addEdge(visibleNeighborhood[i], visibleNeighborhood[j], visualColor, coutIndent+4);
                 }
                 else
                 {
                     //Add the new node to the graph, to bridge the interface
                     if (verbose_)
-                        OMPL_INFORM(" --- Adding node for INTERFACE  ");
+                        std::cout << std::string(coutIndent+2, ' ') + "Adding node for INTERFACE" << std::endl;
+
                     Vertex v = addVertex(si_->cloneState(qNew), INTERFACE);
-                    connectGuards(v, visibleNeighborhood[0]);
-                    connectGuards(v, visibleNeighborhood[1]);
+                    addEdge(v, visibleNeighborhood[i], visualColor, coutIndent+4);
+                    addEdge(v, visibleNeighborhood[j], visualColor, coutIndent+4);
                     if (verbose_)
-                        OMPL_INFORM(" ---   INTERFACE: connected two neighbors through new interface node ");
-                    //Report success
-                    return true;
+                        std::cout << std::string(coutIndent+2, ' ') + "INTERFACE: connected two neighbors through new interface node" << std::endl;
                 }
+                //Report success
+                //return true;
             }
-        }
-    }
+            else
+            {
+                if (verbose_)
+                    std::cout << std::string(coutIndent+2, ' ') + "Two neighbors already share an edge, not connecting" << std::endl;
+            }
+        } // for loop
+    } // for loop
     return false;
 }
-
+*/
+/*
 bool og::SparseDB::checkAddPath( Vertex v )
 {
     bool spannerPropertyWasViolated = false;
@@ -705,7 +857,7 @@ bool og::SparseDB::checkAddPath( Vertex v )
             {
                 spannerPropertyWasViolated = true; //Report that we added for the path
                 if (si_->checkMotion(statePropertySparse_[r], statePropertySparse_[rp]))
-                    connectGuards(r, rp);
+                    addEdge(r, rp, coutIndent+4);
                 else
                 {
                     PathGeometric *p = new PathGeometric( si_ );
@@ -742,12 +894,12 @@ bool og::SparseDB::checkAddPath( Vertex v )
                                 OMPL_INFORM(" --- Adding node for QUALITY");
                             vnew = addVertex(st , QUALITY);
 
-                            connectGuards(prior, vnew);
+                            addEdge(prior, vnew, coutIndent+4);
                             prior = vnew;
                         }
                         // clear the states, so memory is not freed twice
                         states.clear();
-                        connectGuards(prior, rp);
+                        addEdge(prior, rp, coutIndent+4);
                     }
 
                     delete p;

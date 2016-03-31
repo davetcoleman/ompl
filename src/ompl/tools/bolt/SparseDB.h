@@ -452,11 +452,13 @@ namespace ompl
 
             /* ----------------------------------------------------------------------------------------*/
             /** \brief SPARS-related functions */
-            bool addStateToRoadmap(const base::PlannerTerminationCondition &ptc, base::State *newState);
-            geometric::SparseDB::Vertex addVertex(base::State *state, const GuardType &type);
-            void addEdge(Vertex v1, Vertex v2, std::size_t coutIndent);
-            bool checkAddCoverage(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood);
-            bool checkAddConnectivity(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood);
+            bool addStateToRoadmap(const base::PlannerTerminationCondition &ptc, base::State *qNew);
+            Vertex addVertex(base::State *state, const GuardType &type);
+            std::size_t getVizVertexType(const GuardType &type);
+            void addEdge(Vertex v1, Vertex v2, std::size_t visualColor, std::size_t coutIndent);
+            bool checkAddCoverage(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood, std::size_t coutIndent);
+            bool checkAddConnectivity(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood, std::size_t coutIndent);
+            bool checkAddInterface(const base::State *qNew, std::vector<Vertex> &graphNeighborhood, std::vector<Vertex> &visibleNeighborhood, std::size_t coutIndent);
             void findGraphNeighbors(base::State *state, std::vector<Vertex> &graphNeighborhood,
                 std::vector<Vertex> &visibleNeighborhood, std::size_t coutIndent);
             bool sameComponent(Vertex m1, Vertex m2);
@@ -503,6 +505,8 @@ namespace ompl
         public:
             /** \brief Various options for visualizing the algorithmns performance */
             bool visualizeAstar_;
+
+            bool visualizeSparsCreation_;
 
             /** \brief Amount of sub-optimality allowed */
             double sparseDelta_;
