@@ -47,15 +47,14 @@ namespace ompl
 {
 namespace tools
 {
-
-Bolt::Bolt(const base::SpaceInformationPtr &si)
-    : ExperienceSetup(si)
+namespace bolt
+{
+Bolt::Bolt(const base::SpaceInformationPtr &si) : ExperienceSetup(si)
 {
     initialize();
 }
 
-Bolt::Bolt(const base::StateSpacePtr &space)
-    : ExperienceSetup(space)
+Bolt::Bolt(const base::StateSpacePtr &space) : ExperienceSetup(space)
 {
     initialize();
 }
@@ -72,17 +71,17 @@ void Bolt::initialize()
     filePath_ = "unloaded";
 
     // Load the experience database
-    boltDB_.reset(new geometric::BoltDB(si_, visual_));
+    boltDB_.reset(new BoltDB(si_, visual_));
 
     // Load the Retrieve repair database. We do it here so that setRepairPlanner() works
-    boltPlanner_ = ob::PlannerPtr(new og::BoltRetrieveRepair(si_, boltDB_)); // TODO(davetcoleman): pass in visual_
+    boltPlanner_ = ob::PlannerPtr(new BoltRetrieveRepair(si_, boltDB_));  // TODO(davetcoleman): pass in visual_
 
     OMPL_INFORM("Bolt Framework initialized.");
 }
 
 void Bolt::setup(void)
 {
-    if (!configured_ || !si_->isSetup() || !boltPlanner_->isSetup() )
+    if (!configured_ || !si_->isSetup() || !boltPlanner_->isSetup())
     {
         // Setup Space Information if we haven't already done so
         if (!si_->isSetup())
@@ -119,7 +118,8 @@ void Bolt::setPlannerAllocator(const base::PlannerAllocator &pa)
 
 base::PlannerStatus Bolt::solve(const base::PlannerTerminationCondition &ptc)
 {
-    // we provide a duplicate implementation here to allow the planner to choose how the time is turned into a planner termination condition
+    // we provide a duplicate implementation here to allow the planner to choose how the time is turned into a planner
+    // termination condition
 
     OMPL_INFORM("Bolt::solve()");
 
@@ -132,7 +132,8 @@ base::PlannerStatus Bolt::solve(const base::PlannerTerminationCondition &ptc)
     // Warn if there are queued paths that have not been added to the experience database
     if (!queuedSolutionPaths_.empty())
     {
-        OMPL_INFORM("Previous solved paths are currently uninserted into the experience database and are in the post-proccessing queue");
+        OMPL_INFORM("Previous solved paths are currently uninserted into the experience database and are in the "
+                    "post-proccessing queue");
     }
 
     // SOLVE
@@ -146,8 +147,8 @@ base::PlannerStatus Bolt::solve(const base::PlannerTerminationCondition &ptc)
     log.planningTime = planTime_;
 
     // Record stats
-    stats_.totalPlanningTime_ += planTime_; // used for averaging
-    stats_.numProblems_++; // used for averaging
+    stats_.totalPlanningTime_ += planTime_;  // used for averaging
+    stats_.numProblems_++;                   // used for averaging
 
     if (lastStatus_ == base::PlannerStatus::TIMEOUT)
     {
@@ -180,8 +181,9 @@ base::PlannerStatus Bolt::solve(const base::PlannerTerminationCondition &ptc)
         std::cout << "-----------------------------------------------------------" << std::endl;
         std::cout << ANSI_COLOR_RESET;
 
-        og::PathGeometric solutionPath = og::SimpleSetup::getSolutionPath(); // copied so that it is non-const
-        OMPL_INFORM("Solution path has %d states and was generated from planner %s", solutionPath.getStateCount(), getSolutionPlannerName().c_str());
+        og::PathGeometric solutionPath = og::SimpleSetup::getSolutionPath();  // copied so that it is non-const
+        OMPL_INFORM("Solution path has %d states and was generated from planner %s", solutionPath.getStateCount(),
+                    getSolutionPlannerName().c_str());
 
         // Do not save if approximate
         if (!haveExactSolutionPath())
@@ -211,7 +213,7 @@ base::PlannerStatus Bolt::solve(const base::PlannerTerminationCondition &ptc)
     }
 
     // Final log data
-    //log.insertion_time = insertionTime; TODO fix this
+    // log.insertion_time = insertionTime; TODO fix this
     log.numVertices = boltDB_->getNumVertices();
     log.numEdges = boltDB_->getNumEdges();
     log.numConnectedComponents = 0;
@@ -224,19 +226,19 @@ base::PlannerStatus Bolt::solve(const base::PlannerTerminationCondition &ptc)
 
 base::PlannerStatus Bolt::solve(double time)
 {
-    ob::PlannerTerminationCondition ptc = ob::timedPlannerTerminationCondition( time );
+    ob::PlannerTerminationCondition ptc = ob::timedPlannerTerminationCondition(time);
     return solve(ptc);
 }
 
 bool Bolt::save()
 {
-    //setup(); // ensure the db has been loaded to the Experience DB
+    // setup(); // ensure the db has been loaded to the Experience DB
     return boltDB_->save(filePath_);
 }
 
 bool Bolt::saveIfChanged()
 {
-    //setup(); // ensure the db has been loaded to the Experience DB
+    // setup(); // ensure the db has been loaded to the Experience DB
     return boltDB_->saveIfChanged(filePath_);
 }
 
@@ -244,8 +246,7 @@ void Bolt::printResultsInfo(std::ostream &out) const
 {
     for (std::size_t i = 0; i < pdef_->getSolutionCount(); ++i)
     {
-        out << "Solution " << i
-            << "\t | Length: " << pdef_->getSolutions()[i].length_
+        out << "Solution " << i << "\t | Length: " << pdef_->getSolutions()[i].length_
             << "\t | Approximate: " << (pdef_->getSolutions()[i].approximate_ ? "true" : "false")
             << "\t | Planner: " << pdef_->getSolutions()[i].plannerName_ << std::endl;
     }
@@ -256,7 +257,7 @@ bool Bolt::loadOrGenerate()
     // Load from file or generate new grid
     if (!boltDB_->getNumVertices())
     {
-        if (!boltDB_->load(filePath_)) // load from file
+        if (!boltDB_->load(filePath_))  // load from file
         {
             OMPL_INFORM("No database loaded from file - generating new grid");
 
@@ -268,7 +269,7 @@ bool Bolt::loadOrGenerate()
 
             // Benchmark runtime
             double duration = time::seconds(time::now() - startTime);
-            OMPL_INFORM("Grid generation total time: %f seconds (%f hz)", duration, 1.0/duration);
+            OMPL_INFORM("Grid generation total time: %f seconds (%f hz)", duration, 1.0 / duration);
 
             return true;
         }
@@ -301,10 +302,13 @@ void Bolt::printLogs(std::ostream &out) const
     else
         out << "Bolt Framework Logging Results" << std::endl;
     out << "  Solutions Attempted:           " << stats_.numProblems_ << std::endl;
-    out << "    Solved from scratch:        " << stats_.numSolutionsFromScratch_ << " (" << stats_.numSolutionsFromScratch_/stats_.numProblems_*100 << "%)" << std::endl;
-    out << "    Solved from recall:         " << stats_.numSolutionsFromRecall_  << " (" << stats_.numSolutionsFromRecall_/stats_.numProblems_*100 << "%)" << std::endl;
+    out << "    Solved from scratch:        " << stats_.numSolutionsFromScratch_ << " ("
+        << stats_.numSolutionsFromScratch_ / stats_.numProblems_ * 100 << "%)" << std::endl;
+    out << "    Solved from recall:         " << stats_.numSolutionsFromRecall_ << " ("
+        << stats_.numSolutionsFromRecall_ / stats_.numProblems_ * 100 << "%)" << std::endl;
     out << "      That were saved:         " << stats_.numSolutionsFromRecallSaved_ << std::endl;
-    out << "      That were discarded:     " << stats_.numSolutionsFromRecall_ - stats_.numSolutionsFromRecallSaved_ << std::endl;
+    out << "      That were discarded:     " << stats_.numSolutionsFromRecall_ - stats_.numSolutionsFromRecallSaved_
+        << std::endl;
     out << "      Less than 2 states:      " << stats_.numSolutionsTooShort_ << std::endl;
     out << "    Failed:                     " << stats_.numSolutionsFailed_ << std::endl;
     out << "    Timedout:                    " << stats_.numSolutionsTimedout_ << std::endl;
@@ -312,9 +316,9 @@ void Bolt::printLogs(std::ostream &out) const
     out << "  BoltDB                        " << std::endl;
     out << "    Vertices:                    " << boltDB_->getNumVertices() << std::endl;
     out << "    Edges:                       " << boltDB_->getNumEdges() << std::endl;
-    //out << "    Consecutive state failures:  " << boltDB_->getNumConsecutiveFailures() << std::endl;
-    //out << "    Connected path failures:     " << boltDB_->getNumPathInsertionFailed() << std::endl;
-    //out << "    Sparse Delta Fraction:       " << boltDB_->getSparseDeltaFraction() << std::endl;
+    // out << "    Consecutive state failures:  " << boltDB_->getNumConsecutiveFailures() << std::endl;
+    // out << "    Connected path failures:     " << boltDB_->getNumPathInsertionFailed() << std::endl;
+    // out << "    Sparse Delta Fraction:       " << boltDB_->getSparseDeltaFraction() << std::endl;
     out << "  Average planning time:         " << stats_.getAveragePlanningTime() << std::endl;
     out << "  Average insertion time:        " << stats_.getAverageInsertionTime() << std::endl;
 }
@@ -336,7 +340,7 @@ void Bolt::convertPlannerData(const ob::PlannerDataPtr plannerData, og::PathGeom
         path.append(plannerData->getVertex(i).getState());
 }
 
-geometric::BoltDBPtr Bolt::getExperienceDB()
+BoltDBPtr Bolt::getExperienceDB()
 {
     return boltDB_;
 }
@@ -372,6 +376,6 @@ bool Bolt::doPostProcessing()
 
     return true;
 }
-
-} // namespace tools
-} // namespace ompl
+}  // namespace bolt
+}  // namespace tools
+}  // namespace ompl
