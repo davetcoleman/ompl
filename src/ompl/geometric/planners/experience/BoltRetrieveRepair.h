@@ -141,7 +141,7 @@ class BoltRetrieveRepair : public base::Planner
                          ompl::geometric::PathGeometric &geometricSolution, const base::PlannerTerminationCondition &ptc);
 
     /** \brief Clear verticies not on the specified level */
-    bool removeVerticesNotOnLevel(std::vector<BoltDB::Vertex> &graphNeighborhood, int level);
+    bool removeVerticesNotOnLevel(std::vector<BoltDB::DenseVertex> &graphNeighborhood, int level);
 
     /**
      * \brief Convert astar results to correctly ordered path
@@ -151,7 +151,7 @@ class BoltRetrieveRepair : public base::Planner
      * \param path - returned solution
      * \return true on success
      */
-    bool convertVertexPathToStatePath(std::vector<BoltDB::Vertex> &vertexPath, const base::State *actualStart,
+    bool convertVertexPathToStatePath(std::vector<BoltDB::DenseVertex> &vertexPath, const base::State *actualStart,
         const base::State *actualGoal, ompl::geometric::PathGeometric &geometricSolution);
 
     /**
@@ -161,13 +161,13 @@ class BoltRetrieveRepair : public base::Planner
      * \param requiredLevel - if -1, allows states from all levels, otherwise only returns states from a certain level
      * \return false is no neighbors found
      */
-    bool findGraphNeighbors(const base::State *state, std::vector<BoltDB::Vertex> &graphNeighborhood, int requiredLevel = -1);
+    bool findGraphNeighbors(const base::State *state, std::vector<BoltDB::DenseVertex> &graphNeighborhood, int requiredLevel = -1);
 
     /** \brief Check if there exists a solution, i.e., there exists a pair of milestones such that the
         first is in \e start and the second is in \e goal, and the two milestones are in the same
         connected component. If a solution is found, the path is saved. */
-    bool getPathOnGraph(const std::vector<BoltDB::Vertex> &candidateStarts,
-                        const std::vector<BoltDB::Vertex> &candidateGoals, const base::State *actualStart,
+    bool getPathOnGraph(const std::vector<BoltDB::DenseVertex> &candidateStarts,
+                        const std::vector<BoltDB::DenseVertex> &candidateGoals, const base::State *actualStart,
                         const base::State *actualGoal, ompl::geometric::PathGeometric &geometricSolution,
                         const base::PlannerTerminationCondition &ptc);
 
@@ -175,12 +175,12 @@ class BoltRetrieveRepair : public base::Planner
      * \brief Repeatidly search through graph for connection then check for collisions then repeat
      * \return true if a valid path is found
      */
-    bool lazyCollisionSearch(const BoltDB::Vertex &start, const BoltDB::Vertex &goal, const base::State *actualStart,
+    bool lazyCollisionSearch(const BoltDB::DenseVertex &start, const BoltDB::DenseVertex &goal, const base::State *actualStart,
                              const base::State *actualGoal, ompl::geometric::PathGeometric &geometricSolution,
                              const base::PlannerTerminationCondition &ptc);
 
     /** \brief Check recalled path for collision and disable as needed */
-    bool lazyCollisionCheck(std::vector<BoltDB::Vertex> &vertexPath, const base::PlannerTerminationCondition &ptc);
+    bool lazyCollisionCheck(std::vector<BoltDB::DenseVertex> &vertexPath, const base::PlannerTerminationCondition &ptc);
 
     /** \brief Test if the passed in random state can connect to a nearby vertex in the graph */
     bool canConnect(const base::State *randomState, const base::PlannerTerminationCondition &ptc);
@@ -210,8 +210,8 @@ class BoltRetrieveRepair : public base::Planner
     bool smoothingEnabled_;
 
     /** \brief Used by getPathOffGraph */
-    std::vector<BoltDB::Vertex> startVertexCandidateNeighbors_;
-    std::vector<BoltDB::Vertex> goalVertexCandidateNeighbors_;
+    std::vector<BoltDB::DenseVertex> startVertexCandidateNeighbors_;
+    std::vector<BoltDB::DenseVertex> goalVertexCandidateNeighbors_;
 
     /** \brief Output user feedback to console */
     bool verbose_;

@@ -120,17 +120,17 @@ double get(const og::SparseDB::edgeWeightMap &m, const og::SparseDB::Edge &e)
 
 BOOST_CONCEPT_ASSERT((boost::AStarVisitorConcept<og::SparseDB::CustomAstarVisitor, og::SparseDB::Graph>));
 
-og::SparseDB::CustomAstarVisitor::CustomAstarVisitor(Vertex goal, SparseDB *parent) : goal_(goal), parent_(parent)
+og::SparseDB::CustomAstarVisitor::CustomAstarVisitor(SparseVertex goal, SparseDB *parent) : goal_(goal), parent_(parent)
 {
 }
 
-void og::SparseDB::CustomAstarVisitor::discover_vertex(Vertex v, const Graph &) const
+void og::SparseDB::CustomAstarVisitor::discover_vertex(SparseVertex v, const Graph &) const
 {
     if (parent_->visualizeAstar_)
         parent_->visual_->viz1StateCallback(parent_->statePropertySparse_[v], /*mode=*/ 1, 1);
 }
 
-void og::SparseDB::CustomAstarVisitor::examine_vertex(Vertex v, const Graph &) const
+void og::SparseDB::CustomAstarVisitor::examine_vertex(SparseVertex v, const Graph &) const
 {
     if (parent_->visualizeAstar_)
     {
@@ -165,7 +165,7 @@ og::SparseDB::SparseDB(base::SpaceInformationPtr si, BoltDB* boltDB, tools::Visu
   , visualizeAstarSpeed_(0.1)
 {
     // Initialize nearest neighbor datastructure
-    nn_.reset(new NearestNeighborsGNATNoThreadSafety<Vertex>());
+    nn_.reset(new NearestNeighborsGNATNoThreadSafety<SparseVertex>());
     nn_->setDistanceFunction(boost::bind(&og::SparseDB::distanceFunction, this, _1, _2));
 
     // Add search state
@@ -179,7 +179,7 @@ og::SparseDB::~SparseDB(void)
 
 void og::SparseDB::freeMemory()
 {
-    BOOST_FOREACH (Vertex v, boost::vertices(g_))
+    BOOST_FOREACH (SparseVertex v, boost::vertices(g_))
     {
         // BOOST_FOREACH (InterfaceData &d, interfaceDataProperty_[v].interfaceHash | boost::adaptors::map_values)
         // d.clear(si_);
@@ -198,11 +198,11 @@ bool og::SparseDB::setup()
     return true;
 }
 
-bool og::SparseDB::astarSearch(const Vertex start, const Vertex goal, std::vector<Vertex> &vertexPath)
+bool og::SparseDB::astarSearch(const SparseVertex start, const SparseVertex goal, std::vector<SparseVertex> &vertexPath)
 {
     // Hold a list of the shortest path parent to each vertex
-    Vertex *vertexPredecessors = new Vertex[getNumVertices()];
-    // boost::vector_property_map<Vertex> vertexPredecessors(getNumVertices());
+    SparseVertex *vertexPredecessors = new SparseVertex[getNumVertices()];
+    // boost::vector_property_map<SparseVertex> vertexPredecessors(getNumVertices());
 
     bool foundGoal = false;
     double *vertexDistances = new double[getNumVertices()];
@@ -246,7 +246,7 @@ bool og::SparseDB::astarSearch(const Vertex start, const Vertex goal, std::vecto
             vertexPath.clear();  // remove any old solutions
 
             // Trace back the shortest path in reverse and only save the states
-            Vertex v;
+            SparseVertex v;
             for (v = goal; v != vertexPredecessors[v]; v = vertexPredecessors[v])
             {
                 vertexPath.push_back(v);
@@ -269,8 +269,8 @@ bool og::SparseDB::astarSearch(const Vertex start, const Vertex goal, std::vecto
         OMPL_INFORM("        Show all predecessors");
         for (std::size_t i = 1; i < getNumVertices(); ++i)  // skip vertex 0 b/c that is the search vertex
         {
-            const Vertex v1 = i;
-            const Vertex v2 = vertexPredecessors[v1];
+            const SparseVertex v1 = i;
+            const SparseVertex v2 = vertexPredecessors[v1];
             if (v1 != v2)
             {
                 // std::cout << "Edge " << v1 << " to " << v2 << std::endl;
@@ -298,7 +298,7 @@ void og::SparseDB::debugState(const ompl::base::State *state)
     si_->printState(state, std::cout);
 }
 
-double og::SparseDB::distanceFunction(const Vertex a, const Vertex b) const
+double og::SparseDB::distanceFunction(const SparseVertex a, const SparseVertex b) const
 {
     // const double dist = si_->distance(statePropertySparse_[a], statePropertySparse_[b]);
     // std::cout << "getting distance from " << a << " to " << b << " of value " << dist << std::endl;
@@ -324,14 +324,14 @@ void og::SparseDB::clearEdgeCollisionStates()
 // Create SPARs graph using popularity
 void og::SparseDB::createSPARS()
 {
-    bool verbose = true;
+    bool verbose = false;
 
     // Sort the verticies by popularity in a queue
     std::priority_queue<BoltDB::WeightedVertex, std::vector<BoltDB::WeightedVertex>,
                         BoltDB::CompareWeightedVertex> pqueue;
 
     // Loop through each popular edge in the dense graph
-    BOOST_FOREACH (BoltDB::Vertex v, boost::vertices(boltDB_->g_))
+    BOOST_FOREACH (BoltDB::DenseVertex v, boost::vertices(boltDB_->g_))
     {
         // Do not process the search vertex, it is null
         if (v == 0)
@@ -353,20 +353,24 @@ void og::SparseDB::createSPARS()
     }
 
     double largestWeight = pqueue.top().weight_;
-    std::vector<BoltDB::Vertex> failedInsertVertices;
+    std::vector<BoltDB::DenseVertex> failedInsertVertices;
 
     // Output the vertices in order
     while (!pqueue.empty())
     {
-        BoltDB::Vertex v = pqueue.top().v_;
+        BoltDB::DenseVertex v = pqueue.top().v_;
+
+        // Don't use unpopular nodes
+        //if (pqueue.size() < boltDB_->getNumVertices() / 2.0)
+        //break;
 
         // Visualize
         if (visualizeSparsCreation_)
         {
-            const double visualWeight = pqueue.top().weight_ / largestWeight * 100.0;
-            //std::cout << "  Visualizing vertex " << v << " with popularity " << visualWeight
+            const double weightPercent = pqueue.top().weight_ / largestWeight * 100.0;
+            //std::cout << "  Visualizing vertex " << v << " with popularity " << weightPercent
             //<< " queue remaining size " << pqueue.size() << std::endl;
-            visual_->viz1StateCallback(boltDB_->stateProperty_[v], /*mode=*/ 7, visualWeight);
+            visual_->viz1StateCallback(boltDB_->stateProperty_[v], /*mode=*/ 7, weightPercent);
             visual_->viz1TriggerCallback();
             usleep(0.01 * 1000000);
         }
@@ -376,7 +380,7 @@ void og::SparseDB::createSPARS()
         ob::PlannerTerminationCondition ptc = ob::timedPlannerTerminationCondition(seconds, 0.1);
 
         // Run SPARS checks
-        if (!addStateToRoadmap(ptc, boltDB_->stateProperty_[v]))
+        if (!addStateToRoadmap(ptc)) //, v))
         {
             std::cout << "Failed to add state to roadmap------" << std::endl;
             failedInsertVertices.push_back(v);
@@ -407,7 +411,7 @@ void og::SparseDB::createSPARS()
             ob::PlannerTerminationCondition ptc = ob::timedPlannerTerminationCondition(seconds, 0.1);
 
             // Run SPARS checks
-            if (!addStateToRoadmap(ptc, boltDB_->stateProperty_[failedInsertVertices[i]]))
+            if (!addStateToRoadmap(ptc)) //, failedInsertVertices[i]))
             {
                 std::cout << "Failed AGAIN to add state to roadmap------" << std::endl;
             }
@@ -424,8 +428,10 @@ void og::SparseDB::createSPARS()
     }
 }
 
-bool og::SparseDB::addStateToRoadmap(const base::PlannerTerminationCondition &ptc, base::State *qNew)
+bool og::SparseDB::addStateToRoadmap(const base::PlannerTerminationCondition &ptc) //, BoltDB::DenseVertex denseVertex)
 {
+    OMPL_ERROR("need to add second arg");
+    BoltDB::DenseVertex denseVertex; // TODO
     std::size_t coutIndent = 0;
     if (verbose_)
         std::cout << "addStateToRoadmap()" << std::endl;
@@ -436,10 +442,12 @@ bool og::SparseDB::addStateToRoadmap(const base::PlannerTerminationCondition &pt
     //base::State *qNew = si_->cloneState(newState);  // TODO(davetcoleman): do i need to clone it?
     //base::State *workState = si_->allocState();     // TODO(davetcoleman): do i need this state?
 
+    base::State *qNew = boltDB_->stateProperty_[denseVertex];
+
     /* Nodes near our input state */
-    std::vector<Vertex> graphNeighborhood;
+    std::vector<SparseVertex> graphNeighborhood;
     /* Visible nodes near our input state */
-    std::vector<Vertex> visibleNeighborhood;
+    std::vector<SparseVertex> visibleNeighborhood;
 
     // Find nearby nodes
     findGraphNeighbors(qNew, graphNeighborhood, visibleNeighborhood, coutIndent);
@@ -457,6 +465,10 @@ bool og::SparseDB::addStateToRoadmap(const base::PlannerTerminationCondition &pt
     {
         stateAdded = true;
     }
+    // else if (checkAsymptoticOptimal(denseVertex, coutIndent+16))
+    // {
+    //     stateAdded = true;
+    // }
     /*
     else
     {
@@ -464,7 +476,7 @@ bool og::SparseDB::addStateToRoadmap(const base::PlannerTerminationCondition &pt
             OMPL_INFORM(" ---- Ensure SPARS asymptotic optimality");
         if (visibleNeighborhood.size() > 0)
         {
-            std::map<Vertex, base::State*> closeRepresentatives;
+            std::map<SparseVertex, base::State*> closeRepresentatives;
             if (verbose_)
                 OMPL_INFORM(" ----- findCloseRepresentatives()");
 
@@ -472,7 +484,7 @@ bool og::SparseDB::addStateToRoadmap(const base::PlannerTerminationCondition &pt
             if (verbose_)
                 OMPL_INFORM("------ Found %d close representatives", closeRepresentatives.size());
 
-            for (std::map<Vertex, base::State*>::iterator it = closeRepresentatives.begin(); it !=
+            for (std::map<SparseVertex, base::State*>::iterator it = closeRepresentatives.begin(); it !=
     closeRepresentatives.end(); ++it)
             {
                 if (verbose_)
@@ -490,7 +502,7 @@ bool og::SparseDB::addStateToRoadmap(const base::PlannerTerminationCondition &pt
                 }
             }
 
-            for (std::map<Vertex, base::State*>::iterator it = closeRepresentatives.begin(); it !=
+            for (std::map<SparseVertex, base::State*>::iterator it = closeRepresentatives.begin(); it !=
     closeRepresentatives.end(); ++it)
             {
                 if (verbose_)
@@ -510,10 +522,10 @@ bool og::SparseDB::addStateToRoadmap(const base::PlannerTerminationCondition &pt
     return stateAdded;
 }
 
-og::SparseDB::Vertex og::SparseDB::addVertex(base::State *state, const GuardType &type)
+og::SparseDB::SparseVertex og::SparseDB::addVertex(base::State *state, const GuardType &type)
 {
     // Create vertex
-    Vertex v = boost::add_vertex(g_);
+    SparseVertex v = boost::add_vertex(g_);
 
     // Add properties
     typePropertySparse_[v] = type;
@@ -559,7 +571,7 @@ std::size_t og::SparseDB::getVizVertexType(const GuardType &type)
     return 5;
 }
 
-void og::SparseDB::addEdge(Vertex v1, Vertex v2, std::size_t visualColor, std::size_t coutIndent)
+void og::SparseDB::addEdge(SparseVertex v1, SparseVertex v2, std::size_t visualColor, std::size_t coutIndent)
 {
     assert(v1 <= getNumVertices());
     assert(v2 <= getNumVertices());
@@ -592,7 +604,7 @@ void og::SparseDB::addEdge(Vertex v1, Vertex v2, std::size_t visualColor, std::s
     }
 }
 
-bool og::SparseDB::checkAddCoverage(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood, std::size_t coutIndent)
+bool og::SparseDB::checkAddCoverage(const base::State *qNew, std::vector<SparseVertex> &visibleNeighborhood, std::size_t coutIndent)
 {
     if (verbose_)
         std::cout << std::string(coutIndent, ' ') + "checkAddCoverage() Are other nodes around it visible?" << std::endl;
@@ -609,7 +621,7 @@ bool og::SparseDB::checkAddCoverage(const base::State *qNew, std::vector<Vertex>
     if (verbose_)
         std::cout << std::string(coutIndent+2, ' ') + "Adding node for COVERAGE " << std::endl;
 
-    //Vertex v =
+    //SparseVertex v =
     addVertex(si_->cloneState(qNew), COVERAGE);
     // Note: we do not connect this node with any edges because we have already determined
     // it is too far away from any nearby nodes
@@ -617,7 +629,7 @@ bool og::SparseDB::checkAddCoverage(const base::State *qNew, std::vector<Vertex>
     return true;
 }
 
-bool og::SparseDB::checkAddConnectivity(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood, std::size_t coutIndent)
+bool og::SparseDB::checkAddConnectivity(const base::State *qNew, std::vector<SparseVertex> &visibleNeighborhood, std::size_t coutIndent)
 {
     if (verbose_)
         std::cout << std::string(coutIndent, ' ') + "checkAddConnectivity() Does this node connect neighboring nodes "
@@ -633,7 +645,7 @@ bool og::SparseDB::checkAddConnectivity(const base::State *qNew, std::vector<Ver
 
     // Identify visibile nodes around our new state that are unconnected (in different connected components)
     // and connect them
-    boost::unordered_set<Vertex> statesInDiffConnectedComponents; // TODO(davetcoleman): in C++11 change to std::unordered_set
+    boost::unordered_set<SparseVertex> statesInDiffConnectedComponents; // TODO(davetcoleman): in C++11 change to std::unordered_set
 
     // For each neighbor
     for (std::size_t i = 0; i < visibleNeighborhood.size(); ++i)
@@ -662,9 +674,9 @@ bool og::SparseDB::checkAddConnectivity(const base::State *qNew, std::vector<Ver
         std::cout << std::string(coutIndent+2, ' ') + "Adding node for CONNECTIVITY " << std::endl;
 
     // Add the node
-    Vertex newVertex = addVertex(si_->cloneState(qNew), CONNECTIVITY);
+    SparseVertex newVertex = addVertex(si_->cloneState(qNew), CONNECTIVITY);
 
-    for (boost::unordered_set<Vertex>::const_iterator vertex_it = statesInDiffConnectedComponents.begin();
+    for (boost::unordered_set<SparseVertex>::const_iterator vertex_it = statesInDiffConnectedComponents.begin();
          vertex_it != statesInDiffConnectedComponents.end(); ++vertex_it)
     {
         if (verbose_)
@@ -700,7 +712,7 @@ bool og::SparseDB::checkAddConnectivity(const base::State *qNew, std::vector<Ver
     return true;
 }
 
-bool og::SparseDB::checkAddInterface(const base::State *qNew, std::vector<Vertex> &graphNeighborhood, std::vector<Vertex> &visibleNeighborhood, std::size_t coutIndent)
+bool og::SparseDB::checkAddInterface(const base::State *qNew, std::vector<SparseVertex> &graphNeighborhood, std::vector<SparseVertex> &visibleNeighborhood, std::size_t coutIndent)
 {
     if (verbose_)
         std::cout << std::string(coutIndent, ' ') + "checkAddInterface() Does this node's neighbor's need it to better connect them?" << std::endl;
@@ -735,7 +747,7 @@ bool og::SparseDB::checkAddInterface(const base::State *qNew, std::vector<Vertex
                 if (verbose_)
                     std::cout << std::string(coutIndent+2, ' ') + "Adding node for INTERFACE" << std::endl;
 
-                Vertex v = addVertex(si_->cloneState(qNew), INTERFACE);
+                SparseVertex v = addVertex(si_->cloneState(qNew), INTERFACE);
                 addEdge(v, visibleNeighborhood[0], visualColor, coutIndent+4);
                 addEdge(v, visibleNeighborhood[1], visualColor, coutIndent+4);
                 if (verbose_)
@@ -752,97 +764,77 @@ bool og::SparseDB::checkAddInterface(const base::State *qNew, std::vector<Vertex
     }
     return false;
 }
-/*
-bool og::SparseDB::checkAddInterface(const base::State *qNew, std::vector<Vertex> &graphNeighborhood, std::vector<Vertex> &visibleNeighborhood, std::size_t coutIndent)
+
+/*bool og::SparseDB::checkAsymptoticOptimal(BoltDB::DenseVertex denseVertex, std::size_t coutIndent)
 {
     if (verbose_)
-        std::cout << std::string(coutIndent, ' ') + "checkAddInterface() Does this node's neighbor's need it to better connect them?" << std::endl;
+        std::cout << std::string(coutIndent, ' ') + "checkAsymptoticOptimal()" << std::endl;
 
-    //If we have at least 2 neighbors
-    if (visibleNeighborhood.size() < 2)
+    // Storage for the interface neighborhood, populated by getInterfaceNeighborhood()
+    std::vector<BoltDB::DenseVertex> interfaceNeighborhood;
+
+    // Check to see if Vertex is on an interface
+    getInterfaceNeighborhood(qNew, interfaceNeighborhood);
+    if (interfaceNeighborhood.size() > 0)
     {
         if (verbose_)
-            std::cout << std::string(coutIndent+2, ' ') + "NOT adding node for interface" << std::endl;
-        return false;
+            std::cout << std::string(coutIndent+2, ' ') + "Interface neighborhood is not empty" << std::endl;
+
+        //Check for addition for spanner prop
+        //if (checkAddPath(q, interfaceNeighborhood))
+        //return true;
     }
-    std::size_t visualColor;
-
-    // For each pair of neighbors
-    for (std::size_t i = 0; i < visibleNeighborhood.size(); ++i)
-    {
-        // For each other neighbor
-        for (std::size_t j = i + 1; j < visibleNeighborhood.size(); ++j)
-        {
-            if (i == 0 && j == 1)
-                visualColor = 50;
-            else
-            {
-                visualColor = 100;
-                //return false;
-            }
-
-            // If our pair of neighbors don't share an edge
-            if (!boost::edge(visibleNeighborhood[i], visibleNeighborhood[j], g_).second)
-            {
-                // If they can be directly connected
-                if (si_->checkMotion(statePropertySparse_[visibleNeighborhood[i]], statePropertySparse_[visibleNeighborhood[j]]))
-                {
-                    if (verbose_)
-                        std::cout << std::string(coutIndent+2, ' ') + "INTERFACE: directly connected nodes" << std::endl;
-
-                    //Connect them
-                    addEdge(visibleNeighborhood[i], visibleNeighborhood[j], visualColor, coutIndent+4);
-                }
-                else
-                {
-                    //Add the new node to the graph, to bridge the interface
-                    if (verbose_)
-                        std::cout << std::string(coutIndent+2, ' ') + "Adding node for INTERFACE" << std::endl;
-
-                    Vertex v = addVertex(si_->cloneState(qNew), INTERFACE);
-                    addEdge(v, visibleNeighborhood[i], visualColor, coutIndent+4);
-                    addEdge(v, visibleNeighborhood[j], visualColor, coutIndent+4);
-                    if (verbose_)
-                        std::cout << std::string(coutIndent+2, ' ') + "INTERFACE: connected two neighbors through new interface node" << std::endl;
-                }
-                //Report success
-                //return true;
-            }
-            else
-            {
-                if (verbose_)
-                    std::cout << std::string(coutIndent+2, ' ') + "Two neighbors already share an edge, not connecting" << std::endl;
-            }
-        } // for loop
-    } // for loop
+    //All of the tests have failed.  Report failure for the sample
     return false;
+}
+
+void og::SparseDB::getInterfaceNeighborhood(BoltDB::DenseVertex q, std::vector<BoltDB::DenseVertex> &interfaceNeighborhood)
+{
+    // Get our representative
+    BoltDB::SparseVertex rep = boltDB_->representativesProperty_[q];
+
+    // // For each neighbor we are connected to
+    // BOOST_FOREACH( DenseVertex n, boost::adjacent_vertices( q, boltDB_->g_ ) )
+    // {
+    //     // If neighbor representative is not our own
+    //     if (representativesProperty_[n] != rep )
+    //     {
+    //         // If he is within denseDelta_
+    //         if (distanceFunction( q, n ) < denseDelta_ )
+    //         {
+    //             // Append him to the list
+    //             interfaceNeighborhood.push_back( n );
+    //         }
+    //     }
+    // }
+
 }
 */
 /*
-bool og::SparseDB::checkAddPath( Vertex v )
+bool og::SparseDB::checkAddPath( SparseVertex v )
 {
     bool spannerPropertyWasViolated = false;
 
-    std::vector< Vertex > rs;
-    foreach( Vertex r, boost::adjacent_vertices( v, g_ ) )
+    std::vector< SparseVertex > rs;
+    foreach( SparseVertex r, boost::adjacent_vertices( v, g_ ) )
         rs.push_back(r);
 
     // Candidate x vertices as described in the method, filled by function computeX().
-    std::vector<Vertex> Xs;
+    std::vector<SparseVertex> Xs;
 
     // Candidate v" vertices as described in the method, filled by function computeVPP().
-    std::vector<Vertex> VPPs;
+    std::vector<SparseVertex> VPPs;
 
     for (std::size_t i = 0; i < rs.size() && !spannerPropertyWasViolated; ++i)
     {
-        Vertex r = rs[i];
+        SparseVertex r = rs[i];
         computeVPP(v, r, VPPs);
-        foreach (Vertex rp, VPPs)
+        foreach (SparseVertex rp, VPPs)
         {
             //First, compute the longest path through the graph
             computeX(v, r, rp, Xs);
             double rm_dist = 0.0;
-            foreach( Vertex rpp, Xs)
+            foreach( SparseVertex rpp, Xs)
             {
                 double tmp_dist = (si_->distance( statePropertySparse_[r], statePropertySparse_[v] )
                                    + si_->distance( statePropertySparse_[v], statePropertySparse_[rpp] ) )/2.0;
@@ -883,8 +875,8 @@ bool og::SparseDB::checkAddPath( Vertex v )
 
                     if (p->checkAndRepair(100).second)
                     {
-                        Vertex prior = r;
-                        Vertex vnew;
+                        SparseVertex prior = r;
+                        SparseVertex vnew;
                         std::vector<base::State*>& states = p->getStates();
 
                         foreach (base::State *st, states)
@@ -919,8 +911,8 @@ bool og::SparseDB::checkAddPath( Vertex v )
     return spannerPropertyWasViolated;
 }
 */
-void og::SparseDB::findGraphNeighbors(base::State *state, std::vector<Vertex> &graphNeighborhood,
-    std::vector<Vertex> &visibleNeighborhood, std::size_t coutIndent)
+void og::SparseDB::findGraphNeighbors(base::State *state, std::vector<SparseVertex> &graphNeighborhood,
+    std::vector<SparseVertex> &visibleNeighborhood, std::size_t coutIndent)
 {
     visibleNeighborhood.clear();
 
@@ -943,9 +935,9 @@ void og::SparseDB::findGraphNeighbors(base::State *state, std::vector<Vertex> &g
                   << " | Visible neighborhood: " << visibleNeighborhood.size() << std::endl;
 }
 /*
-og::SparseDB::Vertex og::SparseDB::findGraphRepresentative(base::State *st)
+og::SparseDB::SparseVertex og::SparseDB::findGraphRepresentative(base::State *st)
 {
-    std::vector<Vertex> nbh;
+    std::vector<SparseVertex> nbh;
     statePropertySparse_[ queryVertex_ ] = st;
     nn_->nearestR( queryVertex_, sparseDelta_, nbh);
     statePropertySparse_[queryVertex_] = NULL;
@@ -954,7 +946,7 @@ og::SparseDB::Vertex og::SparseDB::findGraphRepresentative(base::State *st)
         OMPL_INFORM(" ------- findGraphRepresentative found %d nearest neighbors of distance %f",
                     nbh.size(), sparseDelta_);
 
-    Vertex result = boost::graph_traits<Graph>::null_vertex();
+    SparseVertex result = boost::graph_traits<Graph>::null_vertex();
 
     for (std::size_t i = 0 ; i< nbh.size() ; ++i)
     {
@@ -971,12 +963,12 @@ og::SparseDB::Vertex og::SparseDB::findGraphRepresentative(base::State *st)
     return result;
 }
 
-void og::SparseDB::findCloseRepresentatives(base::State *workState, const base::State *qNew, const Vertex qRep,
-                                                        std::map<Vertex, base::State*> &closeRepresentatives,
+void og::SparseDB::findCloseRepresentatives(base::State *workState, const base::State *qNew, const SparseVertex qRep,
+                                                        std::map<SparseVertex, base::State*> &closeRepresentatives,
                                                         const base::PlannerTerminationCondition &ptc)
 {
     // Properly clear the vector by also deleting previously sampled unused states
-    for (std::map<Vertex, base::State*>::iterator it = closeRepresentatives.begin(); it != closeRepresentatives.end();
+    for (std::map<SparseVertex, base::State*>::iterator it = closeRepresentatives.begin(); it != closeRepresentatives.end();
 ++it)
         si_->freeState(it->second);
     closeRepresentatives.clear();
@@ -1032,7 +1024,7 @@ workState)) && ptc == false);
             OMPL_INFORM(" ------ Find graph representative ");
 
         // Compute who his graph neighbors are
-        Vertex representative = findGraphRepresentative(workState);
+        SparseVertex representative = findGraphRepresentative(workState);
 
         // Assuming this sample is actually seen by somebody (which he should be in all likelihood)
         if (representative != boost::graph_traits<Graph>::null_vertex())
@@ -1089,7 +1081,7 @@ closeRepresentatives.end(); ++it)
 
 */
 
-bool og::SparseDB::sameComponent(Vertex m1, Vertex m2)
+bool og::SparseDB::sameComponent(SparseVertex m1, SparseVertex m2)
 {
     return boost::same_component(m1, m2, disjointSets_);
 }

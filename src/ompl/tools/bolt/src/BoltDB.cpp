@@ -119,17 +119,17 @@ double get(const og::BoltDB::edgeWeightMap &m, const og::BoltDB::Edge &e)
 
 BOOST_CONCEPT_ASSERT((boost::AStarVisitorConcept<og::BoltDB::CustomAstarVisitor, og::BoltDB::Graph>));
 
-og::BoltDB::CustomAstarVisitor::CustomAstarVisitor(Vertex goal, BoltDB *parent) : goal_(goal), parent_(parent)
+og::BoltDB::CustomAstarVisitor::CustomAstarVisitor(DenseVertex goal, BoltDB *parent) : goal_(goal), parent_(parent)
 {
 }
 
-void og::BoltDB::CustomAstarVisitor::discover_vertex(Vertex v, const Graph &) const
+void og::BoltDB::CustomAstarVisitor::discover_vertex(DenseVertex v, const Graph &) const
 {
     if (parent_->visualizeAstar_)
         parent_->getVisual()->viz1StateCallback(parent_->stateProperty_[v], /*mode=*/ 1, 1);
 }
 
-void og::BoltDB::CustomAstarVisitor::examine_vertex(Vertex v, const Graph &) const
+void og::BoltDB::CustomAstarVisitor::examine_vertex(DenseVertex v, const Graph &) const
 {
     if (parent_->visualizeAstar_)
     {
@@ -155,6 +155,7 @@ og::BoltDB::BoltDB(base::SpaceInformationPtr si, tools::VisualizerPtr visual)
   // Property accessors of vertices
   , stateProperty_(boost::get(vertex_state_t(), g_))
   , typeProperty_(boost::get(vertex_type_t(), g_))
+    //, representativesProperty_(boost::get(vertex_representative_t(), g_))
   // interfaceDataProperty_(boost::get(vertex_interface_data_t(), g_)),
   , popularityBiasEnabled_(false)
   , verbose_(true)
@@ -163,15 +164,15 @@ og::BoltDB::BoltDB(base::SpaceInformationPtr si, tools::VisualizerPtr visual)
   , visualizeGridGeneration_(false)
   , visualizeCartNeighbors_(false)
   , visualizeCartPath_(false)
+  , visualizeSnapPath_(false)
   , discretization_(2.0)
   , visualizeAstarSpeed_(0.1)
-  , visualizeSnapPath_(false)
 {
     // Initialize sparse database
     sparseDB_.reset(new SparseDB(si_, this, visual_));
 
     // Initialize nearest neighbor datastructure
-    nn_.reset(new NearestNeighborsGNATNoThreadSafety<Vertex>());
+    nn_.reset(new NearestNeighborsGNATNoThreadSafety<DenseVertex>());
     nn_->setDistanceFunction(boost::bind(&og::BoltDB::distanceFunction, this, _1, _2));
 }
 
@@ -184,7 +185,7 @@ og::BoltDB::~BoltDB(void)
 
 void og::BoltDB::freeMemory()
 {
-    BOOST_FOREACH (Vertex v, boost::vertices(g_))
+    BOOST_FOREACH (DenseVertex v, boost::vertices(g_))
     {
         // BOOST_FOREACH (InterfaceData &d, interfaceDataProperty_[v].interfaceHash | boost::adaptors::map_values)
         // d.clear(si_);
@@ -301,7 +302,7 @@ bool og::BoltDB::postProcessPath(og::PathGeometric &solutionPath, double &insert
     // Find starting state's vertex
     // TODO(davetcoleman): loop through all possible start vertices
     stateProperty_[queryVertex_] = currentPathState;
-    Vertex prevGraphVertex = nn_->nearest(queryVertex_);
+    DenseVertex prevGraphVertex = nn_->nearest(queryVertex_);
     stateProperty_[queryVertex_] = NULL;  // Set search vertex to NULL to prevent segfault on class unload of memory
 
     // Visualize
@@ -311,7 +312,7 @@ bool og::BoltDB::postProcessPath(og::PathGeometric &solutionPath, double &insert
     }
 
     // Create new path that is 'snapped' onto the roadmap
-    std::vector<Vertex> roadmapPath;
+    std::vector<DenseVertex> roadmapPath;
     roadmapPath.push_back(prevGraphVertex);
 
     // Remember if any connections failed
@@ -403,8 +404,8 @@ bool og::BoltDB::postProcessPath(og::PathGeometric &solutionPath, double &insert
     return true;
 }
 
-bool og::BoltDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vector<Vertex> &roadmapPath,
-                                      std::size_t currVertexIndex, const Vertex &prevGraphVertex, bool &allValid)
+bool og::BoltDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vector<DenseVertex> &roadmapPath,
+                                      std::size_t currVertexIndex, const DenseVertex &prevGraphVertex, bool &allValid)
 
 {
     bool verbose = false;
@@ -416,7 +417,7 @@ bool og::BoltDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vector<
     }
 
     // Find multiple nearby nodes on the graph
-    std::vector<Vertex> graphNeighborhood;
+    std::vector<DenseVertex> graphNeighborhood;
 
     // Get the next state
     base::State *currentPathState = inputPath.getState(currVertexIndex);
@@ -430,7 +431,7 @@ bool og::BoltDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vector<
 
     // Loop through each neighbor until one is found that connects to the previous vertex
     bool foundValidConnToPrevious = false;
-    Vertex currGraphVertex;
+    DenseVertex currGraphVertex;
     for (std::size_t neighborID = 0; neighborID < graphNeighborhood.size(); ++neighborID)
     {
         bool isValid = false;
@@ -619,11 +620,11 @@ bool og::BoltDB::save(const std::string &fileName)
     return true;
 }
 
-bool og::BoltDB::astarSearch(const Vertex start, const Vertex goal, std::vector<Vertex> &vertexPath)
+bool og::BoltDB::astarSearch(const DenseVertex start, const DenseVertex goal, std::vector<DenseVertex> &vertexPath)
 {
     // Hold a list of the shortest path parent to each vertex
-    Vertex *vertexPredecessors = new Vertex[getNumVertices()];
-    // boost::vector_property_map<Vertex> vertexPredecessors(getNumVertices());
+    DenseVertex *vertexPredecessors = new DenseVertex[getNumVertices()];
+    // boost::vector_property_map<DenseVertex> vertexPredecessors(getNumVertices());
 
     bool foundGoal = false;
     double *vertexDistances = new double[getNumVertices()];
@@ -681,7 +682,7 @@ bool og::BoltDB::astarSearch(const Vertex start, const Vertex goal, std::vector<
             vertexPath.clear();  // remove any old solutions
 
             // Trace back the shortest path in reverse and only save the states
-            Vertex v;
+            DenseVertex v;
             for (v = goal; v != vertexPredecessors[v]; v = vertexPredecessors[v])
             {
                 vertexPath.push_back(v);
@@ -704,8 +705,8 @@ bool og::BoltDB::astarSearch(const Vertex start, const Vertex goal, std::vector<
         OMPL_INFORM("        Show all predecessors");
         for (std::size_t i = 1; i < getNumVertices(); ++i)  // skip vertex 0 b/c that is the search vertex
         {
-            const Vertex v1 = i;
-            const Vertex v2 = vertexPredecessors[v1];
+            const DenseVertex v1 = i;
+            const DenseVertex v2 = vertexPredecessors[v1];
             if (v1 != v2)
             {
                 // std::cout << "Edge " << v1 << " to " << v2 << std::endl;
@@ -740,7 +741,7 @@ void og::BoltDB::debugState(const ompl::base::State *state)
     si_->printState(state, std::cout);
 }
 
-double og::BoltDB::distanceFunction(const Vertex a, const Vertex b) const
+double og::BoltDB::distanceFunction(const DenseVertex a, const DenseVertex b) const
 {
     // const double dist = si_->distance(stateProperty_[a], stateProperty_[b]);
     // std::cout << "getting distance from " << a << " to " << b << " of value " << dist << std::endl;
@@ -748,7 +749,7 @@ double og::BoltDB::distanceFunction(const Vertex a, const Vertex b) const
     return si_->distance(stateProperty_[a], stateProperty_[b]);
 }
 
-double og::BoltDB::distanceFunction2(const Vertex a, const Vertex b) const
+double og::BoltDB::distanceFunction2(const DenseVertex a, const DenseVertex b) const
 {
     // const double dist = si_->getStateSpace()->distance2(stateProperty_[a], stateProperty_[b]);
     // std::cout << "getting distance from " << a << " to " << b << " of value " << dist << std::endl;
@@ -756,7 +757,7 @@ double og::BoltDB::distanceFunction2(const Vertex a, const Vertex b) const
     return si_->getStateSpace()->distance2(stateProperty_[a], stateProperty_[b]);
 }
 
-double og::BoltDB::distanceFunctionTasks(const Vertex a, const Vertex b) const
+double og::BoltDB::distanceFunctionTasks(const DenseVertex a, const DenseVertex b) const
 {
     // Do not use task distance if that mode is not enabled
     if (!useTaskPlanning_)
@@ -866,7 +867,7 @@ double og::BoltDB::distanceFunctionTasks(const Vertex a, const Vertex b) const
     return dist;
 }
 
-std::size_t og::BoltDB::getTaskLevel(const Vertex &v) const
+std::size_t og::BoltDB::getTaskLevel(const DenseVertex &v) const
 {
     return si_->getStateSpace()->getLevel(stateProperty_[v]);
 }
@@ -893,8 +894,8 @@ void og::BoltDB::getPlannerData(base::PlannerData &data) const
         // Adding edges and all other vertices simultaneously
         BOOST_FOREACH (const Edge e, boost::edges(g_))
         {
-            const Vertex v1 = boost::source(e, g_);
-            const Vertex v2 = boost::target(e, g_);
+            const DenseVertex v1 = boost::source(e, g_);
+            const DenseVertex v2 = boost::target(e, g_);
 
             if (!data.addEdge(base::PlannerDataVertex(stateProperty_[v1], (int)typeProperty_[v1]),
                               base::PlannerDataVertex(stateProperty_[v2], (int)typeProperty_[v2]),
@@ -911,7 +912,7 @@ void og::BoltDB::getPlannerData(base::PlannerData &data) const
         OMPL_ERROR("There are no edges in the graph!");
 
     // Make sure to add edge-less nodes as well
-    BOOST_FOREACH (const Vertex n, boost::vertices(g_))
+    BOOST_FOREACH (const DenseVertex n, boost::vertices(g_))
         if (boost::out_degree(n, g_) == 0)
             data.addVertex(base::PlannerDataVertex(stateProperty_[n], (int)typeProperty_[n]));
 
@@ -926,7 +927,7 @@ void og::BoltDB::loadFromPlannerData(const base::PlannerData &data)
     // Add all vertices
     OMPL_INFORM("  Loading %u vertices into BoltDB", data.numVertices());
 
-    std::vector<Vertex> idToVertex;
+    std::vector<DenseVertex> idToVertex;
 
     // Temp disable verbose mode for loading database
     bool wasVerbose = verbose_;
@@ -966,13 +967,13 @@ void og::BoltDB::loadFromPlannerData(const base::PlannerData &data)
         // Get the edges
         data.getEdges(fromVertex, edgeList);  // returns the id of each edge
 
-        Vertex v1 = idToVertex[fromVertex];
+        DenseVertex v1 = idToVertex[fromVertex];
 
         // Process edges
         for (std::size_t edgeId = 0; edgeId < edgeList.size(); ++edgeId)
         {
             unsigned int toVertex = edgeList[edgeId];
-            Vertex v2 = idToVertex[toVertex];
+            DenseVertex v2 = idToVertex[toVertex];
 
             // Add the edge to the graph
             if (verbose_ && false)
@@ -1047,7 +1048,7 @@ void og::BoltDB::generateGrid()
 
     // Remove vertices in collision using multithreading
     // TODO enable
-    // std::vector<Vertex> unvalidatedVertices;
+    // std::vector<DenseVertex> unvalidatedVertices;
     // checkVerticesThreaded(unvalidatedVertices);
 
     {
@@ -1077,10 +1078,10 @@ void og::BoltDB::generateGrid()
 void og::BoltDB::generateTaskSpace()
 {
     OMPL_INFORM("Generating task space");
-    std::vector<Vertex> vertexToNewVertex(getNumVertices());
+    std::vector<DenseVertex> vertexToNewVertex(getNumVertices());
 
     OMPL_INFORM("Adding task space vertices");
-    BOOST_FOREACH (Vertex v, boost::vertices(g_))
+    BOOST_FOREACH (DenseVertex v, boost::vertices(g_))
     {
         // The first vertex (id=0) should have a NULL state because it is used for searching
         if (!stateProperty_[v])
@@ -1095,7 +1096,7 @@ void og::BoltDB::generateTaskSpace()
         si_->getStateSpace()->setLevel(newState, level);
 
         // Add the state back
-        Vertex vNew = addVertex(newState, START);
+        DenseVertex vNew = addVertex(newState, START);
 
         // Map old vertex to new vertex
         vertexToNewVertex[v] = vNew;
@@ -1125,8 +1126,8 @@ void og::BoltDB::generateTaskSpace()
     {
         const Edge &e = edges[i];
 
-        const Vertex v1 = boost::source(e, g_);
-        const Vertex v2 = boost::target(e, g_);
+        const DenseVertex v1 = boost::source(e, g_);
+        const DenseVertex v2 = boost::target(e, g_);
 
         // std::cout << "v1: " << v1 << " v2: " << v2 << std::endl;
         // std::cout << "v1': " << vertexToNewVertex[v1] << " v2': " << vertexToNewVertex[v2] << std::endl;
@@ -1163,7 +1164,7 @@ void og::BoltDB::generateEdges()
     std::size_t count = 0;
 
     // Nearest Neighbor search
-    std::vector<Vertex> graphNeighborhood;
+    std::vector<DenseVertex> graphNeighborhood;
     std::vector<Edge> unvalidatedEdges;
     std::size_t feedbackFrequency = getNumVertices() / 10;
 
@@ -1223,7 +1224,7 @@ void og::BoltDB::generateEdges()
             if (verbose)
                 OMPL_INFORM("Edge %u", i);
 
-            Vertex &v2 = graphNeighborhood[i];
+            DenseVertex &v2 = graphNeighborhood[i];
 
             // Check if these vertices are the same
             if (v1 == v2)
@@ -1293,8 +1294,8 @@ void og::BoltDB::generateEdges()
     std::size_t errorCheckCounter = 0;
     BOOST_FOREACH (const Edge e, boost::edges(g_))
     {
-        const Vertex &v1 = boost::source(e, g_);
-        const Vertex &v2 = boost::target(e, g_);
+        const DenseVertex &v1 = boost::source(e, g_);
+        const DenseVertex &v2 = boost::target(e, g_);
 
         // Determine cost for edge depending on mode
         double cost;
@@ -1331,8 +1332,8 @@ void og::BoltDB::checkEdges()
 
     BOOST_FOREACH (const Edge e, boost::edges(g_))
     {
-        const Vertex &v1 = boost::source(e, g_);
-        const Vertex &v2 = boost::target(e, g_);
+        const DenseVertex &v1 = boost::source(e, g_);
+        const DenseVertex &v2 = boost::target(e, g_);
 
         // Remove any edges that are in collision
         if (!si_->checkMotion(stateProperty_[v1], stateProperty_[v2]))
@@ -1421,8 +1422,8 @@ void og::BoltDB::checkEdgesThread(std::size_t startEdge, std::size_t endEdge, ba
     {
         const Edge &e = unvalidatedEdges[edgeID];
 
-        const Vertex &v1 = boost::source(e, g_);
-        const Vertex &v2 = boost::target(e, g_);
+        const DenseVertex &v1 = boost::source(e, g_);
+        const DenseVertex &v2 = boost::target(e, g_);
 
         // Remove any edges that are in collision
         if (!si->checkMotion(stateProperty_[v1], stateProperty_[v2]))
@@ -1498,7 +1499,7 @@ void og::BoltDB::recursiveDiscretization(std::vector<double> &values, std::size_
     }
 }
 
-void og::BoltDB::checkVerticesThreaded(const std::vector<Vertex> &unvalidatedVertices)
+void og::BoltDB::checkVerticesThreaded(const std::vector<DenseVertex> &unvalidatedVertices)
 {
     // TODO(davetcoleman): have not tested this functionality
     bool verbose = true;
@@ -1554,12 +1555,12 @@ void og::BoltDB::checkVerticesThreaded(const std::vector<Vertex> &unvalidatedVer
 }
 
 void og::BoltDB::checkVerticesThread(std::size_t startVertex, std::size_t endVertex, base::SpaceInformationPtr si,
-                                     const std::vector<Vertex> &unvalidatedVertices)
+                                     const std::vector<DenseVertex> &unvalidatedVertices)
 {
     // Process [startVertex, endVertex] inclusive
     for (std::size_t vertexID = startVertex; vertexID <= endVertex; ++vertexID)
     {
-        const Vertex &v = unvalidatedVertices[vertexID];
+        const DenseVertex &v = unvalidatedVertices[vertexID];
 
         // Remove any vertices that are in collision
         if (!si_->isValid(stateProperty_[v]))
@@ -1586,7 +1587,7 @@ void og::BoltDB::displayDatabase(bool showVertices)
         std::size_t count = 0;
         std::size_t debugFrequency = getNumVertices() / 10;
         std::cout << "Displaying database: " << std::flush;
-        BOOST_FOREACH (Vertex v, boost::vertices(g_))
+        BOOST_FOREACH (DenseVertex v, boost::vertices(g_))
         {
             // Check for null states
             if (stateProperty_[v])
@@ -1614,8 +1615,8 @@ void og::BoltDB::displayDatabase(bool showVertices)
         BOOST_FOREACH (Edge e, boost::edges(g_))
         {
             // Add edge
-            const Vertex &v1 = boost::source(e, g_);
-            const Vertex &v2 = boost::target(e, g_);
+            const DenseVertex &v1 = boost::source(e, g_);
+            const DenseVertex &v2 = boost::target(e, g_);
 
             // Visualize
             visual_->vizDBEdgeCallback(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
@@ -1675,10 +1676,10 @@ void og::BoltDB::normalizeGraphEdgeWeights()
     }
 }
 
-og::BoltDB::Vertex og::BoltDB::addVertex(base::State *state, const GuardType &type)
+og::BoltDB::DenseVertex og::BoltDB::addVertex(base::State *state, const GuardType &type)
 {
     // Create vertex
-    Vertex v1 = boost::add_vertex(g_);
+    DenseVertex v1 = boost::add_vertex(g_);
 
     // Add properties
     typeProperty_[v1] = type;
@@ -1696,7 +1697,7 @@ og::BoltDB::Vertex og::BoltDB::addVertex(base::State *state, const GuardType &ty
     return v1;
 }
 
-og::BoltDB::Edge og::BoltDB::addEdge(const Vertex &v1, const Vertex &v2, const double weight)
+og::BoltDB::Edge og::BoltDB::addEdge(const DenseVertex &v1, const DenseVertex &v2, const double weight)
 {
     // Error check
     assert(v2 <= getNumVertices());
@@ -1727,7 +1728,7 @@ void og::BoltDB::cleanupTemporaryVerticies()
     }
 
     OMPL_INFORM("Cleaning up temp verticies - vertex count: %u, edge count: %u", getNumVertices(), getNumEdges());
-    BOOST_REVERSE_FOREACH(Vertex v, tempVerticies_)
+    BOOST_REVERSE_FOREACH(DenseVertex v, tempVerticies_)
     {
         if (verbose)
             std::cout << "removing vertex " << v << std::endl;
@@ -1766,8 +1767,8 @@ bool og::BoltDB::addCartPath(std::vector<base::State *> path)
     // TODO: check for validity
 
     // Create verticies for the extremas
-    Vertex startVertex = addVertex(path.front(), CARTESIAN);
-    Vertex goalVertex = addVertex(path.back(), CARTESIAN);
+    DenseVertex startVertex = addVertex(path.front(), CARTESIAN);
+    DenseVertex goalVertex = addVertex(path.back(), CARTESIAN);
 
     // Record min cost for cost-to-go heurstic distance function later
     distanceAcrossCartesian_ = distanceFunction(startVertex, goalVertex);
@@ -1791,8 +1792,8 @@ bool og::BoltDB::addCartPath(std::vector<base::State *> path)
     }
 
     // Add cartesian path to mid level graph --------------------
-    Vertex v1 = startVertex;
-    Vertex v2;
+    DenseVertex v1 = startVertex;
+    DenseVertex v2;
     for (std::size_t i = 1; i < path.size(); ++i)
     {
         // Check if we are on the goal vertex
@@ -1821,11 +1822,11 @@ bool og::BoltDB::addCartPath(std::vector<base::State *> path)
     return true;
 }
 
-bool og::BoltDB::connectStateToNeighborsAtLevel(const Vertex &fromVertex, const std::size_t level,
-                                                Vertex &minConnectorVertex)
+bool og::BoltDB::connectStateToNeighborsAtLevel(const DenseVertex &fromVertex, const std::size_t level,
+                                                DenseVertex &minConnectorVertex)
 {
     // Get nearby states to goal
-    std::vector<Vertex> neighbors;
+    std::vector<DenseVertex> neighbors;
     const std::size_t kNeighbors = 20;
     getNeighborsAtLevel(stateProperty_[fromVertex], level, kNeighbors, neighbors);
 
@@ -1846,7 +1847,7 @@ bool og::BoltDB::connectStateToNeighborsAtLevel(const Vertex &fromVertex, const 
     double minConnectorCost = std::numeric_limits<double>::infinity();
 
     // Loop through each neighbor
-    BOOST_FOREACH (Vertex v, neighbors)
+    BOOST_FOREACH (DenseVertex v, neighbors)
     {
         // Add edge from nearby graph vertex to cart path goal
         double connectorCost = distanceFunction(fromVertex, v);
@@ -1878,7 +1879,7 @@ bool og::BoltDB::connectStateToNeighborsAtLevel(const Vertex &fromVertex, const 
 }
 
 void og::BoltDB::getNeighborsAtLevel(const base::State *origState, const std::size_t level,
-                                     const std::size_t kNeighbors, std::vector<Vertex> &neighbors)
+                                     const std::size_t kNeighbors, std::vector<DenseVertex> &neighbors)
 {
     // Clone the state and change its level
     base::State *searchState = si_->cloneState(origState);
@@ -1893,7 +1894,7 @@ void og::BoltDB::getNeighborsAtLevel(const base::State *origState, const std::si
     // Run various checks
     for (std::size_t i = 0; i < neighbors.size(); ++i)
     {
-        const Vertex &nearVertex = neighbors[i];
+        const DenseVertex &nearVertex = neighbors[i];
 
         // Make sure state is on correct level
         if (getTaskLevel(nearVertex) != level)
@@ -1922,8 +1923,8 @@ void og::BoltDB::getNeighborsAtLevel(const base::State *origState, const std::si
 
 void og::BoltDB::vizDBEdge(Edge &e)
 {
-    const Vertex &v1 = boost::source(e, g_);
-    const Vertex &v2 = boost::target(e, g_);
+    const DenseVertex &v1 = boost::source(e, g_);
+    const DenseVertex &v2 = boost::target(e, g_);
 
     // Visualize
     visual_->vizDBEdgeCallback(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
@@ -1997,7 +1998,7 @@ bool og::BoltDB::checkTaskPathSolution(og::PathGeometric &path, ob::State *start
 void og::BoltDB::checkStateType()
 {
     std::size_t count = 0;
-    BOOST_FOREACH (const Vertex v, boost::vertices(g_))
+    BOOST_FOREACH (const DenseVertex v, boost::vertices(g_))
     {
         // The first vertex (id=0) should have a NULL state because it is used for searching
         if (!stateProperty_[v])

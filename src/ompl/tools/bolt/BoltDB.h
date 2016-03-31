@@ -63,7 +63,7 @@
 #include <boost/property_map/property_map.hpp>
 #include <boost/pending/disjoint_sets.hpp>
 #include <boost/function.hpp>
-//#include <boost/thread.hpp>
+#include <boost/thread.hpp>
 
 namespace ompl
 {
@@ -78,7 +78,6 @@ namespace ompl
         /// @cond IGNORE
         OMPL_CLASS_FORWARD(BoltDB);
         OMPL_CLASS_FORWARD(SparseDB);
-        // OMPL_CLASS_FORWARD(BoltRetrieveRepair);
         /// @endcond
 
         /** \class ompl::geometric::BoltDBPtr
@@ -222,6 +221,11 @@ namespace ompl
                 typedef boost::vertex_property_tag kind;
             };
 
+            struct vertex_representative_t
+            {
+                typedef boost::vertex_property_tag kind;
+            };
+
             struct vertex_type_t
             {
                 typedef boost::vertex_property_tag kind;
@@ -278,10 +282,12 @@ namespace ompl
                     boost::vertex_predecessor_t, VertexIndexType,
                     boost::property<
                         boost::vertex_rank_t, VertexIndexType,
-                        boost::property<
-                            vertex_type_t, GuardType  //,
-                            // boost::property < vertex_interface_data_t, InterfaceHashStruct >
-                            > > > > VertexProperties;
+                        //boost::property<
+                        //vertex_representative_t, SparseDB::SparseVertex,
+                            boost::property<
+                                vertex_type_t, GuardType  //,
+                                // boost::property < vertex_interface_data_t, InterfaceHashStruct >
+                                > > > > VertexProperties;
 
             /** Wrapper for the double assigned to an edge as its weight property. */
             typedef boost::property<
@@ -296,7 +302,7 @@ namespace ompl
                                           boost::undirectedS, VertexProperties, EdgeProperties> Graph;
 
             /** \brief Vertex in Graph */
-            typedef boost::graph_traits<Graph>::vertex_descriptor Vertex;
+            typedef boost::graph_traits<Graph>::vertex_descriptor DenseVertex;
 
             /** \brief Edge in Graph */
             typedef boost::graph_traits<Graph>::edge_descriptor Edge;
@@ -362,7 +368,7 @@ namespace ompl
             class CustomAstarVisitor : public boost::default_astar_visitor
             {
             private:
-                Vertex goal_;  // Goal Vertex of the search
+                DenseVertex goal_;  // Goal Vertex of the search
                 BoltDB* parent_;
 
             public:
@@ -370,14 +376,14 @@ namespace ompl
                  * Construct a visitor for a given search.
                  * \param goal  goal vertex of the search
                  */
-                CustomAstarVisitor(Vertex goal, BoltDB* parent);
+                CustomAstarVisitor(DenseVertex goal, BoltDB* parent);
 
                 /**
                  * \brief Invoked when a vertex is first discovered and is added to the OPEN list.
                  * \param v current Vertex
                  * \param g graph we are searching on
                  */
-                void discover_vertex(Vertex v, const Graph& g) const;
+                void discover_vertex(DenseVertex v, const Graph& g) const;
 
                 /**
                  * \brief Check if we have arrived at the goal.
@@ -388,19 +394,19 @@ namespace ompl
                  * \param g graph we are searching on
                  * \throw foundGoalException if \a u is the goal
                  */
-                void examine_vertex(Vertex v, const Graph& g) const;
+                void examine_vertex(DenseVertex v, const Graph& g) const;
             };
 
             /** \brief Custom storage class */
             class WeightedVertex
             {
             public:
-                WeightedVertex(Vertex v, double weight)
+                WeightedVertex(DenseVertex v, double weight)
                     : v_(v), weight_(weight)
                 {
                 }
 
-                Vertex v_;
+                DenseVertex v_;
                 double weight_;
             };
 
@@ -454,8 +460,8 @@ namespace ompl
              * \param allValid - flag to determine if any of the edges were never found to be valdi
              * \return true on success
              */
-            bool recurseSnapWaypoints(ompl::geometric::PathGeometric& inputPath, std::vector<Vertex>& roadmapPath,
-                std::size_t currVertexIndex, const Vertex& prevGraphVertex, bool& allValid);
+            bool recurseSnapWaypoints(ompl::geometric::PathGeometric& inputPath, std::vector<DenseVertex>& roadmapPath,
+                std::size_t currVertexIndex, const DenseVertex& prevGraphVertex, bool& allValid);
 
             /**
              * \brief Save loaded database to file, except skips saving if no paths have been added
@@ -478,7 +484,7 @@ namespace ompl
              *  \param vertexPath
              *  \return true if candidate solution found
              */
-            bool astarSearch(const BoltDB::Vertex start, const BoltDB::Vertex goal, std::vector<BoltDB::Vertex>& vertexPath);
+            bool astarSearch(const DenseVertex start, const DenseVertex goal, std::vector<DenseVertex>& vertexPath);
 
             /**
              * \brief Get a vector of all the planner datas in the database
@@ -548,9 +554,9 @@ namespace ompl
             void recursiveDiscretization(std::vector<double>& values, std::size_t joint_id, std::size_t desired_depth);
 
             /** \brief Faster method for collision checking vertices */
-            void checkVerticesThreaded(const std::vector<Vertex> &unvalidatedVertices);
+            void checkVerticesThreaded(const std::vector<DenseVertex> &unvalidatedVertices);
             void checkVerticesThread(std::size_t startVertex, std::size_t endVertex, base::SpaceInformationPtr si,
-                const std::vector<Vertex> &unvalidatedVertices);
+                const std::vector<DenseVertex> &unvalidatedVertices);
 
             /** \brief Clone the graph to have second and third layers for task planning then free space planning */
             void generateTaskSpace();
@@ -573,16 +579,16 @@ namespace ompl
             void freeMemory();
 
             /** \brief Compute distance between two milestones (this is simply distance between the states of the milestones) */
-            double distanceFunction(const Vertex a, const Vertex b) const;
+            double distanceFunction(const DenseVertex a, const DenseVertex b) const;
 
             /** \brief Compute distance between two milestones (this is simply distance between the states of the milestones) */
-            double distanceFunction2(const Vertex a, const Vertex b) const;
+            double distanceFunction2(const DenseVertex a, const DenseVertex b) const;
 
             /** \brief Compute the heuristic distance between the current node and the next goal */
-            double distanceFunctionTasks(const Vertex a, const Vertex b) const;
+            double distanceFunctionTasks(const DenseVertex a, const DenseVertex b) const;
 
             /** \brief Helper for getting the task level value from a state */
-            std::size_t getTaskLevel(const Vertex& v) const;
+            std::size_t getTaskLevel(const DenseVertex& v) const;
             std::size_t getTaskLevel(const base::State* state) const;
 
             /** \brief Check that the query vertex is initialized (used for internal nearest neighbor searches) */
@@ -604,10 +610,10 @@ namespace ompl
             void normalizeGraphEdgeWeights();
 
             /** \brief Helper for creating/loading graph vertices */
-            Vertex addVertex(base::State* state, const GuardType& type);
+            DenseVertex addVertex(base::State* state, const GuardType& type);
 
             /** \brief Helper for creating/loading graph edges */
-            Edge addEdge(const Vertex& v1, const Vertex& v2, const double weight);
+            Edge addEdge(const DenseVertex& v1, const DenseVertex& v2, const double weight);
 
             /** \brief Get whether to bias search using popularity of edges */
             bool getPopularityBiasEnabled()
@@ -640,12 +646,12 @@ namespace ompl
              * \param minConnectorVertex - the vertex on the main graph that has the shortest path to connecting to the cartesian path
              * \return true on success
              */
-            bool connectStateToNeighborsAtLevel(const Vertex& fromVertex, const std::size_t level,
-                Vertex& minConnectorVertex);
+            bool connectStateToNeighborsAtLevel(const DenseVertex& fromVertex, const std::size_t level,
+                DenseVertex& minConnectorVertex);
 
             /** \brief Get k number of neighbors near a state at a certain level that have valid motions */
             void getNeighborsAtLevel(const base::State* origState, const std::size_t level, const std::size_t kNeighbors,
-                std::vector<Vertex>& neighbors);
+                std::vector<DenseVertex>& neighbors);
 
             /** \brief Shortcut for visualizing an edge */
             void vizDBEdge(Edge &e);
@@ -703,13 +709,13 @@ namespace ompl
             bool savingEnabled_;
 
             /** \brief Nearest neighbors data structure */
-            boost::shared_ptr<NearestNeighbors<Vertex> > nn_;
+            boost::shared_ptr<NearestNeighbors<DenseVertex> > nn_;
 
             /** \brief Connectivity graph */
             Graph g_;
 
             /** \brief Vertex for performing nearest neighbor queries. */
-            Vertex queryVertex_;
+            DenseVertex queryVertex_;
 
             /** \brief Access to the weights of each Edge */
             boost::property_map<Graph, boost::edge_weight_t>::type edgeWeightProperty_;
@@ -722,6 +728,9 @@ namespace ompl
 
             /** \brief Access to the SPARS vertex type for the vertices */
             boost::property_map<Graph, vertex_type_t>::type typeProperty_;
+
+            /** \brief Access to the representatives of the Dense vertices */
+            //boost::property_map<Graph, vertex_representative_t>::type representativesProperty_;
 
             /** \brief Whether to bias search using popularity of edges */
             bool popularityBiasEnabled_;
@@ -736,9 +745,9 @@ namespace ompl
             base::State* nextDiscretizedState_;
 
             /** \brief Track vertex for later removal if temporary */
-            std::vector<Vertex> tempVerticies_;
-            Vertex startConnectorVertex_;
-            Vertex endConnectorVertex_;
+            std::vector<DenseVertex> tempVerticies_;
+            DenseVertex startConnectorVertex_;
+            DenseVertex endConnectorVertex_;
             double distanceAcrossCartesian_;
 
             /** \brief Are we task planning i.e. for hybrid cartesian paths? */
@@ -755,7 +764,7 @@ namespace ompl
             /** \brief Distance between grid points (discretization level) */
             double discretization_;
 
-            /** \brief Visualization speed of astar search, num of seconds to show each vertex */
+            // Visualization speed of astar search, num of seconds to show each vertex
             double visualizeAstarSpeed_;
 
         };  // end of class BoltDB
