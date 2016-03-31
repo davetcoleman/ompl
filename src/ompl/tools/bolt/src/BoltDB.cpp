@@ -165,6 +165,7 @@ og::BoltDB::BoltDB(base::SpaceInformationPtr si, tools::VisualizerPtr visual)
   , visualizeCartPath_(false)
   , discretization_(2.0)
   , visualizeAstarSpeed_(0.1)
+  , visualizeSnapPath_(false)
 {
     // Initialize sparse database
     sparseDB_.reset(new SparseDB(si_, this, visual_));
@@ -304,7 +305,10 @@ bool og::BoltDB::postProcessPath(og::PathGeometric &solutionPath, double &insert
     stateProperty_[queryVertex_] = NULL;  // Set search vertex to NULL to prevent segfault on class unload of memory
 
     // Visualize
-    visual_->viz1StateCallback(stateProperty_[prevGraphVertex], /*mode=*/ 1, 1);
+    if (visualizeSnapPath_)
+    {
+        visual_->viz1StateCallback(stateProperty_[prevGraphVertex], /*mode=*/ 1, 1);
+    }
 
     // Create new path that is 'snapped' onto the roadmap
     std::vector<Vertex> roadmapPath;
@@ -322,8 +326,11 @@ bool og::BoltDB::postProcessPath(og::PathGeometric &solutionPath, double &insert
     }
 
     // Visualize
-    visual_->viz1TriggerCallback();
-    usleep(0.1 * 1000000);
+    if (visualizeSnapPath_)
+    {
+        visual_->viz1TriggerCallback();
+        usleep(0.1 * 1000000);
+    }
 
     // Error check
     if (!allValid)
@@ -355,9 +362,12 @@ bool og::BoltDB::postProcessPath(og::PathGeometric &solutionPath, double &insert
         if (!edgeResult.second)
         {
             OMPL_ERROR("No edge found on snapped path at index %u", vertexID);
-            visual_->viz2EdgeCallback(stateProperty_[roadmapPath[vertexID - 1]], stateProperty_[roadmapPath[vertexID]], 0);
-            visual_->viz2TriggerCallback();
-            usleep(4 * 1000000);
+            if (visualizeSnapPath_)
+            {
+                visual_->viz2EdgeCallback(stateProperty_[roadmapPath[vertexID - 1]], stateProperty_[roadmapPath[vertexID]], 0);
+                visual_->viz2TriggerCallback();
+                usleep(4 * 1000000);
+            }
         }
         else
         {
@@ -374,10 +384,18 @@ bool og::BoltDB::postProcessPath(og::PathGeometric &solutionPath, double &insert
                 std::cout << " new: " << edgeWeightProperty_[edge] << std::endl;
 
             // Visualize
-            visual_->viz2EdgeCallback(stateProperty_[roadmapPath[vertexID - 1]], stateProperty_[roadmapPath[vertexID]], 100);
+            if (visualizeSnapPath_)
+            {
+                visual_->viz2EdgeCallback(stateProperty_[roadmapPath[vertexID - 1]], stateProperty_[roadmapPath[vertexID]], 100);
+            }
         }
     }
-    visual_->viz2TriggerCallback();
+
+    // Visualize
+    if (visualizeSnapPath_)
+    {
+        visual_->viz2TriggerCallback();
+    }
 
     // Record this new addition
     graphUnsaved_ = true;
@@ -408,6 +426,7 @@ bool og::BoltDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vector<
     std::size_t findNearestKNeighbors = 10;
     const std::size_t numSameVerticiesFound = 1;  // add 1 to the end because the NN tree always returns itself
     nn_->nearestK(queryVertex_, findNearestKNeighbors + numSameVerticiesFound, graphNeighborhood);
+    stateProperty_[queryVertex_] = NULL;
 
     // Loop through each neighbor until one is found that connects to the previous vertex
     bool foundValidConnToPrevious = false;
@@ -440,15 +459,22 @@ bool og::BoltDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vector<
         else
         {
             // Visualize nearby state
-            visual_->viz1StateCallback(stateProperty_[currGraphVertex], /*mode=*/ 1, 1);
-            visual_->viz1EdgeCallback(currentPathState, stateProperty_[currGraphVertex], 30);
+            if (visualizeSnapPath_)
+            {
+                visual_->viz1StateCallback(stateProperty_[currGraphVertex], /*mode=*/ 1, 1);
+                visual_->viz1EdgeCallback(currentPathState, stateProperty_[currGraphVertex], 30);
+            }
 
             // Check for collision
             isValid = si_->checkMotion(stateProperty_[prevGraphVertex], stateProperty_[currGraphVertex]);
-            double color = isValid ? 0 : 60;
+
 
             // Visualize
-            visual_->viz1EdgeCallback(stateProperty_[prevGraphVertex], stateProperty_[currGraphVertex], color);
+            if (visualizeSnapPath_)
+            {
+                double color = isValid ? 0 : 60;
+                visual_->viz1EdgeCallback(stateProperty_[prevGraphVertex], stateProperty_[currGraphVertex], color);
+            }
         }
 
         // Remember if any connections failed
@@ -503,8 +529,11 @@ bool og::BoltDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vector<
         allValid = false;
 
         // Visualize
-        visual_->viz1TriggerCallback();
-        usleep(1 * 1000000);
+        if (visualizeSnapPath_)
+        {
+            visual_->viz1TriggerCallback();
+            usleep(1 * 1000000);
+        }
 
         return false;
     }
@@ -905,11 +934,11 @@ void og::BoltDB::loadFromPlannerData(const base::PlannerData &data)
     std::size_t debugFrequency = data.numVertices() / 10;
 
     // Add the nodes to the graph
-    std::cout << "Vertices loaded: ";
+    std::cout << "Vertices loaded: " << std::flush;
     for (std::size_t vertexID = 0; vertexID < data.numVertices(); ++vertexID)
     {
         if ((vertexID + 1) % debugFrequency == 0)
-            std::cout << std::fixed << std::setprecision(0) << (vertexID / double(data.numVertices())) * 100.0 << "% ";
+            std::cout << std::fixed << std::setprecision(0) << (vertexID / double(data.numVertices())) * 100.0 << "% " << std::flush;
 
         // Get the state from loaded planner data
         const base::State *oldState = data.getVertex(vertexID).getState();
@@ -926,11 +955,11 @@ void og::BoltDB::loadFromPlannerData(const base::PlannerData &data)
     OMPL_INFORM("  Loading %u edges into BoltDB", data.numEdges());
     // Add the corresponding edges to the graph
     std::vector<unsigned int> edgeList;
-    std::cout << "Edges loaded: ";
+    std::cout << "Edges loaded: " << std::flush;
     for (unsigned int fromVertex = 0; fromVertex < data.numVertices(); ++fromVertex)
     {
         if ((fromVertex + 1) % debugFrequency == 0)
-            std::cout << std::fixed << std::setprecision(0) << fromVertex / double(data.numVertices()) * 100.0 << "% ";
+            std::cout << std::fixed << std::setprecision(0) << fromVertex / double(data.numVertices()) * 100.0 << "% " << std::flush;
 
         edgeList.clear();
 
@@ -1152,8 +1181,6 @@ void og::BoltDB::generateEdges()
 
         // Add edges
         graphNeighborhood.clear();
-        base::State *state = stateProperty_[v1];
-        stateProperty_[queryVertex_] = state;
 
         //{
         // Benchmark runtime
@@ -1173,6 +1200,8 @@ void og::BoltDB::generateEdges()
         // OMPL_INFORM("Finding %u nearest neighbors for each vertex", findNearestKNeighbors);
 
         const std::size_t numSameVerticiesFound = 1;  // add 1 to the end because the NN tree always returns itself
+
+        stateProperty_[queryVertex_] = stateProperty_[v1];
         nn_->nearestK(queryVertex_, findNearestKNeighbors + numSameVerticiesFound, graphNeighborhood);
         stateProperty_[queryVertex_] = NULL;  // Set search vertex to NULL to prevent segfault on class unload of memory
 
@@ -1556,7 +1585,7 @@ void og::BoltDB::displayDatabase(bool showVertices)
         // Loop through each vertex
         std::size_t count = 0;
         std::size_t debugFrequency = getNumVertices() / 10;
-        std::cout << "Displaying database: ";
+        std::cout << "Displaying database: " << std::flush;
         BOOST_FOREACH (Vertex v, boost::vertices(g_))
         {
             // Check for null states
@@ -1569,7 +1598,7 @@ void og::BoltDB::displayDatabase(bool showVertices)
             if (count % debugFrequency == 0)
             {
                 std::cout << std::fixed << std::setprecision(0)
-                          << (static_cast<double>(count + 1) / getNumVertices()) * 100.0 << "% ";
+                          << (static_cast<double>(count + 1) / getNumVertices()) * 100.0 << "% " << std::flush;
                 visual_->vizDBTriggerCallback();
             }
             count++;
@@ -1581,7 +1610,7 @@ void og::BoltDB::displayDatabase(bool showVertices)
         // Loop through each edge
         std::size_t count = 0;
         std::size_t debugFrequency = getNumEdges() / 10;
-        std::cout << "Displaying database: ";
+        std::cout << "Displaying database: " << std::flush;
         BOOST_FOREACH (Edge e, boost::edges(g_))
         {
             // Add edge
@@ -1595,7 +1624,7 @@ void og::BoltDB::displayDatabase(bool showVertices)
             if (count % debugFrequency == 0)
             {
                 std::cout << std::fixed << std::setprecision(0)
-                          << (static_cast<double>(count + 1) / getNumEdges()) * 100.0 << "% ";
+                          << (static_cast<double>(count + 1) / getNumEdges()) * 100.0 << "% " << std::flush;
                 visual_->vizDBTriggerCallback();
             }
 

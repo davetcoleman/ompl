@@ -750,6 +750,7 @@ namespace ompl
             bool visualizeGridGeneration_;
             bool visualizeCartNeighbors_;
             bool visualizeCartPath_;
+            bool visualizeSnapPath_;
 
             /** \brief Distance between grid points (discretization level) */
             double discretization_;

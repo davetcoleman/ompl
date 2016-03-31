@@ -64,10 +64,10 @@ namespace ompl
         public:
             /** \brief Visualize a planner's data during runtime, externally, using a function callback
              *         This could be called whenever the graph changes */
-            void viz1StateCallback(const ompl::base::State* state, std::size_t type, double neighborRadius)
+            void viz1StateCallback(const ompl::base::State* state, std::size_t type, double extraData)
             {
                 if (viz1StateCallback_)
-                    viz1StateCallback_(state, type, neighborRadius);
+                    viz1StateCallback_(state, type, extraData);
             }
 
             /** \brief Visualize a planner's data during runtime, externally, using a function callback
@@ -96,10 +96,10 @@ namespace ompl
 
             /** \brief Visualize a planner's data during runtime, externally, using a function callback
              *         This could be called whenever the graph changes */
-            void viz2StateCallback(const ompl::base::State* state, std::size_t type, double neighborRadius)
+            void viz2StateCallback(const ompl::base::State* state, std::size_t type, double extraData)
             {
                 if (viz2StateCallback_)
-                    viz2StateCallback_(state, type, neighborRadius);
+                    viz2StateCallback_(state, type, extraData);
             }
 
             /** \brief Visualize a planner's data during runtime, externally, using a function callback
@@ -128,10 +128,10 @@ namespace ompl
 
             /** \brief Visualize a planner's data during runtime, externally, using a function callback
              *         This could be called whenever the graph changes */
-            void vizDBStateCallback(const ompl::base::State* state, std::size_t type, double neighborRadius)
+            void vizDBStateCallback(const ompl::base::State* state, std::size_t type, double extraData)
             {
                 if (vizDBStateCallback_)
-                    vizDBStateCallback_(state, type, neighborRadius);
+                    vizDBStateCallback_(state, type, extraData);
             }
 
             /** \brief Visualize a planner's data during runtime, externally, using a function callback
