@@ -41,6 +41,7 @@
 
 #include <ompl/base/StateSpace.h>
 #include <ompl/geometric/PathGeometric.h>
+#include <ompl/geometric/PathSimplifier.h>
 #include <ompl/base/Planner.h>
 #include <ompl/base/State.h>
 #include <ompl/base/SpaceInformation.h>
@@ -51,16 +52,6 @@
 #include <ompl/tools/bolt/BoltGraph.h>
 
 // Boost
-// #include <boost/range/adaptor/map.hpp>
-// #include <boost/unordered_map.hpp>
-// #include <boost/graph/graph_traits.hpp>
-// #include <boost/graph/adjacency_list.hpp>
-// #include <boost/graph/filtered_graph.hpp>
-// #include <boost/graph/graph_utility.hpp>
-// #include <boost/graph/astar_search.hpp>
-// #include <boost/graph/connected_components.hpp>
-// #include <boost/property_map/property_map.hpp>
-// #include <boost/pending/disjoint_sets.hpp>
 #include <boost/function.hpp>
 
 namespace ompl
@@ -86,8 +77,8 @@ OMPL_CLASS_FORWARD(BoltDB);
 /** \brief Save and load entire paths from file */
 class SparseDB
 {
+    friend class BoltDB;
   public:
-
     ////////////////////////////////////////////////////////////////////////////////////////
     /**
      * Used to artifically supress edges during A* search.
@@ -115,8 +106,8 @@ class SparseDB
          * Construct map for certain constraints.
          * \param graph         Graph to use
          */
-        edgeWeightMap(const SparseGraph& graph, const SparseEdgeCollisionStateMap& collisionStates, const double& popularityBias,
-                      const bool popularityBiasEnabled);
+        edgeWeightMap(const SparseGraph& graph, const SparseEdgeCollisionStateMap& collisionStates,
+                      const double& popularityBias, const bool popularityBiasEnabled);
 
         /**
          * Get the weight of an edge.
@@ -194,8 +185,7 @@ class SparseDB
      *  \param vertexPath
      *  \return true if candidate solution found
      */
-    bool astarSearch(const SparseVertex start, const SparseVertex goal,
-                     std::vector<SparseVertex>& vertexPath);
+    bool astarSearch(const SparseVertex start, const SparseVertex goal, std::vector<SparseVertex>& vertexPath);
 
     /** \brief Print info to screen */
     void debugVertex(const ompl::base::PlannerDataVertex& vertex);
@@ -233,24 +223,40 @@ class SparseDB
 
     /** \brief Create a SPARS graph from the discretized dense graph and its popularity metric */
     void createSPARS();
+    bool findSparseRepresentatives();
+    bool getPopularityOrder(std::vector<DenseVertex>& vertexInsertionOrder);
+    bool getDefaultOrder(std::vector<DenseVertex>& vertexInsertionOrder);
 
     /* ----------------------------------------------------------------------------------------*/
     /** \brief SPARS-related functions */
-    bool addStateToRoadmap(const base::PlannerTerminationCondition& ptc);  // DenseVertex denseVertex);
-    SparseVertex addVertex(base::State* state, const GuardType& type);
+    bool addStateToRoadmap(const base::PlannerTerminationCondition& ptc, DenseVertex denseVertex);
+    bool checkAddCoverage(const DenseVertex& denseV, std::vector<SparseVertex>& visibleNeighborhood,
+                          std::size_t coutIndent);
+    bool checkAddConnectivity(const DenseVertex& denseV, std::vector<SparseVertex>& visibleNeighborhood,
+                              std::size_t coutIndent);
+    bool checkAddInterface(const DenseVertex& denseV, std::vector<SparseVertex>& graphNeighborhood,
+                           std::vector<SparseVertex>& visibleNeighborhood, std::size_t coutIndent);
+    bool checkAsymptoticOptimal(const DenseVertex& denseV, std::size_t coutIndent);
+    void getInterfaceNeighborhood(const DenseVertex& denseV, std::vector<DenseVertex>& interfaceNeighborhood,
+                                  std::size_t coutIndent);
+    void findGraphNeighbors(const DenseVertex& denseV, std::vector<SparseVertex>& graphNeighborhood,
+                            std::vector<SparseVertex>& visibleNeighborhood, std::size_t coutIndent);
+    bool checkAddPath(DenseVertex q, const std::vector<DenseVertex> &neigh, std::size_t coutIndent);
+    void computeVPP(SparseVertex v, SparseVertex vp, std::vector<SparseVertex> &VPPs);
+    void computeX(SparseVertex v, SparseVertex vp, SparseVertex vpp, std::vector<SparseVertex> &Xs);
+    bool addPathToSpanner( const DensePath &densePath, SparseVertex vp, SparseVertex vpp );
+    void connectSparsePoints(SparseVertex v, SparseVertex vp);
+    DenseVertex getInterfaceNeighbor(DenseVertex q, SparseVertex rep);
+    bool sameComponent(SparseVertex m1, SparseVertex m2);
+    SparseVertex addVertex(DenseVertex denseV, const GuardType& type);
     std::size_t getVizVertexType(const GuardType& type);
     void addEdge(SparseVertex v1, SparseVertex v2, std::size_t visualColor, std::size_t coutIndent);
-    bool checkAddCoverage(const base::State* qNew, std::vector<SparseVertex>& visibleNeighborhood,
-                          std::size_t coutIndent);
-    bool checkAddConnectivity(const base::State* qNew, std::vector<SparseVertex>& visibleNeighborhood,
-                              std::size_t coutIndent);
-    bool checkAddInterface(const base::State* qNew, std::vector<SparseVertex>& graphNeighborhood,
-                           std::vector<SparseVertex>& visibleNeighborhood, std::size_t coutIndent);
-    // bool checkAsymptoticOptimal(DenseVertex denseVertex, std::size_t coutIndent);
-    // void getInterfaceNeighborhood(DenseVertex q, std::vector<DenseVertex> &interfaceNeighborhood);
-    void findGraphNeighbors(base::State* state, std::vector<SparseVertex>& graphNeighborhood,
-                            std::vector<SparseVertex>& visibleNeighborhood, std::size_t coutIndent);
-    bool sameComponent(SparseVertex m1, SparseVertex m2);
+
+  public:
+    /** \brief Shortcut function for getting the state of a vertex */
+    inline base::State*& getSparseState(const SparseVertex& v);
+    inline const base::State* getSparseStateConst(const SparseVertex& v) const;
+    inline base::State *&getDenseState(const DenseVertex &denseV);
 
   protected:
     /** \brief The created space information */
@@ -271,6 +277,9 @@ class SparseDB
     /** \brief Vertex for performing nearest neighbor queries. */
     SparseVertex queryVertex_;
 
+    /** \brief Geometric Path variable used for smoothing out paths. */
+    geometric::PathGeometric smoothingGeomPath_;
+
     /** \brief Access to the weights of each Edge */
     boost::property_map<SparseGraph, boost::edge_weight_t>::type edgeWeightPropertySparse_;
 
@@ -278,23 +287,42 @@ class SparseDB
     SparseEdgeCollisionStateMap edgeCollisionStatePropertySparse_;
 
     /** \brief Access to the internal base::state at each Vertex */
-    boost::property_map<SparseGraph, vertex_state_t>::type statePropertySparse_;
+    boost::property_map<SparseGraph, vertex_state2_t>::type denseVertexProperty_;
 
     /** \brief Access to the SPARS vertex type for the vertices */
     boost::property_map<SparseGraph, vertex_type_t>::type typePropertySparse_;
+
+    /** \brief Access to all non-interface supporting vertices of the sparse nodes */
+    boost::property_map<SparseGraph, vertex_list_t>::type nonInterfaceListsProperty_;
+
+    /** \brief Access to the interface-supporting vertice hashes of the sparse nodes */
+    boost::property_map<SparseGraph, vertex_interface_list_t>::type interfaceListsProperty_;
 
     /** \brief Data structure that maintains the connected components */
     boost::disjoint_sets<boost::property_map<SparseGraph, boost::vertex_rank_t>::type,
                          boost::property_map<SparseGraph, boost::vertex_predecessor_t>::type> disjointSets_;
 
-    /** \brief Option to enable debugging output */
-    bool verbose_;
+    /** \brief A path simplifier used to simplify dense paths added to S */
+    geometric::PathSimplifierPtr psimp_;
+
+    /** \brief The stretch factor in terms of graph spanners for SPARS to check against */
+    double stretchFactor_;
 
   public:
+    bool checksVerbose_;
+    bool fourthCheckVerbose_;
+
     /** \brief Various options for visualizing the algorithmns performance */
     bool visualizeAstar_;
 
     bool visualizeSparsCreation_;
+    bool visualizeDenseRepresentatives_;
+
+    /** \brief SPARS parameter for dense graph connection distance as a fraction of max. extent */
+    double denseDeltaFraction_;
+
+    /** \brief SPARS parameter for dense graph connection distance */
+    double denseDelta_;
 
     /** \brief Amount of sub-optimality allowed */
     double sparseDelta_;

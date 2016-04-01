@@ -81,8 +81,11 @@ void Bolt::initialize()
 
 void Bolt::setup(void)
 {
+    OMPL_INFORM("Bolt setup()");
     if (!configured_ || !si_->isSetup() || !boltPlanner_->isSetup())
     {
+        OMPL_ERROR("Bolt setup() inside");
+
         // Setup Space Information if we haven't already done so
         if (!si_->isSetup())
             si_->setup();
@@ -255,7 +258,7 @@ void Bolt::printResultsInfo(std::ostream &out) const
 bool Bolt::loadOrGenerate()
 {
     // Load from file or generate new grid
-    if (!boltDB_->getNumVertices())
+    if (boltDB_->getNumVertices() <= 1) // the search verticie may already be there
     {
         if (!boltDB_->load(filePath_))  // load from file
         {

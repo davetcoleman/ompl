@@ -78,22 +78,31 @@ enum GuardType
     CARTESIAN
 };
 
-////////////////////////////////////////////////////////////////////////////////////////
-// BOOST GRAPH DETAILS - DENSE
-////////////////////////////////////////////////////////////////////////////////////////
-
 /** \brief The type used internally for representing vertex IDs */
 typedef unsigned long int VertexIndexType;  // TODO(davetcoleman): just use size_t?
 
-////////////////////////////////////////////////////////////////////////////////////////
-// Vertex properties
-
+/** \brief Boost vertex properties */
 struct vertex_state_t
 {
     typedef boost::vertex_property_tag kind;
 };
 
-struct vertex_representative_t
+struct vertex_state2_t  // TODO(davetcoleman): rename
+{
+    typedef boost::vertex_property_tag kind;
+};
+
+struct vertex_list_t
+{
+    typedef boost::vertex_property_tag kind;
+};
+
+struct vertex_interface_list_t
+{
+    typedef boost::vertex_property_tag kind;
+};
+
+struct vertex_sparse_rep_t
 {
     typedef boost::vertex_property_tag kind;
 };
@@ -103,9 +112,10 @@ struct vertex_type_t
     typedef boost::vertex_property_tag kind;
 };
 
-// struct vertex_interface_data_t {
-//     typedef boost::vertex_property_tag kind;
-// };
+struct vertex_interface_data_t
+{
+    typedef boost::vertex_property_tag kind;
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // Edge properties
@@ -124,7 +134,32 @@ enum EdgeCollisionState
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////
-// BOOST GRAPH DETAILS - SPARSE
+// INTERFACE PROPERTIES
+////////////////////////////////////////////////////////////////////////////////////////
+
+/** \brief Hash for storing interface information. */
+typedef boost::unordered_map<VertexIndexType, std::set<VertexIndexType>, boost::hash<VertexIndexType> > InterfaceHash;
+
+// The InterfaceHash structure is wrapped inside of this struct due to a compilation error on
+// GCC 4.6 with Boost 1.48.  An implicit assignment operator overload does not compile with these
+// components, so an explicit overload is given here.
+// Remove this struct when the minimum Boost requirement is > v1.48.
+struct InterfaceHashStruct
+{
+    InterfaceHashStruct &operator=(const InterfaceHashStruct &rhs)
+    {
+        interfaceHash = rhs.interfaceHash;
+        return *this;
+    }
+    InterfaceHash interfaceHash;
+};
+
+////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////
+// BOOST GRAPH - SPARSE
+////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -152,13 +187,14 @@ enum EdgeCollisionState
 */
 
 /** Wrapper for the vertex's multiple as its property. */
-typedef boost::property<
-    vertex_state_t, base::State *,
-    boost::property<boost::vertex_predecessor_t, VertexIndexType,
-                    boost::property<boost::vertex_rank_t, VertexIndexType,
-                                    boost::property<vertex_type_t, GuardType  //,
-                                                    // boost::property < vertex_interface_data_t, InterfaceHashStruct >
-                                                    > > > > SparseVertexProperties;
+// clang-format off
+typedef boost::property<vertex_state2_t, VertexIndexType,
+        boost::property<boost::vertex_predecessor_t, VertexIndexType,
+        boost::property<boost::vertex_rank_t, VertexIndexType,
+        boost::property<vertex_type_t, GuardType,
+        boost::property<vertex_list_t, std::set<VertexIndexType>,
+        boost::property<vertex_interface_list_t, InterfaceHashStruct > > > > > > SparseVertexProperties;
+// clang-format on
 
 /** Wrapper for the double assigned to an edge as its weight property. */
 typedef boost::property<boost::edge_weight_t, double, boost::property<edge_collision_state_t, int> >
@@ -181,6 +217,13 @@ typedef boost::graph_traits<SparseGraph>::edge_descriptor SparseEdge;
 /** \brief Access map that stores the lazy collision checking status of each edge */
 typedef boost::property_map<SparseGraph, edge_collision_state_t>::type SparseEdgeCollisionStateMap;
 
+////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////
+// BOOST GRAPH - DENSE
+////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////////
 /**
@@ -194,7 +237,7 @@ typedef boost::property_map<SparseGraph, edge_collision_state_t>::type SparseEdg
    - vertex_state_t: an ompl::base::State* is required for OMPL
    - vertex_predecessor_t: The incremental connected components algorithm requires it
    - vertex_rank_t: The incremental connected components algorithm requires it
-   - vertex_type_t - TODO
+   - vertex_type_t - Type of vertex/guard in SPARS
    - vertex_interface_data_t - needed by PRM2 for maintainings its sparse properties
 
    Note: If boost::vecS is not used for vertex storage, then there must also
@@ -207,15 +250,15 @@ typedef boost::property_map<SparseGraph, edge_collision_state_t>::type SparseEdg
 */
 
 /** Wrapper for the vertex's multiple as its property. */
-typedef boost::property<
-    vertex_state_t, base::State *,
-    boost::property<boost::vertex_predecessor_t, VertexIndexType,
-                    boost::property<boost::vertex_rank_t, VertexIndexType,
-                                    // boost::property<
-                                    // vertex_representative_t, SparseDB::SparseVertex,
-                                    boost::property<vertex_type_t, GuardType  //,
-                                                    // boost::property < vertex_interface_data_t, InterfaceHashStruct >
-                                                    > > > > DenseVertexProperties;
+
+// clang-format off
+typedef boost::property<vertex_state_t, base::State *,
+                        //boost::property<vertex_state3_t, base::State *,
+        boost::property<boost::vertex_predecessor_t, VertexIndexType,
+        boost::property<vertex_sparse_rep_t, SparseVertex,
+        boost::property<boost::vertex_rank_t, VertexIndexType,
+        boost::property<vertex_type_t, GuardType> > > > > DenseVertexProperties;
+// clang-format on
 
 /** Wrapper for the double assigned to an edge as its weight property. */
 typedef boost::property<boost::edge_weight_t, double, boost::property<edge_collision_state_t, int> >
@@ -231,6 +274,9 @@ typedef boost::graph_traits<DenseGraph>::vertex_descriptor DenseVertex;
 
 /** \brief Edge in Graph */
 typedef boost::graph_traits<DenseGraph>::edge_descriptor DenseEdge;
+
+/** \brief Internal representation of a dense path */
+typedef std::deque<base::State*> DensePath;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // Typedefs for property maps
