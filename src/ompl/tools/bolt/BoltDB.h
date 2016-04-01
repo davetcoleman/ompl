@@ -253,6 +253,8 @@ class BoltDB
      */
     bool astarSearch(const DenseVertex start, const DenseVertex goal, std::vector<DenseVertex>& vertexPath);
 
+    void computeDensePath(const DenseVertex start, const DenseVertex goal, DensePath& path);
+
     /**
      * \brief Get a vector of all the planner datas in the database
      */
@@ -494,12 +496,13 @@ class BoltDB
 
     /** \brief Access to the internal base::state at each Vertex */
     boost::property_map<DenseGraph, vertex_state_t>::type stateProperty_;
+    // boost::property_map<DenseGraph, vertex_state3_t>::type state3Property_;
 
     /** \brief Access to the SPARS vertex type for the vertices */
     boost::property_map<DenseGraph, vertex_type_t>::type typeProperty_;
 
     /** \brief Access to the representatives of the Dense vertices */
-    // boost::property_map<DenseGraph, vertex_representative_t>::type representativesProperty_;
+    boost::property_map<DenseGraph, vertex_sparse_rep_t>::type representativesProperty_;
 
     /** \brief Whether to bias search using popularity of edges */
     bool popularityBiasEnabled_;
