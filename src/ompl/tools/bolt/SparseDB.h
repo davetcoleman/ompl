@@ -252,6 +252,9 @@ class SparseDB
     std::size_t getVizVertexType(const GuardType& type);
     void addEdge(SparseVertex v1, SparseVertex v2, std::size_t visualColor, std::size_t coutIndent);
 
+    /** \brief Show in visualizer the sparse graph */
+    void displayDatabase(bool showVertices = false);
+
   public:
     /** \brief Shortcut function for getting the state of a vertex */
     inline base::State*& getSparseState(const SparseVertex& v);
@@ -305,10 +308,22 @@ class SparseDB
     /** \brief A path simplifier used to simplify dense paths added to S */
     geometric::PathSimplifierPtr psimp_;
 
+    bool secondSparseInsertionAttempt_;
+
+  public:
+
+    /** \brief SPARS parameter for dense graph connection distance as a fraction of max. extent */
+    double denseDeltaFraction_;
+
     /** \brief The stretch factor in terms of graph spanners for SPARS to check against */
     double stretchFactor_;
 
-  public:
+    /** \brief SPARS parameter for dense graph connection distance */
+    double denseDelta_;
+
+    /** \brief Amount of sub-optimality allowed */
+    double sparseDelta_;
+
     bool checksVerbose_;
     bool fourthCheckVerbose_;
 
@@ -317,15 +332,6 @@ class SparseDB
 
     bool visualizeSparsCreation_;
     bool visualizeDenseRepresentatives_;
-
-    /** \brief SPARS parameter for dense graph connection distance as a fraction of max. extent */
-    double denseDeltaFraction_;
-
-    /** \brief SPARS parameter for dense graph connection distance */
-    double denseDelta_;
-
-    /** \brief Amount of sub-optimality allowed */
-    double sparseDelta_;
 
     /** \brief Visualization speed of astar search, num of seconds to show each vertex */
     double visualizeAstarSpeed_;

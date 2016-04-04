@@ -163,17 +163,19 @@ SparseDB::SparseDB(base::SpaceInformationPtr si, BoltDB *boltDB, VisualizerPtr v
   , interfaceListsProperty_(boost::get(vertex_interface_list_t(), g_))
   // Disjoint set accessors
   , disjointSets_(boost::get(boost::vertex_rank, g_), boost::get(boost::vertex_predecessor, g_))
+  // Remember what round we're on
+  , secondSparseInsertionAttempt_(false)
   // Sparse properites
-    , denseDeltaFraction_(.05)
-    //, denseDeltaFraction_(.001)
+  , denseDeltaFraction_(.05)
+  //, denseDeltaFraction_(.001)
   , stretchFactor_(3.)
+  , sparseDelta_(2.0)
   // Visualization settings
   , checksVerbose_(false)
   , fourthCheckVerbose_(true)
   , visualizeAstar_(false)
   , visualizeSparsCreation_(false)
   , visualizeDenseRepresentatives_(false)
-  , sparseDelta_(2.0)
   , visualizeAstarSpeed_(0.1)
 {
     // Add search state
@@ -212,8 +214,6 @@ void SparseDB::freeMemory()
 
 bool SparseDB::setup()
 {
-    OMPL_INFORM("SparseDB::setup()");
-
     // Calculate variables for the graph
     const double maxExt = si_->getMaximumExtent();
     // sparseDelta_ = sparseDeltaFraction_ * maxExt;
@@ -401,14 +401,23 @@ void SparseDB::createSPARS()
                   << std::endl;
         loopAttempt++;
 
-        bool debugOverRideJustOnce = true;
-        if (debugOverRideJustOnce)
+        // Increase the sparse delta a bit, but only after the first loop
+        if (loopAttempt == 1)
         {
-            OMPL_WARN("Only attempting to add nodes once for speed");
+            sparseDelta_ = sparseDelta_ * 1.25;
+            OMPL_INFORM("sparseDelta_ is now %f", sparseDelta_);
+            secondSparseInsertionAttempt_ = true;
+        }
+
+        bool debugOverRideJustTwice = true;
+        if (debugOverRideJustTwice && loopAttempt == 2)
+        {
+            OMPL_WARN("Only attempting to add nodes twice for speed");
             break;
         }
     }
 
+    /*
     // Determine every dense node's representative on the sparse graph
     findSparseRepresentatives();
 
@@ -421,6 +430,13 @@ void SparseDB::createSPARS()
         {
             std::cout << "Vertex " << vertexInsertionOrder[i] << " failed asymptotic optimal test " << std::endl;
         }
+    }
+    */
+
+    // If we haven't animated the creation, just show it all at once
+    if (!visualizeSparsCreation_)
+    {
+        displayDatabase();
     }
 
     // Statistics
@@ -754,7 +770,10 @@ bool SparseDB::checkAddConnectivity(const DenseVertex &denseV, std::vector<Spars
         // The components haven't been united by previous edges created in this for loop
         if (!sameComponent(*vertex_it, newVertex))
         {
-            addEdge(newVertex, *vertex_it, 0, coutIndent + 4);
+            std::size_t visualColor = 0;
+            if (secondSparseInsertionAttempt_)
+                visualColor = 75;
+            addEdge(newVertex, *vertex_it, visualColor, coutIndent + 4);
         }
         else
         {
@@ -780,8 +799,9 @@ bool SparseDB::checkAddInterface(const DenseVertex &denseV, std::vector<SparseVe
         return false;
     }
     // TODO(davetcoleman): why only the first two nodes??
-
     std::size_t visualColor = 50;
+    if (secondSparseInsertionAttempt_)
+        visualColor = 100;
 
     // If the two closest nodes are also visible
     if (graphNeighborhood[0] == visibleNeighborhood[0] && graphNeighborhood[1] == visibleNeighborhood[1])
@@ -821,6 +841,7 @@ bool SparseDB::checkAddInterface(const DenseVertex &denseV, std::vector<SparseVe
                                                                 "connecting" << std::endl;
         }
     }
+
     return false;
 }
 
@@ -1201,9 +1222,12 @@ void SparseDB::addEdge(SparseVertex v1, SparseVertex v2, std::size_t visualColor
         /* Color Key:
            0 - connectivity
            50 - interface default
-           100 - interface dave modification
+           75 - connectivity second round
+           100 - interface second round
         */
         visual_->viz2EdgeCallback(getSparseState(v1), getSparseState(v2), visualColor);
+        visual_->viz2TriggerCallback();
+        usleep(0.001*1000000);
     }
 }
 
@@ -1220,6 +1244,76 @@ const base::State *SparseDB::getSparseStateConst(const SparseVertex &v) const
 base::State *&SparseDB::getDenseState(const DenseVertex &denseV)
 {
     return boltDB_->stateProperty_[denseV];
+}
+
+void SparseDB::displayDatabase(bool showVertices)
+{
+    OMPL_INFORM("Displaying Sparse database");
+
+    // Error check
+    if (getNumVertices() == 0 || getNumEdges() == 0)
+    {
+        OMPL_ERROR("Unable to show database because no vertices/edges available");
+        exit(-1);
+    }
+
+    if (showVertices)
+    {
+        // Loop through each vertex
+        std::size_t count = 0;
+        std::size_t debugFrequency = getNumVertices() / 10;
+        std::cout << "Displaying database: " << std::flush;
+        foreach (SparseVertex v, boost::vertices(g_))
+        {
+            // Check for null states
+            if (getSparseStateConst(v))
+            {
+                visual_->viz2StateCallback(getSparseStateConst(v), 6, 1);
+            }
+            else
+                OMPL_WARN("Null sparse state found on vertex %u", v);
+
+            // Prevent cache from getting too big
+            if (count % debugFrequency == 0)
+            {
+                std::cout << std::fixed << std::setprecision(0)
+                          << (static_cast<double>(count + 1) / getNumVertices()) * 100.0 << "% " << std::flush;
+                visual_->viz2TriggerCallback();
+            }
+            count++;
+        }
+        std::cout << std::endl;
+    }
+    else
+    {
+        // Loop through each edge
+        std::size_t count = 0;
+        std::size_t debugFrequency = getNumEdges() / 10;
+        std::cout << "Displaying database: " << std::flush;
+        foreach (SparseEdge e, boost::edges(g_))
+        {
+            // Add edge
+            const SparseVertex &v1 = boost::source(e, g_);
+            const SparseVertex &v2 = boost::target(e, g_);
+
+            // Visualize
+            visual_->viz2EdgeCallback(getSparseStateConst(v1), getSparseStateConst(v2), edgeWeightPropertySparse_[e]);
+
+            // Prevent cache from getting too big
+            if (count % debugFrequency == 0)
+            {
+                std::cout << std::fixed << std::setprecision(0)
+                          << (static_cast<double>(count + 1) / getNumEdges()) * 100.0 << "% " << std::flush;
+                visual_->viz2TriggerCallback();
+            }
+
+            count++;
+        }
+        std::cout << std::endl;
+    }
+
+    // Publish remaining edges
+    visual_->viz2TriggerCallback();
 }
 
 }  // namespace bolt

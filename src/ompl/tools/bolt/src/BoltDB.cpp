@@ -206,8 +206,6 @@ void otb::BoltDB::freeMemory()
 
 bool otb::BoltDB::setup()
 {
-    OMPL_INFORM("BoltDB::setup()");
-
     if (!sampler_)
         sampler_ = si_->allocValidStateSampler();
 
