@@ -177,6 +177,7 @@ SparseDB::SparseDB(base::SpaceInformationPtr si, BoltDB *boltDB, VisualizerPtr v
   , visualizeSparsCreation_(false)
   , visualizeDenseRepresentatives_(false)
   , visualizeAstarSpeed_(0.1)
+  , sparseCreationInsertionOrder_(0)
 {
     // Add search state
     initializeQueryState();
@@ -354,9 +355,19 @@ void SparseDB::clearEdgeCollisionStates()
 void SparseDB::createSPARS()
 {
     // Get the ordering to insert vertices
-    std::vector<DenseVertex> vertexInsertionOrder;
-    getPopularityOrder(vertexInsertionOrder);  // Create SPARs graph in order of popularity
-    // getDefaultOrder(vertexInsertionOrder);
+    std::vector<WeightedVertex> vertexInsertionOrder;
+
+    if (sparseCreationInsertionOrder_ == 0)
+        getPopularityOrder(vertexInsertionOrder);  // Create SPARs graph in order of popularity
+    else if (sparseCreationInsertionOrder_ == 1)
+        getDefaultOrder(vertexInsertionOrder);
+    else if (sparseCreationInsertionOrder_ == 2)
+        getRandomOrder(vertexInsertionOrder);
+    else
+    {
+        OMPL_ERROR("Unknown insertion order method");
+        exit(-1);
+    }
 
     // Limit amount of time generating TODO(davetcoleman): remove this feature
     double seconds = 1000;
@@ -384,8 +395,18 @@ void SparseDB::createSPARS()
             double seconds = 1000;
             ob::PlannerTerminationCondition ptc = ob::timedPlannerTerminationCondition(seconds, 0.1);
 
+            // Customize the sparse delta fraction
+            // if (!secondSparseInsertionAttempt_)
+            // {
+            //     std::size_t minDelta = 2;
+            //     std::size_t maxDelta = 6;
+            //     double invertedPopularity = 100 - vertexInsertionOrder[i].weight_;
+            //     sparseDelta_ = invertedPopularity * (maxDelta - minDelta) / 100.0 + minDelta;
+            //     OMPL_INFORM("sparseDelta_ is now %f", sparseDelta_);
+            // }
+
             // Run SPARS checks
-            if (!addStateToRoadmap(ptc, vertexInsertionOrder[i]))
+            if (!addStateToRoadmap(ptc, vertexInsertionOrder[i].v_))
             {
                 // std::cout << "Failed AGAIN to add state to roadmap------" << std::endl;
             }
@@ -409,7 +430,7 @@ void SparseDB::createSPARS()
             secondSparseInsertionAttempt_ = true;
         }
 
-        bool debugOverRideJustTwice = true;
+        bool debugOverRideJustTwice = false;
         if (debugOverRideJustTwice && loopAttempt == 2)
         {
             OMPL_WARN("Only attempting to add nodes twice for speed");
@@ -426,9 +447,9 @@ void SparseDB::createSPARS()
     OMPL_INFORM("Checking remaining vertices for 4th critera test");
     for (std::size_t i = 0; i < vertexInsertionOrder.size(); ++i)
     {
-        if (!checkAsymptoticOptimal(vertexInsertionOrder[i], coutIndent + 4))
+        if (!checkAsymptoticOptimal(vertexInsertionOrder[i].v_, coutIndent + 4))
         {
-            std::cout << "Vertex " << vertexInsertionOrder[i] << " failed asymptotic optimal test " << std::endl;
+            std::cout << "Vertex " << vertexInsertionOrder[i].v_ << " failed asymptotic optimal test " << std::endl;
         }
     }
     */
@@ -444,6 +465,35 @@ void SparseDB::createSPARS()
     OMPL_INFORM("Created SPARS graph:");
     OMPL_INFORM("  Vertices:  %u", getNumVertices());
     OMPL_INFORM("  Edges:  %u", getNumEdges());
+
+    std::size_t numSets = getDisjointSets();
+    if (numSets > 1)
+    {
+        OMPL_ERROR("  Disjoint sets: %u", numSets);
+        getDisjointSets(true); // show in verbose mode
+        exit(-1);
+    }
+    else
+        OMPL_INFORM("  Disjoint sets: %u", numSets);
+}
+
+std::size_t SparseDB::getDisjointSets(bool verbose)
+{
+    std::size_t numSets = 0;
+    foreach (SparseVertex v, boost::vertices(g_))
+    {
+        // Do not count the search vertex within the sets
+        if (v == queryVertex_)
+            continue;
+
+        if (boost::get(boost::get(boost::vertex_predecessor, g_), v) == v)
+        {
+            if (verbose)
+                OMPL_INFORM("Disjoint set: %u", v);
+            ++numSets;
+        }
+    }
+    return numSets;
 }
 
 bool SparseDB::findSparseRepresentatives()
@@ -517,7 +567,7 @@ bool SparseDB::findSparseRepresentatives()
     return true;
 }
 
-bool SparseDB::getPopularityOrder(std::vector<DenseVertex> &vertexInsertionOrder)
+bool SparseDB::getPopularityOrder(std::vector<WeightedVertex> &vertexInsertionOrder)
 {
     bool verbose = false;
 
@@ -529,7 +579,7 @@ bool SparseDB::getPopularityOrder(std::vector<DenseVertex> &vertexInsertionOrder
     }
 
     // Sort the verticies by popularity in a queue
-    std::priority_queue<BoltDB::WeightedVertex, std::vector<BoltDB::WeightedVertex>, BoltDB::CompareWeightedVertex>
+    std::priority_queue<WeightedVertex, std::vector<WeightedVertex>, CompareWeightedVertex>
         pqueue;
 
     // Loop through each popular edge in the dense graph
@@ -551,7 +601,7 @@ bool SparseDB::getPopularityOrder(std::vector<DenseVertex> &vertexInsertionOrder
         }
         if (verbose)
             std::cout << "  Total popularity: " << popularity << std::endl;
-        pqueue.push(BoltDB::WeightedVertex(v, popularity));
+        pqueue.push(WeightedVertex(v, popularity));
     }
 
     // Remember which one was the largest
@@ -560,12 +610,15 @@ bool SparseDB::getPopularityOrder(std::vector<DenseVertex> &vertexInsertionOrder
     // Convert pqueue into vector
     while (!pqueue.empty())  // Output the vertices in order
     {
-        vertexInsertionOrder.push_back(pqueue.top().v_);
+        vertexInsertionOrder.push_back(pqueue.top());
+
+        // Modify the weight to be a percentage of the max weight
+        const double weightPercent = pqueue.top().weight_ / largestWeight * 100.0;
+        vertexInsertionOrder.back().weight_ = weightPercent;
 
         // Visualize
         if (visualizeSparsCreation_)
         {
-            const double weightPercent = pqueue.top().weight_ / largestWeight * 100.0;
             // std::cout << "  Visualizing vertex " << v << " with popularity " << weightPercent
             //<< " queue remaining size " << pqueue.size() << std::endl;
             visual_->viz1StateCallback(boltDB_->stateProperty_[pqueue.top().v_], /*mode=*/7, weightPercent);
@@ -580,7 +633,7 @@ bool SparseDB::getPopularityOrder(std::vector<DenseVertex> &vertexInsertionOrder
     return true;
 }
 
-bool SparseDB::getDefaultOrder(std::vector<DenseVertex> &vertexInsertionOrder)
+bool SparseDB::getDefaultOrder(std::vector<WeightedVertex> &vertexInsertionOrder)
 {
     bool verbose = false;
     double largestWeight = -1 * std::numeric_limits<double>::infinity();
@@ -607,29 +660,64 @@ bool SparseDB::getDefaultOrder(std::vector<DenseVertex> &vertexInsertionOrder)
             std::cout << "  Total popularity: " << popularity << std::endl;
 
         // Record
-        vertexInsertionOrder.push_back(v);
-        weights.push_back(popularity);
+        vertexInsertionOrder.push_back(WeightedVertex(v, popularity));
 
         // Track largest weight
         if (popularity > largestWeight)
             largestWeight = popularity;
     }
 
-    // Visualize vertices
-    if (visualizeSparsCreation_)
+    // Update the weights
+    foreach (WeightedVertex wv, vertexInsertionOrder)
     {
-        for (std::size_t i = 0; i < vertexInsertionOrder.size(); ++i)
+        // Modify the weight to be a percentage of the max weight
+        const double weightPercent = wv.weight_ / largestWeight * 100.0;
+        wv.weight_ = weightPercent;
+
+        // Visualize vertices
+        if (visualizeSparsCreation_)
         {
-            const double weightPercent = weights[i] / largestWeight * 100.0;
-            // std::cout << "  Visualizing vertex " << v << " with popularity " << weightPercent
-            //<< " queue remaining size " << pqueue.size() << std::endl;
-            visual_->viz1StateCallback(boltDB_->stateProperty_[vertexInsertionOrder[i]], /*mode=*/7, weightPercent);
+            visual_->viz1StateCallback(boltDB_->stateProperty_[wv.v_], /*mode=*/7, weightPercent);
         }
     }
+
     visual_->viz1TriggerCallback();
     usleep(0.01 * 1000000);
 
     return true;
+}
+
+bool SparseDB::getRandomOrder(std::vector<WeightedVertex> &vertexInsertionOrder)
+{
+    std::vector<WeightedVertex> defaultVertexInsertionOrder;
+    getDefaultOrder(defaultVertexInsertionOrder);
+
+    for (std::size_t i = 0; i < defaultVertexInsertionOrder.size(); ++i)
+    {
+        // Choose a random vertex to pick out of default structure
+        int randVertex = iRand(0, defaultVertexInsertionOrder.size() - 1);
+        std::cout << "Choose: " << randVertex << std::endl;
+        assert(randVertex < defaultVertexInsertionOrder.size());
+
+        // Copy random vertex to new structure
+        vertexInsertionOrder.push_back(defaultVertexInsertionOrder[randVertex]);
+
+        // Delete that vertex
+        defaultVertexInsertionOrder.erase(defaultVertexInsertionOrder.begin() + randVertex);
+        randVertex--;
+    }
+}
+
+int SparseDB::iRand(int min, int max)
+{
+  int n = max - min + 1;
+  int remainder = RAND_MAX % n;
+  int x;
+  do
+  {
+    x = rand();
+  } while (x >= RAND_MAX - remainder);
+  return min + x % n;
 }
 
 bool SparseDB::addStateToRoadmap(const base::PlannerTerminationCondition &ptc, DenseVertex denseV)
@@ -1171,6 +1259,7 @@ SparseVertex SparseDB::addVertex(DenseVertex denseV, const GuardType &type)
         visual_->viz2StateCallback(getSparseState(v), /*mode=*/4, sparseDelta_);
         visual_->viz2TriggerCallback();
         usleep(0.01 * 1000000);
+        //usleep(0.1 * 1000000);
     }
 
     return v;

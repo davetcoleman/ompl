@@ -276,13 +276,38 @@ typedef boost::graph_traits<DenseGraph>::vertex_descriptor DenseVertex;
 typedef boost::graph_traits<DenseGraph>::edge_descriptor DenseEdge;
 
 /** \brief Internal representation of a dense path */
-typedef std::deque<base::State*> DensePath;
+typedef std::deque<base::State *> DensePath;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // Typedefs for property maps
 
 /** \brief Access map that stores the lazy collision checking status of each edge */
 typedef boost::property_map<DenseGraph, edge_collision_state_t>::type DenseEdgeCollisionStateMap;
+
+////////////////////////////////////////////////////////////////////////////////////////
+/** \brief Custom storage class */
+class WeightedVertex
+{
+  public:
+    WeightedVertex(DenseVertex v, double weight) : v_(v), weight_(weight)
+    {
+    }
+
+    DenseVertex v_;
+    double weight_;
+};
+
+    /** \brief Custom comparator class */
+    class CompareWeightedVertex
+    {
+      public:
+        bool operator()(WeightedVertex a, WeightedVertex b)
+        {
+            return a.weight_ < b.weight_;  // TODO(davetcoleman): which direction should the sign go?
+        }
+    };
+
+
 
 }  // namespace bolt
 }  // namespace tools

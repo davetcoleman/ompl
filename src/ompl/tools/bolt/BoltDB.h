@@ -165,28 +165,6 @@ class BoltDB
         void examine_vertex(DenseVertex v, const DenseGraph& g) const;
     };
 
-    /** \brief Custom storage class */
-    class WeightedVertex
-    {
-      public:
-        WeightedVertex(DenseVertex v, double weight) : v_(v), weight_(weight)
-        {
-        }
-
-        DenseVertex v_;
-        double weight_;
-    };
-
-    /** \brief Custom comparator class */
-    class CompareWeightedVertex
-    {
-      public:
-        bool operator()(WeightedVertex a, WeightedVertex b)
-        {
-            return a.weight_ < b.weight_;  // TODO(davetcoleman): which direction should the sign go?
-        }
-    };
-
     ////////////////////////////////////////////////////////////////////////////////////////
     // BoltDB MEMBER FUNCTIONS
     ////////////////////////////////////////////////////////////////////////////////////////

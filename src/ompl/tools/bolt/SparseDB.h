@@ -224,8 +224,16 @@ class SparseDB
     /** \brief Create a SPARS graph from the discretized dense graph and its popularity metric */
     void createSPARS();
     bool findSparseRepresentatives();
-    bool getPopularityOrder(std::vector<DenseVertex>& vertexInsertionOrder);
-    bool getDefaultOrder(std::vector<DenseVertex>& vertexInsertionOrder);
+
+    /** \brief Helper for counting the number of disjoint sets in the sparse graph */
+    std::size_t getDisjointSets(bool verbose = false);
+
+    bool getPopularityOrder(std::vector<WeightedVertex>& vertexInsertionOrder);
+    bool getDefaultOrder(std::vector<WeightedVertex>& vertexInsertionOrder);
+    bool getRandomOrder(std::vector<WeightedVertex>& vertexInsertionOrder);
+
+    /** \brief Helper function for random integer creation */
+    int iRand(int min, int max);
 
     /* ----------------------------------------------------------------------------------------*/
     /** \brief SPARS-related functions */
@@ -308,6 +316,7 @@ class SparseDB
     /** \brief A path simplifier used to simplify dense paths added to S */
     geometric::PathSimplifierPtr psimp_;
 
+    /** \brief Special flag for tracking mode when inserting into sparse graph */
     bool secondSparseInsertionAttempt_;
 
   public:
@@ -335,6 +344,9 @@ class SparseDB
 
     /** \brief Visualization speed of astar search, num of seconds to show each vertex */
     double visualizeAstarSpeed_;
+
+    /** \brief Method for ordering of vertex insertion */
+    int sparseCreationInsertionOrder_;
 
 };  // end of class SparseDB
 
