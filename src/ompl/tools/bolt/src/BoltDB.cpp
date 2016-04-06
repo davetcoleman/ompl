@@ -126,15 +126,15 @@ otb::BoltDB::CustomAstarVisitor::CustomAstarVisitor(DenseVertex goal, BoltDB *pa
 void otb::BoltDB::CustomAstarVisitor::discover_vertex(DenseVertex v, const DenseGraph &) const
 {
     if (parent_->visualizeAstar_)
-        parent_->getVisual()->viz1StateCallback(parent_->stateProperty_[v], /*mode=*/1, 1);
+        parent_->getVisual()->viz4StateCallback(parent_->stateProperty_[v], /*mode=*/1, 1);
 }
 
 void otb::BoltDB::CustomAstarVisitor::examine_vertex(DenseVertex v, const DenseGraph &) const
 {
     if (parent_->visualizeAstar_)
     {
-        parent_->getVisual()->viz1StateCallback(parent_->stateProperty_[v], /*mode=*/5, 1);
-        parent_->getVisual()->viz1TriggerCallback();
+        parent_->getVisual()->viz4StateCallback(parent_->stateProperty_[v], /*mode=*/5, 1);
+        parent_->getVisual()->viz4TriggerCallback();
         usleep(parent_->visualizeAstarSpeed_ * 1000000);
     }
 
@@ -287,7 +287,7 @@ bool otb::BoltDB::load(const std::string &fileName)
     return true;
 }
 
-bool otb::BoltDB::postProcessPath(og::PathGeometric &solutionPath, double &insertionTime)
+bool otb::BoltDB::postProcessPath(og::PathGeometric &solutionPath)
 {
     bool verbose = false;
 
@@ -297,9 +297,6 @@ bool otb::BoltDB::postProcessPath(og::PathGeometric &solutionPath, double &inser
         OMPL_WARN("BoltDB: Saving is disabled so not adding path");
         return false;
     }
-
-    // Clear all visuals
-    // visual_->vizDBStateCallback(currentPathState, 0, 1);
 
     // Get starting state
     base::State *currentPathState = solutionPath.getStates()[0];
@@ -314,7 +311,7 @@ bool otb::BoltDB::postProcessPath(og::PathGeometric &solutionPath, double &inser
     // Visualize
     if (visualizeSnapPath_)
     {
-        visual_->viz1StateCallback(stateProperty_[prevGraphVertex], /*mode=*/1, 1);
+        visual_->viz5StateCallback(stateProperty_[prevGraphVertex], /*mode=*/1, 1);
     }
 
     // Create new path that is 'snapped' onto the roadmap
@@ -335,7 +332,7 @@ bool otb::BoltDB::postProcessPath(og::PathGeometric &solutionPath, double &inser
     // Visualize
     if (visualizeSnapPath_)
     {
-        visual_->viz1TriggerCallback();
+        visual_->viz5TriggerCallback();
         usleep(0.1 * 1000000);
     }
 
@@ -371,9 +368,9 @@ bool otb::BoltDB::postProcessPath(og::PathGeometric &solutionPath, double &inser
             OMPL_ERROR("No edge found on snapped path at index %u", vertexID);
             if (visualizeSnapPath_)
             {
-                visual_->viz2EdgeCallback(stateProperty_[roadmapPath[vertexID - 1]],
+                visual_->viz5EdgeCallback(stateProperty_[roadmapPath[vertexID - 1]],
                                           stateProperty_[roadmapPath[vertexID]], 0);
-                visual_->viz2TriggerCallback();
+                visual_->viz5TriggerCallback();
                 usleep(4 * 1000000);
             }
         }
@@ -394,7 +391,7 @@ bool otb::BoltDB::postProcessPath(og::PathGeometric &solutionPath, double &inser
             // Visualize
             if (visualizeSnapPath_)
             {
-                visual_->viz2EdgeCallback(stateProperty_[roadmapPath[vertexID - 1]],
+                visual_->viz5EdgeCallback(stateProperty_[roadmapPath[vertexID - 1]],
                                           stateProperty_[roadmapPath[vertexID]], 100);
             }
         }
@@ -403,7 +400,7 @@ bool otb::BoltDB::postProcessPath(og::PathGeometric &solutionPath, double &inser
     // Visualize
     if (visualizeSnapPath_)
     {
-        visual_->viz2TriggerCallback();
+        visual_->viz5TriggerCallback();
     }
 
     // Record this new addition
@@ -470,8 +467,8 @@ bool otb::BoltDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vector
             // Visualize nearby state
             if (visualizeSnapPath_)
             {
-                visual_->viz1StateCallback(stateProperty_[currGraphVertex], /*mode=*/1, 1);
-                visual_->viz1EdgeCallback(currentPathState, stateProperty_[currGraphVertex], 30);
+                visual_->viz5StateCallback(stateProperty_[currGraphVertex], /*mode=*/1, 1);
+                visual_->viz5EdgeCallback(currentPathState, stateProperty_[currGraphVertex], 30);
             }
 
             // Check for collision
@@ -481,7 +478,7 @@ bool otb::BoltDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vector
             if (visualizeSnapPath_)
             {
                 double color = isValid ? 0 : 60;
-                visual_->viz1EdgeCallback(stateProperty_[prevGraphVertex], stateProperty_[currGraphVertex], color);
+                visual_->viz5EdgeCallback(stateProperty_[prevGraphVertex], stateProperty_[currGraphVertex], color);
             }
         }
 
@@ -493,7 +490,7 @@ bool otb::BoltDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vector
             if (neighborID > 0)
             {
                 OMPL_WARN("Found case where double loop fixed the problem - loop %u", neighborID);
-                // visual_->viz1TriggerCallback();
+                // visual_->viz5TriggerCallback();
                 // usleep(6*1000000);
             }
             foundValidConnToPrevious = true;
@@ -539,7 +536,7 @@ bool otb::BoltDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vector
         // Visualize
         if (visualizeSnapPath_)
         {
-            visual_->viz1TriggerCallback();
+            visual_->viz5TriggerCallback();
             usleep(1 * 1000000);
         }
 
@@ -717,10 +714,10 @@ bool otb::BoltDB::astarSearch(const DenseVertex start, const DenseVertex goal, s
             if (v1 != v2)
             {
                 // std::cout << "Edge " << v1 << " to " << v2 << std::endl;
-                visual_->viz1EdgeCallback(stateProperty_[v1], stateProperty_[v2], 10);
+                visual_->viz4EdgeCallback(stateProperty_[v1], stateProperty_[v2], 10);
             }
         }
-        visual_->viz1TriggerCallback();
+        visual_->viz4TriggerCallback();
     }
 
     // Unload
@@ -1101,7 +1098,7 @@ void otb::BoltDB::generateGrid()
 
     // Display
     if (visualizeGridGeneration_)
-        visual_->vizDBTriggerCallback();
+        visual_->viz5TriggerCallback();
 
     // Mark the graph as ready to be saved
     graphUnsaved_ = true;
@@ -1136,8 +1133,8 @@ void otb::BoltDB::generateTaskSpace()
         // Visualize - only do this for 2/3D environments
         if (visualizeGridGeneration_)
         {
-            visual_->vizDBStateCallback(newState, 5, 1);  // Candidate node has already (just) been added
-            visual_->vizDBTriggerCallback();
+            visual_->viz5StateCallback(newState, 5, 1);  // Candidate node has already (just) been added
+            visual_->viz5TriggerCallback();
             usleep(0.005 * 1000000);
         }
     }
@@ -1169,10 +1166,10 @@ void otb::BoltDB::generateTaskSpace()
         // Visualize
         if (visualizeGridGeneration_)
         {
-            vizDBEdge(newE);
+            viz5Edge(newE);
             if (i % 100 == 0)
             {
-                visual_->vizDBTriggerCallback();
+                visual_->viz5TriggerCallback();
                 usleep(0.01 * 1000000);
             }
         }
@@ -1180,7 +1177,7 @@ void otb::BoltDB::generateTaskSpace()
 
     // Visualize
     if (visualizeGridGeneration_)
-        visual_->vizDBTriggerCallback();
+        visual_->viz5TriggerCallback();
 
     OMPL_INFORM("Done generating task space graph");
 }
@@ -1247,7 +1244,7 @@ void otb::BoltDB::generateEdges()
 
         // Clear all visuals
         // if (visualizeGridGeneration_)
-        //     visual_->vizDBStateCallback(stateProperty_[v1], 0, 1);
+        //     visual_->viz5StateCallback(stateProperty_[v1], 0, 1);
 
         // For each nearby vertex, add an edge
         std::size_t errorCheckNumSameVerticies = 0;
@@ -1267,7 +1264,7 @@ void otb::BoltDB::generateEdges()
 
             // Debug: display edge
             if (visualizeGridGeneration_)
-                visual_->vizDBEdgeCallback(stateProperty_[v1], stateProperty_[v2], 1);
+                visual_->viz5EdgeCallback(stateProperty_[v1], stateProperty_[v2], 1);
 
             // Check if these vertices already share an edge
             {
@@ -1295,7 +1292,7 @@ void otb::BoltDB::generateEdges()
 
         if (visualizeGridGeneration_)
         {
-            visual_->vizDBTriggerCallback();
+            visual_->viz5TriggerCallback();
             usleep(0.01 * 1000000);
         }
 
@@ -1346,10 +1343,10 @@ void otb::BoltDB::generateEdges()
         // Debug in Rviz
         if (visualizeGridGeneration_)
         {
-            visual_->vizDBEdgeCallback(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
+            visual_->viz5EdgeCallback(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
             if (errorCheckCounter % 100 == 0)
             {
-                visual_->vizDBTriggerCallback();
+                visual_->viz5TriggerCallback();
                 usleep(0.01 * 1000000);
             }
         }
@@ -1520,9 +1517,9 @@ void otb::BoltDB::recursiveDiscretization(std::vector<double> &values, std::size
             // Visualize
             if (visualizeGridGeneration_)
             {
-                visual_->vizDBStateCallback(nextDiscretizedState_, 5,
+                visual_->viz5StateCallback(nextDiscretizedState_, 5,
                                             1);  // Candidate node has already (just) been added
-                visual_->vizDBTriggerCallback();
+                visual_->viz5TriggerCallback();
                 usleep(0.005 * 1000000);
             }
 
@@ -1625,14 +1622,14 @@ void otb::BoltDB::displayDatabase(bool showVertices)
     {
         // Loop through each vertex
         std::size_t count = 0;
-        std::size_t debugFrequency = getNumVertices() / 10;
+        std::size_t debugFrequency = std::min(10000, static_cast<int>(getNumEdges() / 10));
         std::cout << "Displaying database: " << std::flush;
         foreach (DenseVertex v, boost::vertices(g_))
         {
             // Check for null states
             if (stateProperty_[v])
             {
-                visual_->vizDBStateCallback(stateProperty_[v], 6, 1);
+                visual_->viz1StateCallback(stateProperty_[v], 6, 1);
             }
 
             // Prevent cache from getting too big
@@ -1640,7 +1637,7 @@ void otb::BoltDB::displayDatabase(bool showVertices)
             {
                 std::cout << std::fixed << std::setprecision(0)
                           << (static_cast<double>(count + 1) / getNumVertices()) * 100.0 << "% " << std::flush;
-                visual_->vizDBTriggerCallback();
+                visual_->viz1TriggerCallback();
             }
             count++;
         }
@@ -1650,7 +1647,7 @@ void otb::BoltDB::displayDatabase(bool showVertices)
     {
         // Loop through each edge
         std::size_t count = 0;
-        std::size_t debugFrequency = getNumEdges() / 10;
+        std::size_t debugFrequency = std::min(10000, static_cast<int>(getNumEdges() / 10));
         std::cout << "Displaying database: " << std::flush;
         foreach (DenseEdge e, boost::edges(g_))
         {
@@ -1659,14 +1656,14 @@ void otb::BoltDB::displayDatabase(bool showVertices)
             const DenseVertex &v2 = boost::target(e, g_);
 
             // Visualize
-            visual_->vizDBEdgeCallback(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
+            visual_->viz1EdgeCallback(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
 
             // Prevent cache from getting too big
             if (count % debugFrequency == 0)
             {
                 std::cout << std::fixed << std::setprecision(0)
                           << (static_cast<double>(count + 1) / getNumEdges()) * 100.0 << "% " << std::flush;
-                visual_->vizDBTriggerCallback();
+                visual_->viz1TriggerCallback();
             }
 
             count++;
@@ -1675,7 +1672,7 @@ void otb::BoltDB::displayDatabase(bool showVertices)
     }
 
     // Publish remaining edges
-    visual_->vizDBTriggerCallback();
+    visual_->viz1TriggerCallback();
 }
 
 void otb::BoltDB::normalizeGraphEdgeWeights()
@@ -1854,9 +1851,9 @@ bool otb::BoltDB::addCartPath(std::vector<base::State *> path)
         // Visualize
         if (visualizeCartPath_)
         {
-            visual_->viz1EdgeCallback(path[i - 1], path[i], 0);
-            visual_->viz1StateCallback(path[i], /*mode=*/1, 1);
-            visual_->viz1TriggerCallback();
+            visual_->viz5EdgeCallback(path[i - 1], path[i], 0);
+            visual_->viz5StateCallback(path[i], /*mode=*/1, 1);
+            visual_->viz5TriggerCallback();
             usleep(0.001 * 1000000);
         }
     }
@@ -1906,16 +1903,16 @@ bool otb::BoltDB::connectStateToNeighborsAtLevel(const DenseVertex &fromVertex, 
         const double cost = (level == 0 ? 100 : 50);
         if (visualizeCartNeighbors_)
         {
-            visual_->viz1EdgeCallback(stateProperty_[v], stateProperty_[fromVertex], cost);
-            visual_->viz1StateCallback(stateProperty_[v], /*mode=*/1, 1);
-            visual_->viz1TriggerCallback();
+            visual_->viz5EdgeCallback(stateProperty_[v], stateProperty_[fromVertex], cost);
+            visual_->viz5StateCallback(stateProperty_[v], /*mode=*/1, 1);
+            visual_->viz5TriggerCallback();
             usleep(0.001 * 1000000);
         }
     }
 
     // Display ---------------------------------------
     if (visualizeCartNeighbors_)
-        visual_->viz1TriggerCallback();
+        visual_->viz5TriggerCallback();
 
     return true;
 }
@@ -1963,13 +1960,13 @@ void otb::BoltDB::getNeighborsAtLevel(const base::State *origState, const std::s
     }
 }
 
-void otb::BoltDB::vizDBEdge(DenseEdge &e)
+void otb::BoltDB::viz5Edge(DenseEdge &e)
 {
     const DenseVertex &v1 = boost::source(e, g_);
     const DenseVertex &v2 = boost::target(e, g_);
 
     // Visualize
-    visual_->vizDBEdgeCallback(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
+    visual_->viz5EdgeCallback(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
 }
 
 bool otb::BoltDB::checkTaskPathSolution(og::PathGeometric &path, ob::State *start, ob::State *goal)

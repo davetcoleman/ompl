@@ -191,10 +191,9 @@ class BoltDB
      * \brief Add a new solution path to our database. Des not actually save to file so
      *        experience will be lost if save() is not called
      * \param new path - must be non-const because will be interpolated
-     * \param returned insertion time to add to db
      * \return true on success
      */
-    bool postProcessPath(ompl::geometric::PathGeometric& solutionPath, double& insertionTime);
+    bool postProcessPath(ompl::geometric::PathGeometric& solutionPath);
 
     /**
      * \brief Call itself recursively for each point in the trajectory, looking for vertices on the graph to connect to
@@ -403,7 +402,7 @@ class BoltDB
                              std::vector<DenseVertex>& neighbors);
 
     /** \brief Shortcut for visualizing an edge */
-    void vizDBEdge(DenseEdge& e);
+    void viz5Edge(DenseEdge& e);
 
     /** \brief Error checking function to ensure solution has correct task path/level changes */
     bool checkTaskPathSolution(geometric::PathGeometric& path, base::State* start, base::State* goal);

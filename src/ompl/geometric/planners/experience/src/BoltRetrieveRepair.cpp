@@ -63,6 +63,10 @@ BoltRetrieveRepair::BoltRetrieveRepair(const base::SpaceInformationPtr &si, cons
   , smoothingEnabled_(false)  // makes understanding recalled paths more difficult if enabled
   , verbose_(true)
 {
+    // Copy in needed objects
+    sparseDB_ = boltDB_->getSparseDB();
+    visual_ = boltDB_->visual_;
+
     specs_.approximateSolutions = true;
     specs_.directed = true;
 
@@ -104,9 +108,9 @@ base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCond
     double approxdif = std::numeric_limits<double>::infinity();
 
     // Check if the database is empty
-    if (boltDB_->isEmpty())
+    if (sparseDB_->isEmpty())
     {
-        OMPL_INFORM("Experience database is empty so unable to run BoltRetrieveRepair algorithm.");
+        OMPL_INFORM("Sparse experience database is empty so unable to run BoltRetrieveRepair algorithm.");
 
         return base::PlannerStatus::ABORT;
     }
@@ -230,7 +234,7 @@ bool BoltRetrieveRepair::getPathOffGraph(const base::State *start, const base::S
     // Get neighbors near start and goal. Note: potentially they are not *visible* - will test for this later
 
     // Start
-    int level = boltDB_->getTaskLevel(start);
+    int level = 0; //boltDB_->getTaskLevel(start);
     OMPL_INFORM("  Looking for a node near the problem start on level %i", level);
     if (!findGraphNeighbors(start, startVertexCandidateNeighbors_, level))
     {
@@ -241,7 +245,7 @@ bool BoltRetrieveRepair::getPathOffGraph(const base::State *start, const base::S
         OMPL_INFORM("  Found %d nodes near start", startVertexCandidateNeighbors_.size());
 
     // Goal
-    level = boltDB_->getTaskLevel(goal);
+    level = 0; //boltDB_->getTaskLevel(goal);
     OMPL_INFORM("  Looking for a node near the problem goal on level %i", level);
     if (!findGraphNeighbors(goal, goalVertexCandidateNeighbors_, level))
     {
@@ -278,16 +282,16 @@ bool BoltRetrieveRepair::getPathOffGraph(const base::State *start, const base::S
     return result;
 }
 
-bool BoltRetrieveRepair::getPathOnGraph(const std::vector<DenseVertex> &candidateStarts,
-                                        const std::vector<DenseVertex> &candidateGoals,
+bool BoltRetrieveRepair::getPathOnGraph(const std::vector<SparseVertex> &candidateStarts,
+                                        const std::vector<SparseVertex> &candidateGoals,
                                         const base::State *actualStart, const base::State *actualGoal,
                                         og::PathGeometric &geometricSolution,
                                         const base::PlannerTerminationCondition &ptc)
 {
     // Try every combination of nearby start and goal pairs
-    BOOST_FOREACH (DenseVertex start, candidateStarts)
+    BOOST_FOREACH (SparseVertex start, candidateStarts)
     {
-        if (actualStart == boltDB_->stateProperty_[start])
+        if (actualStart == sparseDB_->getSparseStateConst(start))
         {
             OMPL_ERROR("Comparing same start state");
             exit(-1);  // just curious if this ever happens, no need to actually exit
@@ -295,23 +299,23 @@ bool BoltRetrieveRepair::getPathOnGraph(const std::vector<DenseVertex> &candidat
         }
 
         // Check if this start is visible from the actual start
-        if (!si_->checkMotion(actualStart, boltDB_->stateProperty_[start]))
+        if (!si_->checkMotion(actualStart, sparseDB_->getSparseStateConst(start)))
         {
             if (verbose_)
             {
                 OMPL_WARN("FOUND START CANDIDATE THAT IS NOT VISIBLE ");
 
-                // vizStateCallback(boltDB_->stateProperty_[start], 3, 1);
-                // vizEdgeCallback(actualStart, boltDB_->stateProperty_[start], 100);
-                // vizTriggerCallback();
+                // visual_->viz5StateCallback(sparseDB_->getSparseStateConst(start), 3, 1);
+                // visual_->viz5EdgeCallback(actualStart, sparseDB_->getSparseStateConst(start), 100);
+                // visual_->viz5TriggerCallback();
                 // usleep(1000000);
             }
             continue;  // this is actually not visible
         }
 
-        BOOST_FOREACH (DenseVertex goal, candidateGoals)
+        BOOST_FOREACH (SparseVertex goal, candidateGoals)
         {
-            if (actualGoal == boltDB_->stateProperty_[goal])
+            if (actualGoal == sparseDB_->getSparseStateConst(goal))
             {
                 OMPL_ERROR("Comparing same goal state");
                 continue;
@@ -319,7 +323,7 @@ bool BoltRetrieveRepair::getPathOnGraph(const std::vector<DenseVertex> &candidat
 
             if (verbose_)
                 OMPL_INFORM("    foreach_goal: Checking motion from  %d to %d", actualGoal,
-                            boltDB_->stateProperty_[goal]);
+                            sparseDB_->getSparseStateConst(goal));
 
             // Check if our planner is out of time
             if (ptc == true)
@@ -329,15 +333,15 @@ bool BoltRetrieveRepair::getPathOnGraph(const std::vector<DenseVertex> &candidat
             }
 
             // Check if this goal is visible from the actual goal
-            if (!si_->checkMotion(actualGoal, boltDB_->stateProperty_[goal]))
+            if (!si_->checkMotion(actualGoal, sparseDB_->getSparseStateConst(goal)))
             {
                 if (verbose_)
                 {
                     OMPL_WARN("FOUND GOAL CANDIDATE THAT IS NOT VISIBLE! ");
 
-                    // vizStateCallback(boltDB_->stateProperty_[goal], 3, 1);
-                    // vizEdgeCallback(actualGoal, boltDB_->stateProperty_[goal], 100);
-                    // vizTriggerCallback();
+                    // visual_->viz5StateCallback(sparseDB_->getSparseStateConst(goal), 3, 1);
+                    // visual_->viz5EdgeCallback(actualGoal, sparseDB_->getSparseStateConst(goal), 100);
+                    // visual_->viz5TriggerCallback();
                     // usleep(1000000);
                 }
 
@@ -347,6 +351,9 @@ bool BoltRetrieveRepair::getPathOnGraph(const std::vector<DenseVertex> &candidat
             // Repeatidly search through graph for connection then check for collisions then repeat
             if (lazyCollisionSearch(start, goal, actualStart, actualGoal, geometricSolution, ptc))
             {
+                // All save trajectories should be at least 1 state long, then we append the start and goal states, for min of 3
+                assert(geometricSolution.getStateCount() >= 3);
+
                 // Found a path
                 return true;
             }
@@ -359,19 +366,16 @@ bool BoltRetrieveRepair::getPathOnGraph(const std::vector<DenseVertex> &candidat
         }  // foreach
     }      // foreach
 
-    // All save trajectories should be at least 1 state long, then we append the start and goal states, for min of 3
-    assert(geometricSolution.getStateCount() >= 3);
-
     return false;
 }
 
-bool BoltRetrieveRepair::lazyCollisionSearch(const DenseVertex &start, const DenseVertex &goal,
+bool BoltRetrieveRepair::lazyCollisionSearch(const SparseVertex &start, const SparseVertex &goal,
                                              const base::State *actualStart, const base::State *actualGoal,
                                              og::PathGeometric &geometricSolution,
                                              const base::PlannerTerminationCondition &ptc)
 {
     // Vector to store candidate paths in before they are converted to PathPtrs
-    std::vector<DenseVertex> vertexPath;
+    std::vector<SparseVertex> vertexPath;
 
     // Make sure that the start and goal aren't so close together that they find the same vertex
     if (start == goal)
@@ -389,24 +393,24 @@ bool BoltRetrieveRepair::lazyCollisionSearch(const DenseVertex &start, const Den
     // Error check all states are non-NULL
     assert(actualStart);
     assert(actualGoal);
-    assert(boltDB_->stateProperty_[start]);
-    assert(boltDB_->stateProperty_[goal]);
+    assert(sparseDB_->getSparseStateConst(start));
+    assert(sparseDB_->getSparseStateConst(goal));
 
     // Visualize start vertex
     const bool visualize = false;
     if (visualize)
     {
       OMPL_INFORM("viz start -----------------------------");
-      vizStateCallback(boltDB_->stateProperty_[start], 4, 1);
-      vizEdgeCallback(actualStart, boltDB_->stateProperty_[start], 30);
-      vizTriggerCallback();
+      visual_->viz5StateCallback(sparseDB_->getSparseStateConst(start), 4, 1);
+      visual_->viz5EdgeCallback(actualStart, sparseDB_->getSparseStateConst(start), 30);
+      visual_->viz5TriggerCallback();
       usleep(5 * 1000000);
 
       // Visualize goal vertex
       OMPL_INFORM("viz goal ------------------------------");
-      vizStateCallback(boltDB_->stateProperty_[goal], 4, 1);
-      vizEdgeCallback(actualGoal, boltDB_->stateProperty_[goal], 0);
-      vizTriggerCallback();
+      visual_->viz5StateCallback(sparseDB_->getSparseStateConst(goal), 4, 1);
+      visual_->viz5EdgeCallback(actualGoal, sparseDB_->getSparseStateConst(goal), 0);
+      visual_->viz5TriggerCallback();
       usleep(5 * 1000000);
     }
 
@@ -426,7 +430,7 @@ bool BoltRetrieveRepair::lazyCollisionSearch(const DenseVertex &start, const Den
         }
 
         // Attempt to find a solution from start to goal
-        if (!boltDB_->astarSearch(start, goal, vertexPath))
+        if (!sparseDB_->astarSearch(start, goal, vertexPath))
         {
             OMPL_INFORM("        unable to construct solution between start and goal using astar");
 
@@ -459,7 +463,7 @@ bool BoltRetrieveRepair::lazyCollisionSearch(const DenseVertex &start, const Den
     return false;
 }
 
-bool BoltRetrieveRepair::lazyCollisionCheck(std::vector<DenseVertex> &vertexPath,
+bool BoltRetrieveRepair::lazyCollisionCheck(std::vector<SparseVertex> &vertexPath,
                                             const base::PlannerTerminationCondition &ptc)
 {
     OMPL_DEBUG("Starting lazy collision checking");
@@ -467,8 +471,8 @@ bool BoltRetrieveRepair::lazyCollisionCheck(std::vector<DenseVertex> &vertexPath
     bool hasInvalidEdges = false;
 
     // Initialize
-    DenseVertex fromVertex = vertexPath[0];
-    DenseVertex toVertex;
+    SparseVertex fromVertex = vertexPath[0];
+    SparseVertex toVertex;
 
     // Loop through every pair of states and make sure path is valid.
     for (std::size_t toID = 1; toID < vertexPath.size(); ++toID)
@@ -483,29 +487,29 @@ bool BoltRetrieveRepair::lazyCollisionCheck(std::vector<DenseVertex> &vertexPath
             return false;
         }
 
-        DenseEdge thisEdge = boost::edge(fromVertex, toVertex, boltDB_->g_).first;
+        SparseEdge thisEdge = boost::edge(fromVertex, toVertex, sparseDB_->g_).first;
 
         // Has this edge already been checked before?
-        if (boltDB_->edgeCollisionStateProperty_[thisEdge] == NOT_CHECKED)
+        if (sparseDB_->edgeCollisionStatePropertySparse_[thisEdge] == NOT_CHECKED)
         {
             // Check path between states
-            if (!si_->checkMotion(boltDB_->stateProperty_[fromVertex], boltDB_->stateProperty_[toVertex]))
+            if (!si_->checkMotion(sparseDB_->getSparseStateConst(fromVertex), sparseDB_->getSparseStateConst(toVertex)))
             {
                 // Path between (from, to) states not valid, disable the edge
                 OMPL_INFORM("  DISABLING EDGE from vertex %f to vertex %f", fromVertex, toVertex);
 
                 // Disable edge
-                boltDB_->edgeCollisionStateProperty_[thisEdge] = IN_COLLISION;
+                sparseDB_->edgeCollisionStatePropertySparse_[thisEdge] = IN_COLLISION;
             }
             else
             {
                 // Mark edge as free so we no longer need to check for collision
-                boltDB_->edgeCollisionStateProperty_[thisEdge] = FREE;
+                sparseDB_->edgeCollisionStatePropertySparse_[thisEdge] = FREE;
             }
         }
 
         // Check final result
-        if (boltDB_->edgeCollisionStateProperty_[thisEdge] == IN_COLLISION)
+        if (sparseDB_->edgeCollisionStatePropertySparse_[thisEdge] == IN_COLLISION)
         {
             // Remember that this path is no longer valid, but keep checking remainder of path edges
             hasInvalidEdges = true;
@@ -521,7 +525,7 @@ bool BoltRetrieveRepair::lazyCollisionCheck(std::vector<DenseVertex> &vertexPath
     return !hasInvalidEdges;
 }
 
-bool BoltRetrieveRepair::findGraphNeighbors(const base::State *state, std::vector<DenseVertex> &graphNeighborhood,
+bool BoltRetrieveRepair::findGraphNeighbors(const base::State *state, std::vector<SparseVertex> &graphNeighborhood,
                                             int requiredLevel)
 {
     // Benchmark runtime
@@ -532,7 +536,7 @@ bool BoltRetrieveRepair::findGraphNeighbors(const base::State *state, std::vecto
 
     // Setup search by getting a non-const version of the focused state
     base::State *stateCopy = si_->cloneState(state);
-    boltDB_->stateProperty_[boltDB_->queryVertex_] = stateCopy;
+    sparseDB_->getSparseState(sparseDB_->queryVertex_) = stateCopy;
 
     // Search
     double find_nearest_k_neighbors;
@@ -540,10 +544,10 @@ bool BoltRetrieveRepair::findGraphNeighbors(const base::State *state, std::vecto
         find_nearest_k_neighbors = 10;
     else
         find_nearest_k_neighbors = 30;
-    boltDB_->nn_->nearestK(boltDB_->queryVertex_, find_nearest_k_neighbors, graphNeighborhood);
+    sparseDB_->nn_->nearestK(sparseDB_->queryVertex_, find_nearest_k_neighbors, graphNeighborhood);
 
     // Reset
-    boltDB_->stateProperty_[boltDB_->queryVertex_] = NULL;
+    sparseDB_->getSparseState(sparseDB_->queryVertex_) = NULL;
 
     // Filter neighbors based on level
     if (requiredLevel >= 0)
@@ -564,14 +568,14 @@ bool BoltRetrieveRepair::findGraphNeighbors(const base::State *state, std::vecto
     return result;
 }
 
-bool BoltRetrieveRepair::removeVerticesNotOnLevel(std::vector<DenseVertex> &graphNeighborhood, int level)
+bool BoltRetrieveRepair::removeVerticesNotOnLevel(std::vector<SparseVertex> &graphNeighborhood, int level)
 {
     std::size_t original_size = graphNeighborhood.size();
 
     // Remove edges based on layer
     for (std::size_t i = 0; i < graphNeighborhood.size(); ++i)
     {
-        const DenseVertex &nearVertex = graphNeighborhood[i];
+        const SparseVertex &nearVertex = graphNeighborhood[i];
 
         // Make sure state is on correct level
         if (boltDB_->getTaskLevel(nearVertex) != static_cast<std::size_t>(level))
@@ -590,7 +594,7 @@ bool BoltRetrieveRepair::removeVerticesNotOnLevel(std::vector<DenseVertex> &grap
     return true;
 }
 
-bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<DenseVertex> &vertexPath,
+bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<SparseVertex> &vertexPath,
                                                       const base::State *actualStart, const base::State *actualGoal,
                                                       og::PathGeometric &geometricSolution)
 {
@@ -601,7 +605,7 @@ bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<DenseVertex> &
     //og::PathGeometric *pathGeometric = new og::PathGeometric(si_);
 
     // Add original start if it is different than the first state
-    if (actualStart != boltDB_->stateProperty_[vertexPath.back()])
+    if (actualStart != sparseDB_->getSparseStateConst(vertexPath.back()))
     {
         geometricSolution.append(actualStart);
     }
@@ -617,7 +621,7 @@ bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<DenseVertex> &
     // Reverse the vertexPath and convert to state path
     for (std::size_t i = vertexPath.size(); i > 0; --i)
     {
-        geometricSolution.append(boltDB_->stateProperty_[vertexPath[i - 1]]);
+        geometricSolution.append(sparseDB_->getSparseStateConst(vertexPath[i - 1]));
 
         // Add the edge status
         if (i > 1)  // skip the last vertex (its reversed)
@@ -629,27 +633,27 @@ bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<DenseVertex> &
                 exit(-1);
             }
 
-            DenseEdge edge = boost::edge(vertexPath[i - 1], vertexPath[i - 2], boltDB_->g_).first;
+            SparseEdge edge = boost::edge(vertexPath[i - 1], vertexPath[i - 2], sparseDB_->g_).first;
 
             /* This functionality has moved to BoltDB
-            if (boltDB_->getPopularityBiasEnabled())
+            if (sparseDB_->getPopularityBiasEnabled())
             {
                 // reduce cost of this edge because it was just used
                 static const double REDUCTION_AMOUNT = 10;
                 std::cout << "Previous edge weight for " << i << " of edge " << edge << std::endl;
-                std::cout << "    is " << boltDB_->edgeWeightProperty_[edge];
-                boltDB_->edgeWeightProperty_[edge] =
-                    std::max(boltDB_->edgeWeightProperty_[edge] - REDUCTION_AMOUNT, 0.0);
-                std::cout << " new: " << boltDB_->edgeWeightProperty_[edge] << std::endl;
+                std::cout << "    is " << sparseDB_->edgeWeightProperty_[edge];
+                sparseDB_->edgeWeightProperty_[edge] =
+                    std::max(sparseDB_->edgeWeightProperty_[edge] - REDUCTION_AMOUNT, 0.0);
+                std::cout << " new: " << sparseDB_->edgeWeightProperty_[edge] << std::endl;
             }
             */
 
             // Check if any edges in path are not free (then it an approximate path)
-            if (boltDB_->edgeCollisionStateProperty_[edge] == IN_COLLISION)
+            if (sparseDB_->edgeCollisionStatePropertySparse_[edge] == IN_COLLISION)
             {
                 OMPL_ERROR("Found invalid edge / approximate solution - how did this happen?");
             }
-            else if (boltDB_->edgeCollisionStateProperty_[edge] == NOT_CHECKED)
+            else if (sparseDB_->edgeCollisionStatePropertySparse_[edge] == NOT_CHECKED)
             {
                 OMPL_ERROR("A chosen path has an edge that has not been checked for collision. This should not happen");
             }
@@ -657,26 +661,26 @@ bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<DenseVertex> &
     }
 
     // Add original goal if it is different than the last state
-    if (actualGoal != boltDB_->stateProperty_[vertexPath.front()])
+    if (actualGoal != sparseDB_->getSparseStateConst(vertexPath.front()))
     {
         geometricSolution.append(actualGoal);
     }
 
-    if (boltDB_->getPopularityBiasEnabled())
-    {
-        // Ensure graph doesn't get too popular
-        boltDB_->normalizeGraphEdgeWeights();
+    // if (sparseDB_->getPopularityBiasEnabled())
+    // {
+    //     // Ensure graph doesn't get too popular
+    //     sparseDB_->normalizeGraphEdgeWeights();
 
-        // Mark as needing to be saved to file
-        boltDB_->graphUnsaved_ = true;
-    }
+    //     // Mark as needing to be saved to file
+    //     sparseDB_->graphUnsaved_ = true;
+    // }
 
     return true;
 }
 
 bool BoltRetrieveRepair::canConnect(const base::State *randomState, const base::PlannerTerminationCondition &ptc)
 {
-    std::vector<DenseVertex> candidateNeighbors;
+    std::vector<SparseVertex> candidateNeighbors;
 
     // Find neighbors to rand state
     OMPL_INFORM("Looking for a node near the random state");
@@ -689,10 +693,10 @@ bool BoltRetrieveRepair::canConnect(const base::State *randomState, const base::
 
     // Try every combination of nearby start and goal pairs
     std::size_t count = 0;
-    BOOST_FOREACH (DenseVertex nearState, candidateNeighbors)
+    BOOST_FOREACH (SparseVertex nearState, candidateNeighbors)
     {
         const base::State *s1 = randomState;
-        const base::State *s2 = boltDB_->stateProperty_[nearState];
+        const base::State *s2 = sparseDB_->getSparseStateConst(nearState);
 
         // Check if this nearState is visible from the random state
         if (!si_->checkMotion(s1, s2))
@@ -701,9 +705,9 @@ bool BoltRetrieveRepair::canConnect(const base::State *randomState, const base::
 
             if (false)
             {
-                vizStateCallback(s2, 2, 1);  // BLUE
-                vizEdgeCallback(s1, s2, 100);
-                vizTriggerCallback();
+                visual_->viz5StateCallback(s2, 2, 1);  // BLUE
+                visual_->viz5EdgeCallback(s1, s2, 100);
+                visual_->viz5TriggerCallback();
                 usleep(1000000);
             }
 
@@ -730,13 +734,13 @@ bool BoltRetrieveRepair::canConnect(const base::State *randomState, const base::
 
                     if (!si_->isValid(interState))
                     {
-                        vizStateCallback(interState, 3, 1);  // RED
-                        vizTriggerCallback();
+                        visual_->viz5StateCallback(interState, 3, 1);  // RED
+                        visual_->viz5TriggerCallback();
                         usleep(2000000);
                     }
                     else
                     {
-                        // vizStateCallback(interState, 1, 1); // GREEN
+                        // visual_->viz5StateCallback(interState, 1, 1); // GREEN
                     }
                 }
             }

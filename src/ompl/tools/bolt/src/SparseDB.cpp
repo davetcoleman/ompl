@@ -124,15 +124,15 @@ otb::SparseDB::CustomAstarVisitor::CustomAstarVisitor(SparseVertex goal, SparseD
 void otb::SparseDB::CustomAstarVisitor::discover_vertex(SparseVertex v, const SparseGraph &) const
 {
     if (parent_->visualizeAstar_)
-        parent_->visual_->viz1StateCallback(parent_->getSparseState(v), /*mode=*/1, 1);
+        parent_->visual_->viz4StateCallback(parent_->getSparseState(v), /*mode=*/1, 1);
 }
 
 void otb::SparseDB::CustomAstarVisitor::examine_vertex(SparseVertex v, const SparseGraph &) const
 {
     if (parent_->visualizeAstar_)
     {
-        parent_->visual_->viz1StateCallback(parent_->getSparseState(v), /*mode=*/5, 1);
-        parent_->visual_->viz1TriggerCallback();
+        parent_->visual_->viz4StateCallback(parent_->getSparseState(v), /*mode=*/5, 1);
+        parent_->visual_->viz4TriggerCallback();
         usleep(parent_->visualizeAstarSpeed_ * 1000000);
     }
 
@@ -165,13 +165,15 @@ SparseDB::SparseDB(base::SpaceInformationPtr si, BoltDB *boltDB, VisualizerPtr v
   , disjointSets_(boost::get(boost::vertex_rank, g_), boost::get(boost::vertex_predecessor, g_))
   // Remember what round we're on
   , secondSparseInsertionAttempt_(false)
+  // Derived properties
+  , sparseDelta_(2.0)
   // Sparse properites
   , denseDeltaFraction_(.05)
+  , sparseDeltaFraction_(.25)
   //, denseDeltaFraction_(.001)
   , stretchFactor_(3.)
-  , sparseDelta_(2.0)
   // Visualization settings
-  , checksVerbose_(false)
+    , checksVerbose_(false)
   , fourthCheckVerbose_(true)
   , visualizeAstar_(false)
   , visualizeSparsCreation_(false)
@@ -217,8 +219,9 @@ bool SparseDB::setup()
 {
     // Calculate variables for the graph
     const double maxExt = si_->getMaximumExtent();
-    // sparseDelta_ = sparseDeltaFraction_ * maxExt;
+    sparseDelta_ = sparseDeltaFraction_ * maxExt;
     denseDelta_ = denseDeltaFraction_ * maxExt;
+    OMPL_INFORM("sparseDelta_ = %f", sparseDelta_);
     OMPL_INFORM("denseDelta_ = %f", denseDelta_);
 
     assert(maxExt > 0);
@@ -304,10 +307,10 @@ bool SparseDB::astarSearch(const SparseVertex start, const SparseVertex goal, st
             if (v1 != v2)
             {
                 // std::cout << "Edge " << v1 << " to " << v2 << std::endl;
-                visual_->viz1EdgeCallback(getSparseStateConst(v1), getSparseStateConst(v2), 10);
+                visual_->viz4EdgeCallback(getSparseStateConst(v1), getSparseStateConst(v2), 10);
             }
         }
-        visual_->viz1TriggerCallback();
+        visual_->viz4TriggerCallback();
     }
 
     // Unload
@@ -354,6 +357,27 @@ void SparseDB::clearEdgeCollisionStates()
 
 void SparseDB::createSPARS()
 {
+    // Clear the old spars graph
+    if (getNumVertices() > 1)
+    {
+        OMPL_INFORM("Cleaning sparse database, currently has %u states", getNumVertices());
+        g_.clear();
+        OMPL_INFORM("Now has %u states", getNumVertices());
+
+        // Clear the nearest neighbor search
+        if (nn_)
+            nn_->clear();
+
+        // Re-add search state
+        initializeQueryState();
+
+        // Clear visuals
+        visual_->viz2StateCallback(getSparseStateConst(queryVertex_), /* type = deleteAllMarkers */ 0, 0);
+    }
+
+    // Reset fractions
+    setup();
+
     // Get the ordering to insert vertices
     std::vector<WeightedVertex> vertexInsertionOrder;
 
@@ -375,6 +399,7 @@ void SparseDB::createSPARS()
 
     // Attempt to insert the verticies multiple times until no more succesful insertions occur
     bool succeededInInserting = true;
+    secondSparseInsertionAttempt_ = false;
     std::size_t loopAttempt = 0;
     while (succeededInInserting)
     {
@@ -621,13 +646,13 @@ bool SparseDB::getPopularityOrder(std::vector<WeightedVertex> &vertexInsertionOr
         {
             // std::cout << "  Visualizing vertex " << v << " with popularity " << weightPercent
             //<< " queue remaining size " << pqueue.size() << std::endl;
-            visual_->viz1StateCallback(boltDB_->stateProperty_[pqueue.top().v_], /*mode=*/7, weightPercent);
+            visual_->viz3StateCallback(boltDB_->stateProperty_[pqueue.top().v_], /*mode=*/7, weightPercent);
         }
 
         // Remove from priority queue
         pqueue.pop();
     }
-    visual_->viz1TriggerCallback();
+    visual_->viz3TriggerCallback();
     usleep(0.01 * 1000000);
 
     return true;
@@ -677,11 +702,11 @@ bool SparseDB::getDefaultOrder(std::vector<WeightedVertex> &vertexInsertionOrder
         // Visualize vertices
         if (visualizeSparsCreation_)
         {
-            visual_->viz1StateCallback(boltDB_->stateProperty_[wv.v_], /*mode=*/7, weightPercent);
+            visual_->viz3StateCallback(boltDB_->stateProperty_[wv.v_], /*mode=*/7, weightPercent);
         }
     }
 
-    visual_->viz1TriggerCallback();
+    visual_->viz3TriggerCallback();
     usleep(0.01 * 1000000);
 
     return true;
@@ -695,7 +720,7 @@ bool SparseDB::getRandomOrder(std::vector<WeightedVertex> &vertexInsertionOrder)
     for (std::size_t i = 0; i < defaultVertexInsertionOrder.size(); ++i)
     {
         // Choose a random vertex to pick out of default structure
-        int randVertex = iRand(0, defaultVertexInsertionOrder.size() - 1);
+        std::size_t randVertex = static_cast<std::size_t>(iRand(0, defaultVertexInsertionOrder.size() - 1));
         std::cout << "Choose: " << randVertex << std::endl;
         assert(randVertex < defaultVertexInsertionOrder.size());
 
@@ -706,6 +731,7 @@ bool SparseDB::getRandomOrder(std::vector<WeightedVertex> &vertexInsertionOrder)
         defaultVertexInsertionOrder.erase(defaultVertexInsertionOrder.begin() + randVertex);
         randVertex--;
     }
+    return true;
 }
 
 int SparseDB::iRand(int min, int max)
