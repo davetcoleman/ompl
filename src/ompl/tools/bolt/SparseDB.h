@@ -353,7 +353,9 @@ class SparseDB
     /** \brief Various options for visualizing the algorithmns performance */
     bool visualizeAstar_;
 
+    /** \brief Show the sparse graph being generated */
     bool visualizeSparsCreation_;
+    double visualizeSparsCreationSpeed_;
     bool visualizeDenseRepresentatives_;
 
     /** \brief Visualization speed of astar search, num of seconds to show each vertex */
