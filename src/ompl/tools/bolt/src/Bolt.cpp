@@ -126,10 +126,10 @@ base::PlannerStatus Bolt::solve(const base::PlannerTerminationCondition &ptc)
     time::point start = time::now();
 
     // Warn if there are queued paths that have not been added to the experience database
-    //if (!queuedSolutionPaths_.empty())
+    // if (!queuedSolutionPaths_.empty())
     //{
-        //OMPL_INFORM("Previous solved paths are currently uninserted into the experience database and are in the "
-        //"post-proccessing queue");
+    // OMPL_INFORM("Previous solved paths are currently uninserted into the experience database and are in the "
+    //"post-proccessing queue");
     //}
 
     // SOLVE
@@ -138,6 +138,13 @@ base::PlannerStatus Bolt::solve(const base::PlannerTerminationCondition &ptc)
     // Planning time
     planTime_ = time::seconds(time::now() - start);
 
+    logResults();
+
+    return lastStatus_;
+}
+
+void Bolt::logResults()
+{
     // Create log
     ExperienceLog log;
     log.planningTime = planTime_;
@@ -146,70 +153,71 @@ base::PlannerStatus Bolt::solve(const base::PlannerTerminationCondition &ptc)
     stats_.totalPlanningTime_ += planTime_;  // used for averaging
     stats_.numProblems_++;                   // used for averaging
 
-    if (lastStatus_ == base::PlannerStatus::TIMEOUT)
+    switch (static_cast<ompl::base::PlannerStatus::StatusType>(lastStatus_))
     {
-        // Skip further processing if absolutely no path is available
-        OMPL_ERROR("Bolt Solve: No solution found after %f seconds", planTime_);
-
-        stats_.numSolutionsTimedout_++;
-
-        // Logging
-        log.planner = "neither_planner";
-        log.result = "timedout";
-        log.isSaved = "not_saved";
-    }
-    else if (!lastStatus_)
-    {
-        // Skip further processing if absolutely no path is available
-        OMPL_ERROR("Bolt Solve: Unknown failure");
-        stats_.numSolutionsFailed_++;
-
-        // Logging
-        log.planner = "neither_planner";
-        log.result = "failed";
-        log.isSaved = "not_saved";
-    }
-    else
-    {
-        std::cout << ANSI_COLOR_BLUE;
-        std::cout << "-----------------------------------------------------------" << std::endl;
-        std::cout << "Bolt Finished - solution found in " << planTime_ << " seconds" << std::endl;
-        std::cout << "-----------------------------------------------------------" << std::endl;
-        std::cout << ANSI_COLOR_RESET;
-
-        og::PathGeometric solutionPath = og::SimpleSetup::getSolutionPath();  // copied so that it is non-const
-        OMPL_INFORM("Solution path has %d states and was generated from planner %s", solutionPath.getStateCount(),
-                    getSolutionPlannerName().c_str());
-
-        // Check for repeated states
-        if (!checkRepeatedStates(solutionPath))
-            exit(-1);
-
-        // Do not save if approximate
-        if (!haveExactSolutionPath())
-        {
+        case base::PlannerStatus::TIMEOUT:
+            stats_.numSolutionsTimedout_++;
+            OMPL_ERROR("Bolt Solve: No solution found after %f seconds", planTime_);
+            // Logging
+            log.planner = "neither_planner";
+            log.result = "timedout";
+            log.isSaved = "not_saved";
+            break;
+        case base::PlannerStatus::ABORT:
+            stats_.numSolutionsTimedout_++;
+            OMPL_ERROR("Bolt Solve: No solution found after %f seconds", planTime_);
+            // Logging
+            log.planner = "neither_planner";
+            log.result = "abort";
+            log.isSaved = "not_saved";
+            break;
+        case base::PlannerStatus::APPROXIMATE_SOLUTION:
             OMPL_ERROR("BOLT RESULTS: Approximate - should not happen!");
             exit(-1);
-        }
-
-        // Stats
-        stats_.numSolutionsFromRecall_++;
-
-        // Make sure solution has at least 2 states
-        if (solutionPath.getStateCount() < 2)
+            break;
+        case base::PlannerStatus::EXACT_SOLUTION:
         {
-            OMPL_INFORM("NOT saving to database because solution is less than 2 states long");
-            stats_.numSolutionsTooShort_++;
+            std::cout << ANSI_COLOR_BLUE;
+            std::cout << "-----------------------------------------------------------" << std::endl;
+            std::cout << "Bolt Finished - solution found in " << planTime_ << " seconds" << std::endl;
+            std::cout << "-----------------------------------------------------------" << std::endl;
+            std::cout << ANSI_COLOR_RESET;
 
+            og::PathGeometric solutionPath = og::SimpleSetup::getSolutionPath();  // copied so that it is non-const
+            OMPL_INFORM("Solution path has %d states and was generated from planner %s", solutionPath.getStateCount(),
+                        getSolutionPlannerName().c_str());
+
+            // Check for repeated states
+            if (!checkRepeatedStates(solutionPath))
+                exit(-1);
+
+            // Stats
+            stats_.numSolutionsFromRecall_++;
+
+            // Make sure solution has at least 2 states
+            if (solutionPath.getStateCount() < 2)
+            {
+                OMPL_INFORM("NOT saving to database because solution is less than 2 states long");
+                stats_.numSolutionsTooShort_++;
+
+                // Logging
+                log.isSaved = "less_2_states";
+                log.tooShort = true;
+            }
+            else
+            {
+                // Queue the solution path for future insertion into experience database (post-processing)
+                // queuedSolutionPaths_.push_back(solutionPath);
+            }
+        }
+        break;
+        default:
+            OMPL_ERROR("Unknown status type: %u", lastStatus_);
+            stats_.numSolutionsFailed_++;
             // Logging
-            log.isSaved = "less_2_states";
-            log.tooShort = true;
-        }
-        else
-        {
-            // Queue the solution path for future insertion into experience database (post-processing)
-            //queuedSolutionPaths_.push_back(solutionPath);
-        }
+            log.planner = "neither_planner";
+            log.result = "failed";
+            log.isSaved = "not_saved";
     }
 
     // Final log data
@@ -220,22 +228,20 @@ base::PlannerStatus Bolt::solve(const base::PlannerTerminationCondition &ptc)
 
     // Flush the log to buffer
     convertLogToString(log);
-
-    return lastStatus_;
 }
 
-    bool Bolt::checkRepeatedStates(const og::PathGeometric& path)
+bool Bolt::checkRepeatedStates(const og::PathGeometric &path)
+{
+    for (std::size_t i = 1; i < path.getStateCount(); ++i)
     {
-        for (std::size_t i = 1; i < path.getStateCount(); ++i)
+        if (si_->getStateSpace()->equalStates(path.getState(i - 1), path.getState(i)))
         {
-            if (si_->getStateSpace()->equalStates(path.getState(i-1), path.getState(i)))
-            {
-                OMPL_ERROR("Duplicate state found on trajectory at %u out of %u", i, path.getStateCount());
-                return false;
-            }
+            OMPL_ERROR("Duplicate state found on trajectory at %u out of %u", i, path.getStateCount());
+            return false;
         }
-        return true;
     }
+    return true;
+}
 
 base::PlannerStatus Bolt::solve(double time)
 {
@@ -268,7 +274,7 @@ void Bolt::printResultsInfo(std::ostream &out) const
 bool Bolt::loadOrGenerate()
 {
     // Load from file or generate new grid
-    if (boltDB_->getNumVertices() <= 1) // the search verticie may already be there
+    if (boltDB_->getNumVertices() <= 1)  // the search verticie may already be there
     {
         if (!boltDB_->load(filePath_))  // load from file
         {

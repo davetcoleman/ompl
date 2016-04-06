@@ -80,6 +80,14 @@ namespace ompl
          * \param cost - signifies the weight of the edge using color
          */
         typedef boost::function<void(const ompl::base::State* v1, const ompl::base::State* v2, double cost)> VizEdgeCallback;
+
+        /**
+         * \brief Visualization callback hook for external debugging of paths
+         * \param path
+         * \param type - style of line
+         */
+        typedef boost::function<void(const PathPtr path, std::size_t type)> VizPathCallback;
+
         /**
          * \brief Visualization callback hook for external debugging that triggers the visualizer to render/publish
          */
@@ -401,6 +409,14 @@ namespace ompl
                     vizEdgeCallback_(stateA, stateB, cost);
             }
 
+            /** \brief Visualize a planner's data during runtime, externally, using a function callback
+             *         This could be called whenever the graph changes */
+            virtual void vizPathCallback(const PathPtr path, std::size_t type)
+            {
+                if (vizPathCallback_)
+                    vizPathCallback_(path, type);
+            }
+
             /** \brief Trigger visualizer to publish graphics */
             virtual void vizTriggerCallback()
             {
@@ -412,10 +428,12 @@ namespace ompl
             virtual void setVizCallbacks(
                 ompl::base::VizStateCallback vizStateCallback,
                 ompl::base::VizEdgeCallback vizEdgeCallback,
+                ompl::base::VizPathCallback vizPathCallback,
                 ompl::base::VizTriggerCallback vizTriggerCallback)
             {
                 vizStateCallback_ = vizStateCallback;
                 vizEdgeCallback_ = vizEdgeCallback;
+                vizPathCallback_ = vizPathCallback;
                 vizTriggerCallback_ = vizTriggerCallback;
             }
 
@@ -472,6 +490,7 @@ namespace ompl
             /** \brief Optional callback to allow easy introspection of a planner's search progress */
             VizStateCallback vizStateCallback_;
             VizEdgeCallback  vizEdgeCallback_;
+            VizPathCallback  vizPathCallback_;
             VizTriggerCallback  vizTriggerCallback_;
         };
 

@@ -138,6 +138,9 @@ class Bolt : public tools::ExperienceSetup
     /** \brief Run the planner for up to a specified amount of time (default is 1 second) */
     virtual base::PlannerStatus solve(double time = 1.0);
 
+    /** \brief Helper function for logging data to file */
+    void logResults();
+
     /** \brief Run the planner until \e ptc becomes true (at most) */
     virtual base::PlannerStatus solve(const base::PlannerTerminationCondition &ptc);
 

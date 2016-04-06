@@ -65,20 +65,25 @@ class Visualizer
 {
   public:
 
-    /** \brief Visualize a planner's data during runtime, externally, using a function callback
-     *         This could be called whenever the graph changes */
+    /** \brief Visualize planner's data during runtime, externally, using a function callback */
     void viz1StateCallback(const ompl::base::State* state, std::size_t type, double extraData)
     {
         if (viz1StateCallback_)
             viz1StateCallback_(state, type, extraData);
     }
 
-    /** \brief Visualize a planner's data during runtime, externally, using a function callback
-     *         This could be called whenever the graph changes */
+    /** \brief Visualize planner's data during runtime, externally, using a function callback */
     void viz1EdgeCallback(const ompl::base::State* stateA, const ompl::base::State* stateB, double cost)
     {
         if (viz1EdgeCallback_)
             viz1EdgeCallback_(stateA, stateB, cost);
+    }
+
+    /** \brief Visualize planner's data during runtime, externally, using a function callback */
+    void viz1PathCallback(const base::PathPtr path, std::size_t type)
+    {
+        if (viz1PathCallback_)
+            viz1PathCallback_(path, type);
     }
 
     /** \brief Trigger visualizer to publish graphics */
@@ -89,30 +94,36 @@ class Visualizer
     }
 
     /** \brief Set the callback to visualize/publish a planner's progress */
-    void setViz1Callbacks(ompl::base::VizStateCallback vizStateCallback, ompl::base::VizEdgeCallback vizEdgeCallback,
+    void setViz1Callbacks(ompl::base::VizStateCallback vizStateCallback, ompl::base::VizEdgeCallback vizEdgeCallback, ompl::base::VizPathCallback vizPathCallback,
                           ompl::base::VizTriggerCallback vizTriggerCallback)
     {
         viz1StateCallback_ = vizStateCallback;
         viz1EdgeCallback_ = vizEdgeCallback;
+        viz1PathCallback_ = vizPathCallback;
         viz1TriggerCallback_ = vizTriggerCallback;
     }
 
     // ------------------------------------------------------------------------------------
 
-    /** \brief Visualize a planner's data during runtime, externally, using a function callback
-     *         This could be called whenever the graph changes */
+    /** \brief Visualize planner's data during runtime, externally, using a function callback */
     void viz2StateCallback(const ompl::base::State* state, std::size_t type, double extraData)
     {
         if (viz2StateCallback_)
             viz2StateCallback_(state, type, extraData);
     }
 
-    /** \brief Visualize a planner's data during runtime, externally, using a function callback
-     *         This could be called whenever the graph changes */
+    /** \brief Visualize planner's data during runtime, externally, using a function callback */
     void viz2EdgeCallback(const ompl::base::State* stateA, const ompl::base::State* stateB, double cost)
     {
         if (viz2EdgeCallback_)
             viz2EdgeCallback_(stateA, stateB, cost);
+    }
+
+    /** \brief Visualize planner's data during runtime, externally, using a function callback */
+    void viz2PathCallback(const base::PathPtr path, std::size_t type)
+    {
+        if (viz2PathCallback_)
+            viz2PathCallback_(path, type);
     }
 
     /** \brief Trigger visualizer to publish graphics */
@@ -123,30 +134,36 @@ class Visualizer
     }
 
     /** \brief Set the callback to visualize/publish a planner's progress */
-    void setViz2Callbacks(ompl::base::VizStateCallback vizStateCallback, ompl::base::VizEdgeCallback vizEdgeCallback,
+    void setViz2Callbacks(ompl::base::VizStateCallback vizStateCallback, ompl::base::VizEdgeCallback vizEdgeCallback, ompl::base::VizPathCallback vizPathCallback,
                           ompl::base::VizTriggerCallback vizTriggerCallback)
     {
         viz2StateCallback_ = vizStateCallback;
         viz2EdgeCallback_ = vizEdgeCallback;
+        viz2PathCallback_ = vizPathCallback;
         viz2TriggerCallback_ = vizTriggerCallback;
     }
 
     // ------------------------------------------------------------------------------------
 
-    /** \brief Visualize a planner's data during runtime, externally, using a function callback
-     *         This could be called whenever the graph changes */
+    /** \brief Visualize planner's data during runtime, externally, using a function callback */
     void viz3StateCallback(const ompl::base::State* state, std::size_t type, double extraData)
     {
         if (viz3StateCallback_)
             viz3StateCallback_(state, type, extraData);
     }
 
-    /** \brief Visualize a planner's data during runtime, externally, using a function callback
-     *         This could be called whenever the graph changes */
+    /** \brief Visualize planner's data during runtime, externally, using a function callback */
     void viz3EdgeCallback(const ompl::base::State* stateA, const ompl::base::State* stateB, double cost)
     {
         if (viz3EdgeCallback_)
             viz3EdgeCallback_(stateA, stateB, cost);
+    }
+
+    /** \brief Visualize planner's data during runtime, externally, using a function callback */
+    void viz3PathCallback(const base::PathPtr path, std::size_t type)
+    {
+        if (viz3PathCallback_)
+            viz3PathCallback_(path, type);
     }
 
     /** \brief Trigger visualizer to publish graphics */
@@ -157,30 +174,36 @@ class Visualizer
     }
 
     /** \brief Set the callback to visualize/publish a planner's progress */
-    void setViz3Callbacks(ompl::base::VizStateCallback vizStateCallback, ompl::base::VizEdgeCallback vizEdgeCallback,
+    void setViz3Callbacks(ompl::base::VizStateCallback vizStateCallback, ompl::base::VizEdgeCallback vizEdgeCallback, ompl::base::VizPathCallback vizPathCallback,
                           ompl::base::VizTriggerCallback vizTriggerCallback)
     {
         viz3StateCallback_ = vizStateCallback;
         viz3EdgeCallback_ = vizEdgeCallback;
+        viz3PathCallback_ = vizPathCallback;
         viz3TriggerCallback_ = vizTriggerCallback;
     }
 
     // ------------------------------------------------------------------------------------
 
-    /** \brief Visualize a planner's data during runtime, externally, using a function callback
-     *         This could be called whenever the graph changes */
+    /** \brief Visualize planner's data during runtime, externally, using a function callback */
     void viz4StateCallback(const ompl::base::State* state, std::size_t type, double extraData)
     {
         if (viz4StateCallback_)
             viz4StateCallback_(state, type, extraData);
     }
 
-    /** \brief Visualize a planner's data during runtime, externally, using a function callback
-     *         This could be called whenever the graph changes */
+    /** \brief Visualize planner's data during runtime, externally, using a function callback */
     void viz4EdgeCallback(const ompl::base::State* stateA, const ompl::base::State* stateB, double cost)
     {
         if (viz4EdgeCallback_)
             viz4EdgeCallback_(stateA, stateB, cost);
+    }
+
+    /** \brief Visualize planner's data during runtime, externally, using a function callback */
+    void viz4PathCallback(const base::PathPtr path, std::size_t type)
+    {
+        if (viz4PathCallback_)
+            viz4PathCallback_(path, type);
     }
 
     /** \brief Trigger visualizer to publish graphics */
@@ -191,26 +214,32 @@ class Visualizer
     }
 
     /** \brief Set the callback to visualize/publish a planner's progress */
-    void setViz4Callbacks(ompl::base::VizStateCallback vizStateCallback, ompl::base::VizEdgeCallback vizEdgeCallback,
+    void setViz4Callbacks(ompl::base::VizStateCallback vizStateCallback, ompl::base::VizEdgeCallback vizEdgeCallback, ompl::base::VizPathCallback vizPathCallback,
                           ompl::base::VizTriggerCallback vizTriggerCallback)
     {
         viz4StateCallback_ = vizStateCallback;
         viz4EdgeCallback_ = vizEdgeCallback;
+        viz4PathCallback_ = vizPathCallback;
         viz4TriggerCallback_ = vizTriggerCallback;
     }
 
     // ------------------------------------------------------------------------------------
 
-    /** \brief Visualize a planner's data during runtime, externally, using a function callback
-     *         This could be called whenever the graph changes */
+    /** \brief Visualize planner's data during runtime, externally, using a function callback */
     void viz5StateCallback(const ompl::base::State* state, std::size_t type, double extraData)
     {
         if (viz5StateCallback_)
             viz5StateCallback_(state, type, extraData);
     }
 
-    /** \brief Visualize a planner's data during runtime, externally, using a function callback
-     *         This could be called whenever the graph changes */
+    /** \brief Visualize planner's data during runtime, externally, using a function callback */
+    void viz5PathCallback(const base::PathPtr path, std::size_t type)
+    {
+        if (viz5PathCallback_)
+            viz5PathCallback_(path, type);
+    }
+
+    /** \brief Visualize planner's data during runtime, externally, using a function callback */
     void viz5EdgeCallback(const ompl::base::State* stateA, const ompl::base::State* stateB, double cost)
     {
         if (viz5EdgeCallback_)
@@ -225,39 +254,91 @@ class Visualizer
     }
 
     /** \brief Set the callback to visualize/publish a planner's progress */
-    void setViz5Callbacks(ompl::base::VizStateCallback vizStateCallback, ompl::base::VizEdgeCallback vizEdgeCallback,
+    void setViz5Callbacks(ompl::base::VizStateCallback vizStateCallback, ompl::base::VizEdgeCallback vizEdgeCallback, ompl::base::VizPathCallback vizPathCallback,
                            ompl::base::VizTriggerCallback vizTriggerCallback)
     {
         viz5StateCallback_ = vizStateCallback;
         viz5EdgeCallback_ = vizEdgeCallback;
+        viz5PathCallback_ = vizPathCallback;
         viz5TriggerCallback_ = vizTriggerCallback;
     }
 
+    // ------------------------------------------------------------------------------------
+
+    /** \brief Visualize planner's data during runtime, externally, using a function callback */
+    void viz6StateCallback(const ompl::base::State* state, std::size_t type, double extraData)
+    {
+        if (viz6StateCallback_)
+            viz6StateCallback_(state, type, extraData);
+    }
+
+    /** \brief Visualize planner's data during runtime, externally, using a function callback */
+    void viz6PathCallback(const base::PathPtr path, std::size_t type)
+    {
+        if (viz6PathCallback_)
+            viz6PathCallback_(path, type);
+    }
+
+    /** \brief Visualize planner's data during runtime, externally, using a function callback */
+    void viz6EdgeCallback(const ompl::base::State* stateA, const ompl::base::State* stateB, double cost)
+    {
+        if (viz6EdgeCallback_)
+            viz6EdgeCallback_(stateA, stateB, cost);
+    }
+
+    /** \brief Trigger visualizer to publish graphics */
+    void viz6TriggerCallback()
+    {
+        if (viz6TriggerCallback_)
+            viz6TriggerCallback_();
+    }
+
+    /** \brief Set the callback to visualize/publish a planner's progress */
+    void setViz6Callbacks(ompl::base::VizStateCallback vizStateCallback, ompl::base::VizEdgeCallback vizEdgeCallback, ompl::base::VizPathCallback vizPathCallback,
+                           ompl::base::VizTriggerCallback vizTriggerCallback)
+    {
+        viz6StateCallback_ = vizStateCallback;
+        viz6EdgeCallback_ = vizEdgeCallback;
+        viz6PathCallback_ = vizPathCallback;
+        viz6TriggerCallback_ = vizTriggerCallback;
+    }
+
   private:
-    /** \brief Optional callbacks to allow easy introspection of a planner's search progress */
+    /** \brief Optional st callbacks for data */
     ompl::base::VizStateCallback viz1StateCallback_;
     ompl::base::VizEdgeCallback viz1EdgeCallback_;
+    ompl::base::VizPathCallback viz1PathCallback_;
     ompl::base::VizTriggerCallback viz1TriggerCallback_;
 
-    /** \brief Optional third callbacks for other data */
+    /** \brief Optional 2nd callbacks for data */
     ompl::base::VizStateCallback viz2StateCallback_;
     ompl::base::VizEdgeCallback viz2EdgeCallback_;
+    ompl::base::VizPathCallback viz2PathCallback_;
     ompl::base::VizTriggerCallback viz2TriggerCallback_;
 
-    /** \brief Optional third callbacks for other data */
+    /** \brief Optional 3rd callbacks for data */
     ompl::base::VizStateCallback viz3StateCallback_;
     ompl::base::VizEdgeCallback viz3EdgeCallback_;
+    ompl::base::VizPathCallback viz3PathCallback_;
     ompl::base::VizTriggerCallback viz3TriggerCallback_;
 
-    /** \brief Optional third callbacks for other data */
+    /** \brief Optional 4th callbacks for data */
     ompl::base::VizStateCallback viz4StateCallback_;
     ompl::base::VizEdgeCallback viz4EdgeCallback_;
+    ompl::base::VizPathCallback viz4PathCallback_;
     ompl::base::VizTriggerCallback viz4TriggerCallback_;
 
-    /** \brief Optional secondary callbacks to allow easy introspection of database */
+    /** \brief Optional 5th callbacks for data */
     ompl::base::VizStateCallback viz5StateCallback_;
     ompl::base::VizEdgeCallback viz5EdgeCallback_;
+    ompl::base::VizPathCallback viz5PathCallback_;
     ompl::base::VizTriggerCallback viz5TriggerCallback_;
+
+    /** \brief Optional 6th callbacks for data */
+    ompl::base::VizStateCallback viz6StateCallback_;
+    ompl::base::VizEdgeCallback viz6EdgeCallback_;
+    ompl::base::VizPathCallback viz6PathCallback_;
+    ompl::base::VizTriggerCallback viz6TriggerCallback_;
 
 
 };  // end of class Visualizer
