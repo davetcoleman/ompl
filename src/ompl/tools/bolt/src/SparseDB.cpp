@@ -222,8 +222,8 @@ bool SparseDB::setup()
     const double maxExt = si_->getMaximumExtent();
     sparseDelta_ = sparseDeltaFraction_ * maxExt;
     denseDelta_ = denseDeltaFraction_ * maxExt;
-    OMPL_INFORM("sparseDelta_ = %f", sparseDelta_);
-    OMPL_INFORM("denseDelta_ = %f", denseDelta_);
+    //OMPL_INFORM("sparseDelta_ = %f", sparseDelta_);
+    //OMPL_INFORM("denseDelta_ = %f", denseDelta_);
 
     assert(maxExt > 0);
     assert(denseDelta_ > 0);
@@ -361,9 +361,8 @@ void SparseDB::createSPARS()
     // Clear the old spars graph
     if (getNumVertices() > 1)
     {
-        OMPL_INFORM("Cleaning sparse database, currently has %u states", getNumVertices());
+        OMPL_INFORM("Resetting sparse database, currently has %u states", getNumVertices());
         g_.clear();
-        OMPL_INFORM("Now has %u states", getNumVertices());
 
         // Clear the nearest neighbor search
         if (nn_)
@@ -600,8 +599,7 @@ bool SparseDB::findSparseRepresentatives()
 
 bool SparseDB::getPopularityOrder(std::vector<WeightedVertex> &vertexInsertionOrder)
 {
-    OMPL_ERROR("getPopularityOrder");
-    bool verbose = true;
+    bool verbose = false;
 
     // Error check
     if (!boltDB_->getNumVertices())
@@ -632,7 +630,6 @@ bool SparseDB::getPopularityOrder(std::vector<WeightedVertex> &vertexInsertionOr
         if (verbose)
             std::cout << "Vertex: " << v << std::endl;
         double popularity = 0;
-        // std::pair<out_edge_iterator, out_edge_iterator> edge
         foreach (DenseEdge edge, boost::out_edges(v, boltDB_->g_))
         {
             if (verbose)

@@ -220,9 +220,12 @@ class BoltRetrieveRepair : public base::Planner
     std::vector<bolt::DenseVertex> startVertexCandidateNeighbors_;
     std::vector<bolt::DenseVertex> goalVertexCandidateNeighbors_;
 
+public:
     /** \brief Output user feedback to console */
     bool verbose_;
 
+    /** \brief Visualize original solution from graph before smoothing */
+    bool visualizeRawTrajectory_;
 };
 }  // namespace bolt
 }  // namespace tools

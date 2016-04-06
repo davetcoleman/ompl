@@ -287,7 +287,7 @@ bool otb::BoltDB::load(const std::string &fileName)
 
 bool otb::BoltDB::postProcessPath(og::PathGeometric &solutionPath)
 {
-    bool verbose = true;
+    bool verbose = false;
 
     // Prevent inserting into database
     if (!savingEnabled_)
@@ -1282,8 +1282,7 @@ void otb::BoltDB::generateEdges()
             }
 
             // Create edge - maybe removed later
-            //DenseEdge e = addEdge(v1, v2, desiredAverageCost_);
-            DenseEdge e = addEdge(v1, v2, 0);
+            DenseEdge e = addEdge(v1, v2, desiredAverageCost_);
             unvalidatedEdges.push_back(e);
 
             count++;
@@ -1680,6 +1679,8 @@ void otb::BoltDB::displayDatabase(bool showVertices)
 
 void otb::BoltDB::normalizeGraphEdgeWeights()
 {
+    bool verbose = false;
+
     if (!popularityBiasEnabled_)
     {
         OMPL_INFORM("Skipping normalize graph edge weights because not using popularity bias currently");
@@ -1693,27 +1694,32 @@ void otb::BoltDB::normalizeGraphEdgeWeights()
         total_cost += edgeWeightProperty_[e];
     }
     double avg_cost = total_cost / getNumEdges();
-    OMPL_ERROR("Average cost of the edges in graph is %f", avg_cost);
+
+    if (verbose)
+        OMPL_INFORM("Average cost of the edges in graph is %f", avg_cost);
 
     if (avg_cost < desiredAverageCost_)  // need to decrease cost in graph
     {
         double avgCostDiff = desiredAverageCost_ - avg_cost;
-        std::cout << "avgCostDiff: " << avgCostDiff << std::endl;
+
+        if (verbose)
+            std::cout << "avgCostDiff: " << avgCostDiff << std::endl;
         double perEdgeReduction = avgCostDiff;  // / getNumEdges();
-        OMPL_INFORM("Decreasing each edge's cost by %f", perEdgeReduction);
+
+        if (verbose)
+            OMPL_INFORM("Decreasing each edge's cost by %f", perEdgeReduction);
         foreach (DenseEdge e, boost::edges(g_))
         {
             assert(edgeWeightProperty_[e] <= MAX_POPULARITY_WEIGHT);
             edgeWeightProperty_[e] = std::min(edgeWeightProperty_[e] + perEdgeReduction, MAX_POPULARITY_WEIGHT);
-            std::cout << "Edge " << e << " now has weight " << edgeWeightProperty_[e] << " via reduction " << perEdgeReduction << std::endl;
+            if (verbose)
+                std::cout << "Edge " << e << " now has weight " << edgeWeightProperty_[e] << " via reduction " << perEdgeReduction << std::endl;
         }
     }
-    else
+    else if (verbose)
     {
         OMPL_INFORM("Not decreasing all edge's cost because average is above desired");
     }
-    usleep(1*1000000);
-    std::cout << "-------------------------------------------------------" << std::endl;
 }
 
 otb::DenseVertex otb::BoltDB::addVertex(base::State *state, const GuardType &type)

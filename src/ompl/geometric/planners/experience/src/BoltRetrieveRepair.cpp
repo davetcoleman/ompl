@@ -62,6 +62,7 @@ BoltRetrieveRepair::BoltRetrieveRepair(const base::SpaceInformationPtr &si, cons
   , boltDB_(boltDB)
   , smoothingEnabled_(false)  // makes understanding recalled paths more difficult if enabled
   , verbose_(true)
+  , visualizeRawTrajectory_(true)
 {
     // Copy in needed objects
     sparseDB_ = boltDB_->getSparseDB();
@@ -119,7 +120,8 @@ base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCond
     pis_.restart();  // PlannerInputStates
 
     // Get a single start and goal state
-    OMPL_INFORM("Getting OMPL start and goal state");
+    if (verbose_)
+        OMPL_INFORM("Getting OMPL start and goal state");
     const base::State *startState = pis_.nextStart();  // PlannerInputStates
     const base::State *goalState = pis_.nextGoal(ptc);
 
@@ -140,7 +142,7 @@ base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCond
 
     // Create solution path as pointer so memory is not unloaded
     ob::PathPtr pathSolutionBase(new og::PathGeometric(si_));
-    og::PathGeometric &geometricSolution = static_cast<og::PathGeometric&>(*pathSolutionBase);
+    og::PathGeometric &geometricSolution = static_cast<og::PathGeometric &>(*pathSolutionBase);
 
     // Search for previous solution in database
     if (!getPathOffGraph(startState, goalState, geometricSolution, ptc))
@@ -149,7 +151,8 @@ base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCond
         return base::PlannerStatus::TIMEOUT;  // The planner failed to find a solution
     }
 
-    OMPL_INFORM("getPathOffGraph() found a solution of size %d", geometricSolution.getStateCount());
+    if (verbose_)
+        OMPL_INFORM("getPathOffGraph() found a solution of size %d", geometricSolution.getStateCount());
 
     // Save this for future debugging
     originalSolutionPath_.reset(new geometric::PathGeometric(geometricSolution));
@@ -157,16 +160,31 @@ base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCond
     // All save trajectories should be at least 1 state long, then we append the start and goal states, for min of 3
     assert(geometricSolution.getStateCount() >= 3);
 
+    // Optionally visualize raw trajectory
+    // Visualize
+    if (visualizeRawTrajectory_)
+    {
+        // Make the chosen path a different color and thickness
+        visual_->viz5PathCallback(pathSolutionBase, /*style*/ 1);
+        visual_->viz5TriggerCallback();
+
+        visual_->viz6PathCallback(pathSolutionBase, /*style*/ 1);
+        visual_->viz6TriggerCallback();
+    }
+
     // Smooth the result
     if (smoothingEnabled_)
     {
-        OMPL_INFORM("BoltRetrieveRepair solve: Simplifying solution (smoothing)...");
+        if (verbose_)
+            OMPL_INFORM("BoltRetrieveRepair solve: Simplifying solution (smoothing)...");
         time::point simplifyStart = time::now();
         std::size_t numStates = geometricSolution.getStateCount();
         path_simplifier_->simplify(geometricSolution, ptc);
         double simplifyTime = time::seconds(time::now() - simplifyStart);
-        OMPL_INFORM("BoltRetrieveRepair: Path simplification took %f seconds and removed %d states", simplifyTime,
-                    numStates - geometricSolution.getStateCount());
+
+        if (verbose_)
+            OMPL_INFORM("BoltRetrieveRepair: Path simplification took %f seconds and removed %d states", simplifyTime,
+                        numStates - geometricSolution.getStateCount());
     }
 
     // Finished
@@ -177,13 +195,15 @@ base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCond
     pdef_->addSolutionPath(pathSolutionBase, approximate, approxdif, getName());
     solved = true;
 
-    OMPL_INFORM("  Finished BoltRetrieveRepair.solve()");
+    if (verbose_)
+        OMPL_INFORM("  Finished BoltRetrieveRepair.solve()");
     return base::PlannerStatus(solved, approximate);
 }
 
 void BoltRetrieveRepair::getPlannerData(base::PlannerData &data) const
 {
-    OMPL_INFORM("BoltRetrieveRepair getPlannerData");
+    if (verbose_)
+        OMPL_INFORM("BoltRetrieveRepair getPlannerData");
 
     for (std::size_t j = 1; j < originalSolutionPath_->getStateCount(); ++j)
     {
@@ -234,22 +254,26 @@ bool BoltRetrieveRepair::getPathOffGraph(const base::State *start, const base::S
     // Get neighbors near start and goal. Note: potentially they are not *visible* - will test for this later
 
     // Start
-    int level = 0; //boltDB_->getTaskLevel(start);
-    OMPL_INFORM("  Looking for a node near the problem start on level %i", level);
+    int level = 0;  // boltDB_->getTaskLevel(start);
+    if (verbose_)
+        OMPL_INFORM("  Looking for a node near the problem start on level %i", level);
     if (!findGraphNeighbors(start, startVertexCandidateNeighbors_, level))
     {
-        OMPL_INFORM("No graph neighbors found for start");
+        if (verbose_)
+            OMPL_INFORM("No graph neighbors found for start");
         return false;
     }
     if (verbose_)
         OMPL_INFORM("  Found %d nodes near start", startVertexCandidateNeighbors_.size());
 
     // Goal
-    level = 0; //boltDB_->getTaskLevel(goal);
-    OMPL_INFORM("  Looking for a node near the problem goal on level %i", level);
+    level = 0;  // boltDB_->getTaskLevel(goal);
+    if (verbose_)
+        OMPL_INFORM("  Looking for a node near the problem goal on level %i", level);
     if (!findGraphNeighbors(goal, goalVertexCandidateNeighbors_, level))
     {
-        OMPL_INFORM("No graph neighbors found for goal");
+        if (verbose_)
+            OMPL_INFORM("No graph neighbors found for goal");
         return false;
     }
     if (verbose_)
@@ -274,7 +298,8 @@ bool BoltRetrieveRepair::getPathOffGraph(const base::State *start, const base::S
     {
         for (std::size_t i = 0; i < geometricSolution.getStateCount(); ++i)
         {
-            OMPL_INFORM("  getPathOffGraph(): Adding state %f to plannerData", i);
+            if (verbose_)
+                OMPL_INFORM("  getPathOffGraph(): Adding state %f to plannerData", i);
             si_->printState(geometricSolution.getState(i), std::cout);
         }
     }
@@ -283,9 +308,8 @@ bool BoltRetrieveRepair::getPathOffGraph(const base::State *start, const base::S
 }
 
 bool BoltRetrieveRepair::getPathOnGraph(const std::vector<SparseVertex> &candidateStarts,
-                                        const std::vector<SparseVertex> &candidateGoals,
-                                        const base::State *actualStart, const base::State *actualGoal,
-                                        og::PathGeometric &geometricSolution,
+                                        const std::vector<SparseVertex> &candidateGoals, const base::State *actualStart,
+                                        const base::State *actualGoal, og::PathGeometric &geometricSolution,
                                         const base::PlannerTerminationCondition &ptc)
 {
     // Try every combination of nearby start and goal pairs
@@ -351,7 +375,8 @@ bool BoltRetrieveRepair::getPathOnGraph(const std::vector<SparseVertex> &candida
             // Repeatidly search through graph for connection then check for collisions then repeat
             if (lazyCollisionSearch(start, goal, actualStart, actualGoal, geometricSolution, ptc))
             {
-                // All save trajectories should be at least 1 state long, then we append the start and goal states, for min of 3
+                // All save trajectories should be at least 1 state long, then we append the start and goal states, for
+                // min of 3
                 assert(geometricSolution.getStateCount() >= 3);
 
                 // Found a path
@@ -400,18 +425,18 @@ bool BoltRetrieveRepair::lazyCollisionSearch(const SparseVertex &start, const Sp
     const bool visualize = false;
     if (visualize)
     {
-      OMPL_INFORM("viz start -----------------------------");
-      visual_->viz5StateCallback(sparseDB_->getSparseStateConst(start), 4, 1);
-      visual_->viz5EdgeCallback(actualStart, sparseDB_->getSparseStateConst(start), 30);
-      visual_->viz5TriggerCallback();
-      usleep(5 * 1000000);
+        OMPL_INFORM("viz start -----------------------------");
+        visual_->viz5StateCallback(sparseDB_->getSparseStateConst(start), 4, 1);
+        visual_->viz5EdgeCallback(actualStart, sparseDB_->getSparseStateConst(start), 30);
+        visual_->viz5TriggerCallback();
+        usleep(5 * 1000000);
 
-      // Visualize goal vertex
-      OMPL_INFORM("viz goal ------------------------------");
-      visual_->viz5StateCallback(sparseDB_->getSparseStateConst(goal), 4, 1);
-      visual_->viz5EdgeCallback(actualGoal, sparseDB_->getSparseStateConst(goal), 0);
-      visual_->viz5TriggerCallback();
-      usleep(5 * 1000000);
+        // Visualize goal vertex
+        OMPL_INFORM("viz goal ------------------------------");
+        visual_->viz5StateCallback(sparseDB_->getSparseStateConst(goal), 4, 1);
+        visual_->viz5EdgeCallback(actualGoal, sparseDB_->getSparseStateConst(goal), 0);
+        visual_->viz5TriggerCallback();
+        usleep(5 * 1000000);
     }
 
     // Keep looking for paths between chosen start and goal until one is found that is valid,
@@ -552,7 +577,7 @@ bool BoltRetrieveRepair::findGraphNeighbors(const base::State *state, std::vecto
     // Filter neighbors based on level
     if (requiredLevel >= 0)
     {
-      removeVerticesNotOnLevel(graphNeighborhood, requiredLevel);
+        removeVerticesNotOnLevel(graphNeighborhood, requiredLevel);
     }
 
     // Check if no neighbors found
@@ -588,8 +613,8 @@ bool BoltRetrieveRepair::removeVerticesNotOnLevel(std::vector<SparseVertex> &gra
             continue;
         }
     }
-    OMPL_INFORM("removeVerticesNotOnLevel(): states require level %d, removed: %u, remaining: %u",
-        level, original_size - graphNeighborhood.size(), graphNeighborhood.size());
+    OMPL_INFORM("removeVerticesNotOnLevel(): states require level %d, removed: %u, remaining: %u", level,
+                original_size - graphNeighborhood.size(), graphNeighborhood.size());
 
     return true;
 }
@@ -602,7 +627,7 @@ bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<SparseVertex> 
     if (!vertexPath.size())
         return false;
 
-    //og::PathGeometric *pathGeometric = new og::PathGeometric(si_);
+    // og::PathGeometric *pathGeometric = new og::PathGeometric(si_);
 
     // Add original start if it is different than the first state
     if (actualStart != sparseDB_->getSparseStateConst(vertexPath.back()))
