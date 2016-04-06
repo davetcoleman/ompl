@@ -74,6 +74,9 @@ OMPL_CLASS_FORWARD(SparseDB);
 /** \class ompl::tools::bolt::BoltDBPtr
     \brief A boost shared pointer wrapper for ompl::tools::bolt::BoltDB */
 
+static const double MAX_POPULARITY_WEIGHT = 100.0; // 100 means the edge is very unpopular
+static const double POPULARITY_WEIGHT_REDUCTION = 5; // Everytime an edge is used, it is reduced by this amount (becomes more popular)
+
 /** \brief Save and load entire paths from file */
 class BoltDB
 {
@@ -402,7 +405,7 @@ class BoltDB
                              std::vector<DenseVertex>& neighbors);
 
     /** \brief Shortcut for visualizing an edge */
-    void viz5Edge(DenseEdge& e);
+    void viz1Edge(DenseEdge& e);
 
     /** \brief Error checking function to ensure solution has correct task path/level changes */
     bool checkTaskPathSolution(geometric::PathGeometric& path, base::State* start, base::State* goal);
@@ -510,11 +513,14 @@ class BoltDB
     bool visualizeCartPath_;
     bool visualizeSnapPath_;
 
+    /** \brief Visualization speed of astar search, num of seconds to show each vertex */
+    double visualizeAstarSpeed_;
+
     /** \brief Distance between grid points (discretization level) */
     double discretization_;
 
-    // Visualization speed of astar search, num of seconds to show each vertex
-    double visualizeAstarSpeed_;
+    /** \brief Keep the average cost of the graph at this level */
+    double desiredAverageCost_;
 
 };  // end of class BoltDB
 

@@ -177,6 +177,7 @@ SparseDB::SparseDB(base::SpaceInformationPtr si, BoltDB *boltDB, VisualizerPtr v
   , fourthCheckVerbose_(true)
   , visualizeAstar_(false)
   , visualizeSparsCreation_(false)
+  , visualizeSparsCreationSpeed_(0.0)
   , visualizeDenseRepresentatives_(false)
   , visualizeAstarSpeed_(0.1)
   , sparseCreationInsertionOrder_(0)
@@ -484,6 +485,11 @@ void SparseDB::createSPARS()
     {
         displayDatabase();
     }
+    else if (visualizeSparsCreationSpeed_ < std::numeric_limits<double>::epsilon())
+    {
+        visual_->viz2TriggerCallback();
+        usleep(0.001 * 1000000);
+    }
 
     // Statistics
     std::cout << std::endl;
@@ -594,13 +600,22 @@ bool SparseDB::findSparseRepresentatives()
 
 bool SparseDB::getPopularityOrder(std::vector<WeightedVertex> &vertexInsertionOrder)
 {
-    bool verbose = false;
+    OMPL_ERROR("getPopularityOrder");
+    bool verbose = true;
 
     // Error check
     if (!boltDB_->getNumVertices())
     {
         OMPL_ERROR("Unable to get vertices in order of popularity becayse dense graph is empty");
         exit(-1);
+    }
+
+    // Visualize - clear image
+    if (visualizeSparsCreation_)
+    {
+        visual_->viz3StateCallback(getSparseStateConst(queryVertex_), /* type = deleteAllMarkers */ 0, 0);
+        visual_->viz3TriggerCallback();
+        usleep(0.001 * 1000000);
     }
 
     // Sort the verticies by popularity in a queue
@@ -644,8 +659,6 @@ bool SparseDB::getPopularityOrder(std::vector<WeightedVertex> &vertexInsertionOr
         // Visualize
         if (visualizeSparsCreation_)
         {
-            // std::cout << "  Visualizing vertex " << v << " with popularity " << weightPercent
-            //<< " queue remaining size " << pqueue.size() << std::endl;
             visual_->viz3StateCallback(boltDB_->stateProperty_[pqueue.top().v_], /*mode=*/7, weightPercent);
         }
 
@@ -653,7 +666,7 @@ bool SparseDB::getPopularityOrder(std::vector<WeightedVertex> &vertexInsertionOr
         pqueue.pop();
     }
     visual_->viz3TriggerCallback();
-    usleep(0.01 * 1000000);
+    usleep(0.001 * 1000000);
 
     return true;
 }
@@ -707,7 +720,7 @@ bool SparseDB::getDefaultOrder(std::vector<WeightedVertex> &vertexInsertionOrder
     }
 
     visual_->viz3TriggerCallback();
-    usleep(0.01 * 1000000);
+    usleep(0.001 * 1000000);
 
     return true;
 }
@@ -1283,9 +1296,11 @@ SparseVertex SparseDB::addVertex(DenseVertex denseV, const GuardType &type)
     {
         // visual_->viz2StateCallback(getSparseState(v), /*mode=*/ getVizVertexType(type), sparseDelta_);
         visual_->viz2StateCallback(getSparseState(v), /*mode=*/4, sparseDelta_);
-        visual_->viz2TriggerCallback();
-        usleep(0.01 * 1000000);
-        //usleep(0.1 * 1000000);
+        if (visualizeSparsCreationSpeed_ > std::numeric_limits<double>::epsilon())
+        {
+            visual_->viz2TriggerCallback();
+            usleep(visualizeSparsCreationSpeed_ * 1000000);
+        }
     }
 
     return v;
@@ -1341,8 +1356,11 @@ void SparseDB::addEdge(SparseVertex v1, SparseVertex v2, std::size_t visualColor
            100 - interface second round
         */
         visual_->viz2EdgeCallback(getSparseState(v1), getSparseState(v2), visualColor);
-        visual_->viz2TriggerCallback();
-        usleep(0.001*1000000);
+        if (visualizeSparsCreationSpeed_ > std::numeric_limits<double>::epsilon())
+        {
+            visual_->viz2TriggerCallback();
+            usleep(visualizeSparsCreationSpeed_ * 1000000);
+        }
     }
 }
 

@@ -79,9 +79,6 @@ otb::BoltDB::edgeWeightMap::edgeWeightMap(const DenseGraph &graph, const DenseEd
 
 double otb::BoltDB::edgeWeightMap::get(DenseEdge e) const
 {
-    // Maximum cost an edge can have based on popularity
-    const double MAX_POPULARITY_WEIGHT = 100.0;
-
     // Get the status of collision checking for this edge
     if (collisionStates_[e] == IN_COLLISION)
         return std::numeric_limits<double>::infinity();
@@ -165,8 +162,9 @@ otb::BoltDB::BoltDB(base::SpaceInformationPtr si, VisualizerPtr visual)
   , visualizeCartNeighbors_(false)
   , visualizeCartPath_(false)
   , visualizeSnapPath_(false)
-  , discretization_(2.0)
   , visualizeAstarSpeed_(0.1)
+  , discretization_(2.0)
+  , desiredAverageCost_(90)
 {
     // Add search state
     initializeQueryState();
@@ -289,7 +287,7 @@ bool otb::BoltDB::load(const std::string &fileName)
 
 bool otb::BoltDB::postProcessPath(og::PathGeometric &solutionPath)
 {
-    bool verbose = false;
+    bool verbose = true;
 
     // Prevent inserting into database
     if (!savingEnabled_)
@@ -333,7 +331,7 @@ bool otb::BoltDB::postProcessPath(og::PathGeometric &solutionPath)
     if (visualizeSnapPath_)
     {
         visual_->viz5TriggerCallback();
-        usleep(0.1 * 1000000);
+        usleep(0.001 * 1000000);
     }
 
     // Error check
@@ -378,13 +376,12 @@ bool otb::BoltDB::postProcessPath(og::PathGeometric &solutionPath)
         {
             // reduce cost of this edge because it was just used (increase popularity)
             // Note: 100 is an *unpopular* edge, and 0 is a super highway
-            static const double REDUCTION_AMOUNT = 5;
             if (verbose)
             {
                 std::cout << "Edge weight for vertex " << vertexID << " of edge " << edge << std::endl;
                 std::cout << "    old: " << edgeWeightProperty_[edge];
             }
-            edgeWeightProperty_[edge] = std::max(edgeWeightProperty_[edge] - REDUCTION_AMOUNT, 0.0);
+            edgeWeightProperty_[edge] = std::max(edgeWeightProperty_[edge] - POPULARITY_WEIGHT_REDUCTION, 0.0);
             if (verbose)
                 std::cout << " new: " << edgeWeightProperty_[edge] << std::endl;
 
@@ -402,6 +399,10 @@ bool otb::BoltDB::postProcessPath(og::PathGeometric &solutionPath)
     {
         visual_->viz5TriggerCallback();
     }
+
+    // Ensure graph doesn't get too popular
+    if (getPopularityBiasEnabled())
+        normalizeGraphEdgeWeights();
 
     // Record this new addition
     graphUnsaved_ = true;
@@ -1098,7 +1099,7 @@ void otb::BoltDB::generateGrid()
 
     // Display
     if (visualizeGridGeneration_)
-        visual_->viz5TriggerCallback();
+        visual_->viz1TriggerCallback();
 
     // Mark the graph as ready to be saved
     graphUnsaved_ = true;
@@ -1133,8 +1134,8 @@ void otb::BoltDB::generateTaskSpace()
         // Visualize - only do this for 2/3D environments
         if (visualizeGridGeneration_)
         {
-            visual_->viz5StateCallback(newState, 5, 1);  // Candidate node has already (just) been added
-            visual_->viz5TriggerCallback();
+            visual_->viz1StateCallback(newState, 5, 1);  // Candidate node has already (just) been added
+            visual_->viz1TriggerCallback();
             usleep(0.005 * 1000000);
         }
     }
@@ -1166,10 +1167,10 @@ void otb::BoltDB::generateTaskSpace()
         // Visualize
         if (visualizeGridGeneration_)
         {
-            viz5Edge(newE);
+            viz1Edge(newE);
             if (i % 100 == 0)
             {
-                visual_->viz5TriggerCallback();
+                visual_->viz1TriggerCallback();
                 usleep(0.01 * 1000000);
             }
         }
@@ -1177,7 +1178,7 @@ void otb::BoltDB::generateTaskSpace()
 
     // Visualize
     if (visualizeGridGeneration_)
-        visual_->viz5TriggerCallback();
+        visual_->viz1TriggerCallback();
 
     OMPL_INFORM("Done generating task space graph");
 }
@@ -1195,7 +1196,7 @@ void otb::BoltDB::generateEdges()
     // Nearest Neighbor search
     std::vector<DenseVertex> graphNeighborhood;
     std::vector<DenseEdge> unvalidatedEdges;
-    std::size_t feedbackFrequency = getNumVertices() / 10;
+    std::size_t feedbackFrequency = std::max(static_cast<int>(getNumVertices() / 10), 10);
 
     // Loop through each vertex
     for (std::size_t v1 = 1; v1 < getNumVertices(); ++v1)  // 1 because 0 is the search vertex?
@@ -1244,7 +1245,7 @@ void otb::BoltDB::generateEdges()
 
         // Clear all visuals
         // if (visualizeGridGeneration_)
-        //     visual_->viz5StateCallback(stateProperty_[v1], 0, 1);
+        //     visual_->viz1StateCallback(stateProperty_[v1], 0, 1);
 
         // For each nearby vertex, add an edge
         std::size_t errorCheckNumSameVerticies = 0;
@@ -1264,7 +1265,7 @@ void otb::BoltDB::generateEdges()
 
             // Debug: display edge
             if (visualizeGridGeneration_)
-                visual_->viz5EdgeCallback(stateProperty_[v1], stateProperty_[v2], 1);
+                visual_->viz1EdgeCallback(stateProperty_[v1], stateProperty_[v2], 1);
 
             // Check if these vertices already share an edge
             {
@@ -1281,6 +1282,7 @@ void otb::BoltDB::generateEdges()
             }
 
             // Create edge - maybe removed later
+            //DenseEdge e = addEdge(v1, v2, desiredAverageCost_);
             DenseEdge e = addEdge(v1, v2, 0);
             unvalidatedEdges.push_back(e);
 
@@ -1292,7 +1294,7 @@ void otb::BoltDB::generateEdges()
 
         if (visualizeGridGeneration_)
         {
-            visual_->viz5TriggerCallback();
+            visual_->viz1TriggerCallback();
             usleep(0.01 * 1000000);
         }
 
@@ -1330,7 +1332,7 @@ void otb::BoltDB::generateEdges()
         double cost;
         if (popularityBiasEnabled_)
         {
-            cost = 100;
+            cost = MAX_POPULARITY_WEIGHT;
         }
         else
         {
@@ -1343,10 +1345,10 @@ void otb::BoltDB::generateEdges()
         // Debug in Rviz
         if (visualizeGridGeneration_)
         {
-            visual_->viz5EdgeCallback(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
+            visual_->viz1EdgeCallback(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
             if (errorCheckCounter % 100 == 0)
             {
-                visual_->viz5TriggerCallback();
+                visual_->viz1TriggerCallback();
                 usleep(0.01 * 1000000);
             }
         }
@@ -1466,7 +1468,7 @@ void otb::BoltDB::checkEdgesThread(std::size_t startEdge, std::size_t endEdge, b
     }
 }
 
-void otb::BoltDB::recursiveDiscretization(std::vector<double> &values, std::size_t joint_id, std::size_t desired_depth)
+void otb::BoltDB::recursiveDiscretization(std::vector<double> &values, std::size_t joint_id, std::size_t desiredDepth)
 {
     ob::RealVectorBounds bounds = si_->getStateSpace()->getBounds();
 
@@ -1490,10 +1492,10 @@ void otb::BoltDB::recursiveDiscretization(std::vector<double> &values, std::size
         }
 
         // Check if we are at the end of the recursion
-        if (joint_id < desired_depth - 1)
+        if (joint_id < desiredDepth - 1)
         {
             // Keep recursing
-            recursiveDiscretization(values, joint_id + 1, desired_depth);
+            recursiveDiscretization(values, joint_id + 1, desiredDepth);
         }
         else  // this is the end of recursion, create a new state
         {
@@ -1517,9 +1519,9 @@ void otb::BoltDB::recursiveDiscretization(std::vector<double> &values, std::size
             // Visualize
             if (visualizeGridGeneration_)
             {
-                visual_->viz5StateCallback(nextDiscretizedState_, 5,
+                visual_->viz1StateCallback(nextDiscretizedState_, 5,
                                             1);  // Candidate node has already (just) been added
-                visual_->viz5TriggerCallback();
+                visual_->viz1TriggerCallback();
                 usleep(0.005 * 1000000);
             }
 
@@ -1656,6 +1658,7 @@ void otb::BoltDB::displayDatabase(bool showVertices)
             const DenseVertex &v2 = boost::target(e, g_);
 
             // Visualize
+            assert(edgeWeightProperty_[e] <= MAX_POPULARITY_WEIGHT);
             visual_->viz1EdgeCallback(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
 
             // Prevent cache from getting too big
@@ -1683,9 +1686,6 @@ void otb::BoltDB::normalizeGraphEdgeWeights()
         return;
     }
 
-    // Maximum cost an edge can have based on popularity
-    const double MAX_POPULARITY_WEIGHT = 100.0;
-
     // Normalize weight of graph
     double total_cost = 0;
     foreach (DenseEdge e, boost::edges(g_))
@@ -1693,24 +1693,27 @@ void otb::BoltDB::normalizeGraphEdgeWeights()
         total_cost += edgeWeightProperty_[e];
     }
     double avg_cost = total_cost / getNumEdges();
-    OMPL_INFORM("Average cost of the edges in graph is %f", avg_cost);
-    double desired_avg_cost = 90;
+    OMPL_ERROR("Average cost of the edges in graph is %f", avg_cost);
 
-    if (avg_cost < desired_avg_cost)  // need to decrease cost in graph
+    if (avg_cost < desiredAverageCost_)  // need to decrease cost in graph
     {
-        double avg_cost_diff = desired_avg_cost - avg_cost;
-        std::cout << "avg_cost_diff: " << avg_cost_diff << std::endl;
-        double perEdge_reduction = avg_cost_diff;  // / getNumEdges();
-        OMPL_INFORM("Decreasing each edge's cost by %f", perEdge_reduction);
+        double avgCostDiff = desiredAverageCost_ - avg_cost;
+        std::cout << "avgCostDiff: " << avgCostDiff << std::endl;
+        double perEdgeReduction = avgCostDiff;  // / getNumEdges();
+        OMPL_INFORM("Decreasing each edge's cost by %f", perEdgeReduction);
         foreach (DenseEdge e, boost::edges(g_))
         {
-            edgeWeightProperty_[e] = std::min(edgeWeightProperty_[e] + perEdge_reduction, MAX_POPULARITY_WEIGHT);
+            assert(edgeWeightProperty_[e] <= MAX_POPULARITY_WEIGHT);
+            edgeWeightProperty_[e] = std::min(edgeWeightProperty_[e] + perEdgeReduction, MAX_POPULARITY_WEIGHT);
+            std::cout << "Edge " << e << " now has weight " << edgeWeightProperty_[e] << " via reduction " << perEdgeReduction << std::endl;
         }
     }
     else
     {
         OMPL_INFORM("Not decreasing all edge's cost because average is above desired");
     }
+    usleep(1*1000000);
+    std::cout << "-------------------------------------------------------" << std::endl;
 }
 
 otb::DenseVertex otb::BoltDB::addVertex(base::State *state, const GuardType &type)
@@ -1851,9 +1854,9 @@ bool otb::BoltDB::addCartPath(std::vector<base::State *> path)
         // Visualize
         if (visualizeCartPath_)
         {
-            visual_->viz5EdgeCallback(path[i - 1], path[i], 0);
-            visual_->viz5StateCallback(path[i], /*mode=*/1, 1);
-            visual_->viz5TriggerCallback();
+            visual_->viz1EdgeCallback(path[i - 1], path[i], 0);
+            visual_->viz1StateCallback(path[i], /*mode=*/1, 1);
+            visual_->viz1TriggerCallback();
             usleep(0.001 * 1000000);
         }
     }
@@ -1903,16 +1906,16 @@ bool otb::BoltDB::connectStateToNeighborsAtLevel(const DenseVertex &fromVertex, 
         const double cost = (level == 0 ? 100 : 50);
         if (visualizeCartNeighbors_)
         {
-            visual_->viz5EdgeCallback(stateProperty_[v], stateProperty_[fromVertex], cost);
-            visual_->viz5StateCallback(stateProperty_[v], /*mode=*/1, 1);
-            visual_->viz5TriggerCallback();
+            visual_->viz1EdgeCallback(stateProperty_[v], stateProperty_[fromVertex], cost);
+            visual_->viz1StateCallback(stateProperty_[v], /*mode=*/1, 1);
+            visual_->viz1TriggerCallback();
             usleep(0.001 * 1000000);
         }
     }
 
     // Display ---------------------------------------
     if (visualizeCartNeighbors_)
-        visual_->viz5TriggerCallback();
+        visual_->viz1TriggerCallback();
 
     return true;
 }
@@ -1960,13 +1963,13 @@ void otb::BoltDB::getNeighborsAtLevel(const base::State *origState, const std::s
     }
 }
 
-void otb::BoltDB::viz5Edge(DenseEdge &e)
+void otb::BoltDB::viz1Edge(DenseEdge &e)
 {
     const DenseVertex &v1 = boost::source(e, g_);
     const DenseVertex &v2 = boost::target(e, g_);
 
     // Visualize
-    visual_->viz5EdgeCallback(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
+    visual_->viz1EdgeCallback(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
 }
 
 bool otb::BoltDB::checkTaskPathSolution(og::PathGeometric &path, ob::State *start, ob::State *goal)
