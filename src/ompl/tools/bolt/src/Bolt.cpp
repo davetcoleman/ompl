@@ -119,11 +119,6 @@ void Bolt::setPlannerAllocator(const base::PlannerAllocator &pa)
 
 base::PlannerStatus Bolt::solve(const base::PlannerTerminationCondition &ptc)
 {
-    // we provide a duplicate implementation here to allow the planner to choose how the time is turned into a planner
-    // termination condition
-
-    OMPL_INFORM("Bolt::solve()");
-
     // Setup again in case it has not been done yet
     setup();
 
@@ -131,11 +126,11 @@ base::PlannerStatus Bolt::solve(const base::PlannerTerminationCondition &ptc)
     time::point start = time::now();
 
     // Warn if there are queued paths that have not been added to the experience database
-    if (!queuedSolutionPaths_.empty())
-    {
-        OMPL_INFORM("Previous solved paths are currently uninserted into the experience database and are in the "
-                    "post-proccessing queue");
-    }
+    //if (!queuedSolutionPaths_.empty())
+    //{
+        //OMPL_INFORM("Previous solved paths are currently uninserted into the experience database and are in the "
+        //"post-proccessing queue");
+    //}
 
     // SOLVE
     lastStatus_ = boltPlanner_->solve(ptc);
@@ -186,10 +181,14 @@ base::PlannerStatus Bolt::solve(const base::PlannerTerminationCondition &ptc)
         OMPL_INFORM("Solution path has %d states and was generated from planner %s", solutionPath.getStateCount(),
                     getSolutionPlannerName().c_str());
 
+        // Check for repeated states
+        if (!checkRepeatedStates(solutionPath))
+            exit(-1);
+
         // Do not save if approximate
         if (!haveExactSolutionPath())
         {
-            OMPL_ERROR("BOLT RESULTS: Approximate - how did this happen??");
+            OMPL_ERROR("BOLT RESULTS: Approximate - should not happen!");
             exit(-1);
         }
 
@@ -209,7 +208,7 @@ base::PlannerStatus Bolt::solve(const base::PlannerTerminationCondition &ptc)
         else
         {
             // Queue the solution path for future insertion into experience database (post-processing)
-            queuedSolutionPaths_.push_back(solutionPath);
+            //queuedSolutionPaths_.push_back(solutionPath);
         }
     }
 
@@ -224,6 +223,19 @@ base::PlannerStatus Bolt::solve(const base::PlannerTerminationCondition &ptc)
 
     return lastStatus_;
 }
+
+    bool Bolt::checkRepeatedStates(const og::PathGeometric& path)
+    {
+        for (std::size_t i = 1; i < path.getStateCount(); ++i)
+        {
+            if (si_->getStateSpace()->equalStates(path.getState(i-1), path.getState(i)))
+            {
+                OMPL_ERROR("Duplicate state found on trajectory at %u out of %u", i, path.getStateCount());
+                return false;
+            }
+        }
+        return true;
+    }
 
 base::PlannerStatus Bolt::solve(double time)
 {
@@ -348,6 +360,7 @@ BoltDBPtr Bolt::getExperienceDB()
 
 bool Bolt::doPostProcessing()
 {
+    return true;
     queuedSolutionPaths_.clear();
 
     OMPL_WARN("Performing post-processing for %i queued solution paths", queuedSolutionPaths_.size());

@@ -77,7 +77,9 @@ OMPL_CLASS_FORWARD(BoltDB);
 /** \brief Save and load entire paths from file */
 class SparseDB
 {
+    friend class BoltRetrieveRepair;
     friend class BoltDB;
+
   public:
     ////////////////////////////////////////////////////////////////////////////////////////
     /**
@@ -212,6 +214,15 @@ class SparseDB
     /** \brief Free all the memory allocated by the database */
     void freeMemory();
 
+    /**
+     * \brief Check if anything has been loaded into DB
+     * \return true if has no nodes
+     */
+    bool isEmpty()
+    {
+        return !getNumVertices();
+    }
+
     /** \brief Compute distance between two milestones (this is simply distance between the states of the milestones) */
     double distanceFunction(const SparseVertex a, const SparseVertex b) const;
 
@@ -319,19 +330,22 @@ class SparseDB
     /** \brief Special flag for tracking mode when inserting into sparse graph */
     bool secondSparseInsertionAttempt_;
 
+    /** \brief Amount of sub-optimality allowed */
+    double sparseDelta_;
+
   public:
 
     /** \brief SPARS parameter for dense graph connection distance as a fraction of max. extent */
     double denseDeltaFraction_;
+
+    /** \brief Maximum visibility range for nodes in the graph as a fraction of maximum extent. */
+    double sparseDeltaFraction_;
 
     /** \brief The stretch factor in terms of graph spanners for SPARS to check against */
     double stretchFactor_;
 
     /** \brief SPARS parameter for dense graph connection distance */
     double denseDelta_;
-
-    /** \brief Amount of sub-optimality allowed */
-    double sparseDelta_;
 
     bool checksVerbose_;
     bool fourthCheckVerbose_;

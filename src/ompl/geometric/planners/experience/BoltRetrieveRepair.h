@@ -41,6 +41,7 @@
 #include <ompl/geometric/PathGeometric.h>
 #include <ompl/geometric/PathSimplifier.h>
 #include <ompl/tools/bolt/BoltDB.h>
+#include <ompl/tools/bolt/Visualizer.h>
 
 // Boost
 #include <boost/lambda/bind.hpp>
@@ -201,6 +202,10 @@ class BoltRetrieveRepair : public base::Planner
 
     /** \brief The database of motions to search through */
     BoltDBPtr boltDB_;
+    SparseDBPtr sparseDB_;
+
+    /** \brief Class for managing various visualization features */
+    VisualizerPtr visual_;
 
     /** \brief Save the recalled path before smoothing for introspection later */
     boost::shared_ptr<geometric::PathGeometric> originalSolutionPath_;

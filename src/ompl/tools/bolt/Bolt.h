@@ -141,6 +141,9 @@ class Bolt : public tools::ExperienceSetup
     /** \brief Run the planner until \e ptc becomes true (at most) */
     virtual base::PlannerStatus solve(const base::PlannerTerminationCondition &ptc);
 
+    /** \brief Sanity check for solution paths */
+    bool checkRepeatedStates(const geometric::PathGeometric& path);
+
     /** \brief Save the experience database to file */
     bool save();
 
