@@ -204,11 +204,12 @@ class BoltDB
      * \param roadmapPath - resulting path that is 'snapped' onto the pre-existing roadmap
      * \param currVertexIndex - index in inputPath (smoothed path) that we are trying to connect to
      * \param prevGraphVertex - vertex we are trying to connect to
-     * \param allValid - flag to determine if any of the edges were never found to be valdi
+     * \param allValid - flag to determine if any of the edges were never found to be valid
+     * \param verbose - whether to show lots of debug output to console
      * \return true on success
      */
     bool recurseSnapWaypoints(ompl::geometric::PathGeometric& inputPath, std::vector<DenseVertex>& roadmapPath,
-                              std::size_t currVertexIndex, const DenseVertex& prevGraphVertex, bool& allValid);
+        std::size_t currVertexIndex, const DenseVertex& prevGraphVertex, bool& allValid, bool verbose);
 
     /**
      * \brief Save loaded database to file, except skips saving if no paths have been added
@@ -309,6 +310,9 @@ class BoltDB
 
     /** \brief Clone the graph to have second and third layers for task planning then free space planning */
     void generateTaskSpace();
+
+    /** \brief Helper function to calculate connectivity based on dimensionality */
+    std::size_t getEdgesPerVertex();
 
     /**
      * \brief Connect vertices wherever possible
@@ -436,6 +440,13 @@ class BoltDB
     {
         return sparseDB_;
     }
+
+    /**
+     * \brief Sometimes the dense graph's discretization is not enough, so we have the ability to manually add
+     *        samples and connect to the graph
+     * \param state - new node that covers a currently un-visible region of the configuration space
+     */
+    void addSample(const base::State *state);
 
   protected:
     /** \brief The created space information */

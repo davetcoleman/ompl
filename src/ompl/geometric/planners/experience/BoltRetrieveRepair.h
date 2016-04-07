@@ -92,6 +92,9 @@ class BoltRetrieveRepair : public base::Planner
 
     virtual ~BoltRetrieveRepair(void);
 
+    /** \brief Wrapper function to show good user feedback while smoothing a path */
+    bool simplifyPath(geometric::PathGeometric &path, const base::PlannerTerminationCondition &ptc);
+
     /** \brief Get information about the exploration data structure the planning from scratch motion planner used. */
     virtual void getPlannerData(base::PlannerData &data) const;
 
@@ -167,12 +170,15 @@ class BoltRetrieveRepair : public base::Planner
     bool findGraphNeighbors(const base::State *state, std::vector<bolt::DenseVertex> &graphNeighborhood, int requiredLevel = -1);
 
     /** \brief Check if there exists a solution, i.e., there exists a pair of milestones such that the
-        first is in \e start and the second is in \e goal, and the two milestones are in the same
-        connected component. If a solution is found, the path is saved. */
+     *   first is in \e start and the second is in \e goal, and the two milestones are in the same
+     *   connected component. If a solution is found, the path is saved.
+     * \param debug - whether to show the failure points
+     * \param feedbackStartFailed - if getPathOnGraph returns false, this flag determines if the start or goal node failed to conenct
+     */
     bool getPathOnGraph(const std::vector<bolt::DenseVertex> &candidateStarts,
                         const std::vector<bolt::DenseVertex> &candidateGoals, const base::State *actualStart,
                         const base::State *actualGoal, geometric::PathGeometric &geometricSolution,
-                        const base::PlannerTerminationCondition &ptc);
+        const base::PlannerTerminationCondition &ptc, bool debug, bool &feedbackStartFailed);
 
     /**
      * \brief Repeatidly search through graph for connection then check for collisions then repeat

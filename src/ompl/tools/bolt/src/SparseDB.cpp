@@ -65,12 +65,12 @@ namespace ob = ompl::base;
 BOOST_CONCEPT_ASSERT((boost::ReadablePropertyMapConcept<otb::SparseDB::edgeWeightMap, otb::SparseEdge>));
 
 otb::SparseDB::edgeWeightMap::edgeWeightMap(const SparseGraph &graph,
-                                            const SparseEdgeCollisionStateMap &collisionStates,
-                                            const double &popularityBias, const bool popularityBiasEnabled)
-  : g_(graph)
-  , collisionStates_(collisionStates)
-  , popularityBias_(popularityBias)
-  , popularityBiasEnabled_(popularityBiasEnabled)
+    const SparseEdgeCollisionStateMap &collisionStates,
+    const double &popularityBias, const bool popularityBiasEnabled)
+    : g_(graph)
+    , collisionStates_(collisionStates)
+    , popularityBias_(popularityBias)
+    , popularityBiasEnabled_(popularityBiasEnabled)
 {
 }
 
@@ -106,10 +106,10 @@ double otb::SparseDB::edgeWeightMap::get(SparseEdge e) const
 
 namespace boost
 {
-double get(const otb::SparseDB::edgeWeightMap &m, const otb::SparseEdge &e)
-{
-    return m.get(e);
-}
+    double get(const otb::SparseDB::edgeWeightMap &m, const otb::SparseEdge &e)
+    {
+        return m.get(e);
+    }
 }
 
 // CustomAstarVisitor methods ////////////////////////////////////////////////////////////////////////////
@@ -117,7 +117,7 @@ double get(const otb::SparseDB::edgeWeightMap &m, const otb::SparseEdge &e)
 BOOST_CONCEPT_ASSERT((boost::AStarVisitorConcept<otb::SparseDB::CustomAstarVisitor, otb::SparseGraph>));
 
 otb::SparseDB::CustomAstarVisitor::CustomAstarVisitor(SparseVertex goal, SparseDB *parent)
-  : goal_(goal), parent_(parent)
+    : goal_(goal), parent_(parent)
 {
 }
 
@@ -144,337 +144,352 @@ void otb::SparseDB::CustomAstarVisitor::examine_vertex(SparseVertex v, const Spa
 
 namespace ompl
 {
-namespace tools
-{
-namespace bolt
-{
-SparseDB::SparseDB(base::SpaceInformationPtr si, BoltDB *boltDB, VisualizerPtr visual)
-  : si_(si)
-  , boltDB_(boltDB)
-  , visual_(visual)
-  , smoothingGeomPath_(si)
-  // Property accessors of edges
-  , edgeWeightPropertySparse_(boost::get(boost::edge_weight, g_))
-  , edgeCollisionStatePropertySparse_(boost::get(edge_collision_state_t(), g_))
-  // Property accessors of vertices
-  , denseVertexProperty_(boost::get(vertex_state2_t(), g_))
-  , typePropertySparse_(boost::get(vertex_type_t(), g_))
-  , nonInterfaceListsProperty_(boost::get(vertex_list_t(), g_))
-  , interfaceListsProperty_(boost::get(vertex_interface_list_t(), g_))
-  // Disjoint set accessors
-  , disjointSets_(boost::get(boost::vertex_rank, g_), boost::get(boost::vertex_predecessor, g_))
-  // Remember what round we're on
-  , secondSparseInsertionAttempt_(false)
-  // Derived properties
-  , sparseDelta_(2.0)
-  // Sparse properites
-  , denseDeltaFraction_(.05)
-  , sparseDeltaFraction_(.25)
-  //, denseDeltaFraction_(.001)
-  , stretchFactor_(3.)
-  // Visualization settings
-    , checksVerbose_(false)
-  , fourthCheckVerbose_(true)
-  , visualizeAstar_(false)
-  , visualizeSparsCreation_(false)
-  , visualizeSparsCreationSpeed_(0.0)
-  , visualizeDenseRepresentatives_(false)
-  , visualizeAstarSpeed_(0.1)
-  , sparseCreationInsertionOrder_(0)
-{
-    // Add search state
-    initializeQueryState();
-
-    // Initialize nearest neighbor datastructure
-    nn_.reset(new NearestNeighborsGNATNoThreadSafety<SparseVertex>());
-    nn_->setDistanceFunction(boost::bind(&otb::SparseDB::distanceFunction, this, _1, _2));
-
-    // Initialize path simplifier
-    psimp_.reset(new geometric::PathSimplifier(si_));
-    psimp_->freeStates(false);
-}
-
-SparseDB::~SparseDB(void)
-{
-    freeMemory();
-}
-
-void SparseDB::freeMemory()
-{
-    foreach (SparseVertex v, boost::vertices(g_))
+    namespace tools
     {
-        // foreach (InterfaceData &d, interfaceDataProperty_[v].interfaceHash |
-        // boost::adaptors::map_values)
-        // d.clear(si_);
-        if (getSparseState(v) != NULL)
-            si_->freeState(getSparseState(v));
-        // getSparseState(v) = NULL;  // TODO(davetcoleman): is this needed??
-    }
-    g_.clear();
-
-    if (nn_)
-        nn_->clear();
-}
-
-bool SparseDB::setup()
-{
-    // Calculate variables for the graph
-    const double maxExt = si_->getMaximumExtent();
-    sparseDelta_ = sparseDeltaFraction_ * maxExt;
-    denseDelta_ = denseDeltaFraction_ * maxExt;
-    //OMPL_INFORM("sparseDelta_ = %f", sparseDelta_);
-    //OMPL_INFORM("denseDelta_ = %f", denseDelta_);
-
-    assert(maxExt > 0);
-    assert(denseDelta_ > 0);
-
-    return true;
-}
-
-bool SparseDB::astarSearch(const SparseVertex start, const SparseVertex goal, std::vector<SparseVertex> &vertexPath)
-{
-    // Hold a list of the shortest path parent to each vertex
-    SparseVertex *vertexPredecessors = new SparseVertex[getNumVertices()];
-    // boost::vector_property_map<SparseVertex> vertexPredecessors(getNumVertices());
-
-    bool foundGoal = false;
-    double *vertexDistances = new double[getNumVertices()];
-
-    OMPL_INFORM("Beginning AStar Search");
-    try
-    {
-        double popularityBias = 0;
-        bool popularityBiasEnabled = false;
-        // Note: could not get astar_search to compile within BoltRetrieveRepair.cpp class because of
-        // namespacing issues
-        boost::astar_search(g_,     // graph
-                            start,  // start state
-                            // boost::bind(&otb::SparseDB::distanceFunction2, this, _1, goal),  // the heuristic
-                            boost::bind(&otb::SparseDB::distanceFunction, this, _1, goal),  // the heuristic
-                            // ability to disable edges (set cost to inifinity):
-                            boost::weight_map(edgeWeightMap(g_, edgeCollisionStatePropertySparse_, popularityBias,
-                                                            popularityBiasEnabled))
-                                .predecessor_map(vertexPredecessors)
-                                .distance_map(&vertexDistances[0])
-                                .visitor(CustomAstarVisitor(goal, this)));
-    }
-    catch (foundGoalException &)
-    {
-        // the custom exception from CustomAstarVisitor
-        OMPL_INFORM("astarSearch: Astar found goal vertex. distance to goal: %f", vertexDistances[goal]);
-
-        if (vertexDistances[goal] > 1.7e+308)  // TODO(davetcoleman): fix terrible hack for detecting infinity
-        // double diff = d[goal] - std::numeric_limits<double>::infinity();
-        // if ((diff < std::numeric_limits<double>::epsilon()) && (-diff <
-        // std::numeric_limits<double>::epsilon()))
-        // check if the distance to goal is inifinity. if so, it is unreachable
-        // if (d[goal] >= std::numeric_limits<double>::infinity())
+        namespace bolt
         {
-            OMPL_INFORM("Distance to goal is infinity");
-            foundGoal = false;
-        }
-        else
-        {
-            // Only clear the vertexPath after we know we have a new solution, otherwise it might have a good
-            // previous one
-            vertexPath.clear();  // remove any old solutions
+            SparseDB::SparseDB(base::SpaceInformationPtr si, BoltDB *boltDB, VisualizerPtr visual)
+                : si_(si)
+                , boltDB_(boltDB)
+                , visual_(visual)
+                , smoothingGeomPath_(si)
+                  // Property accessors of edges
+                , edgeWeightPropertySparse_(boost::get(boost::edge_weight, g_))
+                , edgeCollisionStatePropertySparse_(boost::get(edge_collision_state_t(), g_))
+                  // Property accessors of vertices
+                , denseVertexProperty_(boost::get(vertex_state2_t(), g_))
+                , typePropertySparse_(boost::get(vertex_type_t(), g_))
+                , nonInterfaceListsProperty_(boost::get(vertex_list_t(), g_))
+                , interfaceListsProperty_(boost::get(vertex_interface_list_t(), g_))
+                // Disjoint set accessors
+                , disjointSets_(boost::get(boost::vertex_rank, g_), boost::get(boost::vertex_predecessor, g_))
+                // Remember what round we're on
+                , secondSparseInsertionAttempt_(false)
+                // Derived properties
+                , sparseDelta_(2.0)
+                // Sparse properites
+                , denseDeltaFraction_(.05)
+                , sparseDeltaFraction_(.25)
+                //, denseDeltaFraction_(.001)
+                , stretchFactor_(3.)
+                // Visualization settings
+                , checksVerbose_(false)
+                , fourthCheckVerbose_(true)
+                , visualizeAstar_(false)
+                , visualizeSparsCreation_(false)
+                , visualizeSparsCreationSpeed_(0.0)
+                , visualizeDenseRepresentatives_(false)
+                , visualizeAstarSpeed_(0.1)
+                , sparseCreationInsertionOrder_(0)
+            {
+                // Add search state
+                initializeQueryState();
 
-            // Trace back the shortest path in reverse and only save the states
-            SparseVertex v;
-            for (v = goal; v != vertexPredecessors[v]; v = vertexPredecessors[v])
-            {
-                vertexPath.push_back(v);
-            }
-            if (v != goal)  // TODO explain this because i don't understand
-            {
-                vertexPath.push_back(v);
+                // Initialize nearest neighbor datastructure
+                nn_.reset(new NearestNeighborsGNATNoThreadSafety<SparseVertex>());
+                nn_->setDistanceFunction(boost::bind(&otb::SparseDB::distanceFunction, this, _1, _2));
+
+                // Initialize path simplifier
+                psimp_.reset(new geometric::PathSimplifier(si_));
+                psimp_->freeStates(false);
             }
 
-            foundGoal = true;
-        }
-    }
-
-    if (!foundGoal)
-        OMPL_WARN("        Did not find goal");
-
-    // Show all predecessors
-    if (visualizeAstar_)
-    {
-        OMPL_INFORM("        Show all predecessors");
-        for (std::size_t i = 1; i < getNumVertices(); ++i)  // skip vertex 0 b/c that is the search vertex
-        {
-            const SparseVertex v1 = i;
-            const SparseVertex v2 = vertexPredecessors[v1];
-            if (v1 != v2)
+            SparseDB::~SparseDB(void)
             {
-                // std::cout << "Edge " << v1 << " to " << v2 << std::endl;
-                visual_->viz4EdgeCallback(getSparseStateConst(v1), getSparseStateConst(v2), 10);
+                freeMemory();
             }
-        }
-        visual_->viz4TriggerCallback();
-    }
 
-    // Unload
-    delete[] vertexPredecessors;
-    delete[] vertexDistances;
-
-    // No solution found from start to goal
-    return foundGoal;
-}
-
-void SparseDB::debugVertex(const ompl::base::PlannerDataVertex &vertex)
-{
-    debugState(vertex.getState());
-}
-
-void SparseDB::debugState(const ompl::base::State *state)
-{
-    si_->printState(state, std::cout);
-}
-
-double SparseDB::distanceFunction(const SparseVertex a, const SparseVertex b) const
-{
-    // const double dist = si_->distance(getSparseState(a), getSparseState(b));
-    // std::cout << "getting distance from " << a << " to " << b << " of value " << dist << std::endl;
-    // return dist;
-    return si_->distance(getSparseStateConst(a), getSparseStateConst(b));
-}
-
-void SparseDB::initializeQueryState()
-{
-    if (boost::num_vertices(g_) < 1)
-    {
-        queryVertex_ = boost::add_vertex(g_);
-        denseVertexProperty_[queryVertex_] = boltDB_->queryVertex_;
-        getSparseState(queryVertex_) = NULL;
-    }
-}
-
-void SparseDB::clearEdgeCollisionStates()
-{
-    foreach (const SparseEdge e, boost::edges(g_))
-        edgeCollisionStatePropertySparse_[e] = NOT_CHECKED;  // each edge has an unknown state
-}
-
-void SparseDB::createSPARS()
-{
-    // Clear the old spars graph
-    if (getNumVertices() > 1)
-    {
-        OMPL_INFORM("Resetting sparse database, currently has %u states", getNumVertices());
-        g_.clear();
-
-        // Clear the nearest neighbor search
-        if (nn_)
-            nn_->clear();
-
-        // Re-add search state
-        initializeQueryState();
-
-        // Clear visuals
-        visual_->viz2StateCallback(getSparseStateConst(queryVertex_), /* type = deleteAllMarkers */ 0, 0);
-    }
-
-    // Reset fractions
-    setup();
-
-    // Get the ordering to insert vertices
-    std::vector<WeightedVertex> vertexInsertionOrder;
-
-    if (sparseCreationInsertionOrder_ == 0)
-        getPopularityOrder(vertexInsertionOrder);  // Create SPARs graph in order of popularity
-    else if (sparseCreationInsertionOrder_ == 1)
-        getDefaultOrder(vertexInsertionOrder);
-    else if (sparseCreationInsertionOrder_ == 2)
-        getRandomOrder(vertexInsertionOrder);
-    else
-    {
-        OMPL_ERROR("Unknown insertion order method");
-        exit(-1);
-    }
-
-    // Limit amount of time generating TODO(davetcoleman): remove this feature
-    double seconds = 1000;
-    ob::PlannerTerminationCondition ptc = ob::timedPlannerTerminationCondition(seconds, 0.1);
-
-    // Attempt to insert the verticies multiple times until no more succesful insertions occur
-    bool succeededInInserting = true;
-    secondSparseInsertionAttempt_ = false;
-    std::size_t loopAttempt = 0;
-    while (succeededInInserting)
-    {
-        std::cout << "-------------------------------------------------------" << std::endl;
-        std::cout << "Attempting to insert " << vertexInsertionOrder.size() << " vertices for the " << loopAttempt
-                  << " loop" << std::endl;
-
-        // Sanity check
-        if (loopAttempt > 3)
-            OMPL_WARN("Suprising number of loop when attempting to insert nodes into SPARS graph: %u", loopAttempt);
-
-        // Attempt to insert each vertex using the first 3 criteria
-        succeededInInserting = false;
-        std::size_t sucessfulInsertions = 0;
-        for (std::size_t i = 0; i < vertexInsertionOrder.size(); ++i)
-        {
-            // Attempt to insert into SPARS graph // TODO(davetcoleman): remove this timer
-            double seconds = 1000;
-            ob::PlannerTerminationCondition ptc = ob::timedPlannerTerminationCondition(seconds, 0.1);
-
-            // Customize the sparse delta fraction
-            // if (!secondSparseInsertionAttempt_)
-            // {
-            //     std::size_t minDelta = 2;
-            //     std::size_t maxDelta = 6;
-            //     double invertedPopularity = 100 - vertexInsertionOrder[i].weight_;
-            //     sparseDelta_ = invertedPopularity * (maxDelta - minDelta) / 100.0 + minDelta;
-            //     OMPL_INFORM("sparseDelta_ is now %f", sparseDelta_);
-            // }
-
-            // Run SPARS checks
-            if (!addStateToRoadmap(ptc, vertexInsertionOrder[i].v_))
+            void SparseDB::freeMemory()
             {
-                // std::cout << "Failed AGAIN to add state to roadmap------" << std::endl;
+                foreach (SparseVertex v, boost::vertices(g_))
+                {
+                    // foreach (InterfaceData &d, interfaceDataProperty_[v].interfaceHash |
+                    // boost::adaptors::map_values)
+                    // d.clear(si_);
+                    if (getSparseState(v) != NULL)
+                        si_->freeState(getSparseState(v));
+                    // getSparseState(v) = NULL;  // TODO(davetcoleman): is this needed??
+                }
+                g_.clear();
+
+                if (nn_)
+                    nn_->clear();
             }
-            else
+
+            bool SparseDB::setup()
             {
-                vertexInsertionOrder.erase(vertexInsertionOrder.begin() + i);
-                i--;
-                sucessfulInsertions++;
-                succeededInInserting = true;
+                // Calculate variables for the graph
+                const double maxExt = si_->getMaximumExtent();
+                sparseDelta_ = sparseDeltaFraction_ * maxExt;
+                denseDelta_ = denseDeltaFraction_ * maxExt;
+                //OMPL_INFORM("sparseDelta_ = %f", sparseDelta_);
+                //OMPL_INFORM("denseDelta_ = %f", denseDelta_);
+
+                assert(maxExt > 0);
+                assert(denseDelta_ > 0);
+
+                return true;
             }
-        }
-        std::cout << "Succeeded in inserting " << sucessfulInsertions << " vertices on the " << loopAttempt << " loop"
-                  << std::endl;
-        loopAttempt++;
 
-        // Increase the sparse delta a bit, but only after the first loop
-        if (loopAttempt == 1)
-        {
-            sparseDelta_ = sparseDelta_ * 1.25;
-            OMPL_INFORM("sparseDelta_ is now %f", sparseDelta_);
-            secondSparseInsertionAttempt_ = true;
-        }
+            bool SparseDB::astarSearch(const SparseVertex start, const SparseVertex goal, std::vector<SparseVertex> &vertexPath)
+            {
+                // Hold a list of the shortest path parent to each vertex
+                SparseVertex *vertexPredecessors = new SparseVertex[getNumVertices()];
+                // boost::vector_property_map<SparseVertex> vertexPredecessors(getNumVertices());
 
-        bool debugOverRideJustTwice = false;
-        if (debugOverRideJustTwice && loopAttempt == 2)
-        {
-            OMPL_WARN("Only attempting to add nodes twice for speed");
-            break;
-        }
-    }
+                bool foundGoal = false;
+                double *vertexDistances = new double[getNumVertices()];
 
-    /*
-    // Determine every dense node's representative on the sparse graph
-    findSparseRepresentatives();
+                OMPL_INFORM("Beginning AStar Search");
+                try
+                {
+                    double popularityBias = 0;
+                    bool popularityBiasEnabled = false;
+                    // Note: could not get astar_search to compile within BoltRetrieveRepair.cpp class because of
+                    // namespacing issues
+                    boost::astar_search(g_,     // graph
+                        start,  // start state
+                        // boost::bind(&otb::SparseDB::distanceFunction2, this, _1, goal),  // the heuristic
+                        boost::bind(&otb::SparseDB::distanceFunction, this, _1, goal),  // the heuristic
+                        // ability to disable edges (set cost to inifinity):
+                        boost::weight_map(edgeWeightMap(g_, edgeCollisionStatePropertySparse_, popularityBias,
+                                popularityBiasEnabled))
+                        .predecessor_map(vertexPredecessors)
+                        .distance_map(&vertexDistances[0])
+                        .visitor(CustomAstarVisitor(goal, this)));
+                }
+                catch (foundGoalException &)
+                {
+                    // the custom exception from CustomAstarVisitor
+                    OMPL_INFORM("astarSearch: Astar found goal vertex. distance to goal: %f", vertexDistances[goal]);
 
-    // Check 4th criteria - are we within our stated asymptotic bounds?
-    std::size_t coutIndent = 0;
-    OMPL_INFORM("Checking remaining vertices for 4th critera test");
-    for (std::size_t i = 0; i < vertexInsertionOrder.size(); ++i)
-    {
-        if (!checkAsymptoticOptimal(vertexInsertionOrder[i].v_, coutIndent + 4))
-        {
-            std::cout << "Vertex " << vertexInsertionOrder[i].v_ << " failed asymptotic optimal test " << std::endl;
+                    if (vertexDistances[goal] > 1.7e+308)  // TODO(davetcoleman): fix terrible hack for detecting infinity
+                        // double diff = d[goal] - std::numeric_limits<double>::infinity();
+                        // if ((diff < std::numeric_limits<double>::epsilon()) && (-diff <
+                        // std::numeric_limits<double>::epsilon()))
+                        // check if the distance to goal is inifinity. if so, it is unreachable
+                        // if (d[goal] >= std::numeric_limits<double>::infinity())
+                    {
+                        OMPL_INFORM("Distance to goal is infinity");
+                        foundGoal = false;
+                    }
+                    else
+                    {
+                        // Only clear the vertexPath after we know we have a new solution, otherwise it might have a good
+                        // previous one
+                        vertexPath.clear();  // remove any old solutions
+
+                        // Trace back the shortest path in reverse and only save the states
+                        SparseVertex v;
+                        for (v = goal; v != vertexPredecessors[v]; v = vertexPredecessors[v])
+                        {
+                            vertexPath.push_back(v);
+                        }
+                        if (v != goal)  // TODO explain this because i don't understand
+                        {
+                            vertexPath.push_back(v);
+                        }
+
+                        foundGoal = true;
+                    }
+                }
+
+                if (!foundGoal)
+                    OMPL_WARN("        Did not find goal");
+
+                // Show all predecessors
+                if (visualizeAstar_)
+                {
+                    OMPL_INFORM("        Show all predecessors");
+                    for (std::size_t i = 1; i < getNumVertices(); ++i)  // skip vertex 0 b/c that is the search vertex
+                    {
+                        const SparseVertex v1 = i;
+                        const SparseVertex v2 = vertexPredecessors[v1];
+                        if (v1 != v2)
+                        {
+                            // std::cout << "Edge " << v1 << " to " << v2 << std::endl;
+                            visual_->viz4EdgeCallback(getSparseStateConst(v1), getSparseStateConst(v2), 10);
+                        }
+                    }
+                    visual_->viz4TriggerCallback();
+                }
+
+                // Unload
+                delete[] vertexPredecessors;
+                delete[] vertexDistances;
+
+                // No solution found from start to goal
+                return foundGoal;
+            }
+
+            void SparseDB::debugVertex(const ompl::base::PlannerDataVertex &vertex)
+            {
+                debugState(vertex.getState());
+            }
+
+            void SparseDB::debugState(const ompl::base::State *state)
+            {
+                si_->printState(state, std::cout);
+            }
+
+            double SparseDB::distanceFunction(const SparseVertex a, const SparseVertex b) const
+            {
+                // const double dist = si_->distance(getSparseState(a), getSparseState(b));
+                // std::cout << "getting distance from " << a << " to " << b << " of value " << dist << std::endl;
+                // return dist;
+                return si_->distance(getSparseStateConst(a), getSparseStateConst(b));
+            }
+
+            void SparseDB::initializeQueryState()
+            {
+                if (boost::num_vertices(g_) < 1)
+                {
+                    queryVertex_ = boost::add_vertex(g_);
+                    denseVertexProperty_[queryVertex_] = boltDB_->queryVertex_;
+                    getSparseState(queryVertex_) = NULL;
+                }
+            }
+
+            void SparseDB::clearEdgeCollisionStates()
+            {
+                foreach (const SparseEdge e, boost::edges(g_))
+                    edgeCollisionStatePropertySparse_[e] = NOT_CHECKED;  // each edge has an unknown state
+            }
+
+            void SparseDB::createSPARS()
+            {
+                std::size_t coutIndent = 2;
+
+                // Clear the old spars graph
+                if (getNumVertices() > 1)
+                {
+                    OMPL_INFORM("Resetting sparse database, currently has %u states", getNumVertices());
+                    g_.clear();
+
+                    // Clear the nearest neighbor search
+                    if (nn_)
+                        nn_->clear();
+
+                    // Re-add search state
+                    initializeQueryState();
+
+                    // Clear visuals
+                    visual_->viz2StateCallback(NULL, /* type = deleteAllMarkers */ 0, 0);
+                }
+
+                // Reset fractions
+                setup();
+
+                // Get the ordering to insert vertices
+                std::vector<WeightedVertex> vertexInsertionOrder;
+
+                if (sparseCreationInsertionOrder_ == 0)
+                    getPopularityOrder(vertexInsertionOrder);  // Create SPARs graph in order of popularity
+                else if (sparseCreationInsertionOrder_ == 1)
+                    getDefaultOrder(vertexInsertionOrder);
+                else if (sparseCreationInsertionOrder_ == 2)
+                    getRandomOrder(vertexInsertionOrder);
+                else
+                {
+                    OMPL_ERROR("Unknown insertion order method");
+                    exit(-1);
+                }
+
+                // Error check order creation
+                assert(vertexInsertionOrder.size() == boltDB_->getNumVertices() - 1); // subtract 1 for query vertex
+
+                // Limit amount of time generating TODO(davetcoleman): remove this feature
+                double seconds = 1000;
+                ob::PlannerTerminationCondition ptc = ob::timedPlannerTerminationCondition(seconds, 0.1);
+
+                // Attempt to insert the verticies multiple times until no more succesful insertions occur
+                bool succeededInInserting = true;
+                secondSparseInsertionAttempt_ = false;
+                std::size_t loopAttempt = 0;
+                while (succeededInInserting)
+                {
+                    std::cout << std::string(coutIndent, ' ') + "Attempting to insert " << vertexInsertionOrder.size() << " vertices for the " << loopAttempt
+                              << " loop" << std::endl;
+
+                    // Sanity check
+                    if (loopAttempt > 3)
+                        OMPL_WARN("Suprising number of loop when attempting to insert nodes into SPARS graph: %u", loopAttempt);
+
+                    // Attempt to insert each vertex using the first 3 criteria
+                    succeededInInserting = false;
+                    std::size_t sucessfulInsertions = 0;
+                    for (std::size_t i = 0; i < vertexInsertionOrder.size(); ++i)
+                    {
+                        // Attempt to insert into SPARS graph // TODO(davetcoleman): remove this timer
+                        double seconds = 1000;
+                        ob::PlannerTerminationCondition ptc = ob::timedPlannerTerminationCondition(seconds, 0.1);
+
+                        // Customize the sparse delta fraction
+                        // if (!secondSparseInsertionAttempt_)
+                        // {
+                        //     std::size_t minDelta = 2;
+                        //     std::size_t maxDelta = 6;
+                        //     double invertedPopularity = 100 - vertexInsertionOrder[i].weight_;
+                        //     sparseDelta_ = invertedPopularity * (maxDelta - minDelta) / 100.0 + minDelta;
+                        //     OMPL_INFORM("sparseDelta_ is now %f", sparseDelta_);
+                        // }
+
+                        // Run SPARS checks
+                        if (!addStateToRoadmap(ptc, vertexInsertionOrder[i].v_))
+                        {
+                            // std::cout << "Failed AGAIN to add state to roadmap------" << std::endl;
+
+                            // Visualize the failed vertex as a small red dot
+                            if (visualizeSparsCreation_)
+                            {
+                                visual_->viz2StateCallback(getDenseState(vertexInsertionOrder[i].v_), /*mode=*/3, 0);
+                            }
+                        }
+                        else
+                        {
+                            vertexInsertionOrder.erase(vertexInsertionOrder.begin() + i);
+                            i--;
+                            sucessfulInsertions++;
+                            succeededInInserting = true;
+                        }
+                    } // end for
+
+                    // Visualize
+                    if (visualizeSparsCreation_)
+                        visual_->viz2TriggerCallback();
+
+                    std::cout << std::string(coutIndent+2, ' ') + "Succeeded in inserting " << sucessfulInsertions << " vertices on the " << loopAttempt << " loop"
+                              << std::endl;
+                    loopAttempt++;
+
+                    // Increase the sparse delta a bit, but only after the first loop
+                    if (loopAttempt == 1)
+                    {
+                        sparseDelta_ = sparseDelta_ * 1.25;
+                        std::cout << std::string(coutIndent+2, ' ') + "sparseDelta_ is now " << sparseDelta_ << std::endl;
+                        secondSparseInsertionAttempt_ = true;
+                    }
+
+                    bool debugOverRideJustTwice = false;
+                    if (debugOverRideJustTwice && loopAttempt == 2)
+                    {
+                        OMPL_WARN("Only attempting to add nodes twice for speed");
+                        break;
+                    }
+                }
+
+                /*
+                // Determine every dense node's representative on the sparse graph
+                findSparseRepresentatives();
+
+                // Check 4th criteria - are we within our stated asymptotic bounds?
+                std::size_t coutIndent = 0;
+                OMPL_INFORM("Checking remaining vertices for 4th critera test");
+                for (std::size_t i = 0; i < vertexInsertionOrder.size(); ++i)
+                {
+                if (!checkAsymptoticOptimal(vertexInsertionOrder[i].v_, coutIndent + 4))
+                {
+                std::cout << "Vertex " << vertexInsertionOrder[i].v_ << " failed asymptotic optimal test " << std::endl;
         }
     }
     */
@@ -501,6 +516,7 @@ void SparseDB::createSPARS()
     {
         OMPL_ERROR("  Disjoint sets: %u", numSets);
         getDisjointSets(true); // show in verbose mode
+        OMPL_ERROR("  Shutting down because there should only be one disjoint set");
         exit(-1);
     }
     else
@@ -611,7 +627,7 @@ bool SparseDB::getPopularityOrder(std::vector<WeightedVertex> &vertexInsertionOr
     // Visualize - clear image
     if (visualizeSparsCreation_)
     {
-        visual_->viz3StateCallback(getSparseStateConst(queryVertex_), /* type = deleteAllMarkers */ 0, 0);
+        visual_->viz3StateCallback(NULL, /* type = deleteAllMarkers */ 0, 0);
         visual_->viz3TriggerCallback();
         usleep(0.001 * 1000000);
     }
@@ -731,7 +747,6 @@ bool SparseDB::getRandomOrder(std::vector<WeightedVertex> &vertexInsertionOrder)
     {
         // Choose a random vertex to pick out of default structure
         std::size_t randVertex = static_cast<std::size_t>(iRand(0, defaultVertexInsertionOrder.size() - 1));
-        std::cout << "Choose: " << randVertex << std::endl;
         assert(randVertex < defaultVertexInsertionOrder.size());
 
         // Copy random vertex to new structure
@@ -739,7 +754,7 @@ bool SparseDB::getRandomOrder(std::vector<WeightedVertex> &vertexInsertionOrder)
 
         // Delete that vertex
         defaultVertexInsertionOrder.erase(defaultVertexInsertionOrder.begin() + randVertex);
-        randVertex--;
+        i--;
     }
     return true;
 }
@@ -1291,7 +1306,6 @@ SparseVertex SparseDB::addVertex(DenseVertex denseV, const GuardType &type)
     // Visualize
     if (visualizeSparsCreation_)
     {
-        // visual_->viz2StateCallback(getSparseState(v), /*mode=*/ getVizVertexType(type), sparseDelta_);
         visual_->viz2StateCallback(getSparseState(v), /*mode=*/4, sparseDelta_);
         if (visualizeSparsCreationSpeed_ > std::numeric_limits<double>::epsilon())
         {
@@ -1398,7 +1412,7 @@ void SparseDB::displayDatabase(bool showVertices)
             // Check for null states
             if (getSparseStateConst(v))
             {
-                visual_->viz2StateCallback(getSparseStateConst(v), 6, 1);
+                visual_->viz2StateCallback(getSparseStateConst(v), /*mode=*/6, 1);
             }
             else
                 OMPL_WARN("Null sparse state found on vertex %u", v);

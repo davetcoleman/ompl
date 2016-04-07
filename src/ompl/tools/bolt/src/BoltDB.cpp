@@ -309,6 +309,10 @@ bool otb::BoltDB::postProcessPath(og::PathGeometric &solutionPath)
     // Visualize
     if (visualizeSnapPath_)
     {
+        // Clear old path
+        visual_->viz5StateCallback(NULL, /*deleteAllMarkers=*/0, 1);
+
+        // Add first state
         visual_->viz5StateCallback(stateProperty_[prevGraphVertex], /*mode=*/1, 1);
     }
 
@@ -320,11 +324,12 @@ bool otb::BoltDB::postProcessPath(og::PathGeometric &solutionPath)
     bool allValid = true;
 
     // Start recursive function
-    if (!recurseSnapWaypoints(solutionPath, roadmapPath, currVertexIndex, prevGraphVertex, allValid))
+    bool recurseVerbose = false;
+    if (!recurseSnapWaypoints(solutionPath, roadmapPath, currVertexIndex, prevGraphVertex, allValid, recurseVerbose))
     {
-        // TODO
-        OMPL_ERROR("Could not connect to second point in trajectory - TODO loop through first point neighbors");
-        return false;
+        // TODO - loop through start state
+        OMPL_ERROR("TODO - loop through start state");
+        exit(-1);
     }
 
     // Visualize
@@ -337,8 +342,18 @@ bool otb::BoltDB::postProcessPath(og::PathGeometric &solutionPath)
     // Error check
     if (!allValid)
     {
-        OMPL_ERROR("Found case where unable to connect");
-        exit(-1);  // TODO(davetcoleman): gracefully fail - just ignore that path
+        OMPL_ERROR("Could not find snap waypoint path. Running again in debug");
+
+        // Run again
+        recurseVerbose = true;
+        visualizeSnapPath_ = true;
+        recurseSnapWaypoints(solutionPath, roadmapPath, currVertexIndex, prevGraphVertex, allValid, recurseVerbose);
+
+        visual_->viz5TriggerCallback();
+        usleep(0.001 * 1000000);
+
+        std::cout << "exiting for debug " << std::endl;
+        exit(-1);
     }
 
     // Error check
@@ -369,7 +384,7 @@ bool otb::BoltDB::postProcessPath(og::PathGeometric &solutionPath)
                 visual_->viz5EdgeCallback(stateProperty_[roadmapPath[vertexID - 1]],
                                           stateProperty_[roadmapPath[vertexID]], 0);
                 visual_->viz5TriggerCallback();
-                usleep(4 * 1000000);
+                usleep(0.001 * 1000000);
             }
         }
         else
@@ -400,10 +415,6 @@ bool otb::BoltDB::postProcessPath(og::PathGeometric &solutionPath)
         visual_->viz5TriggerCallback();
     }
 
-    // Ensure graph doesn't get too popular
-    if (getPopularityBiasEnabled())
-        normalizeGraphEdgeWeights();
-
     // Record this new addition
     graphUnsaved_ = true;
 
@@ -411,11 +422,8 @@ bool otb::BoltDB::postProcessPath(og::PathGeometric &solutionPath)
 }
 
 bool otb::BoltDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vector<DenseVertex> &roadmapPath,
-                                       std::size_t currVertexIndex, const DenseVertex &prevGraphVertex, bool &allValid)
-
+    std::size_t currVertexIndex, const DenseVertex &prevGraphVertex, bool &allValid, bool verbose)
 {
-    bool verbose = false;
-
     if (verbose)
     {
         std::cout << std::endl;
@@ -490,7 +498,8 @@ bool otb::BoltDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vector
                 std::cout << std::string(currVertexIndex, ' ') + "Loop " << neighborID << " valid" << std::endl;
             if (neighborID > 0)
             {
-                OMPL_WARN("Found case where double loop fixed the problem - loop %u", neighborID);
+                if (verbose)
+                    OMPL_WARN("Found case where double loop fixed the problem - loop %u", neighborID);
                 // visual_->viz5TriggerCallback();
                 // usleep(6*1000000);
             }
@@ -510,7 +519,7 @@ bool otb::BoltDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vector
             else
             {
                 // Recurisvely call next level
-                if (recurseSnapWaypoints(inputPath, roadmapPath, currVertexIndex + 1, currGraphVertex, allValid))
+                if (recurseSnapWaypoints(inputPath, roadmapPath, currVertexIndex + 1, currGraphVertex, allValid, verbose))
                 {
                     return true;
                 }
@@ -538,16 +547,14 @@ bool otb::BoltDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vector
         if (visualizeSnapPath_)
         {
             visual_->viz5TriggerCallback();
-            usleep(1 * 1000000);
+            usleep(0.001 * 1000000);
         }
 
         return false;
     }
 
-    // This should not happen?
-    OMPL_WARN("This should not happen");
-    exit(-1);
-    return false;
+    OMPL_WARN("this loop found a valid connection, but lower recursive loop did not");
+    return false; // this loop found a valid connection, but lower recursive loop did not
 }
 
 bool otb::BoltDB::saveIfChanged(const std::string &fileName)
@@ -1076,6 +1083,13 @@ void otb::BoltDB::generateGrid()
     recursiveDiscretization(values, starting_joint_id, desired_depth);
     OMPL_INFORM("Generated %i vertices.", getNumVertices());
 
+    // Error check
+    if (getNumVertices() < 2)
+    {
+        OMPL_ERROR("No vertices generated, failing");
+        exit(-1);
+    }
+
     // Remove vertices in collision using multithreading
     // TODO enable
     // std::vector<DenseVertex> unvalidatedVertices;
@@ -1134,9 +1148,9 @@ void otb::BoltDB::generateTaskSpace()
         // Visualize - only do this for 2/3D environments
         if (visualizeGridGeneration_)
         {
-            visual_->viz1StateCallback(newState, 5, 1);  // Candidate node has already (just) been added
+            visual_->viz1StateCallback(newState, /*mode=*/5, 1);  // Candidate node has already (just) been added
             visual_->viz1TriggerCallback();
-            usleep(0.005 * 1000000);
+            usleep(0.001 * 1000000);
         }
     }
 
@@ -1171,7 +1185,7 @@ void otb::BoltDB::generateTaskSpace()
             if (i % 100 == 0)
             {
                 visual_->viz1TriggerCallback();
-                usleep(0.01 * 1000000);
+                usleep(0.001 * 1000000);
             }
         }
     }
@@ -1183,10 +1197,20 @@ void otb::BoltDB::generateTaskSpace()
     OMPL_INFORM("Done generating task space graph");
 }
 
+std::size_t otb::BoltDB::getEdgesPerVertex()
+{
+    if (si_->getStateSpace()->getDimension() == 3)
+    {
+        return 8;
+    }
+
+    // full robot
+    return si_->getStateSpace()->getDimension() * 2;
+}
+
 void otb::BoltDB::generateEdges()
 {
     OMPL_INFORM("Generating edges");
-
     bool verbose = false;
 
     // Benchmark runtime
@@ -1219,15 +1243,7 @@ void otb::BoltDB::generateEdges()
 
         // in 2D this created the regular square with diagonals of 8 edges
 
-        std::size_t findNearestKNeighbors;
-        if (si_->getStateSpace()->getDimension() == 3)
-        {
-            findNearestKNeighbors = 8;
-        }
-        else  // full robot
-        {
-            findNearestKNeighbors = si_->getStateSpace()->getDimension() * 2;
-        }
+        std::size_t findNearestKNeighbors = getEdgesPerVertex();
         // OMPL_INFORM("Finding %u nearest neighbors for each vertex", findNearestKNeighbors);
 
         const std::size_t numSameVerticiesFound = 1;  // add 1 to the end because the NN tree always returns itself
@@ -1245,7 +1261,7 @@ void otb::BoltDB::generateEdges()
 
         // Clear all visuals
         // if (visualizeGridGeneration_)
-        //     visual_->viz1StateCallback(stateProperty_[v1], 0, 1);
+        //     visual_->viz1StateCallback(stateProperty_[v1], /*mode=*/0, 1);
 
         // For each nearby vertex, add an edge
         std::size_t errorCheckNumSameVerticies = 0;
@@ -1263,23 +1279,13 @@ void otb::BoltDB::generateEdges()
                 continue;
             }
 
+            // Check if these vertices already share an edge
+            if (boost::edge(v1, v2, g_).second)
+                continue;
+
             // Debug: display edge
             if (visualizeGridGeneration_)
                 visual_->viz1EdgeCallback(stateProperty_[v1], stateProperty_[v2], 1);
-
-            // Check if these vertices already share an edge
-            {
-                // Benchmark runtime
-                time::point startTime = time::now();
-
-                if (boost::edge(v1, v2, g_).second)
-                    continue;
-
-                // Benchmark runtime
-                double duration = time::seconds(time::now() - startTime) * 1000;
-                if (verbose)
-                    OMPL_INFORM("Check edge exist Total time: %f milliseconds (%f hz)", duration, 1.0 / duration);
-            }
 
             // Create edge - maybe removed later
             DenseEdge e = addEdge(v1, v2, desiredAverageCost_);
@@ -1294,7 +1300,7 @@ void otb::BoltDB::generateEdges()
         if (visualizeGridGeneration_)
         {
             visual_->viz1TriggerCallback();
-            usleep(0.01 * 1000000);
+            usleep(0.001 * 1000000);
         }
 
     }  // for each v1
@@ -1348,7 +1354,7 @@ void otb::BoltDB::generateEdges()
             if (errorCheckCounter % 100 == 0)
             {
                 visual_->viz1TriggerCallback();
-                usleep(0.01 * 1000000);
+                usleep(0.001 * 1000000);
             }
         }
     }
@@ -1518,10 +1524,10 @@ void otb::BoltDB::recursiveDiscretization(std::vector<double> &values, std::size
             // Visualize
             if (visualizeGridGeneration_)
             {
-                visual_->viz1StateCallback(nextDiscretizedState_, 5,
+                visual_->viz1StateCallback(nextDiscretizedState_, /*mode=*/5,
                                             1);  // Candidate node has already (just) been added
                 visual_->viz1TriggerCallback();
-                usleep(0.005 * 1000000);
+                usleep(0.001 * 1000000);
             }
 
             // Prepare for next new state by allocating now
@@ -1619,6 +1625,9 @@ void otb::BoltDB::displayDatabase(bool showVertices)
         exit(-1);
     }
 
+    // Clear old database
+    visual_->viz1StateCallback(NULL, /*deleteAllMarkers=*/0, 0);
+
     if (showVertices)
     {
         // Loop through each vertex
@@ -1630,7 +1639,7 @@ void otb::BoltDB::displayDatabase(bool showVertices)
             // Check for null states
             if (stateProperty_[v])
             {
-                visual_->viz1StateCallback(stateProperty_[v], 6, 1);
+                visual_->viz1StateCallback(stateProperty_[v], /*mode=*/6, 1);
             }
 
             // Prevent cache from getting too big
@@ -2066,4 +2075,65 @@ void otb::BoltDB::checkStateType()
         }
     }
     OMPL_INFORM("All states checked for task level");
+}
+
+void otb::BoltDB::addSample(const base::State *state)
+{
+    // First just add the vertex
+    DenseVertex v1 = addVertex(si_->cloneState(state), QUALITY); // TODO(davetcoleman): how to prevent from adding same state twice?
+
+    // Now connect to nearby vertices
+    std::vector<DenseVertex> graphNeighborhood;
+    std::size_t findNearestKNeighbors = getEdgesPerVertex();
+    OMPL_INFORM("Finding %u nearest neighbors for new vertex", findNearestKNeighbors);
+    const std::size_t numSameVerticiesFound = 1;  // add 1 to the end because the NN tree always returns itself
+
+    stateProperty_[queryVertex_] = stateProperty_[v1];
+    nn_->nearestK(queryVertex_, findNearestKNeighbors + numSameVerticiesFound, graphNeighborhood);
+    stateProperty_[queryVertex_] = NULL;  // Set search vertex to NULL to prevent segfault on class unload of memory
+
+    OMPL_INFORM("Found %u neighbors", graphNeighborhood.size());
+
+    // For each nearby vertex, add an edge
+    for (std::size_t i = 0; i < graphNeighborhood.size(); ++i)
+    {
+        DenseVertex &v2 = graphNeighborhood[i];
+
+        // Check if these vertices are the same
+        if (v1 == v2)
+        {
+            continue;
+        }
+
+        // Check if these vertices are the same STATE
+        if (si_->getStateSpace()->equalStates(stateProperty_[v1], stateProperty_[v2]))
+        {
+            OMPL_ERROR("This state has already been added, should not happen");
+            exit(-1);
+        }
+
+        // Check if these vertices already share an edge
+        if (boost::edge(v1, v2, g_).second)
+        {
+            std::cout << "skipped bc already share an edge " << std::endl;
+            continue;
+        }
+
+        // Create edge if not in collision
+        if (si_->checkMotion(stateProperty_[v1], stateProperty_[v2]))
+        {
+            DenseEdge e = addEdge(v1, v2, desiredAverageCost_);
+            std::cout << "added valid edge " << e << std::endl;
+
+            // Debug: display edge
+            double popularity = 100; // TODO: maybe make edge really popular so we can be sure its added to the spars graph since we need it
+            //visual_->viz1EdgeCallback(stateProperty_[v1], stateProperty_[v2], popularity);
+        }
+    }  // for each neighbor
+
+    std::cout << "addSample()4 is the dense graph image cleared yet? " << std::endl;
+    usleep(3*1000000);
+
+    visual_->viz1TriggerCallback();
+    usleep(0.001*1000000);
 }
