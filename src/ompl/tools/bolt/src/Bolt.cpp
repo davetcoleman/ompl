@@ -81,7 +81,6 @@ void Bolt::initialize()
 
 void Bolt::setup(void)
 {
-    OMPL_INFORM("Bolt setup()");
     if (!configured_ || !si_->isSetup() || !boltPlanner_->isSetup())
     {
         // Setup Space Information if we haven't already done so
@@ -126,11 +125,8 @@ base::PlannerStatus Bolt::solve(const base::PlannerTerminationCondition &ptc)
     time::point start = time::now();
 
     // Warn if there are queued paths that have not been added to the experience database
-    // if (!queuedSolutionPaths_.empty())
-    //{
-    // OMPL_INFORM("Previous solved paths are currently uninserted into the experience database and are in the "
-    //"post-proccessing queue");
-    //}
+    OMPL_INFORM("%u solved paths are currently uninserted into the experience database and are in the "
+        "post-proccessing queue", queuedSolutionPaths_.size());
 
     // SOLVE
     lastStatus_ = boltPlanner_->solve(ptc);
@@ -138,6 +134,7 @@ base::PlannerStatus Bolt::solve(const base::PlannerTerminationCondition &ptc)
     // Planning time
     planTime_ = time::seconds(time::now() - start);
 
+    // Do logging
     logResults();
 
     return lastStatus_;
@@ -157,7 +154,7 @@ void Bolt::logResults()
     {
         case base::PlannerStatus::TIMEOUT:
             stats_.numSolutionsTimedout_++;
-            OMPL_ERROR("Bolt Solve: No solution found after %f seconds", planTime_);
+            OMPL_ERROR("Bolt::solve(): TIMEOUT - No solution found after %f seconds", planTime_);
             // Logging
             log.planner = "neither_planner";
             log.result = "timedout";
@@ -165,14 +162,14 @@ void Bolt::logResults()
             break;
         case base::PlannerStatus::ABORT:
             stats_.numSolutionsTimedout_++;
-            OMPL_ERROR("Bolt Solve: No solution found after %f seconds", planTime_);
+            OMPL_ERROR("Bolt::solve(): ABORT - No solution found after %f seconds", planTime_);
             // Logging
             log.planner = "neither_planner";
             log.result = "abort";
             log.isSaved = "not_saved";
             break;
         case base::PlannerStatus::APPROXIMATE_SOLUTION:
-            OMPL_ERROR("BOLT RESULTS: Approximate - should not happen!");
+            OMPL_ERROR("Bolt::solve(): Approximate - should not happen!");
             exit(-1);
             break;
         case base::PlannerStatus::EXACT_SOLUTION:
@@ -187,7 +184,7 @@ void Bolt::logResults()
             OMPL_INFORM("Solution path has %d states and was generated from planner %s", solutionPath.getStateCount(),
                         getSolutionPlannerName().c_str());
 
-            // Check for repeated states
+            // Error check for repeated states
             if (!checkRepeatedStates(solutionPath))
                 exit(-1);
 
@@ -207,7 +204,7 @@ void Bolt::logResults()
             else
             {
                 // Queue the solution path for future insertion into experience database (post-processing)
-                // queuedSolutionPaths_.push_back(solutionPath);
+                queuedSolutionPaths_.push_back(solutionPath);
             }
         }
         break;
@@ -366,26 +363,20 @@ BoltDBPtr Bolt::getExperienceDB()
 
 bool Bolt::doPostProcessing()
 {
-    return true;
-    queuedSolutionPaths_.clear();
+    OMPL_INFORM("Performing post-processing for %i queued solution paths", queuedSolutionPaths_.size());
 
-    OMPL_WARN("Performing post-processing for %i queued solution paths", queuedSolutionPaths_.size());
+    // Benchmark runtime
+    time::point startTime = time::now();
 
-    /*
     for (std::size_t i = 0; i < queuedSolutionPaths_.size(); ++i)
     {
         // Time to add a path to experience database
-        double insertionTime;
-
-        if (!boltDB_->postProcessPath(queuedSolutionPaths_[i], insertionTime))
+        if (!boltDB_->postProcessPath(queuedSolutionPaths_[i]))
         {
             OMPL_ERROR("Unable to save path");
         }
-
-        OMPL_INFORM("Finished inserting experience path in %f seconds", insertionTime);
-        stats_.totalInsertionTime_ += insertionTime; // used for averaging
     }
-    */
+    OMPL_INFORM("Finished inserting %u experience paths", queuedSolutionPaths_.size());
 
     // Remove all inserted paths from the queue
     queuedSolutionPaths_.clear();
@@ -393,6 +384,12 @@ bool Bolt::doPostProcessing()
     // Ensure graph doesn't get too popular
     if (boltDB_->getPopularityBiasEnabled())
         boltDB_->normalizeGraphEdgeWeights();
+
+    // Benchmark runtime
+    double duration = time::seconds(time::now() - startTime);
+    OMPL_INFORM(" - doPostProcessing() took %f seconds (%f hz)", duration, 1.0/duration);
+
+    stats_.totalInsertionTime_ += duration; // used for averaging
 
     return true;
 }

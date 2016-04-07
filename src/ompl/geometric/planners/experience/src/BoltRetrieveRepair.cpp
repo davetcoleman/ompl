@@ -60,7 +60,7 @@ namespace bolt
 BoltRetrieveRepair::BoltRetrieveRepair(const base::SpaceInformationPtr &si, const BoltDBPtr &boltDB)
   : base::Planner(si, "Bolt_Retrieve_Repair")
   , boltDB_(boltDB)
-  , smoothingEnabled_(false)  // makes understanding recalled paths more difficult if enabled
+  , smoothingEnabled_(true)
   , verbose_(true)
   , visualizeRawTrajectory_(true)
 {
@@ -103,7 +103,6 @@ base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCond
 {
     OMPL_INFORM("-------------------------------------------------------");
     OMPL_INFORM("BoltRetrieveRepair::solve()");
-    OMPL_INFORM("-------------------------------------------------------");
 
     bool solved = false;
     double approxdif = std::numeric_limits<double>::infinity();
@@ -147,7 +146,7 @@ base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCond
     // Search for previous solution in database
     if (!getPathOffGraph(startState, goalState, geometricSolution, ptc))
     {
-        OMPL_INFORM("BoltRetrieveRepair::solve() No nearest start or goal found");
+        OMPL_WARN("BoltRetrieveRepair::solve() No near start or goal found");
         return base::PlannerStatus::TIMEOUT;  // The planner failed to find a solution
     }
 
@@ -161,7 +160,6 @@ base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCond
     assert(geometricSolution.getStateCount() >= 3);
 
     // Optionally visualize raw trajectory
-    // Visualize
     if (visualizeRawTrajectory_)
     {
         // Make the chosen path a different color and thickness
@@ -175,17 +173,15 @@ base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCond
     // Smooth the result
     if (smoothingEnabled_)
     {
-        if (verbose_)
-            OMPL_INFORM("BoltRetrieveRepair solve: Simplifying solution (smoothing)...");
-        time::point simplifyStart = time::now();
-        std::size_t numStates = geometricSolution.getStateCount();
-        path_simplifier_->simplify(geometricSolution, ptc);
-        double simplifyTime = time::seconds(time::now() - simplifyStart);
-
-        if (verbose_)
-            OMPL_INFORM("BoltRetrieveRepair: Path simplification took %f seconds and removed %d states", simplifyTime,
-                        numStates - geometricSolution.getStateCount());
+        simplifyPath(geometricSolution, ptc);
     }
+
+    // Add more points to path
+    geometricSolution.interpolate();
+
+    // Show smoothed & interpolated path
+    visual_->viz6PathCallback(pathSolutionBase, /*style*/ 2);
+    visual_->viz6TriggerCallback();
 
     // Finished
     approxdif = 0;
@@ -198,6 +194,20 @@ base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCond
     if (verbose_)
         OMPL_INFORM("  Finished BoltRetrieveRepair.solve()");
     return base::PlannerStatus(solved, approximate);
+}
+
+bool BoltRetrieveRepair::simplifyPath(og::PathGeometric &path, const base::PlannerTerminationCondition &ptc)
+{
+    OMPL_INFORM("BoltRetrieveRepair solve: Simplifying solution (smoothing)...");
+
+    time::point simplifyStart = time::now();
+    std::size_t numStates = path.getStateCount();
+    path_simplifier_->simplify(path, ptc);
+    double simplifyTime = time::seconds(time::now() - simplifyStart);
+
+    OMPL_INFORM("BoltRetrieveRepair: Path simplification took %f seconds and removed %d states", simplifyTime,
+                numStates - path.getStateCount());
+    return true;
 }
 
 void BoltRetrieveRepair::getPlannerData(base::PlannerData &data) const
@@ -251,42 +261,84 @@ bool BoltRetrieveRepair::getPathOffGraph(const base::State *start, const base::S
                                          og::PathGeometric &geometricSolution,
                                          const base::PlannerTerminationCondition &ptc)
 {
-    // Get neighbors near start and goal. Note: potentially they are not *visible* - will test for this later
-
-    // Start
-    int level = 0;  // boltDB_->getTaskLevel(start);
-    if (verbose_)
-        OMPL_INFORM("  Looking for a node near the problem start on level %i", level);
-    if (!findGraphNeighbors(start, startVertexCandidateNeighbors_, level))
+    // Attempt to connect to graph x times, because if it failes we start adding samples
+    std::size_t maxAttempts = 2;
+    std::size_t attempt = 0;
+    for (; attempt < maxAttempts; ++attempt)
     {
+        OMPL_INFORM("Starting getPathOffGraph attempt %u", attempt);
+
+        // Get neighbors near start and goal. Note: potentially they are not *visible* - will test for this later
+
+        // Start
+        int level = 0;  // boltDB_->getTaskLevel(start);
         if (verbose_)
-            OMPL_INFORM("No graph neighbors found for start");
-        return false;
-    }
-    if (verbose_)
-        OMPL_INFORM("  Found %d nodes near start", startVertexCandidateNeighbors_.size());
-
-    // Goal
-    level = 0;  // boltDB_->getTaskLevel(goal);
-    if (verbose_)
-        OMPL_INFORM("  Looking for a node near the problem goal on level %i", level);
-    if (!findGraphNeighbors(goal, goalVertexCandidateNeighbors_, level))
-    {
+            OMPL_INFORM("  Looking for a node near the problem start on level %i", level);
+        if (!findGraphNeighbors(start, startVertexCandidateNeighbors_, level))
+        {
+            if (verbose_)
+                OMPL_INFORM("No graph neighbors found for start");
+            return false;
+        }
         if (verbose_)
-            OMPL_INFORM("No graph neighbors found for goal");
-        return false;
+            OMPL_INFORM("  Found %d nodes near start", startVertexCandidateNeighbors_.size());
+
+        // Goal
+        level = 0;  // boltDB_->getTaskLevel(goal);
+        if (verbose_)
+            OMPL_INFORM("  Looking for a node near the problem goal on level %i", level);
+        if (!findGraphNeighbors(goal, goalVertexCandidateNeighbors_, level))
+        {
+            if (verbose_)
+                OMPL_INFORM("No graph neighbors found for goal");
+            return false;
+        }
+        if (verbose_)
+            OMPL_INFORM("    Found %d nodes near goal", goalVertexCandidateNeighbors_.size());
+
+        // Get paths between start and goal
+        bool feedbackStartFailed;
+        bool result = getPathOnGraph(startVertexCandidateNeighbors_, goalVertexCandidateNeighbors_, start, goal,
+                      geometricSolution, ptc, /*debug*/ false, feedbackStartFailed);
+
+        // Error check
+        if (!result)
+        {
+            OMPL_ERROR("getPathOffGraph(): BoltRetrieveRepair returned FALSE for getPathOnGraph");
+
+            std::cout << "before trigger " << std::endl;
+            usleep(3*1000000);
+            std::cout << "before getPathOnGraph " << std::endl;
+            visual_->viz1TriggerCallback(); // THIS KILLS IT
+            usleep(3*1000000);
+
+            // Run getPathOnGraph again in debug mode
+            getPathOnGraph(startVertexCandidateNeighbors_, goalVertexCandidateNeighbors_, start, goal, geometricSolution,
+                ptc, /*debug*/ true, feedbackStartFailed);
+
+            // Add the point that failed
+            if (feedbackStartFailed) // start state failed
+            {
+                boltDB_->addSample(start);
+            }
+            else // goal state failed
+            {
+                boltDB_->addSample(goal);
+            }
+
+            OMPL_INFORM("Re-creating the spars graph");
+            sparseDB_->createSPARS();
+
+            std::cout << "Shutting down for debugging " << std::endl;
+            exit(-1);
+        }
+        else
+            break; // success, continue on
     }
-    if (verbose_)
-        OMPL_INFORM("    Found %d nodes near goal", goalVertexCandidateNeighbors_.size());
 
-    // Get paths between start and goal
-    bool result = getPathOnGraph(startVertexCandidateNeighbors_, goalVertexCandidateNeighbors_, start, goal,
-                                 geometricSolution, ptc);
-
-    // Error check
-    if (!result)
+    // Did we finally get it?
+    if (attempt >= maxAttempts)
     {
-        OMPL_INFORM("getPathOffGraph(): BoltRetrieveRepair returned FALSE for getPathOnGraph");
         return false;
     }
 
@@ -304,14 +356,17 @@ bool BoltRetrieveRepair::getPathOffGraph(const base::State *start, const base::S
         }
     }
 
-    return result;
+    return true;
 }
 
 bool BoltRetrieveRepair::getPathOnGraph(const std::vector<SparseVertex> &candidateStarts,
                                         const std::vector<SparseVertex> &candidateGoals, const base::State *actualStart,
                                         const base::State *actualGoal, og::PathGeometric &geometricSolution,
-                                        const base::PlannerTerminationCondition &ptc)
+        const base::PlannerTerminationCondition &ptc, bool debug, bool &feedbackStartFailed)
 {
+    bool foundValidStart = false;
+    bool foundValidGoal = false;
+
     // Try every combination of nearby start and goal pairs
     BOOST_FOREACH (SparseVertex start, candidateStarts)
     {
@@ -328,14 +383,17 @@ bool BoltRetrieveRepair::getPathOnGraph(const std::vector<SparseVertex> &candida
             if (verbose_)
             {
                 OMPL_WARN("FOUND START CANDIDATE THAT IS NOT VISIBLE ");
-
-                // visual_->viz5StateCallback(sparseDB_->getSparseStateConst(start), 3, 1);
-                // visual_->viz5EdgeCallback(actualStart, sparseDB_->getSparseStateConst(start), 100);
-                // visual_->viz5TriggerCallback();
-                // usleep(1000000);
+            }
+            if (debug)
+            {
+                visual_->viz4StateCallback(sparseDB_->getSparseStateConst(start), /*mode=*/3, 1);
+                visual_->viz4EdgeCallback(actualStart, sparseDB_->getSparseStateConst(start), 100);
+                visual_->viz4TriggerCallback();
+                usleep(0.5 * 1000000);
             }
             continue;  // this is actually not visible
         }
+        foundValidStart = true;
 
         BOOST_FOREACH (SparseVertex goal, candidateGoals)
         {
@@ -362,15 +420,19 @@ bool BoltRetrieveRepair::getPathOnGraph(const std::vector<SparseVertex> &candida
                 if (verbose_)
                 {
                     OMPL_WARN("FOUND GOAL CANDIDATE THAT IS NOT VISIBLE! ");
+                }
 
-                    // visual_->viz5StateCallback(sparseDB_->getSparseStateConst(goal), 3, 1);
-                    // visual_->viz5EdgeCallback(actualGoal, sparseDB_->getSparseStateConst(goal), 100);
-                    // visual_->viz5TriggerCallback();
-                    // usleep(1000000);
+                if (debug)
+                {
+                    visual_->viz4StateCallback(sparseDB_->getSparseStateConst(goal), /*mode=*/3, 1);
+                    visual_->viz4EdgeCallback(actualGoal, sparseDB_->getSparseStateConst(goal), 100);
+                    visual_->viz4TriggerCallback();
+                    usleep(0.5 * 1000000);
                 }
 
                 continue;  // this is actually not visible
             }
+            foundValidGoal = true;
 
             // Repeatidly search through graph for connection then check for collisions then repeat
             if (lazyCollisionSearch(start, goal, actualStart, actualGoal, geometricSolution, ptc))
@@ -390,6 +452,24 @@ bool BoltRetrieveRepair::getPathOnGraph(const std::vector<SparseVertex> &candida
 
         }  // foreach
     }      // foreach
+
+    if (foundValidStart && foundValidGoal)
+    {
+        OMPL_ERROR("Unexpected condition - both a valid start and goal were found but still no path found. TODO ");
+        exit(-1);
+    }
+    std::cout << "-------------------------------------------------------" << std::endl;
+
+    if (foundValidStart && !foundValidGoal)
+    {
+        OMPL_WARN("Unable to connect GOAL state to graph");
+        feedbackStartFailed = false; // it was the goal state that failed us
+    }
+    else
+    {
+        OMPL_WARN("Unable to connect START state to graph");
+        feedbackStartFailed = true; // the start state failed us
+    }
 
     return false;
 }
@@ -426,14 +506,14 @@ bool BoltRetrieveRepair::lazyCollisionSearch(const SparseVertex &start, const Sp
     if (visualize)
     {
         OMPL_INFORM("viz start -----------------------------");
-        visual_->viz5StateCallback(sparseDB_->getSparseStateConst(start), 4, 1);
+        visual_->viz5StateCallback(sparseDB_->getSparseStateConst(start), /*mode=*/4, 1);
         visual_->viz5EdgeCallback(actualStart, sparseDB_->getSparseStateConst(start), 30);
         visual_->viz5TriggerCallback();
         usleep(5 * 1000000);
 
         // Visualize goal vertex
         OMPL_INFORM("viz goal ------------------------------");
-        visual_->viz5StateCallback(sparseDB_->getSparseStateConst(goal), 4, 1);
+        visual_->viz5StateCallback(sparseDB_->getSparseStateConst(goal), /*mode=*/4, 1);
         visual_->viz5EdgeCallback(actualGoal, sparseDB_->getSparseStateConst(goal), 0);
         visual_->viz5TriggerCallback();
         usleep(5 * 1000000);
@@ -585,7 +665,9 @@ bool BoltRetrieveRepair::findGraphNeighbors(const base::State *state, std::vecto
 
     // Benchmark runtime
     double duration = time::seconds(time::now() - startTime);
-    OMPL_INFORM(" - findGraphNeighbors() took %f seconds", duration);
+
+    if (verbose_)
+        OMPL_INFORM("   - findGraphNeighbors() took %f seconds", duration);
 
     // Free memory
     si_->getStateSpace()->freeState(stateCopy);
@@ -605,16 +687,19 @@ bool BoltRetrieveRepair::removeVerticesNotOnLevel(std::vector<SparseVertex> &gra
         // Make sure state is on correct level
         if (boltDB_->getTaskLevel(nearVertex) != static_cast<std::size_t>(level))
         {
-            std::cout << "      Skipping neighbor " << nearVertex << ", i=" << i
-                      << ", because wrong level: " << boltDB_->getTaskLevel(nearVertex) << ", desired level: " << level
-                      << std::endl;
+            if (verbose_)
+                std::cout << "      Skipping neighbor " << nearVertex << ", i=" << i
+                          << ", because wrong level: " << boltDB_->getTaskLevel(nearVertex)
+                          << ", desired level: " << level << std::endl;
             graphNeighborhood.erase(graphNeighborhood.begin() + i);
             i--;
             continue;
         }
     }
-    OMPL_INFORM("removeVerticesNotOnLevel(): states require level %d, removed: %u, remaining: %u", level,
-                original_size - graphNeighborhood.size(), graphNeighborhood.size());
+
+    if (verbose_)
+        OMPL_INFORM("    removeVerticesNotOnLevel(): states require level %d, removed: %u, remaining: %u", level,
+                    original_size - graphNeighborhood.size(), graphNeighborhood.size());
 
     return true;
 }
@@ -730,10 +815,10 @@ bool BoltRetrieveRepair::canConnect(const base::State *randomState, const base::
 
             if (false)
             {
-                visual_->viz5StateCallback(s2, 2, 1);  // BLUE
+                visual_->viz5StateCallback(s2, /*mode=*/2, 1);  // BLUE
                 visual_->viz5EdgeCallback(s1, s2, 100);
                 visual_->viz5TriggerCallback();
-                usleep(1000000);
+                usleep(1*1000000);
             }
 
             if (false)
@@ -759,13 +844,13 @@ bool BoltRetrieveRepair::canConnect(const base::State *randomState, const base::
 
                     if (!si_->isValid(interState))
                     {
-                        visual_->viz5StateCallback(interState, 3, 1);  // RED
+                        visual_->viz5StateCallback(interState, /*mode=*/3, 1);  // RED
                         visual_->viz5TriggerCallback();
-                        usleep(2000000);
+                        usleep(1*1000000);
                     }
                     else
                     {
-                        // visual_->viz5StateCallback(interState, 1, 1); // GREEN
+                        // visual_->viz5StateCallback(interState, /*mode=*/1, 1); // GREEN
                     }
                 }
             }
