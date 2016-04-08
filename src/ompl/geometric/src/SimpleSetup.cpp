@@ -248,7 +248,7 @@ void ompl::geometric::SimpleSetup::print(std::ostream &out) const
         pdef_->print(out);
 }
 
-void ompl::geometric::SimpleSetup::setVizStateCallback(ompl::base::VizStateCallback vizStateCallback)
-{
-    //planner_->setVizStateCallback(vizStateCallback);
-}
+// void ompl::geometric::SimpleSetup::setVizState(ompl::base::VizState vizState)
+// {
+//     //planner_->setVizState(vizState);
+// }

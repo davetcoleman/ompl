@@ -301,7 +301,7 @@ class ompl_base_generator_t(code_generator_t):
         self.add_boost_function('bool(const ompl::base::GoalLazySamples*, ompl::base::State*)',
             'GoalSamplingFn', 'Goal sampling function')
         self.add_boost_function('void(const ompl::base::State*)',
-            'NewStateCallbackFn', 'New state callback function')
+            'NewStateFn', 'New state callback function')
         self.add_boost_function('ompl::base::PlannerPtr(const ompl::base::SpaceInformationPtr&)',
             'PlannerAllocator', 'Planner allocator')
         self.add_boost_function('bool()',

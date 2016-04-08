@@ -209,7 +209,7 @@ namespace ompl
 
                 // TODO: remove the decoupleFromPlanner call and freeState call, below
                 // and check if everything still works. i think it will...
-                OMPL_WARN("Remove decoupleFromPlanner() in PlannerDataStorage");
+                OMPL_INFORM("TODO: Remove decoupleFromPlanner() in PlannerDataStorage");
 
                 for (size_t i = 0; i < states.size(); ++i)
                     space->freeState(states[i]);

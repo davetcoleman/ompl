@@ -687,9 +687,9 @@ bool ompl::geometric::SPARSdb::addPathToRoadmap(const base::PlannerTerminationCo
     // Try to add the start first, but don't force it
     addStateToRoadmap(ptc, solutionPath.getState(0));
 
-#ifdef OMPL_THUNDER_DEBUG
-    vizStateCallback(solutionPath.getState(solutionPath.getStateCount() - 1), 3, sparseDelta_);
-#endif
+    //#ifdef OMPL_THUNDER_DEBUG
+    //    vizState(solutionPath.getState(solutionPath.getStateCount() - 1), 3, sparseDelta_);
+    //#endif
 
     // Add solution states to SPARSdb one by one ---------------------------
 
@@ -720,9 +720,9 @@ bool ompl::geometric::SPARSdb::addPathToRoadmap(const base::PlannerTerminationCo
             }
 
             // Show the candidate state in Rviz for path insertion of GUARDS
-#ifdef OMPL_THUNDER_DEBUG
-            vizStateCallback(solutionPath.getState(i), 1, sparseDelta_);
-#endif
+            //#ifdef OMPL_THUNDER_DEBUG
+            //            vizState(solutionPath.getState(i), 1, sparseDelta_);
+            //#endif
 
             // Add a single state to the roadmap
             if (!addStateToRoadmap(ptc, solutionPath.getState(i)))
@@ -787,11 +787,11 @@ bool ompl::geometric::SPARSdb::addPathToRoadmap(const base::PlannerTerminationCo
             OMPL_INFORM("Adding connectvity state ", i);
         }
 
-#ifdef OMPL_THUNDER_DEBUG
-        // Show the candidate state in Rviz for path insertion of BRIDGES (CONNECTIVITY)
-        vizStateCallback(connectivityState, 2, sparseDelta_);
-        sleep(0.5);
-#endif
+// #ifdef OMPL_THUNDER_DEBUG
+//         // Show the candidate state in Rviz for path insertion of BRIDGES (CONNECTIVITY)
+//         vizState(connectivityState, 2, sparseDelta_);
+//         sleep(0.5);
+// #endif
 
         // Add a single state to the roadmap
         addStateToRoadmap(ptc, connectivityState);
@@ -829,9 +829,9 @@ bool ompl::geometric::SPARSdb::addPathToRoadmap(const base::PlannerTerminationCo
     for (std::size_t i = 0; i < shuffledIDs.size(); ++i)
     {
 
-#ifdef OMPL_THUNDER_DEBUG
-        vizStateCallback(solutionPath.getState(shuffledIDs[i]), 1, sparseDelta_);
-#endif
+// #ifdef OMPL_THUNDER_DEBUG
+//         vizState(solutionPath.getState(shuffledIDs[i]), 1, sparseDelta_);
+// #endif
 
         // Add a single state to the roadmap
         addStateToRoadmap(ptc, solutionPath.getState(shuffledIDs[i]));
@@ -1396,10 +1396,10 @@ void ompl::geometric::SPARSdb::findCloseRepresentatives(base::State *workState, 
         {
             sampler_->sampleNear(workState, qNew, denseDelta_);
 
-#ifdef OMPL_THUNDER_DEBUG
-                vizStateCallback(workState, 3, sparseDelta_);
-                sleep(0.1);
-#endif
+            //#ifdef OMPL_THUNDER_DEBUG
+                //vizState(workState, 3, sparseDelta_);
+            //sleep(0.1);
+            //#endif
 
             if (verbose_)
             {
@@ -1616,10 +1616,10 @@ ompl::geometric::SPARSdb::Vertex ompl::geometric::SPARSdb::addGuard(base::State 
     {
         OMPL_INFORM(" ---- addGuard() of type %f", type);
     }
-#ifdef OMPL_THUNDER_DEBUG
-    vizStateCallback(state, 4, sparseDelta_); // Candidate node has already (just) been added
-    sleep(0.1);
-#endif
+    //#ifdef OMPL_THUNDER_DEBUG
+    //vizState(state, 4, sparseDelta_); // Candidate node has already (just) been added
+    //sleep(0.1);
+    //#endif
 
 
     return m;
@@ -1647,10 +1647,10 @@ void ompl::geometric::SPARSdb::connectGuards(Vertex v1, Vertex v2)
     disjointSets_.union_set(v1, v2);
 
     // Debug in Rviz
-#ifdef OMPL_THUNDER_DEBUG
-    vizEdgeCallback(stateProperty_[v1], stateProperty_[v2], 100);
-    sleep(0.8);
-#endif
+// #ifdef OMPL_THUNDER_DEBUG
+//     vizEdge(stateProperty_[v1], stateProperty_[v2], 100);
+//     sleep(0.8);
+// #endif
 
 }
 

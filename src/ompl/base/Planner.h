@@ -68,33 +68,6 @@ namespace ompl
         /** \class ompl::base::PlannerPtr
             \brief A boost shared pointer wrapper for ompl::base::Planner */
 
-        /**
-         * \brief Visualization callback hook for external debugging of states
-         * \param v - state to visualize
-         * \param type - different modes/colors/sizes for visualizing the state
-         * \param extraData - special extra data for showing a range around a state
-         */
-        typedef boost::function<void(const ompl::base::State* v, std::size_t type, double extraData)> VizStateCallback;
-        /**
-         * \brief Visualization callback hook for external debugging of edges
-         * \param v1 - from state that marks beginning of edge
-         * \param v2 - to state that marks end of edge
-         * \param cost - signifies the weight of the edge using color
-         */
-        typedef boost::function<void(const ompl::base::State* v1, const ompl::base::State* v2, double cost)> VizEdgeCallback;
-
-        /**
-         * \brief Visualization callback hook for external debugging of paths
-         * \param path
-         * \param type - style of line
-         */
-        typedef boost::function<void(const PathPtr path, std::size_t type)> VizPathCallback;
-
-        /**
-         * \brief Visualization callback hook for external debugging that triggers the visualizer to render/publish
-         */
-        typedef boost::function<void(void)> VizTriggerCallback;
-
         /** \brief Helper class to extract valid start & goal
             states. Usually used internally by planners.
 
@@ -393,50 +366,6 @@ namespace ompl
             /** \brief Print information about the motion planner's settings */
             virtual void printSettings(std::ostream &out) const;
 
-            /** \brief Visualize a planner's data during runtime, externally, using a function callback
-             *         This could be called whenever the graph changes */
-            virtual void vizStateCallback(const ompl::base::State* state, std::size_t type, double extraData)
-            {
-                if (vizStateCallback_)
-                    vizStateCallback_(state, type, extraData);
-            }
-
-            /** \brief Visualize a planner's data during runtime, externally, using a function callback
-             *         This could be called whenever the graph changes */
-            virtual void vizEdgeCallback(const ompl::base::State* stateA, const ompl::base::State* stateB, double cost)
-            {
-                if (vizEdgeCallback_)
-                    vizEdgeCallback_(stateA, stateB, cost);
-            }
-
-            /** \brief Visualize a planner's data during runtime, externally, using a function callback
-             *         This could be called whenever the graph changes */
-            virtual void vizPathCallback(const PathPtr path, std::size_t type)
-            {
-                if (vizPathCallback_)
-                    vizPathCallback_(path, type);
-            }
-
-            /** \brief Trigger visualizer to publish graphics */
-            virtual void vizTriggerCallback()
-            {
-                if (vizTriggerCallback_)
-                    vizTriggerCallback_();
-            }
-
-            /** \brief Set the callback to visualize/publish a planner's progress */
-            virtual void setVizCallbacks(
-                ompl::base::VizStateCallback vizStateCallback,
-                ompl::base::VizEdgeCallback vizEdgeCallback,
-                ompl::base::VizPathCallback vizPathCallback,
-                ompl::base::VizTriggerCallback vizTriggerCallback)
-            {
-                vizStateCallback_ = vizStateCallback;
-                vizEdgeCallback_ = vizEdgeCallback;
-                vizPathCallback_ = vizPathCallback;
-                vizTriggerCallback_ = vizTriggerCallback;
-            }
-
         protected:
 
             /** \brief This function declares a parameter for this planner instance, and specifies the setter and getter functions. */
@@ -486,12 +415,6 @@ namespace ompl
 
             /** \brief Flag indicating whether setup() has been called */
             bool                      setup_;
-
-            /** \brief Optional callback to allow easy introspection of a planner's search progress */
-            VizStateCallback vizStateCallback_;
-            VizEdgeCallback  vizEdgeCallback_;
-            VizPathCallback  vizPathCallback_;
-            VizTriggerCallback  vizTriggerCallback_;
         };
 
         /** \brief Definition of a function that can allocate a planner */

@@ -76,7 +76,7 @@ namespace ompl
             /** \brief When new samples are generated and added to the
                 list of possible samples, a callback can be
                 called. This type specifies the signature of that callback */
-            typedef boost::function<void(const base::State*)> NewStateCallbackFn;
+            typedef boost::function<void(const base::State*)> NewStateFn;
 
             /** \brief Create a goal region that can be sampled in a
                 lazy fashion. A function (\e samplerFunc) that
@@ -143,7 +143,7 @@ namespace ompl
 
             /** \brief Set the callback function to be called when a new state is added to the list of possible samples. This function
                 is not required to be thread safe, as calls are made one at a time. */
-            void setNewStateCallback(const NewStateCallbackFn &callback);
+            void setNewState(const NewStateFn &callback);
 
             /** \brief Add a state \e st if it further away that \e minDistance from previously added states. Return true if the state was added. */
             bool addStateIfDifferent(const State *st, double minDistance);
@@ -182,7 +182,7 @@ namespace ompl
             double                         minDist_;
 
             /** \brief If defined, this function is called when a new state is added to the list of possible samples */
-            NewStateCallbackFn             callback_;
+            NewStateFn             callback_;
         };
 
     }

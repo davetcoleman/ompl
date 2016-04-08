@@ -64,7 +64,7 @@ void Bolt::initialize()
     OMPL_INFORM("Initializing Bolt Framework");
 
     // Initalize visualizer class
-    visual_.reset(new Visualizer());
+    visual_.reset(new base::Visualizer());
 
     recallEnabled_ = true;
     scratchEnabled_ = true;
@@ -174,15 +174,11 @@ void Bolt::logResults()
             break;
         case base::PlannerStatus::EXACT_SOLUTION:
         {
-            std::cout << ANSI_COLOR_BLUE;
-            std::cout << "-----------------------------------------------------------" << std::endl;
-            std::cout << "Bolt Finished - solution found in " << planTime_ << " seconds" << std::endl;
-            std::cout << "-----------------------------------------------------------" << std::endl;
-            std::cout << ANSI_COLOR_RESET;
-
             og::PathGeometric solutionPath = og::SimpleSetup::getSolutionPath();  // copied so that it is non-const
-            OMPL_INFORM("Solution path has %d states and was generated from planner %s", solutionPath.getStateCount(),
-                        getSolutionPlannerName().c_str());
+
+            std::cout << ANSI_COLOR_BLUE;
+            std::cout << "Bolt Finished - solution found in " << planTime_ << " seconds with " << solutionPath.getStateCount() << " states" << std::endl;
+            std::cout << ANSI_COLOR_RESET;
 
             // Error check for repeated states
             if (!checkRepeatedStates(solutionPath))
@@ -370,6 +366,9 @@ bool Bolt::doPostProcessing()
 
     for (std::size_t i = 0; i < queuedSolutionPaths_.size(); ++i)
     {
+        std::cout << std::endl << "post processing path " << i << " of " << queuedSolutionPaths_.size()
+                  << " -------------------------- " << std::endl;
+
         // Time to add a path to experience database
         if (!denseDB_->postProcessPath(queuedSolutionPaths_[i]))
         {

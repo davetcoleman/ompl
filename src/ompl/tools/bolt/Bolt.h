@@ -181,14 +181,14 @@ class Bolt : public tools::ExperienceSetup
     bool doPostProcessing();
 
     /** \brief Get class for managing various visualization features */
-    VisualizerPtr getVisual()
+    base::VisualizerPtr getVisual()
     {
         return visual_;
     }
 
   protected:
     /** \brief Class for managing various visualization features */
-    VisualizerPtr visual_;
+    base::VisualizerPtr visual_;
 
     /**  The maintained experience planner instance */
     base::PlannerPtr boltPlanner_;
