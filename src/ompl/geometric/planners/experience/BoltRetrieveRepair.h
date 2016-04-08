@@ -40,7 +40,7 @@
 #include <ompl/geometric/planners/PlannerIncludes.h>
 #include <ompl/geometric/PathGeometric.h>
 #include <ompl/geometric/PathSimplifier.h>
-#include <ompl/tools/bolt/BoltDB.h>
+#include <ompl/tools/bolt/DenseDB.h>
 #include <ompl/tools/bolt/Visualizer.h>
 
 // Boost
@@ -64,7 +64,7 @@ namespace bolt
 /// @cond IGNORE
 /** \brief Forward declaration of ompl::base::BoltRetrieveRepair */
 OMPL_CLASS_FORWARD(BoltRetrieveRepair);
-OMPL_CLASS_FORWARD(BoltDB);
+OMPL_CLASS_FORWARD(DenseDB);
 /// @endcond
 
 /** \class ompl::base::BoltRetrieveRepairPtr
@@ -88,7 +88,7 @@ class BoltRetrieveRepair : public base::Planner
 {
   public:
     /** \brief Constructor */
-    BoltRetrieveRepair(const base::SpaceInformationPtr &si, const BoltDBPtr &boltDB);
+    BoltRetrieveRepair(const base::SpaceInformationPtr &si, const DenseDBPtr &denseDB);
 
     virtual ~BoltRetrieveRepair(void);
 
@@ -125,7 +125,7 @@ class BoltRetrieveRepair : public base::Planner
     /**
      * \brief Pass a pointer of the database from the bolt framework
      */
-    void setExperienceDB(const BoltDBPtr &boltDB);
+    void setExperienceDB(const DenseDBPtr &denseDB);
 
     /** \brief Setup function */
     virtual void setup(void);
@@ -207,7 +207,7 @@ class BoltRetrieveRepair : public base::Planner
     void freeMemory(void);
 
     /** \brief The database of motions to search through */
-    BoltDBPtr boltDB_;
+    DenseDBPtr denseDB_;
     SparseDBPtr sparseDB_;
 
     /** \brief Class for managing various visualization features */

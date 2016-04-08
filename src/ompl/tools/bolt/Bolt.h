@@ -40,7 +40,7 @@
 
 #include <ompl/tools/experience/ExperienceSetup.h>  // the parent class
 
-#include <ompl/tools/bolt/BoltDB.h>
+#include <ompl/tools/bolt/DenseDB.h>
 #include <ompl/tools/bolt/Visualizer.h>
 #include <ompl/geometric/planners/experience/BoltRetrieveRepair.h>
 
@@ -175,7 +175,7 @@ class Bolt : public tools::ExperienceSetup
     void convertPlannerData(const base::PlannerDataPtr plannerData, geometric::PathGeometric &path);
 
     /** \brief Hook for getting access to debug data */
-    BoltDBPtr getExperienceDB();
+    DenseDBPtr getExperienceDB();
 
     /** \brief Allow accumlated experiences to be processed */
     bool doPostProcessing();
@@ -194,7 +194,7 @@ class Bolt : public tools::ExperienceSetup
     base::PlannerPtr boltPlanner_;
 
     /** \brief A shared object between all the planners for saving and loading previous experience */
-    BoltDBPtr boltDB_;
+    DenseDBPtr denseDB_;
 
     /** \brief Accumulated experiences to be later added to experience database */
     std::vector<geometric::PathGeometric> queuedSolutionPaths_;

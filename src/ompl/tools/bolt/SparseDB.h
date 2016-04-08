@@ -48,7 +48,7 @@
 #include <ompl/datastructures/NearestNeighbors.h>
 #include <ompl/base/PlannerTerminationCondition.h>
 #include <ompl/tools/bolt/Visualizer.h>
-#include <ompl/tools/bolt/BoltDB.h>
+#include <ompl/tools/bolt/DenseDB.h>
 #include <ompl/tools/bolt/BoltGraph.h>
 
 // Boost
@@ -68,7 +68,7 @@ namespace bolt
 
 /// @cond IGNORE
 OMPL_CLASS_FORWARD(SparseDB);
-OMPL_CLASS_FORWARD(BoltDB);
+OMPL_CLASS_FORWARD(DenseDB);
 /// @endcond
 
 /** \class ompl::tools::bolt::::SparseDBPtr
@@ -78,7 +78,7 @@ OMPL_CLASS_FORWARD(BoltDB);
 class SparseDB
 {
     friend class BoltRetrieveRepair;
-    friend class BoltDB;
+    friend class DenseDB;
 
   public:
     ////////////////////////////////////////////////////////////////////////////////////////
@@ -172,7 +172,7 @@ class SparseDB
     /** \brief Constructor needs the state space used for planning.
      *  \param space - state space
      */
-    SparseDB(base::SpaceInformationPtr si, BoltDB* boltDB, VisualizerPtr visual);
+    SparseDB(base::SpaceInformationPtr si, DenseDB* denseDB, VisualizerPtr visual);
 
     /** \brief Deconstructor */
     virtual ~SparseDB(void);
@@ -236,6 +236,12 @@ class SparseDB
     void createSPARS();
     bool findSparseRepresentatives();
 
+    /** \brief Add random samples until graph is fully connected */
+    void eliminateDisjointSets();
+
+    /** \brief Attempt to re-add neighbors from dense graph that have not been added yet */
+    bool reinsertNeighborsIntoSpars(const SparseVertex& newVertex);
+
     /** \brief Helper for counting the number of disjoint sets in the sparse graph */
     std::size_t getDisjointSets(bool verbose = false);
 
@@ -246,24 +252,41 @@ class SparseDB
     /** \brief Helper function for random integer creation */
     int iRand(int min, int max);
 
+    /**
+     * \brief Run various checks/criteria to determine if to keep DenseVertex in sparse graph
+     * \param denseVertex - the original vertex to consider
+     * \param newVertex - if function returns true, the newly generated sparse vertex
+     * \param addReason - if function returns true, the reson the denseVertex was added to the sparse graph
+     * \return true on success
+     */
+    bool addStateToRoadmap(DenseVertex denseVertex, SparseVertex& newVertex, GuardType& addReason);
+
     /* ----------------------------------------------------------------------------------------*/
     /** \brief SPARS-related functions */
-    bool addStateToRoadmap(const base::PlannerTerminationCondition& ptc, DenseVertex denseVertex);
     bool checkAddCoverage(const DenseVertex& denseV, std::vector<SparseVertex>& visibleNeighborhood,
-                          std::size_t coutIndent);
+                          SparseVertex& newVertex, std::size_t coutIndent);
     bool checkAddConnectivity(const DenseVertex& denseV, std::vector<SparseVertex>& visibleNeighborhood,
-                              std::size_t coutIndent);
+                              SparseVertex& newVertex, std::size_t coutIndent);
     bool checkAddInterface(const DenseVertex& denseV, std::vector<SparseVertex>& graphNeighborhood,
-                           std::vector<SparseVertex>& visibleNeighborhood, std::size_t coutIndent);
+                           std::vector<SparseVertex>& visibleNeighborhood, SparseVertex& newVertex,
+                           std::size_t coutIndent);
     bool checkAsymptoticOptimal(const DenseVertex& denseV, std::size_t coutIndent);
     void getInterfaceNeighborhood(const DenseVertex& denseV, std::vector<DenseVertex>& interfaceNeighborhood,
                                   std::size_t coutIndent);
+    /**
+     * \brief Get neighbors within sparseDelta radius
+     * \param denseV - origin state to search from
+     * \param graphNeighborhood - resulting nearby states
+     * \param visibleNeighborhood - resulting nearby states that are visible
+     * \param countIndent - debugging tool
+     */
     void findGraphNeighbors(const DenseVertex& denseV, std::vector<SparseVertex>& graphNeighborhood,
                             std::vector<SparseVertex>& visibleNeighborhood, std::size_t coutIndent);
-    bool checkAddPath(DenseVertex q, const std::vector<DenseVertex> &neigh, std::size_t coutIndent);
-    void computeVPP(SparseVertex v, SparseVertex vp, std::vector<SparseVertex> &VPPs);
-    void computeX(SparseVertex v, SparseVertex vp, SparseVertex vpp, std::vector<SparseVertex> &Xs);
-    bool addPathToSpanner( const DensePath &densePath, SparseVertex vp, SparseVertex vpp );
+
+    bool checkAddPath(DenseVertex q, const std::vector<DenseVertex>& neigh, std::size_t coutIndent);
+    void computeVPP(SparseVertex v, SparseVertex vp, std::vector<SparseVertex>& VPPs);
+    void computeX(SparseVertex v, SparseVertex vp, SparseVertex vpp, std::vector<SparseVertex>& Xs);
+    bool addPathToSpanner(const DensePath& densePath, SparseVertex vp, SparseVertex vpp);
     void connectSparsePoints(SparseVertex v, SparseVertex vp);
     DenseVertex getInterfaceNeighbor(DenseVertex q, SparseVertex rep);
     bool sameComponent(SparseVertex m1, SparseVertex m2);
@@ -278,14 +301,14 @@ class SparseDB
     /** \brief Shortcut function for getting the state of a vertex */
     inline base::State*& getSparseState(const SparseVertex& v);
     inline const base::State* getSparseStateConst(const SparseVertex& v) const;
-    inline base::State *&getDenseState(const DenseVertex &denseV);
+    inline base::State*& getDenseState(const DenseVertex& denseV);
 
   protected:
     /** \brief The created space information */
     base::SpaceInformationPtr si_;
 
     /** \brief The database of motions to search through */
-    BoltDB* boltDB_;
+    DenseDB* denseDB_;
 
     /** \brief Class for managing various visualization features */
     VisualizerPtr visual_;
@@ -333,8 +356,8 @@ class SparseDB
     /** \brief Amount of sub-optimality allowed */
     double sparseDelta_;
 
+    bool specialMode_;  // for debugging
   public:
-
     /** \brief SPARS parameter for dense graph connection distance as a fraction of max. extent */
     double denseDeltaFraction_;
 
