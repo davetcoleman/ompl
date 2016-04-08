@@ -125,15 +125,15 @@ otb::SparseDB::CustomAstarVisitor::CustomAstarVisitor(SparseVertex goal, SparseD
 void otb::SparseDB::CustomAstarVisitor::discover_vertex(SparseVertex v, const SparseGraph &) const
 {
     if (parent_->visualizeAstar_)
-        parent_->visual_->viz4StateCallback(parent_->getSparseState(v), /*mode=*/1, 1);
+        parent_->visual_->viz4State(parent_->getSparseState(v), /*mode=*/1, 1);
 }
 
 void otb::SparseDB::CustomAstarVisitor::examine_vertex(SparseVertex v, const SparseGraph &) const
 {
     if (parent_->visualizeAstar_)
     {
-        parent_->visual_->viz4StateCallback(parent_->getSparseState(v), /*mode=*/5, 1);
-        parent_->visual_->viz4TriggerCallback();
+        parent_->visual_->viz4State(parent_->getSparseState(v), /*mode=*/5, 1);
+        parent_->visual_->viz4Trigger();
         usleep(parent_->visualizeAstarSpeed_ * 1000000);
     }
 
@@ -149,7 +149,7 @@ namespace tools
 {
 namespace bolt
 {
-SparseDB::SparseDB(base::SpaceInformationPtr si, DenseDB *denseDB, VisualizerPtr visual)
+    SparseDB::SparseDB(base::SpaceInformationPtr si, DenseDB *denseDB, base::VisualizerPtr visual)
   : si_(si)
   , denseDB_(denseDB)
   , visual_(visual)
@@ -169,6 +169,7 @@ SparseDB::SparseDB(base::SpaceInformationPtr si, DenseDB *denseDB, VisualizerPtr
   // Derived properties
   , sparseDelta_(2.0)
   , specialMode_(false)
+  , visualizeOverlayNodes_(false)
   // Sparse properites
   , denseDeltaFraction_(.05)
   , sparseDeltaFraction_(.25)
@@ -176,6 +177,7 @@ SparseDB::SparseDB(base::SpaceInformationPtr si, DenseDB *denseDB, VisualizerPtr
   , stretchFactor_(3.)
   // Visualization settings
   , checksVerbose_(false)
+    , disjointVerbose_(true)
   , fourthCheckVerbose_(true)
   , visualizeAstar_(false)
   , visualizeSparsCreation_(false)
@@ -310,10 +312,10 @@ bool SparseDB::astarSearch(const SparseVertex start, const SparseVertex goal, st
             if (v1 != v2)
             {
                 // std::cout << "Edge " << v1 << " to " << v2 << std::endl;
-                visual_->viz4EdgeCallback(getSparseStateConst(v1), getSparseStateConst(v2), 10);
+                visual_->viz4Edge(getSparseStateConst(v1), getSparseStateConst(v2), 10);
             }
         }
-        visual_->viz4TriggerCallback();
+        visual_->viz4Trigger();
     }
 
     // Unload
@@ -376,7 +378,7 @@ void SparseDB::createSPARS()
         initializeQueryState();
 
         // Clear visuals
-        visual_->viz2StateCallback(NULL, /*mode=deleteAllMarkers*/ 0, 0);
+        visual_->viz2State(NULL, /*mode=deleteAllMarkers*/ 0, 0);
     }
 
     // Reset fractions
@@ -442,7 +444,7 @@ void SparseDB::createSPARS()
                 // Visualize the failed vertex as a small red dot
                 if (visualizeSparsCreation_)
                 {
-                    visual_->viz2StateCallback(getDenseState(vertexInsertionOrder[i].v_), /*mode=*/3, 0);
+                    visual_->viz2State(getDenseState(vertexInsertionOrder[i].v_), /*mode=*/3, 0);
                 }
             }
             else
@@ -456,7 +458,7 @@ void SparseDB::createSPARS()
 
         // Visualize
         if (visualizeSparsCreation_)
-            visual_->viz2TriggerCallback();
+            visual_->viz2Trigger();
 
         std::cout << std::string(coutIndent + 2, ' ') + "Succeeded in inserting " << sucessfulInsertions
                   << " vertices on the " << loopAttempt << " loop" << std::endl;
@@ -501,7 +503,7 @@ void SparseDB::createSPARS()
     }
     else if (visualizeSparsCreationSpeed_ < std::numeric_limits<double>::epsilon())
     {
-        visual_->viz2TriggerCallback();
+        visual_->viz2Trigger();
         usleep(0.001 * 1000000);
     }
 
@@ -518,16 +520,21 @@ void SparseDB::createSPARS()
         OMPL_INFORM("  Number of disjoint sets: %u, attempting to random sample until fully connected", numSets);
         eliminateDisjointSets();
         denseDB_->displayDatabase();
-
-        std::cout << "sleeping after creating SPARS " << std::endl;
-        usleep(10*1000000);
     }
     else
         OMPL_INFORM("  Disjoint sets: %u", numSets);
+
+    OMPL_INFORM("Finished creating sparse database ----------------------");
+    std::cout << std::endl;
 }
 
 void SparseDB::eliminateDisjointSets()
 {
+    std::size_t coutIndent = 2;
+    if (disjointVerbose_)
+        std::cout << std::string(coutIndent, ' ') + "eliminateDisjointSets()" << std::endl;
+
+    visualizeOverlayNodes_ = true;  // visualize all added nodes in a separate window, also
     specialMode_ = false;  // disable parts of addRoadmap
     bool verbose = false;
 
@@ -539,9 +546,8 @@ void SparseDB::eliminateDisjointSets()
 
     // For each dense vertex we add
     std::size_t numSets = 2;   // dummy value that will be updated at first loop
-    std::size_t newState = 0;  // count how many states we add
+    std::size_t newStateCount = 0;  // count how many states we add
     while (numSets > 1)
-        //for (std::size_t i = 0; i < 1000; ++i)
     {
         // Add dense vertex
         base::State *state = si_->allocState();
@@ -564,8 +570,8 @@ void SparseDB::eliminateDisjointSets()
             // Debug
             if (verbose && false)
             {
-                visual_->viz4StateCallback(state, /*mode=*/3, 0);
-                visual_->viz4TriggerCallback();
+                visual_->viz4State(state, /*mode=*/3, 0);
+                visual_->viz4Trigger();
                 usleep(0.001 * 1000000);
             }
 
@@ -574,10 +580,19 @@ void SparseDB::eliminateDisjointSets()
             SparseVertex newVertex;  // the newly generated sparse vertex
             if (addStateToRoadmap(denseV, newVertex, addReason))
             {
-                std::cout << "Added random sampled state to fix graph connectivity: " << newState++ << std::endl;
-                visual_->viz2TriggerCallback();  // show the new sparse graph addition
+                // Debug
+                if (disjointVerbose_)
+                    std::cout << std::string(coutIndent+2, ' ')
+                              << "Added random sampled state to fix graph connectivity, total new states: " << ++newStateCount << std::endl;
 
-                // Attempt to re-add neighbors from dense graph that have not been added yet
+                // Visualize
+                if (visualizeSparsCreation_)
+                {
+                    visual_->viz2Trigger();  // show the new sparse graph addition
+                }
+
+                // Attempt to re-add neighbors from dense graph into sparse graph that have not been added yet
+                // so that the new vertex has good edges
                 if (addReason == COVERAGE)
                 {
                     if (reinsertNeighborsIntoSpars(newVertex))
@@ -587,13 +602,20 @@ void SparseDB::eliminateDisjointSets()
                     }
                 }
 
+                // Attempt to connect new DENSE vertex into dense graph by connecting neighbors
+                denseDB_->connectNewVertex(denseV);
+
                 break;  // must break so that a new state can be allocated
             }
         }
 
         // Update number of sets
         numSets = getDisjointSets();
-        std::cout << "  Remaining disjoint sets: " << numSets << std::endl;
+
+        // Debug
+        if (disjointVerbose_)
+            std::cout << std::string(coutIndent+4, ' ')
+                      << "Remaining disjoint sets: " << numSets << std::endl;
     }  // end while
 
     // getDisjointSets(true);  // show in verbose mode
@@ -712,12 +734,12 @@ bool SparseDB::findSparseRepresentatives()
             else
             {
                 double visualColor = 100;
-                visual_->viz2EdgeCallback(state, getSparseState(denseDB_->representativesProperty_[denseV]),
+                visual_->viz2Edge(state, getSparseState(denseDB_->representativesProperty_[denseV]),
                                           visualColor);
             }
         }
     }
-    visual_->viz2TriggerCallback();
+    visual_->viz2Trigger();
 
     return true;
 }
@@ -734,9 +756,9 @@ bool SparseDB::getPopularityOrder(std::vector<WeightedVertex> &vertexInsertionOr
     }
 
     // Visualize - clear image
-    if (visualizeSparsCreation_)
+    if (visualizeNodePopularity_)
     {
-        visual_->viz3StateCallback(NULL, /* type = deleteAllMarkers */ 0, 0);
+        visual_->viz3State(NULL, /* type = deleteAllMarkers */ 0, 0);
     }
 
     // Sort the verticies by popularity in a queue
@@ -782,17 +804,17 @@ bool SparseDB::getPopularityOrder(std::vector<WeightedVertex> &vertexInsertionOr
         vertexInsertionOrder.back().weight_ = weightPercent;
 
         // Visualize
-        if (visualizeSparsCreation_)
+        if (visualizeNodePopularity_)
         {
             if (verbose)
                 std::cout << "vertex " << pqueue.top().v_ << ", mode 7, weightPercent " << weightPercent << std::endl;
-            visual_->viz3StateCallback(denseDB_->stateProperty_[pqueue.top().v_], /*mode=*/7, weightPercent);
+            visual_->viz3State(denseDB_->stateProperty_[pqueue.top().v_], /*mode=*/7, weightPercent);
         }
 
         // Remove from priority queue
         pqueue.pop();
     }
-    visual_->viz3TriggerCallback();
+    visual_->viz3Trigger();
     usleep(0.001 * 1000000);
 
     return true;
@@ -840,14 +862,18 @@ bool SparseDB::getDefaultOrder(std::vector<WeightedVertex> &vertexInsertionOrder
         wv.weight_ = weightPercent;
 
         // Visualize vertices
-        if (visualizeSparsCreation_)
+        if (visualizeNodePopularity_)
         {
-            visual_->viz3StateCallback(denseDB_->stateProperty_[wv.v_], /*mode=*/7, weightPercent);
+            visual_->viz3State(denseDB_->stateProperty_[wv.v_], /*mode=*/7, weightPercent);
         }
     }
 
-    visual_->viz3TriggerCallback();
-    usleep(0.001 * 1000000);
+    // Visualize vertices
+    if (visualizeNodePopularity_)
+    {
+        visual_->viz3Trigger();
+        usleep(0.001 * 1000000);
+    }
 
     return true;
 }
@@ -1018,8 +1044,8 @@ bool SparseDB::checkAddConnectivity(const DenseVertex &denseV, std::vector<Spars
         for (std::size_t i = 0; i < visibleNeighborhood.size(); ++i)
         {
             std::cout << "showing neighbor " << i << " - " << visibleNeighborhood[i] << std::endl;
-            visual_->viz2StateCallback(getSparseStateConst(visibleNeighborhood[i]), 9, 2);
-            visual_->viz2TriggerCallback();
+            visual_->viz2State(getSparseStateConst(visibleNeighborhood[i]), 9, 2);
+            visual_->viz2Trigger();
             usleep(0.001 * 1000000);
         }
     }
@@ -1043,9 +1069,9 @@ bool SparseDB::checkAddConnectivity(const DenseVertex &denseV, std::vector<Spars
         // Visualize each diff component state
         if (specialMode_)
         {
-            visual_->viz2StateCallback(getDenseState(denseV), 9, 3);
-            // visual_->viz2StateCallback(getSparseStateConst(*vertexIt), 9, 2);
-            visual_->viz2TriggerCallback();
+            visual_->viz2State(getDenseState(denseV), 9, 3);
+            // visual_->viz2State(getSparseStateConst(*vertexIt), 9, 2);
+            visual_->viz2Trigger();
             usleep(0.001 * 1000000);
         }
 
@@ -1489,17 +1515,17 @@ SparseVertex SparseDB::addVertex(DenseVertex denseV, const GuardType &type)
         else
             OMPL_ERROR("Unknown mode");
 
-        visual_->viz2StateCallback(getSparseState(v), mode, sparseDelta_);
+        visual_->viz2State(getSparseState(v), mode, sparseDelta_);
         if (visualizeSparsCreationSpeed_ > std::numeric_limits<double>::epsilon())
         {
-            visual_->viz2TriggerCallback();
+            visual_->viz2Trigger();
             usleep(visualizeSparsCreationSpeed_ * 1000000);
         }
 
-        if (specialMode_)
+        if (visualizeOverlayNodes_)
         {
-            visual_->viz3StateCallback(getSparseState(v), mode, sparseDelta_);
-            visual_->viz3TriggerCallback();
+            visual_->viz3State(getSparseState(v), mode, sparseDelta_);
+            visual_->viz3Trigger();
             usleep(0.001*1000000);
         }
     }
@@ -1559,17 +1585,17 @@ void SparseDB::addEdge(SparseVertex v1, SparseVertex v2, std::size_t visualColor
            75  - ORANGE - interface second round
            100 - RED    - interface special
         */
-        visual_->viz2EdgeCallback(getSparseState(v1), getSparseState(v2), visualColor);
+        visual_->viz2Edge(getSparseState(v1), getSparseState(v2), visualColor);
         if (visualizeSparsCreationSpeed_ > std::numeric_limits<double>::epsilon())
         {
-            visual_->viz2TriggerCallback();
+            visual_->viz2Trigger();
             usleep(visualizeSparsCreationSpeed_ * 1000000);
         }
 
-        if (specialMode_)
+        if (visualizeOverlayNodes_)
         {
-            visual_->viz3EdgeCallback(getSparseState(v1), getSparseState(v2), visualColor);
-            visual_->viz3TriggerCallback();
+            visual_->viz3Edge(getSparseState(v1), getSparseState(v2), visualColor);
+            visual_->viz3Trigger();
             usleep(0.001*1000000);
         }
     }
@@ -1612,7 +1638,7 @@ void SparseDB::displayDatabase(bool showVertices)
             // Check for null states
             if (getSparseStateConst(v))
             {
-                visual_->viz2StateCallback(getSparseStateConst(v), /*mode=*/6, 1);
+                visual_->viz2State(getSparseStateConst(v), /*mode=*/6, 1);
             }
             else
                 OMPL_WARN("Null sparse state found on vertex %u", v);
@@ -1622,7 +1648,7 @@ void SparseDB::displayDatabase(bool showVertices)
             {
                 std::cout << std::fixed << std::setprecision(0)
                           << (static_cast<double>(count + 1) / getNumVertices()) * 100.0 << "% " << std::flush;
-                visual_->viz2TriggerCallback();
+                visual_->viz2Trigger();
             }
             count++;
         }
@@ -1641,14 +1667,14 @@ void SparseDB::displayDatabase(bool showVertices)
             const SparseVertex &v2 = boost::target(e, g_);
 
             // Visualize
-            visual_->viz2EdgeCallback(getSparseStateConst(v1), getSparseStateConst(v2), edgeWeightPropertySparse_[e]);
+            visual_->viz2Edge(getSparseStateConst(v1), getSparseStateConst(v2), edgeWeightPropertySparse_[e]);
 
             // Prevent cache from getting too big
             if (count % debugFrequency == 0)
             {
                 std::cout << std::fixed << std::setprecision(0)
                           << (static_cast<double>(count + 1) / getNumEdges()) * 100.0 << "% " << std::flush;
-                visual_->viz2TriggerCallback();
+                visual_->viz2Trigger();
             }
 
             count++;
@@ -1657,7 +1683,7 @@ void SparseDB::displayDatabase(bool showVertices)
     }
 
     // Publish remaining edges
-    visual_->viz2TriggerCallback();
+    visual_->viz2Trigger();
 }
 
 }  // namespace bolt

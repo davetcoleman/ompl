@@ -211,7 +211,7 @@ class BoltRetrieveRepair : public base::Planner
     SparseDBPtr sparseDB_;
 
     /** \brief Class for managing various visualization features */
-    VisualizerPtr visual_;
+    base::VisualizerPtr visual_;
 
     /** \brief Save the recalled path before smoothing for introspection later */
     boost::shared_ptr<geometric::PathGeometric> originalSolutionPath_;

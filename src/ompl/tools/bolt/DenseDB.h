@@ -175,7 +175,7 @@ class DenseDB
     /** \brief Constructor needs the state space used for planning.
      *  \param space - state space
      */
-    DenseDB(base::SpaceInformationPtr si, VisualizerPtr visual);
+    DenseDB(base::SpaceInformationPtr si, base::VisualizerPtr visual);
 
     /** \brief Deconstructor */
     virtual ~DenseDB(void);
@@ -441,7 +441,7 @@ class DenseDB
     }
 
     /** \brief Get class for managing various visualization features */
-    VisualizerPtr getVisual()
+    base::VisualizerPtr getVisual()
     {
         return visual_;
     }
@@ -455,16 +455,17 @@ class DenseDB
     /**
      * \brief Sometimes the dense graph's discretization is not enough, so we have the ability to manually add
      *        samples and connect to the graph
-     * \param state - new node that covers a currently un-visible region of the configuration space
+     * \param denseV - a newly created vertex that needs to be connected to the dense graph
+     *                 the vertex should cover a currently un-visible region of the configuration space
      */
-    void addSample(const base::State *state);
+    void connectNewVertex(DenseVertex denseV);
 
   protected:
     /** \brief The created space information */
     base::SpaceInformationPtr si_;
 
     /** \brief Class for managing various visualization features */
-    VisualizerPtr visual_;
+    base::VisualizerPtr visual_;
 
     /** \brief Class to store lighter version of graph */
     SparseDBPtr sparseDB_;
@@ -528,6 +529,9 @@ class DenseDB
     bool useTaskPlanning_;
 
   public:
+    /** \brief Option to enable debugging output */
+    bool snapPathVerbose_;
+
     /** \brief Various options for visualizing the algorithmns performance */
     bool visualizeAstar_;
     bool visualizeGridGeneration_;

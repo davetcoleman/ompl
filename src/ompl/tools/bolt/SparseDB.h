@@ -172,7 +172,7 @@ class SparseDB
     /** \brief Constructor needs the state space used for planning.
      *  \param space - state space
      */
-    SparseDB(base::SpaceInformationPtr si, DenseDB* denseDB, VisualizerPtr visual);
+    SparseDB(base::SpaceInformationPtr si, DenseDB* denseDB, base::VisualizerPtr visual);
 
     /** \brief Deconstructor */
     virtual ~SparseDB(void);
@@ -311,7 +311,7 @@ class SparseDB
     DenseDB* denseDB_;
 
     /** \brief Class for managing various visualization features */
-    VisualizerPtr visual_;
+    base::VisualizerPtr visual_;
 
     /** \brief Nearest neighbors data structure */
     boost::shared_ptr<NearestNeighbors<SparseVertex> > nn_;
@@ -356,7 +356,12 @@ class SparseDB
     /** \brief Amount of sub-optimality allowed */
     double sparseDelta_;
 
-    bool specialMode_;  // for debugging
+    /** \brief For debugging */
+    bool specialMode_;
+
+    /** \brief Show what nodes are added on top of the regular SPARS graph */
+    bool visualizeOverlayNodes_;
+
   public:
     /** \brief SPARS parameter for dense graph connection distance as a fraction of max. extent */
     double denseDeltaFraction_;
@@ -371,6 +376,7 @@ class SparseDB
     double denseDelta_;
 
     bool checksVerbose_;
+    bool disjointVerbose_;
     bool fourthCheckVerbose_;
 
     /** \brief Various options for visualizing the algorithmns performance */
@@ -380,6 +386,7 @@ class SparseDB
     bool visualizeSparsCreation_;
     double visualizeSparsCreationSpeed_;
     bool visualizeDenseRepresentatives_;
+    bool visualizeNodePopularity_;
 
     /** \brief Visualization speed of astar search, num of seconds to show each vertex */
     double visualizeAstarSpeed_;

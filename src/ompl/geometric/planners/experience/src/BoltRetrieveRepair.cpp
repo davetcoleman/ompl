@@ -101,7 +101,6 @@ void BoltRetrieveRepair::freeMemory(void)
 
 base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCondition &ptc)
 {
-    OMPL_INFORM("-------------------------------------------------------");
     OMPL_INFORM("BoltRetrieveRepair::solve()");
 
     bool solved = false;
@@ -163,11 +162,11 @@ base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCond
     if (visualizeRawTrajectory_)
     {
         // Make the chosen path a different color and thickness
-        visual_->viz5PathCallback(pathSolutionBase, /*style*/ 1);
-        visual_->viz5TriggerCallback();
+        visual_->viz5Path(pathSolutionBase, /*style*/ 1);
+        visual_->viz5Trigger();
 
-        visual_->viz6PathCallback(pathSolutionBase, /*style*/ 1);
-        visual_->viz6TriggerCallback();
+        visual_->viz6Path(pathSolutionBase, /*style*/ 1);
+        visual_->viz6Trigger();
     }
 
     // Smooth the result
@@ -180,8 +179,8 @@ base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCond
     geometricSolution.interpolate();
 
     // Show smoothed & interpolated path
-    visual_->viz6PathCallback(pathSolutionBase, /*style*/ 2);
-    visual_->viz6TriggerCallback();
+    visual_->viz6Path(pathSolutionBase, /*style*/ 2);
+    visual_->viz6Trigger();
 
     // Finished
     approxdif = 0;
@@ -198,7 +197,8 @@ base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCond
 
 bool BoltRetrieveRepair::simplifyPath(og::PathGeometric &path, const base::PlannerTerminationCondition &ptc)
 {
-    OMPL_INFORM("BoltRetrieveRepair solve: Simplifying solution (smoothing)...");
+    if (verbose_)
+        OMPL_INFORM("BoltRetrieveRepair: Simplifying solution (smoothing)...");
 
     time::point simplifyStart = time::now();
     std::size_t numStates = path.getStateCount();
@@ -266,7 +266,8 @@ bool BoltRetrieveRepair::getPathOffGraph(const base::State *start, const base::S
     std::size_t attempt = 0;
     for (; attempt < maxAttempts; ++attempt)
     {
-        OMPL_INFORM("Starting getPathOffGraph attempt %u", attempt);
+        if (verbose_)
+            OMPL_INFORM("Starting getPathOffGraph attempt %u", attempt);
 
         // Get neighbors near start and goal. Note: potentially they are not *visible* - will test for this later
 
@@ -313,11 +314,17 @@ bool BoltRetrieveRepair::getPathOffGraph(const base::State *start, const base::S
             // Add the point that failed
             if (feedbackStartFailed) // start state failed
             {
-                denseDB_->addSample(start);
+                // Create the vertex then connect to denseDB
+                // TODO(davetcoleman): how to prevent from adding same state twice?
+                DenseVertex denseV = denseDB_->addVertex(si_->cloneState(start), QUALITY);
+                denseDB_->connectNewVertex(denseV);
             }
             else // goal state failed
             {
-                denseDB_->addSample(goal);
+                // Create the vertex then connect to denseDB
+                // TODO(davetcoleman): how to prevent from adding same state twice?
+                DenseVertex denseV = denseDB_->addVertex(si_->cloneState(goal), QUALITY);
+                denseDB_->connectNewVertex(denseV);
             }
 
             OMPL_INFORM("Re-creating the spars graph");
@@ -356,7 +363,7 @@ bool BoltRetrieveRepair::getPathOffGraph(const base::State *start, const base::S
 bool BoltRetrieveRepair::getPathOnGraph(const std::vector<SparseVertex> &candidateStarts,
                                         const std::vector<SparseVertex> &candidateGoals, const base::State *actualStart,
                                         const base::State *actualGoal, og::PathGeometric &geometricSolution,
-        const base::PlannerTerminationCondition &ptc, bool debug, bool &feedbackStartFailed)
+    const base::PlannerTerminationCondition &ptc, bool debug, bool &feedbackStartFailed)
 {
     bool foundValidStart = false;
     bool foundValidGoal = false;
@@ -380,9 +387,9 @@ bool BoltRetrieveRepair::getPathOnGraph(const std::vector<SparseVertex> &candida
             }
             if (debug)
             {
-                visual_->viz4StateCallback(sparseDB_->getSparseStateConst(start), /*mode=*/3, 1);
-                visual_->viz4EdgeCallback(actualStart, sparseDB_->getSparseStateConst(start), 100);
-                visual_->viz4TriggerCallback();
+                visual_->viz4State(sparseDB_->getSparseStateConst(start), /*mode=*/3, 1);
+                visual_->viz4Edge(actualStart, sparseDB_->getSparseStateConst(start), 100);
+                visual_->viz4Trigger();
                 usleep(0.1 * 1000000);
             }
             continue;  // this is actually not visible
@@ -418,9 +425,9 @@ bool BoltRetrieveRepair::getPathOnGraph(const std::vector<SparseVertex> &candida
 
                 if (debug)
                 {
-                    visual_->viz4StateCallback(sparseDB_->getSparseStateConst(goal), /*mode=*/3, 1);
-                    visual_->viz4EdgeCallback(actualGoal, sparseDB_->getSparseStateConst(goal), 100);
-                    visual_->viz4TriggerCallback();
+                    visual_->viz4State(sparseDB_->getSparseStateConst(goal), /*mode=*/3, 1);
+                    visual_->viz4Edge(actualGoal, sparseDB_->getSparseStateConst(goal), 100);
+                    visual_->viz4Trigger();
                     usleep(0.1 * 1000000);
                 }
 
@@ -499,16 +506,16 @@ bool BoltRetrieveRepair::lazyCollisionSearch(const SparseVertex &start, const Sp
     if (visualize)
     {
         OMPL_INFORM("viz start -----------------------------");
-        visual_->viz5StateCallback(sparseDB_->getSparseStateConst(start), /*mode=*/4, 1);
-        visual_->viz5EdgeCallback(actualStart, sparseDB_->getSparseStateConst(start), 30);
-        visual_->viz5TriggerCallback();
+        visual_->viz5State(sparseDB_->getSparseStateConst(start), /*mode=*/4, 1);
+        visual_->viz5Edge(actualStart, sparseDB_->getSparseStateConst(start), 30);
+        visual_->viz5Trigger();
         usleep(5 * 1000000);
 
         // Visualize goal vertex
         OMPL_INFORM("viz goal ------------------------------");
-        visual_->viz5StateCallback(sparseDB_->getSparseStateConst(goal), /*mode=*/4, 1);
-        visual_->viz5EdgeCallback(actualGoal, sparseDB_->getSparseStateConst(goal), 0);
-        visual_->viz5TriggerCallback();
+        visual_->viz5State(sparseDB_->getSparseStateConst(goal), /*mode=*/4, 1);
+        visual_->viz5Edge(actualGoal, sparseDB_->getSparseStateConst(goal), 0);
+        visual_->viz5Trigger();
         usleep(5 * 1000000);
     }
 
@@ -617,7 +624,8 @@ bool BoltRetrieveRepair::lazyCollisionCheck(std::vector<SparseVertex> &vertexPat
         fromVertex = toVertex;
     }
 
-    OMPL_INFORM("  Done lazy collision checking");
+    if (verbose_)
+        OMPL_INFORM("  Done lazy collision checking");
 
     // Only return true if nothing was found invalid
     return !hasInvalidEdges;
@@ -808,9 +816,9 @@ bool BoltRetrieveRepair::canConnect(const base::State *randomState, const base::
 
             if (false)
             {
-                visual_->viz5StateCallback(s2, /*mode=*/2, 1);  // BLUE
-                visual_->viz5EdgeCallback(s1, s2, 100);
-                visual_->viz5TriggerCallback();
+                visual_->viz5State(s2, /*mode=*/2, 1);  // BLUE
+                visual_->viz5Edge(s1, s2, 100);
+                visual_->viz5Trigger();
                 usleep(1*1000000);
             }
 
@@ -838,13 +846,13 @@ bool BoltRetrieveRepair::canConnect(const base::State *randomState, const base::
 
                     if (!si_->isValid(interState))
                     {
-                        visual_->viz5StateCallback(interState, /*mode=*/3, 1);  // RED
-                        visual_->viz5TriggerCallback();
+                        visual_->viz5State(interState, /*mode=*/3, 1);  // RED
+                        visual_->viz5Trigger();
                         usleep(1*1000000);
                     }
                     else
                     {
-                        // visual_->viz5StateCallback(interState, /*mode=*/1, 1); // GREEN
+                        // visual_->viz5State(interState, /*mode=*/1, 1); // GREEN
                     }
                 }
             }
