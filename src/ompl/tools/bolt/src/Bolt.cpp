@@ -71,10 +71,10 @@ void Bolt::initialize()
     filePath_ = "unloaded";
 
     // Load the experience database
-    boltDB_.reset(new BoltDB(si_, visual_));
+    denseDB_.reset(new DenseDB(si_, visual_));
 
     // Load the Retrieve repair database. We do it here so that setRepairPlanner() works
-    boltPlanner_ = ob::PlannerPtr(new BoltRetrieveRepair(si_, boltDB_));  // TODO(davetcoleman): pass in visual_
+    boltPlanner_ = ob::PlannerPtr(new BoltRetrieveRepair(si_, denseDB_));  // TODO(davetcoleman): pass in visual_
 
     OMPL_INFORM("Bolt Framework initialized.");
 }
@@ -94,7 +94,7 @@ void Bolt::setup(void)
             boltPlanner_->setup();
 
         // Setup database
-        boltDB_->setup();
+        denseDB_->setup();
 
         // Set the configured flag
         configured_ = true;
@@ -219,8 +219,8 @@ void Bolt::logResults()
 
     // Final log data
     // log.insertion_time = insertionTime; TODO fix this
-    log.numVertices = boltDB_->getNumVertices();
-    log.numEdges = boltDB_->getNumEdges();
+    log.numVertices = denseDB_->getNumVertices();
+    log.numEdges = denseDB_->getNumEdges();
     log.numConnectedComponents = 0;
 
     // Flush the log to buffer
@@ -249,13 +249,13 @@ base::PlannerStatus Bolt::solve(double time)
 bool Bolt::save()
 {
     // setup(); // ensure the db has been loaded to the Experience DB
-    return boltDB_->save(filePath_);
+    return denseDB_->save(filePath_);
 }
 
 bool Bolt::saveIfChanged()
 {
     // setup(); // ensure the db has been loaded to the Experience DB
-    return boltDB_->saveIfChanged(filePath_);
+    return denseDB_->saveIfChanged(filePath_);
 }
 
 void Bolt::printResultsInfo(std::ostream &out) const
@@ -271,9 +271,9 @@ void Bolt::printResultsInfo(std::ostream &out) const
 bool Bolt::loadOrGenerate()
 {
     // Load from file or generate new grid
-    if (boltDB_->getNumVertices() <= 1)  // the search verticie may already be there
+    if (denseDB_->getNumVertices() <= 1)  // the search verticie may already be there
     {
-        if (!boltDB_->load(filePath_))  // load from file
+        if (!denseDB_->load(filePath_))  // load from file
         {
             OMPL_INFORM("No database loaded from file - generating new grid");
 
@@ -281,7 +281,7 @@ bool Bolt::loadOrGenerate()
             time::point startTime = time::now();
 
             // Discretize grid
-            boltDB_->generateGrid();
+            denseDB_->generateGrid();
 
             // Benchmark runtime
             double duration = time::seconds(time::now() - startTime);
@@ -329,24 +329,24 @@ void Bolt::printLogs(std::ostream &out) const
     out << "    Failed:                     " << stats_.numSolutionsFailed_ << std::endl;
     out << "    Timedout:                    " << stats_.numSolutionsTimedout_ << std::endl;
     out << "    Approximate:                 " << stats_.numSolutionsApproximate_ << std::endl;
-    out << "  BoltDB                        " << std::endl;
-    out << "    Vertices:                    " << boltDB_->getNumVertices() << std::endl;
-    out << "    Edges:                       " << boltDB_->getNumEdges() << std::endl;
-    // out << "    Consecutive state failures:  " << boltDB_->getNumConsecutiveFailures() << std::endl;
-    // out << "    Connected path failures:     " << boltDB_->getNumPathInsertionFailed() << std::endl;
-    // out << "    Sparse Delta Fraction:       " << boltDB_->getSparseDeltaFraction() << std::endl;
+    out << "  DenseDB                        " << std::endl;
+    out << "    Vertices:                    " << denseDB_->getNumVertices() << std::endl;
+    out << "    Edges:                       " << denseDB_->getNumEdges() << std::endl;
+    // out << "    Consecutive state failures:  " << denseDB_->getNumConsecutiveFailures() << std::endl;
+    // out << "    Connected path failures:     " << denseDB_->getNumPathInsertionFailed() << std::endl;
+    // out << "    Sparse Delta Fraction:       " << denseDB_->getSparseDeltaFraction() << std::endl;
     out << "  Average planning time:         " << stats_.getAveragePlanningTime() << std::endl;
     out << "  Average insertion time:        " << stats_.getAverageInsertionTime() << std::endl;
 }
 
 std::size_t Bolt::getExperiencesCount() const
 {
-    return boltDB_->getNumVertices();
+    return denseDB_->getNumVertices();
 }
 
 void Bolt::getAllPlannerDatas(std::vector<ob::PlannerDataPtr> &plannerDatas) const
 {
-    boltDB_->getAllPlannerDatas(plannerDatas);
+    denseDB_->getAllPlannerDatas(plannerDatas);
 }
 
 void Bolt::convertPlannerData(const ob::PlannerDataPtr plannerData, og::PathGeometric &path)
@@ -356,9 +356,9 @@ void Bolt::convertPlannerData(const ob::PlannerDataPtr plannerData, og::PathGeom
         path.append(plannerData->getVertex(i).getState());
 }
 
-BoltDBPtr Bolt::getExperienceDB()
+DenseDBPtr Bolt::getExperienceDB()
 {
-    return boltDB_;
+    return denseDB_;
 }
 
 bool Bolt::doPostProcessing()
@@ -371,7 +371,7 @@ bool Bolt::doPostProcessing()
     for (std::size_t i = 0; i < queuedSolutionPaths_.size(); ++i)
     {
         // Time to add a path to experience database
-        if (!boltDB_->postProcessPath(queuedSolutionPaths_[i]))
+        if (!denseDB_->postProcessPath(queuedSolutionPaths_[i]))
         {
             OMPL_ERROR("Unable to save path");
         }
@@ -382,8 +382,8 @@ bool Bolt::doPostProcessing()
     queuedSolutionPaths_.clear();
 
     // Ensure graph doesn't get too popular
-    if (boltDB_->getPopularityBiasEnabled())
-        boltDB_->normalizeGraphEdgeWeights();
+    if (denseDB_->getPopularityBiasEnabled())
+        denseDB_->normalizeGraphEdgeWeights();
 
     // Benchmark runtime
     double duration = time::seconds(time::now() - startTime);

@@ -36,8 +36,8 @@
    Desc:   Experience database for storing and reusing past path plans
 */
 
-#ifndef OMPL_TOOLS_BOLT_BOLTDB_
-#define OMPL_TOOLS_BOLT_BOLTDB_
+#ifndef OMPL_TOOLS_BOLT_DENSEDB_
+#define OMPL_TOOLS_BOLT_DENSEDB_
 
 // OMPL
 #include <ompl/base/StateSpace.h>
@@ -61,24 +61,24 @@ namespace tools
 namespace bolt
 {
 /**
-   @anchor BoltDB
+   @anchor DenseDB
    @par Short description
    Database for storing and retrieving past plans
 */
 
 /// @cond IGNORE
-OMPL_CLASS_FORWARD(BoltDB);
+OMPL_CLASS_FORWARD(DenseDB);
 OMPL_CLASS_FORWARD(SparseDB);
 /// @endcond
 
-/** \class ompl::tools::bolt::BoltDBPtr
-    \brief A boost shared pointer wrapper for ompl::tools::bolt::BoltDB */
+/** \class ompl::tools::bolt::DenseDBPtr
+    \brief A boost shared pointer wrapper for ompl::tools::bolt::DenseDB */
 
 static const double MAX_POPULARITY_WEIGHT = 100.0; // 100 means the edge is very unpopular
 static const double POPULARITY_WEIGHT_REDUCTION = 5; // Everytime an edge is used, it is reduced by this amount (becomes more popular)
 
 /** \brief Save and load entire paths from file */
-class BoltDB
+class DenseDB
 {
     friend class BoltRetrieveRepair;
     friend class SparseDB;
@@ -140,14 +140,14 @@ class BoltDB
     {
       private:
         DenseVertex goal_;  // Goal Vertex of the search
-        BoltDB* parent_;
+        DenseDB* parent_;
 
       public:
         /**
          * Construct a visitor for a given search.
          * \param goal  goal vertex of the search
          */
-        CustomAstarVisitor(DenseVertex goal, BoltDB* parent);
+        CustomAstarVisitor(DenseVertex goal, DenseDB* parent);
 
         /**
          * \brief Invoked when a vertex is first discovered and is added to the OPEN list.
@@ -169,16 +169,16 @@ class BoltDB
     };
 
     ////////////////////////////////////////////////////////////////////////////////////////
-    // BoltDB MEMBER FUNCTIONS
+    // DenseDB MEMBER FUNCTIONS
     ////////////////////////////////////////////////////////////////////////////////////////
 
     /** \brief Constructor needs the state space used for planning.
      *  \param space - state space
      */
-    BoltDB(base::SpaceInformationPtr si, VisualizerPtr visual);
+    DenseDB(base::SpaceInformationPtr si, VisualizerPtr visual);
 
     /** \brief Deconstructor */
-    virtual ~BoltDB(void);
+    virtual ~DenseDB(void);
 
     /** \brief Initialize database */
     bool setup();
@@ -404,6 +404,17 @@ class BoltDB
     bool connectStateToNeighborsAtLevel(const DenseVertex& fromVertex, const std::size_t level,
                                         DenseVertex& minConnectorVertex);
 
+    /**
+     * \brief Get neighbors within radius
+     * \param denseV - origin state to search from
+     * \param graphNeighborhood - resulting nearby states
+     * \param visibleNeighborhood - resulting nearby states that are visible
+     * \param searchRadius - how far to search
+     * \param countIndent - debugging tool
+     */
+    void findGraphNeighbors(const DenseVertex &denseV, std::vector<DenseVertex> &graphNeighborhood,
+        std::vector<DenseVertex> &visibleNeighborhood, double searchRadius, std::size_t coutIndent);
+
     /** \brief Get k number of neighbors near a state at a certain level that have valid motions */
     void getNeighborsAtLevel(const base::State* origState, const std::size_t level, const std::size_t kNeighbors,
                              std::vector<DenseVertex>& neighbors);
@@ -523,6 +534,7 @@ class BoltDB
     bool visualizeCartNeighbors_;
     bool visualizeCartPath_;
     bool visualizeSnapPath_;
+    bool visualizeAddSample_;
 
     /** \brief Visualization speed of astar search, num of seconds to show each vertex */
     double visualizeAstarSpeed_;
@@ -533,7 +545,7 @@ class BoltDB
     /** \brief Keep the average cost of the graph at this level */
     double desiredAverageCost_;
 
-};  // end of class BoltDB
+};  // end of class DenseDB
 
 }  // namespace bolt
 }  // namespace tools

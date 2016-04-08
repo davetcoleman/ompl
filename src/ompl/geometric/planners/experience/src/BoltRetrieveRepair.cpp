@@ -57,16 +57,16 @@ namespace tools
 {
 namespace bolt
 {
-BoltRetrieveRepair::BoltRetrieveRepair(const base::SpaceInformationPtr &si, const BoltDBPtr &boltDB)
+BoltRetrieveRepair::BoltRetrieveRepair(const base::SpaceInformationPtr &si, const DenseDBPtr &denseDB)
   : base::Planner(si, "Bolt_Retrieve_Repair")
-  , boltDB_(boltDB)
+  , denseDB_(denseDB)
   , smoothingEnabled_(true)
   , verbose_(true)
   , visualizeRawTrajectory_(true)
 {
     // Copy in needed objects
-    sparseDB_ = boltDB_->getSparseDB();
-    visual_ = boltDB_->visual_;
+    sparseDB_ = denseDB_->getSparseDB();
+    visual_ = denseDB_->visual_;
 
     specs_.approximateSolutions = true;
     specs_.directed = true;
@@ -85,9 +85,9 @@ void BoltRetrieveRepair::clear(void)
     freeMemory();
 }
 
-void BoltRetrieveRepair::setExperienceDB(const BoltDBPtr &boltDB)
+void BoltRetrieveRepair::setExperienceDB(const DenseDBPtr &denseDB)
 {
-    boltDB_ = boltDB;
+    denseDB_ = denseDB;
 }
 
 void BoltRetrieveRepair::setup(void)
@@ -125,16 +125,16 @@ base::PlannerStatus BoltRetrieveRepair::solve(const base::PlannerTerminationCond
     const base::State *goalState = pis_.nextGoal(ptc);
 
     // Error check task planning
-    if (boltDB_->getUseTaskPlanning())
+    if (denseDB_->getUseTaskPlanning())
     {
-        if (boltDB_->getTaskLevel(startState) != 0)
+        if (denseDB_->getTaskLevel(startState) != 0)
         {
-            OMPL_ERROR("solve: start level is %u", boltDB_->getTaskLevel(startState));
+            OMPL_ERROR("solve: start level is %u", denseDB_->getTaskLevel(startState));
             exit(-1);
         }
-        if (boltDB_->getTaskLevel(goalState) != 2)
+        if (denseDB_->getTaskLevel(goalState) != 2)
         {
-            OMPL_ERROR("solve: goal level is %u", boltDB_->getTaskLevel(goalState));
+            OMPL_ERROR("solve: goal level is %u", denseDB_->getTaskLevel(goalState));
             exit(-1);
         }
     }
@@ -271,7 +271,7 @@ bool BoltRetrieveRepair::getPathOffGraph(const base::State *start, const base::S
         // Get neighbors near start and goal. Note: potentially they are not *visible* - will test for this later
 
         // Start
-        int level = 0;  // boltDB_->getTaskLevel(start);
+        int level = 0;  // denseDB_->getTaskLevel(start);
         if (verbose_)
             OMPL_INFORM("  Looking for a node near the problem start on level %i", level);
         if (!findGraphNeighbors(start, startVertexCandidateNeighbors_, level))
@@ -284,7 +284,7 @@ bool BoltRetrieveRepair::getPathOffGraph(const base::State *start, const base::S
             OMPL_INFORM("  Found %d nodes near start", startVertexCandidateNeighbors_.size());
 
         // Goal
-        level = 0;  // boltDB_->getTaskLevel(goal);
+        level = 0;  // denseDB_->getTaskLevel(goal);
         if (verbose_)
             OMPL_INFORM("  Looking for a node near the problem goal on level %i", level);
         if (!findGraphNeighbors(goal, goalVertexCandidateNeighbors_, level))
@@ -306,12 +306,6 @@ bool BoltRetrieveRepair::getPathOffGraph(const base::State *start, const base::S
         {
             OMPL_ERROR("getPathOffGraph(): BoltRetrieveRepair returned FALSE for getPathOnGraph");
 
-            std::cout << "before trigger " << std::endl;
-            usleep(3*1000000);
-            std::cout << "before getPathOnGraph " << std::endl;
-            visual_->viz1TriggerCallback(); // THIS KILLS IT
-            usleep(3*1000000);
-
             // Run getPathOnGraph again in debug mode
             getPathOnGraph(startVertexCandidateNeighbors_, goalVertexCandidateNeighbors_, start, goal, geometricSolution,
                 ptc, /*debug*/ true, feedbackStartFailed);
@@ -319,18 +313,18 @@ bool BoltRetrieveRepair::getPathOffGraph(const base::State *start, const base::S
             // Add the point that failed
             if (feedbackStartFailed) // start state failed
             {
-                boltDB_->addSample(start);
+                denseDB_->addSample(start);
             }
             else // goal state failed
             {
-                boltDB_->addSample(goal);
+                denseDB_->addSample(goal);
             }
 
             OMPL_INFORM("Re-creating the spars graph");
             sparseDB_->createSPARS();
 
-            std::cout << "Shutting down for debugging " << std::endl;
-            exit(-1);
+            //std::cout << "Shutting down for debugging " << std::endl;
+            //exit(-1);
         }
         else
             break; // success, continue on
@@ -389,7 +383,7 @@ bool BoltRetrieveRepair::getPathOnGraph(const std::vector<SparseVertex> &candida
                 visual_->viz4StateCallback(sparseDB_->getSparseStateConst(start), /*mode=*/3, 1);
                 visual_->viz4EdgeCallback(actualStart, sparseDB_->getSparseStateConst(start), 100);
                 visual_->viz4TriggerCallback();
-                usleep(0.5 * 1000000);
+                usleep(0.1 * 1000000);
             }
             continue;  // this is actually not visible
         }
@@ -427,7 +421,7 @@ bool BoltRetrieveRepair::getPathOnGraph(const std::vector<SparseVertex> &candida
                     visual_->viz4StateCallback(sparseDB_->getSparseStateConst(goal), /*mode=*/3, 1);
                     visual_->viz4EdgeCallback(actualGoal, sparseDB_->getSparseStateConst(goal), 100);
                     visual_->viz4TriggerCallback();
-                    usleep(0.5 * 1000000);
+                    usleep(0.1 * 1000000);
                 }
 
                 continue;  // this is actually not visible
@@ -458,7 +452,6 @@ bool BoltRetrieveRepair::getPathOnGraph(const std::vector<SparseVertex> &candida
         OMPL_ERROR("Unexpected condition - both a valid start and goal were found but still no path found. TODO ");
         exit(-1);
     }
-    std::cout << "-------------------------------------------------------" << std::endl;
 
     if (foundValidStart && !foundValidGoal)
     {
@@ -685,11 +678,11 @@ bool BoltRetrieveRepair::removeVerticesNotOnLevel(std::vector<SparseVertex> &gra
         const SparseVertex &nearVertex = graphNeighborhood[i];
 
         // Make sure state is on correct level
-        if (boltDB_->getTaskLevel(nearVertex) != static_cast<std::size_t>(level))
+        if (denseDB_->getTaskLevel(nearVertex) != static_cast<std::size_t>(level))
         {
             if (verbose_)
                 std::cout << "      Skipping neighbor " << nearVertex << ", i=" << i
-                          << ", because wrong level: " << boltDB_->getTaskLevel(nearVertex)
+                          << ", because wrong level: " << denseDB_->getTaskLevel(nearVertex)
                           << ", desired level: " << level << std::endl;
             graphNeighborhood.erase(graphNeighborhood.begin() + i);
             i--;
@@ -745,7 +738,7 @@ bool BoltRetrieveRepair::convertVertexPathToStatePath(std::vector<SparseVertex> 
 
             SparseEdge edge = boost::edge(vertexPath[i - 1], vertexPath[i - 2], sparseDB_->g_).first;
 
-            /* This functionality has moved to BoltDB
+            /* This functionality has moved to DenseDB
             if (sparseDB_->getPopularityBiasEnabled())
             {
                 // reduce cost of this edge because it was just used
@@ -821,6 +814,7 @@ bool BoltRetrieveRepair::canConnect(const base::State *randomState, const base::
                 usleep(1*1000000);
             }
 
+            // Optional Debug
             if (false)
             {
                 std::cout << "checking path " << std::endl;
