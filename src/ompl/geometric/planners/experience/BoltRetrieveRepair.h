@@ -232,6 +232,8 @@ public:
 
     /** \brief Visualize original solution from graph before smoothing */
     bool visualizeRawTrajectory_;
+
+    int numStartGoalStatesAddedToDense_;
 };
 }  // namespace bolt
 }  // namespace tools

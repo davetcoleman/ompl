@@ -74,8 +74,10 @@ OMPL_CLASS_FORWARD(SparseDB);
 /** \class ompl::tools::bolt::DenseDBPtr
     \brief A boost shared pointer wrapper for ompl::tools::bolt::DenseDB */
 
-static const double MAX_POPULARITY_WEIGHT = 100.0; // 100 means the edge is very unpopular
-static const double POPULARITY_WEIGHT_REDUCTION = 5; // Everytime an edge is used, it is reduced by this amount (becomes more popular)
+static const double MAX_POPULARITY_WEIGHT = 100.0;  // 100 means the edge is very unpopular
+// Everytime an edge is used, it is reduced by this amount (becomes more popular)
+static const double POPULARITY_WEIGHT_REDUCTION = 5;
+
 
 /** \brief Save and load entire paths from file */
 class DenseDB
@@ -196,7 +198,15 @@ class DenseDB
      * \param new path - must be non-const because will be interpolated
      * \return true on success
      */
-    bool postProcessPath(ompl::geometric::PathGeometric& solutionPath);
+    bool postProcessPath(geometric::PathGeometric& solutionPath);
+
+    /** \brief Helper function for postProcessPath */
+    bool postProcessPathWithNeighbors(geometric::PathGeometric& solutionPath,
+                                      const std::vector<DenseVertex>& visibleNeighborhood, bool recurseVerbose,
+                                      std::vector<DenseVertex>& roadmapPath);
+
+    /** \brief Update edge weights of dense graph based on this a newly created path */
+    bool updateEdgeWeights(const std::vector<DenseVertex>& roadmapPath);
 
     /**
      * \brief Call itself recursively for each point in the trajectory, looking for vertices on the graph to connect to
@@ -209,7 +219,8 @@ class DenseDB
      * \return true on success
      */
     bool recurseSnapWaypoints(ompl::geometric::PathGeometric& inputPath, std::vector<DenseVertex>& roadmapPath,
-        std::size_t currVertexIndex, const DenseVertex& prevGraphVertex, bool& allValid, bool verbose);
+                              std::size_t currVertexIndex, const DenseVertex& prevGraphVertex, bool& allValid,
+                              bool verbose);
 
     /**
      * \brief Save loaded database to file, except skips saving if no paths have been added
@@ -412,8 +423,11 @@ class DenseDB
      * \param searchRadius - how far to search
      * \param countIndent - debugging tool
      */
-    void findGraphNeighbors(const DenseVertex &denseV, std::vector<DenseVertex> &graphNeighborhood,
-        std::vector<DenseVertex> &visibleNeighborhood, double searchRadius, std::size_t coutIndent);
+    void findGraphNeighbors(const DenseVertex& denseV, std::vector<DenseVertex>& graphNeighborhood,
+                            std::vector<DenseVertex>& visibleNeighborhood, double searchRadius, std::size_t coutIndent);
+
+    void findGraphNeighbors(base::State* state, std::vector<DenseVertex>& graphNeighborhood,
+                            std::vector<DenseVertex>& visibleNeighborhood, double searchRadius, std::size_t coutIndent);
 
     /** \brief Get k number of neighbors near a state at a certain level that have valid motions */
     void getNeighborsAtLevel(const base::State* origState, const std::size_t level, const std::size_t kNeighbors,
@@ -538,6 +552,7 @@ class DenseDB
     bool visualizeCartNeighbors_;
     bool visualizeCartPath_;
     bool visualizeSnapPath_;
+    double visualizeSnapPathSpeed_;
     bool visualizeAddSample_;
 
     /** \brief Visualization speed of astar search, num of seconds to show each vertex */

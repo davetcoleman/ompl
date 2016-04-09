@@ -125,8 +125,7 @@ base::PlannerStatus Bolt::solve(const base::PlannerTerminationCondition &ptc)
     time::point start = time::now();
 
     // Warn if there are queued paths that have not been added to the experience database
-    OMPL_INFORM("%u solved paths are currently uninserted into the experience database and are in the "
-        "post-proccessing queue", queuedSolutionPaths_.size());
+    OMPL_INFORM("Num solved paths uninserted into the experience database in the post-proccessing queue: %u", queuedSolutionPaths_.size());
 
     // SOLVE
     lastStatus_ = boltPlanner_->solve(ptc);
@@ -177,7 +176,7 @@ void Bolt::logResults()
             og::PathGeometric solutionPath = og::SimpleSetup::getSolutionPath();  // copied so that it is non-const
 
             std::cout << ANSI_COLOR_BLUE;
-            std::cout << "Bolt Finished - solution found in " << planTime_ << " seconds with " << solutionPath.getStateCount() << " states" << std::endl;
+            std::cout << "Bolt Finished - solution found in " << std::setprecision(5) << planTime_ << " seconds with " << solutionPath.getStateCount() << " states" << std::endl;
             std::cout << ANSI_COLOR_RESET;
 
             // Error check for repeated states
@@ -309,30 +308,33 @@ void Bolt::print(std::ostream &out) const
 
 void Bolt::printLogs(std::ostream &out) const
 {
+    SparseDBPtr sparseDB = denseDB_->getSparseDB();
+    double vertPercent = sparseDB->getNumVertices() / double(denseDB_->getNumVertices()) * 100.0;
+    double edgePercent = sparseDB->getNumEdges() / double(denseDB_->getNumEdges()) * 100.0;
+    double solvedPercent = stats_.numSolutionsFromRecall_ / static_cast<double>(stats_.numProblems_) * 100.0;
     if (!recallEnabled_)
         out << "Scratch Planning Logging Results (inside Bolt Framework)" << std::endl;
     else
-        out << "Bolt Framework Logging Results" << std::endl;
+        out << "Bolt Framework Logging Results" << std::endl << std::setprecision(0);
     out << "  Solutions Attempted:           " << stats_.numProblems_ << std::endl;
-    out << "    Solved from scratch:        " << stats_.numSolutionsFromScratch_ << " ("
-        << stats_.numSolutionsFromScratch_ / stats_.numProblems_ * 100 << "%)" << std::endl;
-    out << "    Solved from recall:         " << stats_.numSolutionsFromRecall_ << " ("
-        << stats_.numSolutionsFromRecall_ / stats_.numProblems_ * 100 << "%)" << std::endl;
-    out << "      That were saved:         " << stats_.numSolutionsFromRecallSaved_ << std::endl;
-    out << "      That were discarded:     " << stats_.numSolutionsFromRecall_ - stats_.numSolutionsFromRecallSaved_
-        << std::endl;
-    out << "      Less than 2 states:      " << stats_.numSolutionsTooShort_ << std::endl;
-    out << "    Failed:                     " << stats_.numSolutionsFailed_ << std::endl;
+    out << "    Solved:                      " << stats_.numSolutionsFromRecall_ << " (" << solvedPercent << "%)\n";
+    out << "    Failed:                      " << stats_.numSolutionsFailed_ << std::endl;
     out << "    Timedout:                    " << stats_.numSolutionsTimedout_ << std::endl;
     out << "    Approximate:                 " << stats_.numSolutionsApproximate_ << std::endl;
     out << "  DenseDB                        " << std::endl;
     out << "    Vertices:                    " << denseDB_->getNumVertices() << std::endl;
     out << "    Edges:                       " << denseDB_->getNumEdges() << std::endl;
+    out << "    Start/Goal States Added:     " << getRetrieveRepairPlanner().numStartGoalStatesAddedToDense_ << std::endl;
+    out << "  SparseDB                       " << std::endl;
+    out << "    Vertices:                    " << sparseDB->getNumVertices() << " (" << vertPercent << "%)" << std::endl;
+    out << "    Edges:                       " << sparseDB->getNumEdges() << " (" << edgePercent << "%)" << std::endl;
+    out << "    Regenerations:               " << sparseDB->numGraphGenerations_ << std::endl;
+    out << "    Disjoint Samples Added:      " << sparseDB->numSamplesAddedForDisjointSets_ << std::endl;
     // out << "    Consecutive state failures:  " << denseDB_->getNumConsecutiveFailures() << std::endl;
     // out << "    Connected path failures:     " << denseDB_->getNumPathInsertionFailed() << std::endl;
     // out << "    Sparse Delta Fraction:       " << denseDB_->getSparseDeltaFraction() << std::endl;
-    out << "  Average planning time:         " << stats_.getAveragePlanningTime() << std::endl;
-    out << "  Average insertion time:        " << stats_.getAverageInsertionTime() << std::endl;
+    out << "  Average planning time:         " << stats_.getAveragePlanningTime() << " seconds" << std::endl;
+    out << "  Average insertion time:        " << stats_.getAverageInsertionTime() << " seconds" << std::endl;
 }
 
 std::size_t Bolt::getExperiencesCount() const
@@ -366,8 +368,9 @@ bool Bolt::doPostProcessing()
 
     for (std::size_t i = 0; i < queuedSolutionPaths_.size(); ++i)
     {
-        std::cout << std::endl << "post processing path " << i << " of " << queuedSolutionPaths_.size()
-                  << " -------------------------- " << std::endl;
+        if (denseDB_->snapPathVerbose_)
+            std::cout << "post processing path " << i << " of " << queuedSolutionPaths_.size()
+                      << " -------------------------- " << std::endl;
 
         // Time to add a path to experience database
         if (!denseDB_->postProcessPath(queuedSolutionPaths_[i]))
@@ -383,6 +386,10 @@ bool Bolt::doPostProcessing()
     // Ensure graph doesn't get too popular
     if (denseDB_->getPopularityBiasEnabled())
         denseDB_->normalizeGraphEdgeWeights();
+
+
+    // I think this is a bad idea
+    //createSPARS();
 
     // Benchmark runtime
     double duration = time::seconds(time::now() - startTime);

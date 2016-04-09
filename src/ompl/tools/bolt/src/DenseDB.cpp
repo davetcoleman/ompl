@@ -157,13 +157,14 @@ otb::DenseDB::DenseDB(base::SpaceInformationPtr si, base::VisualizerPtr visual)
   , popularityBiasEnabled_(false)
   , verbose_(true)
   , distanceAcrossCartesian_(0.0)
-    , useTaskPlanning_(false)
-    , snapPathVerbose_(false)
+  , useTaskPlanning_(false)
+  , snapPathVerbose_(false)
   , visualizeAstar_(false)
   , visualizeGridGeneration_(false)
   , visualizeCartNeighbors_(false)
   , visualizeCartPath_(false)
   , visualizeSnapPath_(false)
+  , visualizeSnapPathSpeed_(0.001)
   , visualizeAddSample_(false)
   , visualizeAstarSpeed_(0.1)
   , discretization_(2.0)
@@ -297,64 +298,37 @@ bool otb::DenseDB::postProcessPath(og::PathGeometric &solutionPath)
         return false;
     }
 
+    if (visualizeSnapPath_)  // Clear old path
+    {
+        visual_->viz5State(NULL, /*deleteAllMarkers*/ 0, 0);
+        visual_->viz4State(NULL, /*deleteAllMarkers*/ 0, 0);
+    }
+
     // Get starting state
     base::State *currentPathState = solutionPath.getStates()[0];
-    std::size_t currVertexIndex = 1;
 
-    // Find starting state's vertex
-    // TODO(davetcoleman): loop through all possible start vertices
-    stateProperty_[queryVertex_] = currentPathState;
-    DenseVertex prevGraphVertex = nn_->nearest(queryVertex_);
-    stateProperty_[queryVertex_] = NULL;  // Set search vertex to NULL to prevent segfault on class unload of memory
+    // Get neighbors
+    std::vector<DenseVertex> graphNeighborhood;
+    std::vector<DenseVertex> visibleNeighborhood;
+    std::size_t coutIndent = 0;
+    findGraphNeighbors(currentPathState, graphNeighborhood, visibleNeighborhood, sparseDB_->sparseDelta_, coutIndent);
 
-    // Visualize
-    if (visualizeSnapPath_)
-    {
-        // Clear old path
-        visual_->viz5State(NULL, /*deleteAllMarkers*/0, 0);
-        visual_->viz4State(NULL, /*deleteAllMarkers*/0, 0);
-
-        // Add first state
-        visual_->viz5State(stateProperty_[prevGraphVertex], /*mode=*/1, 1);
-    }
-
-    // Create new path that is 'snapped' onto the roadmap
     std::vector<DenseVertex> roadmapPath;
-    roadmapPath.push_back(prevGraphVertex);
 
-    // Remember if any connections failed
-    bool allValid = true;
-
-    // Start recursive function
+    // Run in non-debug mode
     bool recurseVerbose = snapPathVerbose_;
-    if (!recurseSnapWaypoints(solutionPath, roadmapPath, currVertexIndex, prevGraphVertex, allValid, recurseVerbose))
-    {
-        // TODO - loop through start state
-        OMPL_ERROR("TODO - loop through start state");
-        // exit(-1);
-        allValid = false;
-    }
-
-    // Visualize
-    if (visualizeSnapPath_)
-    {
-        visual_->viz5Trigger();
-        usleep(0.001 * 1000000);
-    }
-
-    // Error check
-    if (!allValid)
+    if (!postProcessPathWithNeighbors(solutionPath, visibleNeighborhood, recurseVerbose, roadmapPath))
     {
         OMPL_ERROR("Could not find snap waypoint path. Running again in debug");
+        std::cout << "-------------------------------------------------------" << std::endl;
 
-        // Run again
+        // Run in debug mode
         recurseVerbose = true;
         visualizeSnapPath_ = true;
-        recurseSnapWaypoints(solutionPath, roadmapPath, currVertexIndex, prevGraphVertex, allValid, recurseVerbose);
+        roadmapPath.clear();
+        postProcessPathWithNeighbors(solutionPath, visibleNeighborhood, recurseVerbose, roadmapPath);
 
-        visual_->viz5Trigger();
-        usleep(0.001 * 1000000);
-
+        // temp
         std::cout << "exiting for debug " << std::endl;
         exit(-1);
     }
@@ -372,10 +346,65 @@ bool otb::DenseDB::postProcessPath(og::PathGeometric &solutionPath)
         // experience from it
     }
 
+    if (roadmapPath.size() > 100)
+        OMPL_WARN("Roadmap size is %u", roadmapPath.size());
+
     if (snapPathVerbose_)
         std::cout << "Finished recurseSnapWaypoints(), now updating edge weights in Dense graph " << std::endl;
 
     // Update edge weights based on this newly created path
+    updateEdgeWeights(roadmapPath);
+
+    // Record this new addition
+    graphUnsaved_ = true;
+
+    return true;
+}
+
+bool otb::DenseDB::postProcessPathWithNeighbors(og::PathGeometric &solutionPath,
+    const std::vector<DenseVertex> &visibleNeighborhood, bool recurseVerbose, std::vector<DenseVertex> &roadmapPath)
+{
+    std::size_t currVertexIndex = 1;
+
+    // Remember if any connections failed
+    bool allValid = true;
+
+    for (std::size_t i = 0; i < visibleNeighborhood.size(); ++i)
+    {
+        std::cout << "Attempting to start with neighbor " << i << std::endl;
+        DenseVertex prevGraphVertex = visibleNeighborhood[i];
+
+        if (visualizeSnapPath_)  // Add first state
+        {
+            visual_->viz5State(stateProperty_[prevGraphVertex], /*mode=*/1, 1);
+        }
+
+        // Add this start state
+        roadmapPath.push_back(prevGraphVertex);
+
+        // Start recursive function
+        allValid = true;
+        if (!recurseSnapWaypoints(solutionPath, roadmapPath, currVertexIndex, prevGraphVertex, allValid, recurseVerbose))
+        {
+            std::cout << "Failed to find path with starting state neighbor " << i << std::endl;
+        }
+        else
+        {
+            break; // sucess
+        }
+
+        if (visualizeSnapPath_)  // Visualize
+        {
+            visual_->viz5Trigger();
+            usleep(visualizeSnapPathSpeed_ * 1000000);
+        }
+    }
+
+    return allValid;
+}
+
+bool otb::DenseDB::updateEdgeWeights(const std::vector<DenseVertex> &roadmapPath)
+{
     for (std::size_t vertexID = 1; vertexID < roadmapPath.size(); ++vertexID)
     {
         std::pair<DenseEdge, bool> edgeResult = boost::edge(roadmapPath[vertexID - 1], roadmapPath[vertexID], g_);
@@ -384,18 +413,20 @@ bool otb::DenseDB::postProcessPath(og::PathGeometric &solutionPath)
         // Error check
         if (!edgeResult.second)
         {
-            std::cout << std::string(2, ' ') << "WARNUNG: No edge found on snapped path at index " << vertexID
-                      << ", unable to save popularity of this edge. perhaps path needs interpolation first" << std::endl;
+            std::cout << std::string(2, ' ') << "WARNING: No edge found on snapped path at index " << vertexID
+                      << ", unable to save popularity of this edge. perhaps path needs interpolation first"
+                      << std::endl;
 
-            // Visualize
-            if (visualizeSnapPath_)
+            if (visualizeSnapPath_)  // Visualize
             {
-                const double cost = 100; // red
-                visual_->viz3Edge(stateProperty_[roadmapPath[vertexID - 1]],
-                                          stateProperty_[roadmapPath[vertexID]], cost);
-                visual_->viz3Trigger();
-                usleep(1 * 1000000);
+                const double cost = 100;  // red
+                visual_->viz6Edge(stateProperty_[roadmapPath[vertexID - 1]], stateProperty_[roadmapPath[vertexID]],
+                                  cost);
+                visual_->viz6Trigger();
+                usleep(visualizeSnapPathSpeed_ * 1000000);
             }
+            std::cout << "shutting down out of curiosity " << std::endl;
+            exit(-1);
         }
         else
         {
@@ -410,23 +441,19 @@ bool otb::DenseDB::postProcessPath(og::PathGeometric &solutionPath)
             if (snapPathVerbose_)
                 std::cout << " new: " << edgeWeightProperty_[edge] << std::endl;
 
-            // Visualize
-            if (visualizeSnapPath_)
+            if (visualizeSnapPath_)  // Visualize
             {
-                visual_->viz5Edge(stateProperty_[roadmapPath[vertexID - 1]],
-                                          stateProperty_[roadmapPath[vertexID]], 100);
+                visual_->viz5Edge(stateProperty_[roadmapPath[vertexID - 1]], stateProperty_[roadmapPath[vertexID]],
+                                  100);
             }
         }
     }
 
-    // Visualize
-    if (visualizeSnapPath_)
+    if (visualizeSnapPath_)  // Visualize
     {
         visual_->viz5Trigger();
+        usleep(visualizeSnapPathSpeed_ * 1000000);
     }
-
-    // Record this new addition
-    graphUnsaved_ = true;
 
     return true;
 }
@@ -436,7 +463,7 @@ bool otb::DenseDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vecto
                                         bool verbose)
 {
     if (verbose)
-        std::cout << std::string(currVertexIndex, ' ') + "recurseSnapWaypoints() -------" << std::endl;
+        std::cout << std::string(currVertexIndex, ' ') << "recurseSnapWaypoints() -------" << std::endl;
 
     // Find multiple nearby nodes on the graph
     std::vector<DenseVertex> graphNeighborhood;
@@ -453,6 +480,8 @@ bool otb::DenseDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vecto
 
     // Loop through each neighbor until one is found that connects to the previous vertex
     bool foundValidConnToPrevious = false;
+    bool addedToRoadmapPath =
+        false;  // track if we added a vertex to the roadmapPath, so that we can remove it later if needed
     DenseVertex candidateVertex;
     for (std::size_t neighborID = 0; neighborID < graphNeighborhood.size(); ++neighborID)
     {
@@ -479,26 +508,26 @@ bool otb::DenseDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vecto
             // Check for collision
             isValid = si_->checkMotion(stateProperty_[prevGraphVertex], stateProperty_[candidateVertex]);
 
-            // Visualize
-            if (visualizeSnapPath_)
+            if (visualizeSnapPath_)  // Visualize
             {
                 // Show the node we're currently considering going through
-                visual_->viz5State(stateProperty_[candidateVertex], /*regular, purple*/4, 1);
+                visual_->viz5State(stateProperty_[candidateVertex], /*regular, purple*/ 4, 1);
                 // edge between the state on the original inputPath and its neighbor we are currently considering
-                double color = 25; // light green
+                double color = 25;  // light green
                 visual_->viz5Edge(currentPathState, stateProperty_[candidateVertex], color);
 
-                color = isValid ? 75 : 100; // orange, red
-                // edge between the previous connection point we chose for the roadmapPath, and the currently considered next state
+                color = isValid ? 75 : 100;  // orange, red
+                // edge between the previous connection point we chose for the roadmapPath, and the currently considered
+                // next state
                 visual_->viz5Edge(stateProperty_[prevGraphVertex], stateProperty_[candidateVertex], color);
 
                 visual_->viz5Trigger();
-                usleep(0.1 * 1000000);
+                usleep(visualizeSnapPathSpeed_ * 1000000);
             }
 
-            // Debug
-            if (isValid && verbose)
-                std::cout << std::string(currVertexIndex, ' ') + "Found valid nearby edge on loop " << neighborID << std::endl;
+            if (isValid && verbose)  // Debug
+                std::cout << std::string(currVertexIndex, ' ') << "Found valid nearby edge on loop " << neighborID
+                          << std::endl;
         }
 
         // Remember if any connections failed
@@ -507,7 +536,8 @@ bool otb::DenseDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vecto
             if (neighborID > 0)
             {
                 if (verbose)
-                    std::cout << std::string(currVertexIndex+2, ' ') + "Found case where double loop fixed the problem - loop " << neighborID << std::endl;
+                    std::cout << std::string(currVertexIndex + 2, ' ') << "Found case where double loop fixed the "
+                                                                         "problem - loop " << neighborID << std::endl;
                 // visual_->viz5Trigger();
                 // usleep(6*1000000);
             }
@@ -516,15 +546,20 @@ bool otb::DenseDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vecto
             // Add this waypoint solution
             if (!isRepeatOfPrevWaypoint)
             {
+                // std::cout << std::string(currVertexIndex+2, ' ') << "roadmapPath.size=" << std::fixed <<
+                // roadmapPath.size() << std::flush;
+                // std::cout << " Vertex: " << candidateVertex;
+                // std::cout << " State: " << stateProperty_[candidateVertex];
+                // std::cout << std::endl;
                 roadmapPath.push_back(candidateVertex);
+                addedToRoadmapPath = true;  // remember it was added
 
-                // Visualize
-                if (visualizeSnapPath_)
+                if (visualizeSnapPath_)  // Visualize
                 {
-                    double color = 25; // light green
+                    double color = 25;  // light green
                     visual_->viz4Edge(stateProperty_[prevGraphVertex], stateProperty_[candidateVertex], color);
                     visual_->viz4Trigger();
-                    usleep(0.001*1000000);
+                    usleep(visualizeSnapPathSpeed_ * 1000000);
                 }
             }
 
@@ -532,7 +567,8 @@ bool otb::DenseDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vecto
             if (currVertexIndex + 1 >= inputPath.getStateCount())
             {
                 if (verbose)
-                    std::cout << std::string(currVertexIndex, ' ') + "END OF PATH, great job :)" << std::endl;
+                    std::cout << std::string(currVertexIndex, ' ') << "END OF PATH, great job :)" << std::endl;
+                allValid = true;
                 return true;
             }
             else
@@ -545,35 +581,48 @@ bool otb::DenseDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vecto
                 }
                 else
                 {
-                    // Keep trying to find a working neighbor
-                    // remove last roadmapPath node
-                    roadmapPath.pop_back();
+                    // Keep trying to find a working neighbor, remove last roadmapPath node if we added one
+                    if (addedToRoadmapPath)
+                    {
+                        assert(roadmapPath.size() > 0);
+                        roadmapPath.pop_back();
+                        addedToRoadmapPath = false;
+                    }
                 }
             }
         }
         else
         {
             if (verbose)
-                std::cout << std::string(currVertexIndex, ' ') + "Loop " << neighborID << " not valid" << std::endl;
+                std::cout << std::string(currVertexIndex, ' ') << "Loop " << neighborID << " not valid" << std::endl;
         }
-    }
+    } // for every neighbor
 
     if (!foundValidConnToPrevious)
     {
-        OMPL_ERROR("Unable to find valid connection to previous");
+        std::cout << std::string(currVertexIndex, ' ') << "Unable to find valid connection to previous, backing up a "
+                                                         "level and trying again" << std::endl;
         allValid = false;
 
-        // Visualize
-        if (visualizeSnapPath_)
+        if (visualizeSnapPath_)  // Visualize
         {
             visual_->viz5Trigger();
-            usleep(0.001 * 1000000);
+            usleep(visualizeSnapPathSpeed_ * 1000000);
         }
+
+        // TODO(davetcoleman): remove hack
+        std::cout << std::string(currVertexIndex, ' ') << "TODO remove this viz" << std::endl;
+
+        // Show the node we're currently considering going through
+        visual_->viz5State(stateProperty_[prevGraphVertex], /*Medium purple, translucent outline*/ 4, 3);
+        visual_->viz5Trigger();
+        usleep(0.001 * 1000000);
 
         return false;
     }
+    std::cout << std::string(currVertexIndex, ' ') << "This loop found a valid connection, but higher recursive loop "
+                                                     "(one that has already returned) did not" << std::endl;
 
-    OMPL_WARN("this loop found a valid connection, but lower recursive loop did not");
     return false;  // this loop found a valid connection, but lower recursive loop did not
 }
 
@@ -618,8 +667,7 @@ bool otb::DenseDB::save(const std::string &fileName)
     // TODO: make this more than 1 planner data perhaps
     base::PlannerDataPtr data(new base::PlannerData(si_));
     getPlannerData(*data);
-    OMPL_INFORM("Saving PlannerData with \n  %d vertices\n  %d edges\n  %d start states\n  %d goal states",
-                data->numVertices(), data->numEdges(), data->numStartVertices(), data->numGoalVertices());
+    OMPL_INFORM("Saving PlannerData with %d vertices %d edges", data->numVertices(), data->numEdges());
 
     // Write the number of paths we will be saving
     double numPaths = 1;
@@ -629,8 +677,7 @@ bool otb::DenseDB::save(const std::string &fileName)
     ompl::base::PlannerData &pd = *data.get();
     OMPL_INFORM("Saving graph with %d vertices and %d edges", pd.numVertices(), pd.numEdges());
 
-    // Debug
-    if (false)
+    if (false)  // Debug
         for (std::size_t i = 0; i < pd.numVertices(); ++i)
         {
             OMPL_INFORM("Vertex %d:", i);
@@ -1163,8 +1210,7 @@ void otb::DenseDB::generateTaskSpace()
         // Map old vertex to new vertex
         vertexToNewVertex[v] = vNew;
 
-        // Visualize - only do this for 2/3D environments
-        if (visualizeGridGeneration_)
+        if (visualizeGridGeneration_)  // Visualize - only do this for 2/3D environments
         {
             visual_->viz1State(newState, /*mode=*/5, 1);  // Candidate node has already (just) been added
             visual_->viz1Trigger();
@@ -1196,8 +1242,7 @@ void otb::DenseDB::generateTaskSpace()
 
         DenseEdge newE = addEdge(vertexToNewVertex[v1], vertexToNewVertex[v2], edgeWeightProperty_[e]);
 
-        // Visualize
-        if (visualizeGridGeneration_)
+        if (visualizeGridGeneration_)  // Visualize
         {
             viz1Edge(newE);
             if (i % 100 == 0)
@@ -1208,8 +1253,7 @@ void otb::DenseDB::generateTaskSpace()
         }
     }
 
-    // Visualize
-    if (visualizeGridGeneration_)
+    if (visualizeGridGeneration_)  // Visualize
         visual_->viz1Trigger();
 
     OMPL_INFORM("Done generating task space graph");
@@ -1288,8 +1332,7 @@ void otb::DenseDB::generateEdges()
             if (boost::edge(v1, v2, g_).second)
                 continue;
 
-            // Debug: display edge
-            if (visualizeGridGeneration_)
+            if (visualizeGridGeneration_)  // Debug: display edge
                 visual_->viz1Edge(stateProperty_[v1], stateProperty_[v2], 1);
 
             // Create edge - maybe removed later
@@ -1353,8 +1396,7 @@ void otb::DenseDB::generateEdges()
         edgeWeightProperty_[e] = cost;
         errorCheckCounter++;
 
-        // Debug in Rviz
-        if (visualizeGridGeneration_)
+        if (visualizeGridGeneration_)  // Debug in Rviz
         {
             visual_->viz1Edge(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
             if (errorCheckCounter % 100 == 0)
@@ -1530,8 +1572,8 @@ void otb::DenseDB::recursiveDiscretization(std::vector<double> &values, std::siz
             // Visualize
             if (visualizeGridGeneration_)
             {
-                visual_->viz1State(nextDiscretizedState_, /*mode=*/5,
-                                           1);  // Candidate node has already (just) been added
+                // Candidate node has already (just) been added
+                visual_->viz1State(nextDiscretizedState_, /*mode=*/5, 1);
                 visual_->viz1Trigger();
                 usleep(0.001 * 1000000);
             }
@@ -1632,7 +1674,7 @@ void otb::DenseDB::displayDatabase(bool showVertices)
     }
 
     // Clear old database
-    visual_->viz1State(NULL, /*deleteAllMarkers*/0, 0);
+    visual_->viz1State(NULL, /*deleteAllMarkers*/ 0, 0);
 
     // if (showVertices)
     {
@@ -1946,11 +1988,16 @@ void otb::DenseDB::findGraphNeighbors(const DenseVertex &denseV, std::vector<Den
                                       std::vector<DenseVertex> &visibleNeighborhood, double searchRadius,
                                       std::size_t coutIndent)
 {
+    findGraphNeighbors(stateProperty_[denseV], graphNeighborhood, visibleNeighborhood, searchRadius, coutIndent);
+}
+
+void otb::DenseDB::findGraphNeighbors(base::State* state, std::vector<DenseVertex> &graphNeighborhood,
+                                      std::vector<DenseVertex> &visibleNeighborhood, double searchRadius,
+                                      std::size_t coutIndent)
+{
     bool verbose = false;
     if (verbose)
-        std::cout << std::string(coutIndent, ' ') + "findGraphNeighbors() DenseV: " << denseV << std::endl;
-
-    base::State *state = stateProperty_[denseV];
+        std::cout << std::string(coutIndent, ' ') << "findGraphNeighbors()" << std::endl;
 
     // Search
     stateProperty_[queryVertex_] = state;
@@ -1967,7 +2014,7 @@ void otb::DenseDB::findGraphNeighbors(const DenseVertex &denseV, std::vector<Den
     }
 
     if (verbose)
-        std::cout << std::string(coutIndent + 2, ' ') + "Graph neighborhood: " << graphNeighborhood.size()
+        std::cout << std::string(coutIndent + 2, ' ') << "Graph neighborhood: " << graphNeighborhood.size()
                   << " | Visible neighborhood: " << visibleNeighborhood.size() << std::endl;
 }
 
@@ -2115,6 +2162,8 @@ void otb::DenseDB::checkStateType()
 
 void otb::DenseDB::connectNewVertex(DenseVertex v1)
 {
+    bool verbose = false;
+
     // Visualize new vertex
     if (visualizeAddSample_)
     {
@@ -2124,7 +2173,7 @@ void otb::DenseDB::connectNewVertex(DenseVertex v1)
     // Now connect to nearby vertices
     std::vector<DenseVertex> graphNeighborhood;
     std::size_t findNearestKNeighbors = getEdgesPerVertex();
-    OMPL_INFORM("Finding %u nearest neighbors for new vertex", findNearestKNeighbors);
+    OMPL_INFORM("connectNewVertex(): Finding %u nearest neighbors for new vertex", findNearestKNeighbors);
     const std::size_t numSameVerticiesFound = 1;  // add 1 to the end because the NN tree always returns itself
 
     // Search
@@ -2141,7 +2190,8 @@ void otb::DenseDB::connectNewVertex(DenseVertex v1)
         // Check if these vertices are the same
         if (v1 == v2)
         {
-            std::cout << "connectNewVertex attempted to connect edge to itself: " << v1 << ", " << v2 << std::endl;
+            if (verbose)
+                std::cout << "connectNewVertex attempted to connect edge to itself: " << v1 << ", " << v2 << std::endl;
             errorCheckNumSameVerticies++;  // sanity check
             continue;
         }
@@ -2166,16 +2216,13 @@ void otb::DenseDB::connectNewVertex(DenseVertex v1)
             DenseEdge e = addEdge(v1, v2, desiredAverageCost_);
             std::cout << "added valid edge " << e << std::endl;
 
-            // Debug: display edge
-            if (visualizeAddSample_)
+            if (visualizeAddSample_)  // Debug: display edge
             {
                 double popularity = 100;  // TODO: maybe make edge really popular so we can be sure its added to the
                                           // spars graph since we need it
                 visual_->viz1Edge(stateProperty_[v1], stateProperty_[v2], popularity);
             }
         }
-        else
-            std::cout << "skipped edge because motion is invalid " << std::endl;
 
     }  // for each neighbor
 
