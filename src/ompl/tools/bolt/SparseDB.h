@@ -270,7 +270,6 @@ class SparseDB
     bool checkAddInterface(const DenseVertex& denseV, std::vector<SparseVertex>& graphNeighborhood,
                            std::vector<SparseVertex>& visibleNeighborhood, SparseVertex& newVertex,
                            std::size_t coutIndent);
-    bool checkAsymptoticOptimal(const DenseVertex& denseV, std::size_t coutIndent);
     void getInterfaceNeighborhood(const DenseVertex& denseV, std::vector<DenseVertex>& interfaceNeighborhood,
                                   std::size_t coutIndent);
     /**
@@ -283,11 +282,6 @@ class SparseDB
     void findGraphNeighbors(const DenseVertex& denseV, std::vector<SparseVertex>& graphNeighborhood,
                             std::vector<SparseVertex>& visibleNeighborhood, std::size_t coutIndent);
 
-    bool checkAddPath(DenseVertex q, const std::vector<DenseVertex>& neigh, std::size_t coutIndent);
-    void computeVPP(SparseVertex v, SparseVertex vp, std::vector<SparseVertex>& VPPs);
-    void computeX(SparseVertex v, SparseVertex vp, SparseVertex vpp, std::vector<SparseVertex>& Xs);
-    bool addPathToSpanner(const DensePath& densePath, SparseVertex vp, SparseVertex vpp);
-    void connectSparsePoints(SparseVertex v, SparseVertex vp);
     DenseVertex getInterfaceNeighbor(DenseVertex q, SparseVertex rep);
     bool sameComponent(SparseVertex m1, SparseVertex m2);
     SparseVertex addVertex(DenseVertex denseV, const GuardType& type);
@@ -394,6 +388,9 @@ class SparseDB
     /** \brief Method for ordering of vertex insertion */
     int sparseCreationInsertionOrder_;
 
+    /** \brief For statistics */
+    int numGraphGenerations_;
+    int numSamplesAddedForDisjointSets_;
 };  // end of class SparseDB
 
 }  // namespace bolt

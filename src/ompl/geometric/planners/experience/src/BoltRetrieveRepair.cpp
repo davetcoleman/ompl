@@ -63,6 +63,7 @@ BoltRetrieveRepair::BoltRetrieveRepair(const base::SpaceInformationPtr &si, cons
   , smoothingEnabled_(true)
   , verbose_(true)
   , visualizeRawTrajectory_(true)
+  , numStartGoalStatesAddedToDense_(0)
 {
     // Copy in needed objects
     sparseDB_ = denseDB_->getSparseDB();
@@ -305,7 +306,7 @@ bool BoltRetrieveRepair::getPathOffGraph(const base::State *start, const base::S
         // Error check
         if (!result)
         {
-            OMPL_ERROR("getPathOffGraph(): BoltRetrieveRepair returned FALSE for getPathOnGraph");
+            OMPL_WARN("getPathOffGraph(): BoltRetrieveRepair returned FALSE for getPathOnGraph. Trying again in debug mode");
 
             // Run getPathOnGraph again in debug mode
             getPathOnGraph(startVertexCandidateNeighbors_, goalVertexCandidateNeighbors_, start, goal, geometricSolution,
@@ -326,6 +327,7 @@ bool BoltRetrieveRepair::getPathOffGraph(const base::State *start, const base::S
                 DenseVertex denseV = denseDB_->addVertex(si_->cloneState(goal), QUALITY);
                 denseDB_->connectNewVertex(denseV);
             }
+            numStartGoalStatesAddedToDense_++; // for later analysis
 
             OMPL_INFORM("Re-creating the spars graph");
             sparseDB_->createSPARS();
@@ -571,7 +573,7 @@ bool BoltRetrieveRepair::lazyCollisionSearch(const SparseVertex &start, const Sp
 bool BoltRetrieveRepair::lazyCollisionCheck(std::vector<SparseVertex> &vertexPath,
                                             const base::PlannerTerminationCondition &ptc)
 {
-    OMPL_DEBUG("Starting lazy collision checking");
+    OMPL_INFORM("Starting lazy collision checking");
 
     bool hasInvalidEdges = false;
 
