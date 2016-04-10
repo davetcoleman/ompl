@@ -77,9 +77,6 @@ otb::SparseDB::edgeWeightMap::edgeWeightMap(const SparseGraph &graph,
 
 double otb::SparseDB::edgeWeightMap::get(SparseEdge e) const
 {
-    // Maximum cost an edge can have based on popularity
-    const double MAX_POPULARITY_WEIGHT = 100.0;
-
     // Get the status of collision checking for this edge
     if (collisionStates_[e] == IN_COLLISION)
         return std::numeric_limits<double>::infinity();
@@ -87,9 +84,12 @@ double otb::SparseDB::edgeWeightMap::get(SparseEdge e) const
     double weight;
     if (popularityBiasEnabled_)
     {
+        // Maximum cost an edge can have based on popularity
+        const double MAX_POPULARITY_WEIGHT = 100.0;
+
         // static const double popularityBias = 10;
         weight = boost::get(boost::edge_weight, g_, e) / MAX_POPULARITY_WEIGHT * popularityBias_;
-        // std::cout << "getting popularity weight of edge " << e << " with value " << weight << std::endl;
+        std::cout << "getting popularity weight of edge " << e << " with value " << weight << std::endl;
     }
     else
     {
@@ -100,7 +100,7 @@ double otb::SparseDB::edgeWeightMap::get(SparseEdge e) const
     // const double weighted_astar = 0.8;
     // const double weight = boost::get(boost::edge_weight, g_, e) * weighted_astar;
 
-    // std::cout << "getting weight of edge " << e << " with value " << weight << std::endl;
+    //std::cout << "getting weight of edge " << e << " with value " << weight << std::endl;
 
     return weight;
 }
@@ -118,21 +118,27 @@ double get(const otb::SparseDB::edgeWeightMap &m, const otb::SparseEdge &e)
 BOOST_CONCEPT_ASSERT((boost::AStarVisitorConcept<otb::SparseDB::CustomAstarVisitor, otb::SparseGraph>));
 
 otb::SparseDB::CustomAstarVisitor::CustomAstarVisitor(SparseVertex goal, SparseDB *parent)
-  : goal_(goal), parent_(parent)
+    : goal_(goal), parent_(parent)
 {
 }
 
 void otb::SparseDB::CustomAstarVisitor::discover_vertex(SparseVertex v, const SparseGraph &) const
 {
+    // Statistics
+    parent_->recordNodeOpened();
+
     if (parent_->visualizeAstar_)
-        parent_->visual_->viz4State(parent_->getSparseState(v), /*mode=*/1, 1);
+        parent_->visual_->viz4State(parent_->getSparseState(v), /*small green*/ 1, 1);
 }
 
 void otb::SparseDB::CustomAstarVisitor::examine_vertex(SparseVertex v, const SparseGraph &) const
 {
+    // Statistics
+    parent_->recordNodeClosed();
+
     if (parent_->visualizeAstar_)
     {
-        parent_->visual_->viz4State(parent_->getSparseState(v), /*mode=*/5, 1);
+        parent_->visual_->viz4State(parent_->getSparseState(v), /*large black*/ 5, 1);
         parent_->visual_->viz4Trigger();
         usleep(parent_->visualizeAstarSpeed_ * 1000000);
     }
@@ -149,7 +155,7 @@ namespace tools
 {
 namespace bolt
 {
-    SparseDB::SparseDB(base::SpaceInformationPtr si, DenseDB *denseDB, base::VisualizerPtr visual)
+SparseDB::SparseDB(base::SpaceInformationPtr si, DenseDB *denseDB, base::VisualizerPtr visual)
   : si_(si)
   , denseDB_(denseDB)
   , visual_(visual)
@@ -158,10 +164,11 @@ namespace bolt
   , edgeWeightPropertySparse_(boost::get(boost::edge_weight, g_))
   , edgeCollisionStatePropertySparse_(boost::get(edge_collision_state_t(), g_))
   // Property accessors of vertices
-  , denseVertexProperty_(boost::get(vertex_state2_t(), g_))
+  , denseVertexProperty_(boost::get(vertex_dense_pointer_t(), g_))
   , typePropertySparse_(boost::get(vertex_type_t(), g_))
-  , nonInterfaceListsProperty_(boost::get(vertex_list_t(), g_))
-  , interfaceListsProperty_(boost::get(vertex_interface_list_t(), g_))
+  //, nonInterfaceListsProperty_(boost::get(vertex_list_t(), g_))
+  //, interfaceListsProperty_(boost::get(vertex_interface_list_t(), g_))
+  , vertexPopularity_(boost::get(vertex_popularity_t(), g_))
   // Disjoint set accessors
   , disjointSets_(boost::get(boost::vertex_rank, g_), boost::get(boost::vertex_predecessor, g_))
   // Remember what round we're on
@@ -170,23 +177,25 @@ namespace bolt
   , sparseDelta_(2.0)
   , specialMode_(false)
   , visualizeOverlayNodes_(false)
+    , numNodesOpened_(0)
+    , numNodesClosed_(0)
   // Sparse properites
   , denseDeltaFraction_(.05)
   , sparseDeltaFraction_(.25)
-  //, denseDeltaFraction_(.001)
+  , percentMaxExtentUnderestimate_(0.01)
   , stretchFactor_(3.)
   // Visualization settings
   , checksVerbose_(false)
-    , disjointVerbose_(true)
+  , disjointVerbose_(true)
   , fourthCheckVerbose_(true)
   , visualizeAstar_(false)
-  , visualizeSparsCreation_(false)
-  , visualizeSparsCreationSpeed_(0.0)
+  , visualizeSparsGraph_(false)
+  , visualizeSparsGraphSpeed_(0.0)
   , visualizeDenseRepresentatives_(false)
   , visualizeAstarSpeed_(0.1)
   , sparseCreationInsertionOrder_(0)
-        , numGraphGenerations_(0)
-        , numSamplesAddedForDisjointSets_(0)
+  , numGraphGenerations_(0)
+  , numSamplesAddedForDisjointSets_(0)
 {
     // Add search state
     initializeQueryState();
@@ -225,14 +234,15 @@ void SparseDB::freeMemory()
 bool SparseDB::setup()
 {
     // Calculate variables for the graph
-    const double maxExt = si_->getMaximumExtent();
-    sparseDelta_ = sparseDeltaFraction_ * maxExt;
-    denseDelta_ = denseDeltaFraction_ * maxExt;
+    maxExtent_ = si_->getMaximumExtent();
+    sparseDelta_ = sparseDeltaFraction_ * maxExtent_;
+    denseDelta_ = denseDeltaFraction_ * maxExtent_;
     // OMPL_INFORM("sparseDelta_ = %f", sparseDelta_);
     // OMPL_INFORM("denseDelta_ = %f", denseDelta_);
 
-    assert(maxExt > 0);
+    assert(maxExtent_ > 0);
     assert(denseDelta_ > 0);
+    assert(sparseDelta_ > 0);
 
     return true;
 }
@@ -246,6 +256,10 @@ bool SparseDB::astarSearch(const SparseVertex start, const SparseVertex goal, st
     bool foundGoal = false;
     double *vertexDistances = new double[getNumVertices()];
 
+    // Reset statistics
+    numNodesOpened_ = 0;
+    numNodesClosed_ = 0;
+
     OMPL_INFORM("Beginning AStar Search");
     try
     {
@@ -253,10 +267,9 @@ bool SparseDB::astarSearch(const SparseVertex start, const SparseVertex goal, st
         bool popularityBiasEnabled = false;
         // Note: could not get astar_search to compile within BoltRetrieveRepair.cpp class because of
         // namespacing issues
-        boost::astar_search(g_,     // graph
-                            start,  // start state
-                            // boost::bind(&otb::SparseDB::distanceFunction2, this, _1, goal),  // the heuristic
-                            boost::bind(&otb::SparseDB::distanceFunction, this, _1, goal),  // the heuristic
+        boost::astar_search(g_,                                                           // graph
+                            start,                                                        // start state
+                            boost::bind(&otb::SparseDB::astarHeuristic, this, _1, goal),  // the heuristic
                             // ability to disable edges (set cost to inifinity):
                             boost::weight_map(edgeWeightMap(g_, edgeCollisionStatePropertySparse_, popularityBias,
                                                             popularityBiasEnabled))
@@ -268,6 +281,7 @@ bool SparseDB::astarSearch(const SparseVertex start, const SparseVertex goal, st
     {
         // the custom exception from CustomAstarVisitor
         OMPL_INFORM("AStar found goal vertex. distance to goal: %f", vertexDistances[goal]);
+        OMPL_INFORM("Number nodes opened: %u, Number nodes closed: %u", numNodesOpened_, numNodesClosed_);
 
         if (vertexDistances[goal] > 1.7e+308)  // TODO(davetcoleman): fix terrible hack for detecting infinity
         // double diff = d[goal] - std::numeric_limits<double>::infinity();
@@ -338,6 +352,28 @@ void SparseDB::debugState(const ompl::base::State *state)
     si_->printState(state, std::cout);
 }
 
+double SparseDB::astarHeuristic(const SparseVertex a, const SparseVertex b) const
+{
+    // Assume vertex 'a' is the one we care about its populariy
+
+    // Get the classic distance
+    double dist = si_->distance(getSparseStateConst(a), getSparseStateConst(b));
+
+    const double percentMaxExtent = (maxExtent_ * percentMaxExtentUnderestimate_); // TODO(davetcoleman): cache
+    double popularityComponent = percentMaxExtent * (vertexPopularity_[a] / 100.0);
+
+    std::cout << "astarHeuristic - dist: " << std::setprecision(4) << dist
+              << ", popularity: " << vertexPopularity_[a]
+              << ", max extent: " << maxExtent_ << ", percentMaxExtent: " << percentMaxExtent
+              << ", popularityComponent: " << popularityComponent;
+
+    dist = std::max(0.0, dist - popularityComponent);
+
+    std::cout << ", new distance: " << dist << std::endl;
+
+    return dist;
+}
+
 double SparseDB::distanceFunction(const SparseVertex a, const SparseVertex b) const
 {
     // const double dist = si_->distance(getSparseState(a), getSparseState(b));
@@ -380,7 +416,7 @@ void SparseDB::createSPARS()
         initializeQueryState();
 
         // Clear visuals
-        visual_->viz2State(NULL, /*mode=deleteAllMarkers*/ 0, 0);
+        visual_->viz2State(NULL, /*deleteAllMarkers*/ 0, 0);
     }
 
     // Reset fractions
@@ -388,18 +424,7 @@ void SparseDB::createSPARS()
 
     // Get the ordering to insert vertices
     std::vector<WeightedVertex> vertexInsertionOrder;
-
-    if (sparseCreationInsertionOrder_ == 0)
-        getPopularityOrder(vertexInsertionOrder);  // Create SPARs graph in order of popularity
-    else if (sparseCreationInsertionOrder_ == 1)
-        getDefaultOrder(vertexInsertionOrder);
-    else if (sparseCreationInsertionOrder_ == 2)
-        getRandomOrder(vertexInsertionOrder);
-    else
-    {
-        OMPL_ERROR("Unknown insertion order method");
-        exit(-1);
-    }
+    getVertexInsertionOrdering(vertexInsertionOrder);
 
     // Error check order creation
     assert(vertexInsertionOrder.size() == denseDB_->getNumVertices() - 1);  // subtract 1 for query vertex
@@ -438,20 +463,30 @@ void SparseDB::createSPARS()
             // }
 
             // Run SPARS checks
-            GuardType addReason;     // returns why the state was added
-            SparseVertex newVertex;  // the newly generated sparse vertex
+            GuardType addReason;            // returns why the state was added
+            SparseVertex newVertex = NULL;  // the newly generated sparse vertex
             if (!addStateToRoadmap(vertexInsertionOrder[i].v_, newVertex, addReason))
             {
                 // std::cout << "Failed AGAIN to add state to roadmap------" << std::endl;
 
                 // Visualize the failed vertex as a small red dot
-                if (visualizeSparsCreation_)
+                if (visualizeSparsGraph_)
                 {
-                    visual_->viz2State(getDenseState(vertexInsertionOrder[i].v_), /*mode=*/3, 0);
+                    visual_->viz2State(getDenseState(vertexInsertionOrder[i].v_), /*small red*/ 3, 0);
                 }
             }
             else
             {
+                // If a new vertex was created, update its popularity property
+                if (newVertex)  // value is not null, so it was created
+                {
+                    std::cout << "SETTING POPULARITY of vertex " << newVertex << " to value "
+                              << vertexInsertionOrder[i].weight_ << std::endl;
+                    // Update popularity
+                    vertexPopularity_[newVertex] = vertexInsertionOrder[i].weight_;
+                }
+
+                // Remove this state from the candidates for insertion vector
                 vertexInsertionOrder.erase(vertexInsertionOrder.begin() + i);
                 i--;
                 sucessfulInsertions++;
@@ -460,11 +495,12 @@ void SparseDB::createSPARS()
         }  // end for
 
         // Visualize
-        if (visualizeSparsCreation_)
+        if (visualizeSparsGraph_)
             visual_->viz2Trigger();
 
-        std::cout << std::string(coutIndent+2, ' ') << "Succeeded in inserting " << sucessfulInsertions
-                  << " vertices on the " << loopAttempt << " loop, remaining uninserted verticies: " << vertexInsertionOrder.size() << std::endl;
+        std::cout << std::string(coutIndent + 2, ' ') << "Succeeded in inserting " << sucessfulInsertions
+                  << " vertices on the " << loopAttempt
+                  << " loop, remaining uninserted verticies: " << vertexInsertionOrder.size() << std::endl;
         loopAttempt++;
 
         // Increase the sparse delta a bit, but only after the first loop
@@ -495,16 +531,16 @@ void SparseDB::createSPARS()
     if (!checkAsymptoticOptimal(vertexInsertionOrder[i].v_, coutIndent + 4))
     {
     std::cout << "Vertex " << vertexInsertionOrder[i].v_ << " failed asymptotic optimal test " << std::endl;
-}
-}
-*/
+    }
+    }
+    */
 
     // If we haven't animated the creation, just show it all at once
-    if (!visualizeSparsCreation_)
+    if (!visualizeSparsGraph_)
     {
         displayDatabase();
     }
-    else if (visualizeSparsCreationSpeed_ < std::numeric_limits<double>::epsilon())
+    else if (visualizeSparsGraphSpeed_ < std::numeric_limits<double>::epsilon())
     {
         visual_->viz2Trigger();
         usleep(0.001 * 1000000);
@@ -530,6 +566,34 @@ void SparseDB::createSPARS()
 
     OMPL_INFORM("Finished creating sparse database ----------------------");
     std::cout << std::endl;
+
+    // Temp TODO(davetcoleman): remove
+    std::cout << "temp display database " << std::endl;
+    displayDatabase();
+}
+
+void SparseDB::getVertexInsertionOrdering(std::vector<WeightedVertex> &vertexInsertionOrder)
+{
+    if (sparseCreationInsertionOrder_ == 0)
+    {
+        OMPL_INFORM("Creating sparse graph using popularity ordering");
+        getPopularityOrder(vertexInsertionOrder);  // Create SPARs graph in order of popularity
+    }
+    else if (sparseCreationInsertionOrder_ == 1)
+    {
+        OMPL_WARN("Creating sparse graph using default ordering");
+        getDefaultOrder(vertexInsertionOrder);
+    }
+    else if (sparseCreationInsertionOrder_ == 2)
+    {
+        OMPL_WARN("Creating sparse graph using random ordering");
+        getRandomOrder(vertexInsertionOrder);
+    }
+    else
+    {
+        OMPL_ERROR("Unknown insertion order method");
+        exit(-1);
+    }
 }
 
 void SparseDB::eliminateDisjointSets()
@@ -539,7 +603,7 @@ void SparseDB::eliminateDisjointSets()
         std::cout << std::string(coutIndent, ' ') << "eliminateDisjointSets()" << std::endl;
 
     visualizeOverlayNodes_ = true;  // visualize all added nodes in a separate window, also
-    specialMode_ = false;  // disable parts of addRoadmap
+    specialMode_ = false;           // disable parts of addRoadmap
     bool verbose = false;
 
     /** \brief Sampler user for generating valid samples in the state space */
@@ -549,7 +613,7 @@ void SparseDB::eliminateDisjointSets()
     ob::PlannerTerminationCondition ptc = ob::timedPlannerTerminationCondition(seconds, 0.1);
 
     // For each dense vertex we add
-    std::size_t numSets = 2;   // dummy value that will be updated at first loop
+    std::size_t numSets = 2;        // dummy value that will be updated at first loop
     std::size_t newStateCount = 0;  // count how many states we add
     while (numSets > 1)
     {
@@ -562,7 +626,7 @@ void SparseDB::eliminateDisjointSets()
         {
             // Sample randomly
             if (!validSampler->sample(state))  // TODO(davetcoleman): is it ok with the nn_ to change the state after
-                                               // having added it to the nearest neighbor??
+            // having added it to the nearest neighbor??
             {
                 OMPL_ERROR("Unable to find valid sample");
                 exit(-1);  // this should never happen
@@ -574,7 +638,7 @@ void SparseDB::eliminateDisjointSets()
             // Debug
             if (verbose && false)
             {
-                visual_->viz4State(state, /*mode=*/3, 0);
+                visual_->viz4State(state, /*small red*/ 3, 0);
                 visual_->viz4Trigger();
                 usleep(0.001 * 1000000);
             }
@@ -586,11 +650,12 @@ void SparseDB::eliminateDisjointSets()
             {
                 // Debug
                 if (disjointVerbose_)
-                    std::cout << std::string(coutIndent+2, ' ')
-                              << "Added random sampled state to fix graph connectivity, total new states: " << ++newStateCount << std::endl;
+                    std::cout << std::string(coutIndent + 2, ' ')
+                              << "Added random sampled state to fix graph connectivity, total new states: "
+                              << ++newStateCount << std::endl;
 
                 // Visualize
-                if (visualizeSparsCreation_)
+                if (visualizeSparsGraph_)
                 {
                     visual_->viz2Trigger();  // show the new sparse graph addition
                 }
@@ -621,8 +686,7 @@ void SparseDB::eliminateDisjointSets()
 
         // Debug
         if (disjointVerbose_)
-            std::cout << std::string(coutIndent+4, ' ')
-                      << "Remaining disjoint sets: " << numSets << std::endl;
+            std::cout << std::string(coutIndent + 4, ' ') << "Remaining disjoint sets: " << numSets << std::endl;
     }  // end while
 
     // getDisjointSets(true);  // show in verbose mode
@@ -741,8 +805,7 @@ bool SparseDB::findSparseRepresentatives()
             else
             {
                 double visualColor = 100;
-                visual_->viz2Edge(state, getSparseState(denseDB_->representativesProperty_[denseV]),
-                                          visualColor);
+                visual_->viz2Edge(state, getSparseState(denseDB_->representativesProperty_[denseV]), visualColor);
             }
         }
     }
@@ -756,14 +819,10 @@ bool SparseDB::getPopularityOrder(std::vector<WeightedVertex> &vertexInsertionOr
     bool verbose = false;
 
     // Error check
-    if (!denseDB_->getNumVertices())
-    {
-        OMPL_ERROR("Unable to get vertices in order of popularity becayse dense graph is empty");
-        exit(-1);
-    }
+    BOOST_ASSERT_MSG(denseDB_->getNumVertices() > 1, "Unable to get vertices in order of popularity because dense "
+                                                     "graph is empty");
 
-    // Visualize - clear image
-    if (visualizeNodePopularity_)
+    if (visualizeNodePopularity_)  // Clear visualization
     {
         visual_->viz3State(NULL, /* type = deleteAllMarkers */ 0, 0);
     }
@@ -815,7 +874,7 @@ bool SparseDB::getPopularityOrder(std::vector<WeightedVertex> &vertexInsertionOr
         {
             if (verbose)
                 std::cout << "vertex " << pqueue.top().v_ << ", mode 7, weightPercent " << weightPercent << std::endl;
-            visual_->viz3State(denseDB_->stateProperty_[pqueue.top().v_], /*mode=*/7, weightPercent);
+            visual_->viz3State(denseDB_->stateProperty_[pqueue.top().v_], /*value0-100*/ 7, weightPercent);
         }
 
         // Remove from priority queue
@@ -871,7 +930,7 @@ bool SparseDB::getDefaultOrder(std::vector<WeightedVertex> &vertexInsertionOrder
         // Visualize vertices
         if (visualizeNodePopularity_)
         {
-            visual_->viz3State(denseDB_->stateProperty_[wv.v_], /*mode=*/7, weightPercent);
+            visual_->viz3State(denseDB_->stateProperty_[wv.v_], /*value0-100*/ 7, weightPercent);
         }
     }
 
@@ -1000,7 +1059,7 @@ bool SparseDB::checkAddConnectivity(const DenseVertex &denseV, std::vector<Spars
 {
     if (checksVerbose_)
         std::cout << std::string(coutIndent, ' ') << "checkAddConnectivity() Does this node connect neighboring nodes "
-                                                    "that are not connected? " << std::endl;
+                                                     "that are not connected? " << std::endl;
 
     // If less than 2 neighbors there is no way to find a pair of nodes in different connected components
     if (visibleNeighborhood.size() < 2)
@@ -1129,8 +1188,8 @@ bool SparseDB::checkAddInterface(const DenseVertex &denseV, std::vector<SparseVe
                                  std::size_t coutIndent)
 {
     if (checksVerbose_)
-        std::cout << std::string(coutIndent, ' ')
-                  << "checkAddInterface() Does this node's neighbor's need it to better connect them?" << std::endl;
+        std::cout << std::string(coutIndent, ' ') << "checkAddInterface() Does this node's neighbor's need it to "
+                                                     "better connect them?" << std::endl;
 
     // If we have at least 2 neighbors
     // TODO(davetcoleman): why only the first two nodes??
@@ -1161,7 +1220,7 @@ bool SparseDB::checkAddInterface(const DenseVertex &denseV, std::vector<SparseVe
                 // Connect them
                 addEdge(visibleNeighborhood[0], visibleNeighborhood[1], visualColor, coutIndent + 4);
             }
-            else // They cannot be directly connected
+            else  // They cannot be directly connected
             {
                 // Add the new node to the graph, to bridge the interface
                 if (checksVerbose_)
@@ -1172,7 +1231,7 @@ bool SparseDB::checkAddInterface(const DenseVertex &denseV, std::vector<SparseVe
                 addEdge(newVertex, visibleNeighborhood[1], visualColor, coutIndent + 4);
                 if (checksVerbose_)
                     std::cout << std::string(coutIndent + 2, ' ') << "INTERFACE: connected two neighbors through new "
-                                                                    "interface node" << std::endl;
+                                                                     "interface node" << std::endl;
             }
             // Report success
             return true;
@@ -1181,7 +1240,7 @@ bool SparseDB::checkAddInterface(const DenseVertex &denseV, std::vector<SparseVe
         {
             if (checksVerbose_)
                 std::cout << std::string(coutIndent + 2, ' ') << "Two neighbors already share an edge, not "
-                                                                "connecting" << std::endl;
+                                                                 "connecting" << std::endl;
         }
     }
 
@@ -1259,6 +1318,7 @@ SparseVertex SparseDB::addVertex(DenseVertex denseV, const GuardType &type)
     // Add properties
     typePropertySparse_[v] = type;
     denseVertexProperty_[v] = denseV;
+    vertexPopularity_[v] = MAX_POPULARITY_WEIGHT;  // 100 means the vertex is very unpopular
 
     // Connected component tracking
     disjointSets_.make_set(v);
@@ -1267,9 +1327,9 @@ SparseVertex SparseDB::addVertex(DenseVertex denseV, const GuardType &type)
     nn_->add(v);
 
     // Visualize
-    if (visualizeSparsCreation_)
+    if (visualizeSparsGraph_)
     {
-        std::size_t mode = 5; // default
+        std::size_t mode = 5;  // default
         if (type == CONNECTIVITY)
             mode = 5;  // black, large
         else if (type == COVERAGE)
@@ -1280,17 +1340,17 @@ SparseVertex SparseDB::addVertex(DenseVertex denseV, const GuardType &type)
             OMPL_ERROR("Unknown mode");
 
         visual_->viz2State(getSparseState(v), mode, sparseDelta_);
-        if (visualizeSparsCreationSpeed_ > std::numeric_limits<double>::epsilon())
+        if (visualizeSparsGraphSpeed_ > std::numeric_limits<double>::epsilon())
         {
             visual_->viz2Trigger();
-            usleep(visualizeSparsCreationSpeed_ * 1000000);
+            usleep(visualizeSparsGraphSpeed_ * 1000000);
         }
 
-        if (visualizeOverlayNodes_) // after initial spars graph is created, show additions not from grid
+        if (visualizeOverlayNodes_)  // after initial spars graph is created, show additions not from grid
         {
             visual_->viz3State(getSparseState(v), mode, sparseDelta_);
             visual_->viz3Trigger();
-            usleep(0.001*1000000);
+            usleep(0.001 * 1000000);
         }
     }
 
@@ -1324,7 +1384,7 @@ void SparseDB::addEdge(SparseVertex v1, SparseVertex v2, std::size_t visualColor
     assert(v1 <= getNumVertices());
     assert(v2 <= getNumVertices());
     assert(v1 != v2);
-    // BOOST_ASSERT_MSG(getSparseState(v1) != getSparseState(v2), "States on both sides of an edge are the same");
+    BOOST_ASSERT_MSG(getSparseState(v1) != getSparseState(v2), "States on both sides of an edge are the same");
 
     // std::cout << std::string(coutIndent, ' ') << "addEdge: Connecting vertex " << v1 << " to vertex " << v2 <<
     // std::endl;
@@ -1340,7 +1400,7 @@ void SparseDB::addEdge(SparseVertex v1, SparseVertex v2, std::size_t visualColor
     disjointSets_.union_set(v1, v2);
 
     // Visualize
-    if (visualizeSparsCreation_)
+    if (visualizeSparsGraph_)
     {
         /* Color Key:
            0   - GREEN  - connectivity
@@ -1350,17 +1410,17 @@ void SparseDB::addEdge(SparseVertex v1, SparseVertex v2, std::size_t visualColor
            100 - RED    - interface special
         */
         visual_->viz2Edge(getSparseState(v1), getSparseState(v2), visualColor);
-        if (visualizeSparsCreationSpeed_ > std::numeric_limits<double>::epsilon())
+        if (visualizeSparsGraphSpeed_ > std::numeric_limits<double>::epsilon())
         {
             visual_->viz2Trigger();
-            usleep(visualizeSparsCreationSpeed_ * 1000000);
+            usleep(visualizeSparsGraphSpeed_ * 1000000);
         }
 
-        if (visualizeOverlayNodes_) // after initial spars graph is created, show additions not from grid
+        if (visualizeOverlayNodes_)  // after initial spars graph is created, show additions not from grid
         {
             visual_->viz3Edge(getSparseState(v1), getSparseState(v2), visualColor);
             visual_->viz3Trigger();
-            usleep(0.001*1000000);
+            usleep(0.001 * 1000000);
         }
     }
 }
@@ -1391,34 +1451,9 @@ void SparseDB::displayDatabase(bool showVertices)
         exit(-1);
     }
 
-    if (showVertices)
-    {
-        // Loop through each vertex
-        std::size_t count = 0;
-        std::size_t debugFrequency = getNumVertices() / 10;
-        std::cout << "Displaying database: " << std::flush;
-        foreach (SparseVertex v, boost::vertices(g_))
-        {
-            // Check for null states
-            if (getSparseStateConst(v))
-            {
-                visual_->viz2State(getSparseStateConst(v), /*mode=*/6, 1);
-            }
-            else
-                OMPL_WARN("Null sparse state found on vertex %u", v);
+    // Clear previous visualization
+    visual_->viz2State(NULL, /*deleteAllMarkers=*/0, 1);
 
-            // Prevent cache from getting too big
-            if (count % debugFrequency == 0)
-            {
-                std::cout << std::fixed << std::setprecision(0)
-                          << (static_cast<double>(count + 1) / getNumVertices()) * 100.0 << "% " << std::flush;
-                visual_->viz2Trigger();
-            }
-            count++;
-        }
-        std::cout << std::endl;
-    }
-    else
     {
         // Loop through each edge
         std::size_t count = 0;
@@ -1430,8 +1465,12 @@ void SparseDB::displayDatabase(bool showVertices)
             const SparseVertex &v1 = boost::source(e, g_);
             const SparseVertex &v2 = boost::target(e, g_);
 
+            //std::cout << "edgeWeightPropertySparse_[e]: " << std::setprecision(4) << edgeWeightPropertySparse_[e]
+            //<< std::endl;
+
+            // TODO(davetcoleman): currently the weight property is not normalized for 0-100 scale so not using for visualization
             // Visualize
-            visual_->viz2Edge(getSparseStateConst(v1), getSparseStateConst(v2), edgeWeightPropertySparse_[e]);
+            visual_->viz2Edge(getSparseStateConst(v1), getSparseStateConst(v2), 100); //edgeWeightPropertySparse_[e]);
 
             // Prevent cache from getting too big
             if (count % debugFrequency == 0)
@@ -1445,6 +1484,37 @@ void SparseDB::displayDatabase(bool showVertices)
         }
         std::cout << std::endl;
     }
+
+    //if (true || showVertices)
+    {
+        // Loop through each vertex
+        std::size_t count = 0;
+        std::size_t debugFrequency = getNumVertices() / 10;
+        std::cout << "Displaying database: " << std::flush;
+        foreach (SparseVertex v, boost::vertices(g_))
+        {
+            // Check for null states
+            if (getSparseStateConst(v))
+            {
+                //visual_->viz2State(getSparseStateConst(v), /*large, black*/ 6, 1);
+                visual_->viz2State(getSparseStateConst(v), /*popularity0-100*/7, vertexPopularity_[v]);
+            }
+            else if (v != queryVertex_) // query vertex should always be null, actually
+                OMPL_WARN("Null sparse state found on vertex %u", v);
+
+            // Prevent cache from getting too big
+            if (count % debugFrequency == 0)
+            {
+                std::cout << std::fixed << std::setprecision(0)
+                          << (static_cast<double>(count + 1) / getNumVertices()) * 100.0 << "% " << std::flush;
+                visual_->viz2Trigger();
+            }
+            count++;
+        }
+        std::cout << std::endl;
+    }
+    //else
+
 
     // Publish remaining edges
     visual_->viz2Trigger();

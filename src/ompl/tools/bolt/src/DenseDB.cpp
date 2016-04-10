@@ -371,7 +371,8 @@ bool otb::DenseDB::postProcessPathWithNeighbors(og::PathGeometric &solutionPath,
 
     for (std::size_t i = 0; i < visibleNeighborhood.size(); ++i)
     {
-        std::cout << "Attempting to start with neighbor " << i << std::endl;
+        if (recurseVerbose)
+            std::cout << "Attempting to start with neighbor " << i << std::endl;
         DenseVertex prevGraphVertex = visibleNeighborhood[i];
 
         if (visualizeSnapPath_)  // Add first state
@@ -420,9 +421,8 @@ bool otb::DenseDB::updateEdgeWeights(const std::vector<DenseVertex> &roadmapPath
             if (visualizeSnapPath_)  // Visualize
             {
                 const double cost = 100;  // red
-                visual_->viz6Edge(stateProperty_[roadmapPath[vertexID - 1]], stateProperty_[roadmapPath[vertexID]],
-                                  cost);
-                visual_->viz6Trigger();
+                visual_->viz4Edge(stateProperty_[roadmapPath[vertexID-1]], stateProperty_[roadmapPath[vertexID]], cost);
+                visual_->viz4Trigger();
                 usleep(visualizeSnapPathSpeed_ * 1000000);
             }
             std::cout << "shutting down out of curiosity " << std::endl;
@@ -2173,7 +2173,7 @@ void otb::DenseDB::connectNewVertex(DenseVertex v1)
     // Now connect to nearby vertices
     std::vector<DenseVertex> graphNeighborhood;
     std::size_t findNearestKNeighbors = getEdgesPerVertex();
-    OMPL_INFORM("connectNewVertex(): Finding %u nearest neighbors for new vertex", findNearestKNeighbors);
+    OMPL_INFORM("DenseDB.connectNewVertex(): Finding %u nearest neighbors for new vertex", findNearestKNeighbors);
     const std::size_t numSameVerticiesFound = 1;  // add 1 to the end because the NN tree always returns itself
 
     // Search
