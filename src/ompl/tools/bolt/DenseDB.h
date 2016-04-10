@@ -74,11 +74,6 @@ OMPL_CLASS_FORWARD(SparseDB);
 /** \class ompl::tools::bolt::DenseDBPtr
     \brief A boost shared pointer wrapper for ompl::tools::bolt::DenseDB */
 
-static const double MAX_POPULARITY_WEIGHT = 100.0;  // 100 means the edge is very unpopular
-// Everytime an edge is used, it is reduced by this amount (becomes more popular)
-static const double POPULARITY_WEIGHT_REDUCTION = 5;
-
-
 /** \brief Save and load entire paths from file */
 class DenseDB
 {

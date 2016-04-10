@@ -330,11 +330,10 @@ void Bolt::printLogs(std::ostream &out) const
     out << "    Edges:                       " << sparseDB->getNumEdges() << " (" << edgePercent << "%)" << std::endl;
     out << "    Regenerations:               " << sparseDB->numGraphGenerations_ << std::endl;
     out << "    Disjoint Samples Added:      " << sparseDB->numSamplesAddedForDisjointSets_ << std::endl;
-    // out << "    Consecutive state failures:  " << denseDB_->getNumConsecutiveFailures() << std::endl;
-    // out << "    Connected path failures:     " << denseDB_->getNumPathInsertionFailed() << std::endl;
-    // out << "    Sparse Delta Fraction:       " << denseDB_->getSparseDeltaFraction() << std::endl;
+    out << "    Sparse Delta Fraction:       " << sparseDB->sparseDeltaFraction_ << std::endl;
     out << "  Average planning time:         " << stats_.getAveragePlanningTime() << " seconds" << std::endl;
     out << "  Average insertion time:        " << stats_.getAverageInsertionTime() << " seconds" << std::endl;
+    out << std::endl;
 }
 
 std::size_t Bolt::getExperiencesCount() const
@@ -387,9 +386,11 @@ bool Bolt::doPostProcessing()
     if (denseDB_->getPopularityBiasEnabled())
         denseDB_->normalizeGraphEdgeWeights();
 
+    // Show changes
+    denseDB_->displayDatabase();
 
-    // I think this is a bad idea
-    //createSPARS();
+    // Recreate the sparse graph, too
+    denseDB_->getSparseDB()->createSPARS();
 
     // Benchmark runtime
     double duration = time::seconds(time::now() - startTime);

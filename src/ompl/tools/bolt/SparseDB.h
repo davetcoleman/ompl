@@ -140,6 +140,7 @@ class SparseDB
         SparseDB* parent_;
 
       public:
+
         /**
          * Construct a visitor for a given search.
          * \param goal  goal vertex of the search
@@ -223,6 +224,9 @@ class SparseDB
         return !getNumVertices();
     }
 
+    /** \brief Distance between two states with special bias using popularity */
+    double astarHeuristic(const SparseVertex a, const SparseVertex b) const;
+
     /** \brief Compute distance between two milestones (this is simply distance between the states of the milestones) */
     double distanceFunction(const SparseVertex a, const SparseVertex b) const;
 
@@ -235,6 +239,9 @@ class SparseDB
     /** \brief Create a SPARS graph from the discretized dense graph and its popularity metric */
     void createSPARS();
     bool findSparseRepresentatives();
+
+    /** \brief Helper function for choosing the correct method for vertex insertion ordering */
+    void getVertexInsertionOrdering(std::vector<WeightedVertex> &vertexInsertionOrder);
 
     /** \brief Add random samples until graph is fully connected */
     void eliminateDisjointSets();
@@ -291,6 +298,17 @@ class SparseDB
     /** \brief Show in visualizer the sparse graph */
     void displayDatabase(bool showVertices = false);
 
+    /** \brief Custom A* visitor statistics */
+    void recordNodeOpened() // discovered
+    {
+        numNodesOpened_++;
+    }
+    void recordNodeClosed() // examined
+    {
+        numNodesClosed_++;
+    }
+
+
   public:
     /** \brief Shortcut function for getting the state of a vertex */
     inline base::State*& getSparseState(const SparseVertex& v);
@@ -326,16 +344,19 @@ class SparseDB
     SparseEdgeCollisionStateMap edgeCollisionStatePropertySparse_;
 
     /** \brief Access to the internal base::state at each Vertex */
-    boost::property_map<SparseGraph, vertex_state2_t>::type denseVertexProperty_;
+    boost::property_map<SparseGraph, vertex_dense_pointer_t>::type denseVertexProperty_;
 
     /** \brief Access to the SPARS vertex type for the vertices */
     boost::property_map<SparseGraph, vertex_type_t>::type typePropertySparse_;
 
     /** \brief Access to all non-interface supporting vertices of the sparse nodes */
-    boost::property_map<SparseGraph, vertex_list_t>::type nonInterfaceListsProperty_;
+    //boost::property_map<SparseGraph, vertex_list_t>::type nonInterfaceListsProperty_;
 
     /** \brief Access to the interface-supporting vertice hashes of the sparse nodes */
-    boost::property_map<SparseGraph, vertex_interface_list_t>::type interfaceListsProperty_;
+    //boost::property_map<SparseGraph, vertex_interface_list_t>::type interfaceListsProperty_;
+
+    /** \brief Access to the popularity of each node */
+    boost::property_map<SparseGraph, vertex_popularity_t>::type vertexPopularity_;
 
     /** \brief Data structure that maintains the connected components */
     boost::disjoint_sets<boost::property_map<SparseGraph, boost::vertex_rank_t>::type,
@@ -356,6 +377,13 @@ class SparseDB
     /** \brief Show what nodes are added on top of the regular SPARS graph */
     bool visualizeOverlayNodes_;
 
+    /** \brief Cache the maximum extent for later re-use */
+    double maxExtent_;
+
+    // Statistics
+    std::size_t numNodesOpened_;
+    std::size_t numNodesClosed_;
+
   public:
     /** \brief SPARS parameter for dense graph connection distance as a fraction of max. extent */
     double denseDeltaFraction_;
@@ -369,6 +397,10 @@ class SparseDB
     /** \brief SPARS parameter for dense graph connection distance */
     double denseDelta_;
 
+    /** \brief How much the popularity of a node can cause its cost-to-go heuristic to be underestimated */
+    double percentMaxExtentUnderestimate_;
+
+    /** \brief Change verbosity levels */
     bool checksVerbose_;
     bool disjointVerbose_;
     bool fourthCheckVerbose_;
@@ -377,8 +409,8 @@ class SparseDB
     bool visualizeAstar_;
 
     /** \brief Show the sparse graph being generated */
-    bool visualizeSparsCreation_;
-    double visualizeSparsCreationSpeed_;
+    bool visualizeSparsGraph_;
+    double visualizeSparsGraphSpeed_;
     bool visualizeDenseRepresentatives_;
     bool visualizeNodePopularity_;
 

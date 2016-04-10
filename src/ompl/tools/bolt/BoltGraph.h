@@ -62,6 +62,12 @@ namespace tools
 {
 namespace bolt
 {
+
+// TODO(davetcoleman): maybe make all popularity use ints instead of doubles for memory efficiency?
+static const double MAX_POPULARITY_WEIGHT = 100.0;  // 100 means the edge is very unpopular
+// Everytime an edge is used, it is reduced by this amount (becomes more popular)
+static const double POPULARITY_WEIGHT_REDUCTION = 5;
+
 ////////////////////////////////////////////////////////////////////////////////////////
 // VERTEX PROPERTIES
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -87,20 +93,20 @@ struct vertex_state_t
     typedef boost::vertex_property_tag kind;
 };
 
-struct vertex_state2_t  // TODO(davetcoleman): rename
+struct vertex_dense_pointer_t
 {
     typedef boost::vertex_property_tag kind;
 };
 
-struct vertex_list_t
-{
-    typedef boost::vertex_property_tag kind;
-};
+// struct vertex_list_t
+// {
+//     typedef boost::vertex_property_tag kind;
+// };
 
-struct vertex_interface_list_t
-{
-    typedef boost::vertex_property_tag kind;
-};
+// struct vertex_interface_list_t
+// {
+//     typedef boost::vertex_property_tag kind;
+//};
 
 struct vertex_sparse_rep_t
 {
@@ -112,7 +118,7 @@ struct vertex_type_t
     typedef boost::vertex_property_tag kind;
 };
 
-struct vertex_interface_data_t
+struct vertex_popularity_t
 {
     typedef boost::vertex_property_tag kind;
 };
@@ -171,11 +177,11 @@ struct InterfaceHashStruct
    appropriate than an adjacency_matrix. Edges are undirected.
 
    *Properties of vertices*
-   - vertex_state_t: an ompl::base::State* is required for OMPL
+   - vertex_dense_pointer_t: a reference back to the dense graph where the original state is stored
    - vertex_predecessor_t: The incremental connected components algorithm requires it
    - vertex_rank_t: The incremental connected components algorithm requires it
-   - vertex_type_t - TODO
-   - vertex_interface_data_t - needed by PRM2 for maintainings its sparse properties
+   - vertex_type_t: The type of guard this node is
+   - vertex_list_t: non interface list property?
 
    Note: If boost::vecS is not used for vertex storage, then there must also
    be a boost:vertex_index_t property manually added.
@@ -188,17 +194,21 @@ struct InterfaceHashStruct
 
 /** Wrapper for the vertex's multiple as its property. */
 // clang-format off
-typedef boost::property<vertex_state2_t, VertexIndexType,
+typedef boost::property<vertex_dense_pointer_t, VertexIndexType,
         boost::property<boost::vertex_predecessor_t, VertexIndexType,
         boost::property<boost::vertex_rank_t, VertexIndexType,
         boost::property<vertex_type_t, GuardType,
-        boost::property<vertex_list_t, std::set<VertexIndexType>,
-        boost::property<vertex_interface_list_t, InterfaceHashStruct > > > > > > SparseVertexProperties;
+        boost::property<vertex_popularity_t, double
+        //boost::property<vertex_list_t, std::set<VertexIndexType>,
+        //boost::property<vertex_interface_list_t, InterfaceHashStruct > >
+        > > > > > SparseVertexProperties;
 // clang-format on
 
 /** Wrapper for the double assigned to an edge as its weight property. */
-typedef boost::property<boost::edge_weight_t, double, boost::property<edge_collision_state_t, int> >
-    SparseEdgeProperties;
+// clang-format off
+typedef boost::property<boost::edge_weight_t, double,
+        boost::property<edge_collision_state_t, int> > SparseEdgeProperties;
+// clang-format on
 
 /** The underlying boost graph type (undirected weighted-edge adjacency list with above properties). */
 typedef boost::adjacency_list<boost::vecS,  // store in std::vector
@@ -238,7 +248,6 @@ typedef boost::property_map<SparseGraph, edge_collision_state_t>::type SparseEdg
    - vertex_predecessor_t: The incremental connected components algorithm requires it
    - vertex_rank_t: The incremental connected components algorithm requires it
    - vertex_type_t - Type of vertex/guard in SPARS
-   - vertex_interface_data_t - needed by PRM2 for maintainings its sparse properties
 
    Note: If boost::vecS is not used for vertex storage, then there must also
    be a boost:vertex_index_t property manually added.
@@ -253,9 +262,8 @@ typedef boost::property_map<SparseGraph, edge_collision_state_t>::type SparseEdg
 
 // clang-format off
 typedef boost::property<vertex_state_t, base::State *,
-                        //boost::property<vertex_state3_t, base::State *,
         boost::property<boost::vertex_predecessor_t, VertexIndexType,
-        boost::property<vertex_sparse_rep_t, SparseVertex,
+        boost::property<vertex_sparse_rep_t, SparseVertex, // Currently unused
         boost::property<boost::vertex_rank_t, VertexIndexType,
         boost::property<vertex_type_t, GuardType> > > > > DenseVertexProperties;
 // clang-format on
