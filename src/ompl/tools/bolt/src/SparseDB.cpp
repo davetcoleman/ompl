@@ -359,17 +359,49 @@ double SparseDB::astarHeuristic(const SparseVertex a, const SparseVertex b) cons
     // Get the classic distance
     double dist = si_->distance(getSparseStateConst(a), getSparseStateConst(b));
 
-    const double percentMaxExtent = (maxExtent_ * percentMaxExtentUnderestimate_); // TODO(davetcoleman): cache
-    double popularityComponent = percentMaxExtent * (vertexPopularity_[a] / 100.0);
+    if (false) // method 1
+    {
+        const double percentMaxExtent = (maxExtent_ * percentMaxExtentUnderestimate_); // TODO(davetcoleman): cache
+        double popularityComponent = percentMaxExtent * (vertexPopularity_[a] / 100.0);
 
-    std::cout << "astarHeuristic - dist: " << std::setprecision(4) << dist
-              << ", popularity: " << vertexPopularity_[a]
-              << ", max extent: " << maxExtent_ << ", percentMaxExtent: " << percentMaxExtent
-              << ", popularityComponent: " << popularityComponent;
+        std::cout << "astarHeuristic - dist: " << std::setprecision(4) << dist
+                  << ", popularity: " << vertexPopularity_[a]
+                  << ", max extent: " << maxExtent_ << ", percentMaxExtent: " << percentMaxExtent
+                  << ", popularityComponent: " << popularityComponent;
+        dist = std::max(0.0, dist - popularityComponent);
+    }
+    else if (false) // method 2
+    {
+        const double percentDist = (dist * percentMaxExtentUnderestimate_); // TODO(davetcoleman): cache
+        double popularityComponent = percentDist * (vertexPopularity_[a] / 100.0);
 
-    dist = std::max(0.0, dist - popularityComponent);
+        std::cout << "astarHeuristic - dist: " << std::setprecision(4) << dist
+                  << ", popularity: " << vertexPopularity_[a]
+                  << ", percentDist: " << percentDist
+                  << ", popularityComponent: " << popularityComponent;
+        dist = std::max(0.0, dist - popularityComponent);
+    }
+    else if (false) // method 3
+    {
+        std::cout << "astarHeuristic - dist: " << std::setprecision(4) << dist
+                  << ", popularity: " << vertexPopularity_[a]
+                  << ", vertexPopularity_[a] / 100.0: " << vertexPopularity_[a] / 100.0
+                  << ", percentMaxExtentUnderestimate_: " << percentMaxExtentUnderestimate_;
+        //if ((vertexPopularity_[a] / 100.0) < (1 - percentMaxExtentUnderestimate_))
+        if (vertexPopularity_[a] > (100 - percentMaxExtentUnderestimate_ * 100.0))
+        {
+            dist = 0;
+        }
 
-    std::cout << ", new distance: " << dist << std::endl;
+        //dist = std::max(0.0, dist - popularityComponent);
+    }
+    else // method 4
+    {
+        dist *= (1 + percentMaxExtentUnderestimate_);
+    }
+    // method 5: increasing the sparseDelta fraction
+
+    //std::cout << ", new distance: " << dist << std::endl;
 
     return dist;
 }
@@ -568,8 +600,8 @@ void SparseDB::createSPARS()
     std::cout << std::endl;
 
     // Temp TODO(davetcoleman): remove
-    std::cout << "temp display database " << std::endl;
-    displayDatabase();
+    //std::cout << "temp display database " << std::endl;
+    //displayDatabase();
 }
 
 void SparseDB::getVertexInsertionOrdering(std::vector<WeightedVertex> &vertexInsertionOrder)
