@@ -380,11 +380,12 @@ class SparseDB
     /** \brief Cache the maximum extent for later re-use */
     double maxExtent_;
 
-    // Statistics
+  public:
+
+    /** \brief Astar statistics */
     std::size_t numNodesOpened_;
     std::size_t numNodesClosed_;
 
-  public:
     /** \brief SPARS parameter for dense graph connection distance as a fraction of max. extent */
     double denseDeltaFraction_;
 
