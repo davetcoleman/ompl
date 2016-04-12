@@ -182,8 +182,8 @@ SparseDB::SparseDB(base::SpaceInformationPtr si, DenseDB *denseDB, base::Visuali
   // Sparse properites
   , denseDeltaFraction_(.05)
   , sparseDeltaFraction_(.25)
-  , percentMaxExtentUnderestimate_(0.01)
   , stretchFactor_(3.)
+  , percentMaxExtentUnderestimate_(0.01)
   // Visualization settings
   , checksVerbose_(false)
   , disjointVerbose_(true)
@@ -496,7 +496,7 @@ void SparseDB::createSPARS()
 
             // Run SPARS checks
             GuardType addReason;            // returns why the state was added
-            SparseVertex newVertex = NULL;  // the newly generated sparse vertex
+            SparseVertex newVertex = 0;  // the newly generated sparse vertex
             if (!addStateToRoadmap(vertexInsertionOrder[i].v_, newVertex, addReason))
             {
                 // std::cout << "Failed AGAIN to add state to roadmap------" << std::endl;

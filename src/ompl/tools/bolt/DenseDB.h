@@ -43,8 +43,8 @@
 #include <ompl/base/StateSpace.h>
 #include <ompl/geometric/PathGeometric.h>
 #include <ompl/base/Planner.h>
-#include <ompl/base/PlannerData.h>
-#include <ompl/base/PlannerDataStorage.h>
+//#include <ompl/base/PlannerData.h>
+//#include <ompl/base/PlannerDataStorage.h>
 #include <ompl/datastructures/NearestNeighbors.h>
 #include <ompl/tools/bolt/Visualizer.h>
 #include <ompl/tools/bolt/SparseDB.h>
@@ -53,6 +53,9 @@
 // Boost
 #include <boost/function.hpp>
 #include <boost/thread.hpp>
+
+// this package
+#include <ompl/tools/bolt/BoltStorage.h>
 
 namespace ompl
 {
@@ -79,6 +82,7 @@ class DenseDB
 {
     friend class BoltRetrieveRepair;
     friend class SparseDB;
+    friend class BoltStorage;
 
   public:
     ////////////////////////////////////////////////////////////////////////////////////////
@@ -246,7 +250,7 @@ class DenseDB
      * \brief Get a vector of all the planner datas in the database
      */
     // TODO(davetcoleman): remove the vector of plannerdatas, because really its just one
-    void getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr>& plannerDatas) const;
+    //void getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr>& plannerDatas) const;
 
     /** \brief Print info to screen */
     void debugVertex(const ompl::base::PlannerDataVertex& vertex);
@@ -290,6 +294,12 @@ class DenseDB
     {
         return boost::num_edges(g_);
     }
+
+    /** \brief Hook for adding vertices from BoltStorage */
+    void addVertexFromFile(BoltStorage::PlannerDataVertex *v);
+
+    /** \brief Hook for adding edges from BoltStorage */
+    void addEdgeFromFile(BoltStorage::PlannerDataEdgeData e);
 
     /**
      * \brief Set the sparse graph from file
@@ -358,7 +368,7 @@ class DenseDB
      * \brief Get the sparse graph to save to file
      * \param data - where to convert the data into
      */
-    virtual void getPlannerData(base::PlannerData& data) const;
+    //virtual void getPlannerData(base::PlannerData& data) const;
 
     /** \brief Clear all past edge state information about in collision or not */
     void clearEdgeCollisionStates();
@@ -486,7 +496,7 @@ class DenseDB
     bool graphUnsaved_;
 
     /** \brief Helper class for storing each plannerData instance */
-    ompl::base::PlannerDataStorage plannerDataStorage_;
+    //ompl::base::PlannerDataStorage plannerDataStorage_;
 
     /** \brief Allow the database to save to file (new experiences) */
     bool savingEnabled_;
@@ -508,13 +518,15 @@ class DenseDB
 
     /** \brief Access to the internal base::state at each Vertex */
     boost::property_map<DenseGraph, vertex_state_t>::type stateProperty_;
-    // boost::property_map<DenseGraph, vertex_state3_t>::type state3Property_;
 
     /** \brief Access to the SPARS vertex type for the vertices */
     boost::property_map<DenseGraph, vertex_type_t>::type typeProperty_;
 
     /** \brief Access to the representatives of the Dense vertices */
     boost::property_map<DenseGraph, vertex_sparse_rep_t>::type representativesProperty_;
+
+    /** \brief Loading/unloading utility */
+    BoltStorage storage_;
 
     /** \brief Whether to bias search using popularity of edges */
     bool popularityBiasEnabled_;

@@ -41,7 +41,7 @@
 #include <ompl/base/ScopedState.h>
 #include <ompl/util/Time.h>
 #include <ompl/util/Console.h>
-#include <ompl/base/PlannerDataStorage.h>
+//#include <ompl/base/PlannerDataStorage.h>
 #include <ompl/datastructures/NearestNeighborsGNATNoThreadSafety.h>
 #include <ompl/base/spaces/RealVectorStateSpace.h>  // TODO: remove, this is not space agnostic
 
@@ -154,6 +154,7 @@ otb::DenseDB::DenseDB(base::SpaceInformationPtr si, base::VisualizerPtr visual)
   //, state3Property_(boost::get(vertex_state3_t(), g_))
   , typeProperty_(boost::get(vertex_type_t(), g_))
   , representativesProperty_(boost::get(vertex_sparse_rep_t(), g_))
+  , storage_(si_, this)
   , popularityBiasEnabled_(false)
   , verbose_(true)
   , distanceAcrossCartesian_(0.0)
@@ -237,55 +238,25 @@ bool otb::DenseDB::load(const std::string &fileName)
         return false;
     }
 
-    // Load database from file, track loading time
+    // Benchmark
     time::point start = time::now();
 
+    // Load
     OMPL_INFORM("Loading database from file: %s", fileName.c_str());
+    storage_.load(fileName.c_str());
+    OMPL_INFORM("DenseDB: Loaded planner data with %d vertices, %d edges", getNumVertices(), getNumEdges());
 
-    // Open a binary input stream
-    std::ifstream iStream(fileName.c_str(), std::ios::binary);
-
-    // Get the total number of paths saved
-    double numPaths = 0;
-    iStream >> numPaths;
-
-    // Check that the number of paths makes sense
-    if (numPaths < 0 || numPaths > std::numeric_limits<double>::max())
-    {
-        OMPL_WARN("Number of paths to load %d is a bad value", numPaths);
-        return false;
-    }
-
-    if (numPaths > 1)
-    {
-        OMPL_ERROR("Currently more than one planner data is disabled from loading");
-        return false;
-    }
-
-    // Create a new planner data instance
-    ompl::base::PlannerDataPtr plannerData(new ompl::base::PlannerData(si_));
-
-    // Note: the StateStorage class checks if the states match for us
-    plannerDataStorage_.load(iStream, *plannerData.get());
-
-    OMPL_INFORM("DenseDB: Loaded planner data with %d vertices, %d edges", plannerData->numVertices(),
-                plannerData->numEdges());
-
-    if (!plannerData->numVertices() || !plannerData->numEdges())
+    // Error check
+    if (!getNumVertices() || !getNumEdges())
     {
         OMPL_ERROR("Corrupted planner data loaded, skipping building graph");
         return false;
     }
 
-    // Add to db
-    OMPL_INFORM("Adding plannerData to database.");
-    loadFromPlannerData(*plannerData);
-
-    // Close file
-    iStream.close();
-
+    // Benchmark
     double loadTime = time::seconds(time::now() - start);
     OMPL_INFORM("Loading from file took %f sec", loadTime);
+
     return true;
 }
 
@@ -362,7 +333,8 @@ bool otb::DenseDB::postProcessPath(og::PathGeometric &solutionPath)
 }
 
 bool otb::DenseDB::postProcessPathWithNeighbors(og::PathGeometric &solutionPath,
-    const std::vector<DenseVertex> &visibleNeighborhood, bool recurseVerbose, std::vector<DenseVertex> &roadmapPath)
+                                                const std::vector<DenseVertex> &visibleNeighborhood,
+                                                bool recurseVerbose, std::vector<DenseVertex> &roadmapPath)
 {
     std::size_t currVertexIndex = 1;
 
@@ -385,13 +357,14 @@ bool otb::DenseDB::postProcessPathWithNeighbors(og::PathGeometric &solutionPath,
 
         // Start recursive function
         allValid = true;
-        if (!recurseSnapWaypoints(solutionPath, roadmapPath, currVertexIndex, prevGraphVertex, allValid, recurseVerbose))
+        if (!recurseSnapWaypoints(solutionPath, roadmapPath, currVertexIndex, prevGraphVertex, allValid,
+                                  recurseVerbose))
         {
             std::cout << "Failed to find path with starting state neighbor " << i << std::endl;
         }
         else
         {
-            break; // sucess
+            break;  // sucess
         }
 
         if (visualizeSnapPath_)  // Visualize
@@ -421,7 +394,8 @@ bool otb::DenseDB::updateEdgeWeights(const std::vector<DenseVertex> &roadmapPath
             if (visualizeSnapPath_)  // Visualize
             {
                 const double cost = 100;  // red
-                visual_->viz4Edge(stateProperty_[roadmapPath[vertexID-1]], stateProperty_[roadmapPath[vertexID]], cost);
+                visual_->viz4Edge(stateProperty_[roadmapPath[vertexID - 1]], stateProperty_[roadmapPath[vertexID]],
+                                  cost);
                 visual_->viz4Trigger();
                 usleep(visualizeSnapPathSpeed_ * 1000000);
             }
@@ -537,7 +511,7 @@ bool otb::DenseDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vecto
             {
                 if (verbose)
                     std::cout << std::string(currVertexIndex + 2, ' ') << "Found case where double loop fixed the "
-                                                                         "problem - loop " << neighborID << std::endl;
+                                                                          "problem - loop " << neighborID << std::endl;
                 // visual_->viz5Trigger();
                 // usleep(6*1000000);
             }
@@ -596,12 +570,12 @@ bool otb::DenseDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vecto
             if (verbose)
                 std::cout << std::string(currVertexIndex, ' ') << "Loop " << neighborID << " not valid" << std::endl;
         }
-    } // for every neighbor
+    }  // for every neighbor
 
     if (!foundValidConnToPrevious)
     {
         std::cout << std::string(currVertexIndex, ' ') << "Unable to find valid connection to previous, backing up a "
-                                                         "level and trying again" << std::endl;
+                                                          "level and trying again" << std::endl;
         allValid = false;
 
         if (visualizeSnapPath_)  // Visualize
@@ -621,7 +595,7 @@ bool otb::DenseDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vecto
         return false;
     }
     std::cout << std::string(currVertexIndex, ' ') << "This loop found a valid connection, but higher recursive loop "
-                                                     "(one that has already returned) did not" << std::endl;
+                                                      "(one that has already returned) did not" << std::endl;
 
     return false;  // this loop found a valid connection, but lower recursive loop did not
 }
@@ -656,46 +630,20 @@ bool otb::DenseDB::save(const std::string &fileName)
         return false;
     }
 
-    // Save database from file, track saving time
+    OMPL_INFORM("Saving database to file: %s", fileName.c_str());
+    OMPL_INFORM("Saving graph with %d vertices and %d edges", getNumVertices(), getNumEdges());
+
+    // Benchmark
     time::point start = time::now();
 
-    OMPL_INFORM("Saving database to file: %s", fileName.c_str());
-
-    // Open a binary output stream
-    std::ofstream outStream(fileName.c_str(), std::ios::binary);
-
-    // TODO: make this more than 1 planner data perhaps
-    base::PlannerDataPtr data(new base::PlannerData(si_));
-    getPlannerData(*data);
-    OMPL_INFORM("Saving PlannerData with %d vertices %d edges", data->numVertices(), data->numEdges());
-
-    // Write the number of paths we will be saving
-    double numPaths = 1;
-    outStream << numPaths;
-
-    // Start saving each planner data object
-    ompl::base::PlannerData &pd = *data.get();
-    OMPL_INFORM("Saving graph with %d vertices and %d edges", pd.numVertices(), pd.numEdges());
-
-    if (false)  // Debug
-        for (std::size_t i = 0; i < pd.numVertices(); ++i)
-        {
-            OMPL_INFORM("Vertex %d:", i);
-            debugVertex(pd.getVertex(i));
-        }
-
-    // Save a single planner data
-    plannerDataStorage_.store(pd, outStream);
-
-    // Close file
-    outStream.close();
+    // Save
+    storage_.store(fileName.c_str());
 
     // Benchmark
     double loadTime = time::seconds(time::now() - start);
     OMPL_INFORM("Saved database to file in %f sec", loadTime);
 
     graphUnsaved_ = false;
-
     return true;
 }
 
@@ -830,12 +778,12 @@ void otb::DenseDB::computeDensePath(const DenseVertex start, const DenseVertex g
     }
 }
 
-void otb::DenseDB::getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const
-{
-    base::PlannerDataPtr data(new base::PlannerData(si_));
-    getPlannerData(*data);
-    plannerDatas.push_back(data);  // TODO(davetcoleman): don't make second copy of this?
-}
+// void otb::DenseDB::getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const
+// {
+//     base::PlannerDataPtr data(new base::PlannerData(si_));
+//     getPlannerData(*data);
+//     plannerDatas.push_back(data);  // TODO(davetcoleman): don't make second copy of this?
+// }
 
 void otb::DenseDB::debugVertex(const ompl::base::PlannerDataVertex &vertex)
 {
@@ -992,6 +940,7 @@ void otb::DenseDB::initializeQueryState()
     }
 }
 
+/*
 void otb::DenseDB::getPlannerData(base::PlannerData &data) const
 {
     // If there are even edges here
@@ -1024,86 +973,40 @@ void otb::DenseDB::getPlannerData(base::PlannerData &data) const
 
     // data.properties["iterations INTEGER"] = boost::lexical_cast<std::string>(iterations_);
 }
+*/
 
-void otb::DenseDB::loadFromPlannerData(const base::PlannerData &data)
+void otb::DenseDB::addVertexFromFile(BoltStorage::PlannerDataVertex *v)
 {
-    // Add all vertices
-    OMPL_INFORM("  Loading %u vertices into DenseDB", data.numVertices());
+    GuardType type = static_cast<GuardType>(v->getTag());
+    //addVertex(const_cast<BoltStorage::PlannerDataVertex *>(v)->state_, type);
 
-    std::vector<DenseVertex> idToVertex;
+    std::cout << "addVertexFromFile: " << std::endl;
+    debugState(v->state_);
 
-    // Temp disable verbose mode for loading database
-    bool wasVerbose = verbose_;
-    verbose_ = false;
-    std::size_t debugFrequency = data.numVertices() / 10;
+    visual_->viz1State(v->state_, /*mode=*/6, 1);
+    visual_->viz1Trigger();
+    usleep(0.01*1000000);
 
-    // Add the nodes to the graph
-    std::cout << "Vertices loaded: " << std::flush;
-    for (std::size_t vertexID = 0; vertexID < data.numVertices(); ++vertexID)
-    {
-        if ((vertexID + 1) % debugFrequency == 0)
-            std::cout << std::fixed << std::setprecision(0) << (vertexID / double(data.numVertices())) * 100.0 << "% "
-                      << std::flush;
+    DenseVertex vNew = addVertex(v->state_, type);
+    std::cout << "vNew: " << vNew << std::endl;
+}
 
-        // Get the state from loaded planner data
-        const base::State *oldState = data.getVertex(vertexID).getState();
-        base::State *state = si_->cloneState(oldState);
+void otb::DenseDB::addEdgeFromFile(BoltStorage::PlannerDataEdgeData e)
+{
+    // Note: we increment all vertex indexes by 1 because the queryVertex_ is vertex id 0
+    static const std::size_t INCREMENT_VERTEX_COUNT = 1;
 
-        // Get the tag, which in this application represents the vertex type
-        GuardType type = static_cast<GuardType>(data.getVertex(vertexID).getTag());
+    DenseVertex v1 = e.endpoints_.first + INCREMENT_VERTEX_COUNT;
+    DenseVertex v2 = e.endpoints_.second + INCREMENT_VERTEX_COUNT;
 
-        // ADD GUARD
-        idToVertex.push_back(addVertex(state, type));
-    }
-    std::cout << std::endl;
+    std::cout << "addEdgeFromFile " << v1 << ", " << v2 << " weight " << e.weight_ << std::endl;
 
-    OMPL_INFORM("  Loading %u edges into DenseDB", data.numEdges());
-    // Add the corresponding edges to the graph
-    std::vector<unsigned int> edgeList;
-    std::cout << "Edges loaded: " << std::flush;
-    for (unsigned int fromVertex = 0; fromVertex < data.numVertices(); ++fromVertex)
-    {
-        if ((fromVertex + 1) % debugFrequency == 0)
-            std::cout << std::fixed << std::setprecision(0) << fromVertex / double(data.numVertices()) * 100.0 << "% "
-                      << std::flush;
+    DenseEdge newE = addEdge(v1, v2, e.weight_);
 
-        edgeList.clear();
-
-        // Get the edges
-        data.getEdges(fromVertex, edgeList);  // returns the id of each edge
-
-        DenseVertex v1 = idToVertex[fromVertex];
-
-        // Process edges
-        for (std::size_t edgeId = 0; edgeId < edgeList.size(); ++edgeId)
-        {
-            unsigned int toVertex = edgeList[edgeId];
-            DenseVertex v2 = idToVertex[toVertex];
-
-            // Add the edge to the graph
-            if (verbose_ && false)
-            {
-                OMPL_INFORM("    Adding edge from vertex id %d to id %d into edgeList", fromVertex, toVertex);
-                OMPL_INFORM("      Vertex %d to %d", v1, v2);
-            }
-
-            base::Cost weight;
-            if (!data.getEdgeWeight(fromVertex, toVertex, &weight))
-            {
-                OMPL_ERROR("Unable to get edge weight");
-            }
-
-            addEdge(v1, v2, weight.value());
-        }
-    }  // for
-    std::cout << std::endl;
-    OMPL_INFORM("  Finished loading %u edges", getNumEdges());
-
-    // OMPL_WARN("temp save when load graph from file");
-    // graphUnsaved_ = true;
-
-    // Re-enable verbose mode, if necessary
-    verbose_ = wasVerbose;
+    // Visualize
+    viz1Edge(newE);
+    visual_->viz1Trigger();
+    usleep(0.01*1000000);
 }
 
 void otb::DenseDB::generateGrid()
@@ -1991,7 +1894,7 @@ void otb::DenseDB::findGraphNeighbors(const DenseVertex &denseV, std::vector<Den
     findGraphNeighbors(stateProperty_[denseV], graphNeighborhood, visibleNeighborhood, searchRadius, coutIndent);
 }
 
-void otb::DenseDB::findGraphNeighbors(base::State* state, std::vector<DenseVertex> &graphNeighborhood,
+void otb::DenseDB::findGraphNeighbors(base::State *state, std::vector<DenseVertex> &graphNeighborhood,
                                       std::vector<DenseVertex> &visibleNeighborhood, double searchRadius,
                                       std::size_t coutIndent)
 {
