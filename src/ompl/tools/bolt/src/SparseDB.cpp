@@ -512,8 +512,9 @@ void SparseDB::createSPARS()
                 // If a new vertex was created, update its popularity property
                 if (newVertex)  // value is not null, so it was created
                 {
-                    std::cout << "SETTING POPULARITY of vertex " << newVertex << " to value "
-                              << vertexInsertionOrder[i].weight_ << std::endl;
+                    //std::cout << "SETTING POPULARITY of vertex " << newVertex << " to value "
+                    //<< vertexInsertionOrder[i].weight_ << std::endl;
+
                     // Update popularity
                     vertexPopularity_[newVertex] = vertexInsertionOrder[i].weight_;
                 }

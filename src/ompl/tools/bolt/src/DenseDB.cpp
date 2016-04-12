@@ -154,7 +154,6 @@ otb::DenseDB::DenseDB(base::SpaceInformationPtr si, base::VisualizerPtr visual)
   //, state3Property_(boost::get(vertex_state3_t(), g_))
   , typeProperty_(boost::get(vertex_type_t(), g_))
   , representativesProperty_(boost::get(vertex_sparse_rep_t(), g_))
-  , storage_(si_, this)
   , popularityBiasEnabled_(false)
   , verbose_(true)
   , distanceAcrossCartesian_(0.0)
@@ -185,7 +184,7 @@ otb::DenseDB::DenseDB(base::SpaceInformationPtr si, base::VisualizerPtr visual)
 otb::DenseDB::~DenseDB(void)
 {
     if (graphUnsaved_)
-        OMPL_WARN("The database is being unloaded with unsaved experiences");
+        std::cout << "The database is being unloaded with unsaved experiences" << std::endl;
     freeMemory();
 }
 
@@ -193,12 +192,11 @@ void otb::DenseDB::freeMemory()
 {
     foreach (DenseVertex v, boost::vertices(g_))
     {
-        // foreach (InterfaceData &d, interfaceDataProperty_[v].interfaceHash | boost::adaptors::map_values)
-        // d.clear(si_);
         if (stateProperty_[v] != NULL)
             si_->freeState(stateProperty_[v]);
         stateProperty_[v] = NULL;  // TODO(davetcoleman): is this needed??
     }
+
     g_.clear();
 
     if (nn_)
@@ -243,8 +241,14 @@ bool otb::DenseDB::load(const std::string &fileName)
 
     // Load
     OMPL_INFORM("Loading database from file: %s", fileName.c_str());
+
+    BoltStorage storage_(si_, this);
     storage_.load(fileName.c_str());
     OMPL_INFORM("DenseDB: Loaded planner data with %d vertices, %d edges", getNumVertices(), getNumEdges());
+
+    // Visualize
+    visual_->viz1Trigger();
+    usleep(0.1*1000000);
 
     // Error check
     if (!getNumVertices() || !getNumEdges())
@@ -630,14 +634,14 @@ bool otb::DenseDB::save(const std::string &fileName)
         return false;
     }
 
-    OMPL_INFORM("Saving database to file: %s", fileName.c_str());
-    OMPL_INFORM("Saving graph with %d vertices and %d edges", getNumVertices(), getNumEdges());
+    OMPL_INFORM("Saving graph with %d vertices and %d edges to file: %s", getNumVertices(), getNumEdges(), fileName.c_str());
 
     // Benchmark
     time::point start = time::now();
 
     // Save
-    storage_.store(fileName.c_str());
+    BoltStorage storage_(si_, this);
+    storage_.save(fileName.c_str());
 
     // Benchmark
     double loadTime = time::seconds(time::now() - start);
@@ -975,38 +979,24 @@ void otb::DenseDB::getPlannerData(base::PlannerData &data) const
 }
 */
 
-void otb::DenseDB::addVertexFromFile(BoltStorage::PlannerDataVertex *v)
+void otb::DenseDB::addVertexFromFile(BoltStorage::BoltVertexData v)
 {
-    GuardType type = static_cast<GuardType>(v->getTag());
-    //addVertex(const_cast<BoltStorage::PlannerDataVertex *>(v)->state_, type);
-
-    std::cout << "addVertexFromFile: " << std::endl;
-    debugState(v->state_);
-
-    visual_->viz1State(v->state_, /*mode=*/6, 1);
-    visual_->viz1Trigger();
-    usleep(0.01*1000000);
-
-    DenseVertex vNew = addVertex(v->state_, type);
-    std::cout << "vNew: " << vNew << std::endl;
+    GuardType type = static_cast<GuardType>(v.type_);
+    DenseVertex vNew = addVertex(v.state_, type);
 }
 
-void otb::DenseDB::addEdgeFromFile(BoltStorage::PlannerDataEdgeData e)
+void otb::DenseDB::addEdgeFromFile(BoltStorage::BoltEdgeData e)
 {
     // Note: we increment all vertex indexes by 1 because the queryVertex_ is vertex id 0
-    static const std::size_t INCREMENT_VERTEX_COUNT = 1;
+    const DenseVertex v1 = e.endpoints_.first + INCREMENT_VERTEX_COUNT;
+    const DenseVertex v2 = e.endpoints_.second + INCREMENT_VERTEX_COUNT;
 
-    DenseVertex v1 = e.endpoints_.first + INCREMENT_VERTEX_COUNT;
-    DenseVertex v2 = e.endpoints_.second + INCREMENT_VERTEX_COUNT;
+    // Error check
+    BOOST_ASSERT_MSG(v1 <= getNumVertices(), "Vertex 1 out of range of possible verticies");
+    BOOST_ASSERT_MSG(v2 <= getNumVertices(), "Vertex 2 out of range of possible verticies");
 
-    std::cout << "addEdgeFromFile " << v1 << ", " << v2 << " weight " << e.weight_ << std::endl;
-
+    // Add edge
     DenseEdge newE = addEdge(v1, v2, e.weight_);
-
-    // Visualize
-    viz1Edge(newE);
-    visual_->viz1Trigger();
-    usleep(0.01*1000000);
 }
 
 void otb::DenseDB::generateGrid()
@@ -1709,8 +1699,8 @@ otb::DenseVertex otb::DenseDB::addVertex(base::State *state, const GuardType &ty
 otb::DenseEdge otb::DenseDB::addEdge(const DenseVertex &v1, const DenseVertex &v2, const double weight)
 {
     // Error check
-    assert(v2 <= getNumVertices());
-    assert(v1 <= getNumVertices());
+    BOOST_ASSERT_MSG(v1 <= getNumVertices(), "Vertex 1 out of range of possible verticies");
+    BOOST_ASSERT_MSG(v2 <= getNumVertices(), "Vertex 2 out of range of possible verticies");
 
     // Create the new edge
     DenseEdge e = (boost::add_edge(v1, v2, g_)).first;
