@@ -343,7 +343,7 @@ std::size_t Bolt::getExperiencesCount() const
 
 void Bolt::getAllPlannerDatas(std::vector<ob::PlannerDataPtr> &plannerDatas) const
 {
-    denseDB_->getAllPlannerDatas(plannerDatas);
+    //denseDB_->getAllPlannerDatas(plannerDatas);
 }
 
 void Bolt::convertPlannerData(const ob::PlannerDataPtr plannerData, og::PathGeometric &path)
