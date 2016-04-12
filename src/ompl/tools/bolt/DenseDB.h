@@ -296,10 +296,11 @@ class DenseDB
     }
 
     /** \brief Hook for adding vertices from BoltStorage */
-    void addVertexFromFile(BoltStorage::PlannerDataVertex *v);
+    //void addVertexFromFile(BoltStorage::PlannerDataVertex *v);
+    void addVertexFromFile(BoltStorage::BoltVertexData v);
 
     /** \brief Hook for adding edges from BoltStorage */
-    void addEdgeFromFile(BoltStorage::PlannerDataEdgeData e);
+    void addEdgeFromFile(BoltStorage::BoltEdgeData e);
 
     /**
      * \brief Set the sparse graph from file
@@ -526,7 +527,7 @@ class DenseDB
     boost::property_map<DenseGraph, vertex_sparse_rep_t>::type representativesProperty_;
 
     /** \brief Loading/unloading utility */
-    BoltStorage storage_;
+    //BoltStorage storage_;
 
     /** \brief Whether to bias search using popularity of edges */
     bool popularityBiasEnabled_;

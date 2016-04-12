@@ -76,129 +76,17 @@ OMPL_CLASS_FORWARD(DenseDB);
 
 static const boost::uint32_t OMPL_PLANNER_DATA_ARCHIVE_MARKER = 0x5044414D;  // this spells PDAM
 
+// Note: we increment all vertex indexes by 1 because the queryVertex_ is vertex id 0
+static const std::size_t INCREMENT_VERTEX_COUNT = 1;
+
 class BoltStorage
 {
   public:
-    /// \brief Base class for a vertex in the PlannerData structure.  All
-    /// derived classes must implement the clone and equivalence operators.
-    /// It is assumed that each vertex in the PlannerData structure is
-    /// unique (i.e. no duplicates allowed).
-    class PlannerDataVertex
-    {
-      public:
-        /// \brief Constructor.  Takes a state pointer and an optional integer tag.
-        PlannerDataVertex(base::State *st, int tag = 0) : state_(st), tag_(tag)
-        {
-        }
-        /// \brief Copy constructor.
-        PlannerDataVertex(const PlannerDataVertex &rhs) : state_(rhs.state_), tag_(rhs.tag_)
-        {
-        }
-        virtual ~PlannerDataVertex()
-        {
-        }
 
-        /// \brief Returns the integer tag associated with this vertex.
-        virtual int getTag() const
-        {
-            return tag_;
-        }
-        /// \brief Set the integer tag associated with this vertex.
-        virtual void setTag(int tag)
-        {
-            tag_ = tag;
-        }
-        /// \brief Retrieve the state associated with this vertex.
-        virtual base::State *getState()
-        {
-            return state_;
-        }
-
-        // /// \brief Return a clone of this object, allocated from the heap.
-        // virtual PlannerDataVertex *clone() const
-        // {
-        //     return new PlannerDataVertex(*this);
-        // }
-
-        // /// \brief Equivalence operator.  Return true if the state pointers are equal.
-        // virtual bool operator==(const PlannerDataVertex &rhs) const
-        // {
-        //     // States should be unique
-        //     return state_ == rhs.state_;
-        // }
-
-        // /// \brief Returns true if this vertex is not equal to the argument.
-        // /// This is the complement of the == operator.
-        // bool operator!=(const PlannerDataVertex &rhs) const
-        // {
-        //     return !(*this == rhs);
-        // }
-
-      protected:
-        PlannerDataVertex()
-        {
-        }
-
-        friend class boost::serialization::access;
-        template <class Archive>
-        void serialize(Archive &ar, const unsigned int /*version*/)
-        {
-            ar &tag_;
-            // Serialization of the state pointer is handled by PlannerDataStorage
-        }
-
-        /// \brief The state represented by this vertex
-        base::State *state_;
-        /// \brief A generic integer tag for this state.  Not used for equivalence checking.
-        int tag_;
-
-        // friend class PlannerData;
-        // friend class PlannerDataStorage;
-        friend class BoltStorage;
-        friend class DenseDB;
-    };
-
-    /// \brief Base class for a PlannerData edge.
-    class PlannerDataEdge
-    {
-      public:
-        PlannerDataEdge()
-        {
-        }
-        virtual ~PlannerDataEdge()
-        {
-        }
-        // /// \brief Return a clone of this object, allocated from the heap.
-        // virtual PlannerDataEdge *clone() const
-        // {
-        //     return new PlannerDataEdge();
-        // }
-
-        // /// \brief Returns true if the edges point to the same memory
-        // virtual bool operator==(const PlannerDataEdge &rhs) const
-        // {
-        //     return this == &rhs;
-        // }
-
-        // /// \brief Returns true if the edges do not point to the same memory.
-        // /// This is the complement of the == operator.
-        // bool operator!=(const PlannerDataEdge &rhs) const
-        // {
-        //     return !(*this == rhs);
-        // }
-
-      protected:
-        friend class boost::serialization::access;
-        template <class Archive>
-        void serialize(Archive & /*ar*/, const unsigned int /*version*/)
-        {
-        }
-    };
-
-    /// \brief Information stored at the beginning of the PlannerData archive
+    /// \brief Information stored at the beginning of the BoltStorage archive
     struct Header
     {
-        /// \brief OMPL PlannerData specific marker (fixed value)
+        /// \brief OMPL specific marker (fixed value)
         boost::uint32_t marker;
 
         /// \brief Number of vertices stored in the archive
@@ -223,40 +111,33 @@ class BoltStorage
     };
 
     /// \brief The object containing all vertex data that will be stored
-    struct PlannerDataVertexData
+    struct BoltVertexData
     {
-        enum VertexType
-        {
-            STANDARD = 0,
-            START,
-            GOAL
-        };
-
         template <typename Archive>
         void serialize(Archive &ar, const unsigned int /*version*/)
         {
-            ar &v_;
-            ar &state_;
+            //ar &v_;
+            ar &stateSerialized_;
             ar &type_;
         }
 
-        PlannerDataVertex *v_;
-        std::vector<unsigned char> state_;
-        VertexType type_;
+        /// \brief The state represented by this vertex
+        base::State *state_;
+
+        std::vector<unsigned char> stateSerialized_;
+        int type_;
     };
 
     /// \brief The object containing all edge data that will be stored
-    struct PlannerDataEdgeData
+    struct BoltEdgeData
     {
         template <typename Archive>
         void serialize(Archive &ar, const unsigned int /*version*/)
         {
-            ar &e_;
             ar &endpoints_;
             ar &weight_;
         }
 
-        const PlannerDataEdge *e_;
         std::pair<unsigned int, unsigned int> endpoints_;
         double weight_;
     };
@@ -264,24 +145,24 @@ class BoltStorage
     /** \brief Constructor */
     BoltStorage(const base::SpaceInformationPtr &si, DenseDB *denseDB);
 
-    void store(const char *filename);
+    void save(const char *filename);
 
-    void store(std::ostream &out);
+    void save(std::ostream &out);
 
-    /// \brief Serialize and store all vertices in \e pd to the binary archive.
-    void storeVertices(boost::archive::binary_oarchive &oa);
+    /// \brief Serialize and save all vertices in \e pd to the binary archive.
+    void saveVertices(boost::archive::binary_oarchive &oa);
 
     /// \brief Serialize and store all edges in \e pd to the binary archive.
-    void storeEdges(boost::archive::binary_oarchive &oa);
+    void saveEdges(boost::archive::binary_oarchive &oa);
 
     void load(const char *filename);
 
     void load(std::istream &in);
 
-    /// \brief Read \e numVertices from the binary input \e ia and store them as PlannerData.
+    /// \brief Read \e numVertices from the binary input \e ia and store them as BoltStorage
     void loadVertices(unsigned int numVertices, boost::archive::binary_iarchive &ia);
 
-    /// \brief Read \e numEdges from the binary input \e ia and store them as PlannerData.
+    /// \brief Read \e numEdges from the binary input \e ia and store them as BoltStorage
     void loadEdges(unsigned int numEdges, boost::archive::binary_iarchive &ia);
 
     /// \brief The space information instance for this data.
