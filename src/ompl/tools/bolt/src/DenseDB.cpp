@@ -167,6 +167,8 @@ otb::DenseDB::DenseDB(base::SpaceInformationPtr si, base::VisualizerPtr visual)
   , visualizeSnapPath_(false)
   , visualizeSnapPathSpeed_(0.001)
   , visualizeAddSample_(false)
+  , visualizeDatabaseVertices_(true)
+  , visualizeDatabaseEdges_(true)
   , visualizeAstarSpeed_(0.1)
   , desiredAverageCost_(90)
 {
@@ -1047,14 +1049,14 @@ void otb::DenseDB::clearEdgeCollisionStates()
         edgeCollisionStateProperty_[e] = NOT_CHECKED;  // each edge has an unknown state
 }
 
-void otb::DenseDB::displayDatabase(bool showVertices)
+void otb::DenseDB::displayDatabase()
 {
     OMPL_INFORM("Displaying database");
 
     // Clear old database
     visual_->viz1State(NULL, /*deleteAllMarkers*/ 0, 0);
 
-    // if (showVertices)
+    if (visualizeDatabaseVertices_)
     {
         // Error check
         if (getNumVertices() == 0)
@@ -1085,7 +1087,8 @@ void otb::DenseDB::displayDatabase(bool showVertices)
         }
         std::cout << std::endl;
     }
-    // else
+
+    if (visualizeDatabaseEdges_)
     {
         // Error check
         if (getNumEdges() == 0)

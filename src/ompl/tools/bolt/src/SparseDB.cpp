@@ -216,6 +216,8 @@ SparseDB::~SparseDB(void)
 
 void SparseDB::freeMemory()
 {
+    // Do not unload any states because they are all owned by the DenseDB
+    /*
     foreach (SparseVertex v, boost::vertices(g_))
     {
         // foreach (InterfaceData &d, interfaceDataProperty_[v].interfaceHash |
@@ -225,6 +227,8 @@ void SparseDB::freeMemory()
             si_->freeState(getSparseState(v));
         // getSparseState(v) = NULL;  // TODO(davetcoleman): is this needed??
     }
+    */
+
     g_.clear();
 
     if (nn_)
@@ -599,10 +603,6 @@ void SparseDB::createSPARS()
 
     OMPL_INFORM("Finished creating sparse database ----------------------");
     std::cout << std::endl;
-
-    // Temp TODO(davetcoleman): remove
-    //std::cout << "temp display database " << std::endl;
-    //displayDatabase();
 }
 
 void SparseDB::getVertexInsertionOrdering(std::vector<WeightedVertex> &vertexInsertionOrder)
