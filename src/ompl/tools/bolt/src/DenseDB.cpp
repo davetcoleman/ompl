@@ -141,7 +141,13 @@ void otb::DenseDB::CustomAstarVisitor::examine_vertex(DenseVertex v, const Dense
 
 // Actual class ////////////////////////////////////////////////////////////////////////////
 
-otb::DenseDB::DenseDB(base::SpaceInformationPtr si, base::VisualizerPtr visual)
+namespace ompl
+{
+namespace tools
+{
+namespace bolt
+{
+DenseDB::DenseDB(base::SpaceInformationPtr si, base::VisualizerPtr visual)
   : si_(si)
   , visual_(visual)
   , graphUnsaved_(false)
@@ -153,6 +159,9 @@ otb::DenseDB::DenseDB(base::SpaceInformationPtr si, base::VisualizerPtr visual)
   //, state3Property_(boost::get(vertex_state3_t(), g_))
   , typeProperty_(boost::get(vertex_type_t(), g_))
   , representativesProperty_(boost::get(vertex_sparse_rep_t(), g_))
+    // Disjoint set accessors
+  , disjointSets_(boost::get(boost::vertex_rank, g_), boost::get(boost::vertex_predecessor, g_))
+    // Settings
   , distanceAcrossCartesian_(0.0)
     // public
   , savingEnabled_(true)
@@ -180,17 +189,17 @@ otb::DenseDB::DenseDB(base::SpaceInformationPtr si, base::VisualizerPtr visual)
 
     // Initialize nearest neighbor datastructure
     nn_.reset(new NearestNeighborsGNATNoThreadSafety<DenseVertex>());
-    nn_->setDistanceFunction(boost::bind(&otb::DenseDB::distanceFunction, this, _1, _2));
+    nn_->setDistanceFunction(boost::bind(&DenseDB::distanceFunction, this, _1, _2));
 }
 
-otb::DenseDB::~DenseDB(void)
+DenseDB::~DenseDB(void)
 {
     if (graphUnsaved_)
         std::cout << "The database is being unloaded with unsaved experiences" << std::endl;
     freeMemory();
 }
 
-void otb::DenseDB::freeMemory()
+void DenseDB::freeMemory()
 {
     foreach (DenseVertex v, boost::vertices(g_))
     {
@@ -207,7 +216,7 @@ void otb::DenseDB::freeMemory()
     sampler_.reset();
 }
 
-bool otb::DenseDB::setup()
+bool DenseDB::setup()
 {
     if (!sampler_)
         sampler_ = si_->allocValidStateSampler();
@@ -217,7 +226,7 @@ bool otb::DenseDB::setup()
     return true;
 }
 
-bool otb::DenseDB::load(const std::string &fileName)
+bool DenseDB::load(const std::string &fileName)
 {
     OMPL_INFORM("DenseDB: load()");
 
@@ -259,6 +268,9 @@ bool otb::DenseDB::load(const std::string &fileName)
         return false;
     }
 
+    // Checks
+    checkConnectedComponents();
+
     // Benchmark
     double loadTime = time::seconds(time::now() - start);
     OMPL_INFORM("Loading from file took %f sec", loadTime);
@@ -266,7 +278,7 @@ bool otb::DenseDB::load(const std::string &fileName)
     return true;
 }
 
-bool otb::DenseDB::postProcessPath(og::PathGeometric &solutionPath)
+bool DenseDB::postProcessPath(og::PathGeometric &solutionPath)
 {
     // Prevent inserting into database
     if (!savingEnabled_)
@@ -338,7 +350,7 @@ bool otb::DenseDB::postProcessPath(og::PathGeometric &solutionPath)
     return true;
 }
 
-bool otb::DenseDB::postProcessPathWithNeighbors(og::PathGeometric &solutionPath,
+bool DenseDB::postProcessPathWithNeighbors(og::PathGeometric &solutionPath,
                                                 const std::vector<DenseVertex> &visibleNeighborhood,
                                                 bool recurseVerbose, std::vector<DenseVertex> &roadmapPath)
 {
@@ -383,7 +395,7 @@ bool otb::DenseDB::postProcessPathWithNeighbors(og::PathGeometric &solutionPath,
     return allValid;
 }
 
-bool otb::DenseDB::updateEdgeWeights(const std::vector<DenseVertex> &roadmapPath)
+bool DenseDB::updateEdgeWeights(const std::vector<DenseVertex> &roadmapPath)
 {
     for (std::size_t vertexID = 1; vertexID < roadmapPath.size(); ++vertexID)
     {
@@ -438,7 +450,7 @@ bool otb::DenseDB::updateEdgeWeights(const std::vector<DenseVertex> &roadmapPath
     return true;
 }
 
-bool otb::DenseDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vector<DenseVertex> &roadmapPath,
+bool DenseDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vector<DenseVertex> &roadmapPath,
                                         std::size_t currVertexIndex, const DenseVertex &prevGraphVertex, bool &allValid,
                                         bool verbose)
 {
@@ -606,7 +618,7 @@ bool otb::DenseDB::recurseSnapWaypoints(og::PathGeometric &inputPath, std::vecto
     return false;  // this loop found a valid connection, but lower recursive loop did not
 }
 
-bool otb::DenseDB::saveIfChanged(const std::string &fileName)
+bool DenseDB::saveIfChanged(const std::string &fileName)
 {
     if (graphUnsaved_)
     {
@@ -617,7 +629,7 @@ bool otb::DenseDB::saveIfChanged(const std::string &fileName)
     return true;
 }
 
-bool otb::DenseDB::save(const std::string &fileName)
+bool DenseDB::save(const std::string &fileName)
 {
     if (!graphUnsaved_)
         OMPL_WARN("No need to save because graphUnsaved_ is false, but saving anyway because requested");
@@ -653,7 +665,7 @@ bool otb::DenseDB::save(const std::string &fileName)
     return true;
 }
 
-bool otb::DenseDB::astarSearch(const DenseVertex start, const DenseVertex goal, std::vector<DenseVertex> &vertexPath)
+bool DenseDB::astarSearch(const DenseVertex start, const DenseVertex goal, std::vector<DenseVertex> &vertexPath)
 {
     // Hold a list of the shortest path parent to each vertex
     DenseVertex *vertexPredecessors = new DenseVertex[getNumVertices()];
@@ -684,9 +696,9 @@ bool otb::DenseDB::astarSearch(const DenseVertex start, const DenseVertex goal, 
         boost::astar_search(
             g_,     // graph
             start,  // start state
-            // boost::bind(&otb::DenseDB::distanceFunction2, this, _1, goal),  // the heuristic
-            // boost::bind(&otb::DenseDB::distanceFunction, this, _1, goal),  // the heuristic
-            boost::bind(&otb::DenseDB::distanceFunctionTasks, this, _1, goal),  // the heuristic
+            // boost::bind(&DenseDB::distanceFunction2, this, _1, goal),  // the heuristic
+            // boost::bind(&DenseDB::distanceFunction, this, _1, goal),  // the heuristic
+            boost::bind(&DenseDB::distanceFunctionTasks, this, _1, goal),  // the heuristic
             // ability to disable edges (set cost to inifinity):
             boost::weight_map(edgeWeightMap(g_, edgeCollisionStateProperty_, popularityBias_, popularityBiasEnabled_))
                 .predecessor_map(vertexPredecessors)
@@ -757,7 +769,7 @@ bool otb::DenseDB::astarSearch(const DenseVertex start, const DenseVertex goal, 
     return foundGoal;
 }
 
-void otb::DenseDB::computeDensePath(const DenseVertex start, const DenseVertex goal, DensePath &path)
+void DenseDB::computeDensePath(const DenseVertex start, const DenseVertex goal, DensePath &path)
 {
     path.clear();
 
@@ -767,7 +779,7 @@ void otb::DenseDB::computeDensePath(const DenseVertex start, const DenseVertex g
     {
         boost::astar_search(g_,                                                                 // graph
                             start,                                                              // start state
-                            boost::bind(&otb::DenseDB::distanceFunctionTasks, this, _1, goal),  // the heuristic
+                            boost::bind(&DenseDB::distanceFunctionTasks, this, _1, goal),  // the heuristic
                             boost::predecessor_map(prev).visitor(CustomAstarVisitor(goal, this)));
     }
     catch (foundGoalException &)
@@ -784,24 +796,24 @@ void otb::DenseDB::computeDensePath(const DenseVertex start, const DenseVertex g
     }
 }
 
-// void otb::DenseDB::getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const
+// void DenseDB::getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const
 // {
 //     base::PlannerDataPtr data(new base::PlannerData(si_));
 //     getPlannerData(*data);
 //     plannerDatas.push_back(data);  // TODO(davetcoleman): don't make second copy of this?
 // }
 
-void otb::DenseDB::debugVertex(const ompl::base::PlannerDataVertex &vertex)
+void DenseDB::debugVertex(const ompl::base::PlannerDataVertex &vertex)
 {
     debugState(vertex.getState());
 }
 
-void otb::DenseDB::debugState(const ompl::base::State *state)
+void DenseDB::debugState(const ompl::base::State *state)
 {
     si_->printState(state, std::cout);
 }
 
-double otb::DenseDB::distanceFunction(const DenseVertex a, const DenseVertex b) const
+double DenseDB::distanceFunction(const DenseVertex a, const DenseVertex b) const
 {
     // const double dist = si_->distance(stateProperty_[a], stateProperty_[b]);
     // std::cout << "getting distance from " << a << " to " << b << " of value " << dist << std::endl;
@@ -809,7 +821,7 @@ double otb::DenseDB::distanceFunction(const DenseVertex a, const DenseVertex b) 
     return si_->distance(stateProperty_[a], stateProperty_[b]);
 }
 
-double otb::DenseDB::distanceFunction2(const DenseVertex a, const DenseVertex b) const
+double DenseDB::distanceFunction2(const DenseVertex a, const DenseVertex b) const
 {
     // const double dist = si_->getStateSpace()->distance2(stateProperty_[a], stateProperty_[b]);
     // std::cout << "getting distance from " << a << " to " << b << " of value " << dist << std::endl;
@@ -817,7 +829,7 @@ double otb::DenseDB::distanceFunction2(const DenseVertex a, const DenseVertex b)
     return si_->getStateSpace()->distance2(stateProperty_[a], stateProperty_[b]);
 }
 
-double otb::DenseDB::distanceFunctionTasks(const DenseVertex a, const DenseVertex b) const
+double DenseDB::distanceFunctionTasks(const DenseVertex a, const DenseVertex b) const
 {
     // Do not use task distance if that mode is not enabled
     if (!useTaskPlanning_)
@@ -927,17 +939,17 @@ double otb::DenseDB::distanceFunctionTasks(const DenseVertex a, const DenseVerte
     return dist;
 }
 
-std::size_t otb::DenseDB::getTaskLevel(const DenseVertex &v) const
+std::size_t DenseDB::getTaskLevel(const DenseVertex &v) const
 {
     return si_->getStateSpace()->getLevel(stateProperty_[v]);
 }
 
-std::size_t otb::DenseDB::getTaskLevel(const base::State *state) const
+std::size_t DenseDB::getTaskLevel(const base::State *state) const
 {
     return si_->getStateSpace()->getLevel(state);
 }
 
-void otb::DenseDB::initializeQueryState()
+void DenseDB::initializeQueryState()
 {
     if (boost::num_vertices(g_) < 1)
     {
@@ -946,14 +958,14 @@ void otb::DenseDB::initializeQueryState()
     }
 }
 
-void otb::DenseDB::addVertexFromFile(BoltStorage::BoltVertexData v)
+void DenseDB::addVertexFromFile(BoltStorage::BoltVertexData v)
 {
     GuardType type = static_cast<GuardType>(v.type_);
     //DenseVertex vNew =
     addVertex(v.state_, type);
 }
 
-void otb::DenseDB::addEdgeFromFile(BoltStorage::BoltEdgeData e)
+void DenseDB::addEdgeFromFile(BoltStorage::BoltEdgeData e)
 {
     // Note: we increment all vertex indexes by 1 because the queryVertex_ is vertex id 0
     const DenseVertex v1 = e.endpoints_.first + INCREMENT_VERTEX_COUNT;
@@ -968,7 +980,7 @@ void otb::DenseDB::addEdgeFromFile(BoltStorage::BoltEdgeData e)
     addEdge(v1, v2, e.weight_);
 }
 
-void otb::DenseDB::generateTaskSpace()
+void DenseDB::generateTaskSpace()
 {
     OMPL_INFORM("Generating task space");
     std::vector<DenseVertex> vertexToNewVertex(getNumVertices());
@@ -1043,13 +1055,13 @@ void otb::DenseDB::generateTaskSpace()
     OMPL_INFORM("Done generating task space graph");
 }
 
-void otb::DenseDB::clearEdgeCollisionStates()
+void DenseDB::clearEdgeCollisionStates()
 {
     foreach (const DenseEdge e, boost::edges(g_))
         edgeCollisionStateProperty_[e] = NOT_CHECKED;  // each edge has an unknown state
 }
 
-void otb::DenseDB::displayDatabase()
+void DenseDB::displayDatabase()
 {
     OMPL_INFORM("Displaying database");
 
@@ -1126,7 +1138,7 @@ void otb::DenseDB::displayDatabase()
     visual_->viz1Trigger();
 }
 
-void otb::DenseDB::normalizeGraphEdgeWeights()
+void DenseDB::normalizeGraphEdgeWeights()
 {
     bool verbose = false;
 
@@ -1172,32 +1184,35 @@ void otb::DenseDB::normalizeGraphEdgeWeights()
     }
 }
 
-otb::DenseVertex otb::DenseDB::addVertex(base::State *state, const GuardType &type)
+otb::DenseVertex DenseDB::addVertex(base::State *state, const GuardType &type)
 {
     // Create vertex
-    DenseVertex v1 = boost::add_vertex(g_);
+    DenseVertex v = boost::add_vertex(g_);
 
     // Add properties
-    typeProperty_[v1] = type;
-    stateProperty_[v1] = state;
-    // state3Property_[v1] = state;
-    representativesProperty_[v1] = 0;
+    typeProperty_[v] = type;
+    stateProperty_[v] = state;
+    // state3Property_[v] = state;
+    representativesProperty_[v] = 0;
+
+    // Connected component tracking
+    disjointSets_.make_set(v);
 
     // Add vertex to nearest neighbor structure
-    nn_->add(v1);
+    nn_->add(v);
 
     // Track vertex for later removal if temporary
     if (type == CARTESIAN)
     {
-        tempVerticies_.push_back(v1);
+        tempVerticies_.push_back(v);
     }
 
     graphUnsaved_ = true;
 
-    return v1;
+    return v;
 }
 
-otb::DenseEdge otb::DenseDB::addEdge(const DenseVertex &v1, const DenseVertex &v2, const double weight)
+otb::DenseEdge DenseDB::addEdge(const DenseVertex &v1, const DenseVertex &v2, const double weight)
 {
     // Error check
     BOOST_ASSERT_MSG(v1 <= getNumVertices(), "Vertex 1 out of range of possible verticies");
@@ -1214,11 +1229,14 @@ otb::DenseEdge otb::DenseDB::addEdge(const DenseVertex &v1, const DenseVertex &v
     // edgeWeightProperty_[e] = distanceFunction(v1, v2);
     edgeCollisionStateProperty_[e] = NOT_CHECKED;
 
+    // Add the edge to the incrementeal connected components datastructure
+    disjointSets_.union_set(v1, v2);
+
     graphUnsaved_ = true;
     return e;
 }
 
-void otb::DenseDB::cleanupTemporaryVerticies()
+void DenseDB::cleanupTemporaryVerticies()
 {
     const bool verbose = false;
 
@@ -1257,7 +1275,7 @@ void otb::DenseDB::cleanupTemporaryVerticies()
     OMPL_INFORM("Finished cleaning up temp verticies");
 }
 
-bool otb::DenseDB::addCartPath(std::vector<base::State *> path)
+bool DenseDB::addCartPath(std::vector<base::State *> path)
 {
     // Error check
     if (path.size() < 2)
@@ -1323,7 +1341,7 @@ bool otb::DenseDB::addCartPath(std::vector<base::State *> path)
     return true;
 }
 
-bool otb::DenseDB::connectStateToNeighborsAtLevel(const DenseVertex &fromVertex, const std::size_t level,
+bool DenseDB::connectStateToNeighborsAtLevel(const DenseVertex &fromVertex, const std::size_t level,
                                                   DenseVertex &minConnectorVertex)
 {
     // Get nearby states to goal
@@ -1379,14 +1397,14 @@ bool otb::DenseDB::connectStateToNeighborsAtLevel(const DenseVertex &fromVertex,
     return true;
 }
 
-void otb::DenseDB::findGraphNeighbors(const DenseVertex &denseV, std::vector<DenseVertex> &graphNeighborhood,
+void DenseDB::findGraphNeighbors(const DenseVertex &denseV, std::vector<DenseVertex> &graphNeighborhood,
                                       std::vector<DenseVertex> &visibleNeighborhood, double searchRadius,
                                       std::size_t coutIndent)
 {
     findGraphNeighbors(stateProperty_[denseV], graphNeighborhood, visibleNeighborhood, searchRadius, coutIndent);
 }
 
-void otb::DenseDB::findGraphNeighbors(base::State *state, std::vector<DenseVertex> &graphNeighborhood,
+void DenseDB::findGraphNeighbors(base::State *state, std::vector<DenseVertex> &graphNeighborhood,
                                       std::vector<DenseVertex> &visibleNeighborhood, double searchRadius,
                                       std::size_t coutIndent)
 {
@@ -1413,7 +1431,7 @@ void otb::DenseDB::findGraphNeighbors(base::State *state, std::vector<DenseVerte
                   << " | Visible neighborhood: " << visibleNeighborhood.size() << std::endl;
 }
 
-void otb::DenseDB::getNeighborsAtLevel(const base::State *origState, const std::size_t level,
+void DenseDB::getNeighborsAtLevel(const base::State *origState, const std::size_t level,
                                        const std::size_t kNeighbors, std::vector<DenseVertex> &neighbors)
 {
     // Clone the state and change its level
@@ -1456,7 +1474,7 @@ void otb::DenseDB::getNeighborsAtLevel(const base::State *origState, const std::
     }
 }
 
-void otb::DenseDB::viz1Edge(DenseEdge &e)
+void DenseDB::viz1Edge(DenseEdge &e)
 {
     const DenseVertex &v1 = boost::source(e, g_);
     const DenseVertex &v2 = boost::target(e, g_);
@@ -1465,7 +1483,7 @@ void otb::DenseDB::viz1Edge(DenseEdge &e)
     visual_->viz1Edge(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
 }
 
-bool otb::DenseDB::checkTaskPathSolution(og::PathGeometric &path, ob::State *start, ob::State *goal)
+bool DenseDB::checkTaskPathSolution(og::PathGeometric &path, ob::State *start, ob::State *goal)
 {
     bool error = false;
     int current_level = 0;
@@ -1530,7 +1548,7 @@ bool otb::DenseDB::checkTaskPathSolution(og::PathGeometric &path, ob::State *sta
     return error;
 }
 
-void otb::DenseDB::checkStateType()
+void DenseDB::checkStateType()
 {
     std::size_t count = 0;
     foreach (const DenseVertex v, boost::vertices(g_))
@@ -1555,7 +1573,7 @@ void otb::DenseDB::checkStateType()
     OMPL_INFORM("All states checked for task level");
 }
 
-void otb::DenseDB::connectNewVertex(DenseVertex v1)
+void DenseDB::connectNewVertex(DenseVertex v1)
 {
     bool verbose = false;
 
@@ -1635,3 +1653,38 @@ void otb::DenseDB::connectNewVertex(DenseVertex v1)
     // Record this new addition
     graphUnsaved_ = true;
 }
+
+std::size_t DenseDB::getDisjointSetsCount(bool verbose)
+{
+    std::size_t numSets = 0;
+    foreach (DenseVertex v, boost::vertices(g_))
+    {
+        // Do not count the search vertex within the sets
+        if (v == queryVertex_)
+            continue;
+
+        if (boost::get(boost::get(boost::vertex_predecessor, g_), v) == v)
+        {
+            if (verbose)
+                OMPL_INFORM("Disjoint set: %u", v);
+            ++numSets;
+        }
+    }
+    return numSets;
+}
+
+bool DenseDB::checkConnectedComponents()
+{
+    // Check how many disjoint sets are in the dense graph (should be none)
+    std::size_t numSets = getDisjointSetsCount();
+    if (numSets > 1)
+    {
+        OMPL_ERROR("More than 1 connected component is in the dense graph: %u", numSets);
+    }
+    else
+        OMPL_INFORM("Number of connected components %u", numSets);
+}
+
+}  // namespace bolt
+}  // namespace tools
+}  // namespace ompl

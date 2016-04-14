@@ -178,8 +178,8 @@ struct InterfaceHashStruct
 
    *Properties of vertices*
    - vertex_dense_pointer_t: a reference back to the dense graph where the original state is stored
-   - vertex_predecessor_t: The incremental connected components algorithm requires it
-   - vertex_rank_t: The incremental connected components algorithm requires it
+   - vertex_predecessor_t: Requred by incremental connected components algorithm (disjoint sets)
+   - vertex_rank_t: Requred by incremental connected components algorithm (disjoint sets)
    - vertex_type_t: The type of guard this node is
    - vertex_list_t: non interface list property?
 
@@ -263,9 +263,10 @@ typedef boost::property_map<SparseGraph, edge_collision_state_t>::type SparseEdg
 // clang-format off
 typedef boost::property<vertex_state_t, base::State *,
         boost::property<boost::vertex_predecessor_t, VertexIndexType,
+        boost::property<boost::vertex_rank_t, VertexIndexType,
         boost::property<vertex_sparse_rep_t, SparseVertex, // Currently unused
         boost::property<boost::vertex_rank_t, VertexIndexType,
-        boost::property<vertex_type_t, GuardType> > > > > DenseVertexProperties;
+        boost::property<vertex_type_t, GuardType> > > > > > DenseVertexProperties;
 // clang-format on
 
 /** Wrapper for the double assigned to an edge as its weight property. */
