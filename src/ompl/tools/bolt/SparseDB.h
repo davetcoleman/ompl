@@ -311,9 +311,9 @@ class SparseDB
 
   public:
     /** \brief Shortcut function for getting the state of a vertex */
-    inline base::State*& getSparseState(const SparseVertex& v);
-    inline const base::State* getSparseStateConst(const SparseVertex& v) const;
-    inline base::State*& getDenseState(const DenseVertex& denseV);
+    base::State*& getSparseState(const SparseVertex& v);
+    const base::State* getSparseStateConst(const SparseVertex& v) const;
+    base::State*& getDenseState(const DenseVertex& denseV);
 
   protected:
     /** \brief The created space information */

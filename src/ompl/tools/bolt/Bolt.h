@@ -42,6 +42,7 @@
 
 #include <ompl/tools/bolt/DenseDB.h>
 #include <ompl/tools/bolt/Visualizer.h>
+#include <ompl/tools/bolt/Discretizer.h>
 #include <ompl/geometric/planners/experience/BoltRetrieveRepair.h>
 
 #include <ompl/base/Planner.h>
@@ -68,12 +69,6 @@ namespace bolt
    @par Short description
    Bolt is an experience-based planning framework that learns to reduce computation time
    required to solve high-dimensional planning problems in varying environments.
-   @par External documentation
-   Berenson, Dmitry, Pieter Abbeel, and Ken Goldberg: A robot path planning framework that learns from experience, in
-   <em>Robotics and Automation (ICRA), 2012 IEEE International Conference on. IEEE</em>, 2012.
-   David Coleman, Ioan A. Sucan, Mark Moll, Kei Okada, Nikolaus Correll, "Experience-Based Planning with Sparse Roadmap
-   Spanners"
-   <a href="http://arxiv.org/pdf/1410.1950.pdf">[PDF]</a>
 */
 
 /// @cond IGNORE
@@ -174,8 +169,14 @@ class Bolt : public tools::ExperienceSetup
     /** \brief Convert PlannerData to PathGeometric. Assume ordering of verticies is order of path */
     void convertPlannerData(const base::PlannerDataPtr plannerData, geometric::PathGeometric &path);
 
-    /** \brief Hook for getting access to debug data */
-    DenseDBPtr getExperienceDB();
+    /** \brief Hook for getting access to dense db */
+    DenseDBPtr getDenseDB();
+
+    /** \brief Hook for getting access to discretizer */
+    DiscretizerPtr getDiscretizer()
+    {
+        return discretizer_;
+    }
 
     /** \brief Allow accumlated experiences to be processed */
     bool doPostProcessing();
@@ -195,6 +196,9 @@ class Bolt : public tools::ExperienceSetup
 
     /** \brief A shared object between all the planners for saving and loading previous experience */
     DenseDBPtr denseDB_;
+
+    /** \brief Tool for gridding state space */
+    DiscretizerPtr discretizer_;
 
     /** \brief Accumulated experiences to be later added to experience database */
     std::vector<geometric::PathGeometric> queuedSolutionPaths_;

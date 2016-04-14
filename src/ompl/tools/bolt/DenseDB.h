@@ -83,6 +83,7 @@ class DenseDB
     friend class BoltRetrieveRepair;
     friend class SparseDB;
     friend class BoltStorage;
+    friend class Discretizer;
 
   public:
     ////////////////////////////////////////////////////////////////////////////////////////
@@ -173,13 +174,13 @@ class DenseDB
     // DenseDB MEMBER FUNCTIONS
     ////////////////////////////////////////////////////////////////////////////////////////
 
-    /** \brief Constructor needs the state space used for planning.
-     *  \param space - state space
-     */
-    DenseDB(base::SpaceInformationPtr si, base::VisualizerPtr visual);
+     /** \brief Constructor needs the state space used for planning.
+      *  \param space - state space
+      */
+     DenseDB(base::SpaceInformationPtr si, base::VisualizerPtr visual);
 
-    /** \brief Deconstructor */
-    virtual ~DenseDB(void);
+     /** \brief Deconstructor */
+     virtual ~DenseDB(void);
 
     /** \brief Initialize database */
     bool setup();
@@ -308,43 +309,8 @@ class DenseDB
      */
     void loadFromPlannerData(const base::PlannerData& data);
 
-    /**
-     * \brief Discretize the space into a simple grid
-     */
-    void generateGrid();
-
-    /** \brief Recursively discretize
-     *  \param values - the joint positions currently searching over
-     *  \param joint_id - the dimension currently on
-     *  \param desired_depth - how many dimensions to discretize to
-     */
-    void recursiveDiscretization(std::vector<double>& values, std::size_t joint_id, std::size_t desired_depth);
-
-    /** \brief Faster method for collision checking vertices */
-    void checkVerticesThreaded(const std::vector<DenseVertex>& unvalidatedVertices);
-    void checkVerticesThread(std::size_t startVertex, std::size_t endVertex, base::SpaceInformationPtr si,
-                             const std::vector<DenseVertex>& unvalidatedVertices);
-
     /** \brief Clone the graph to have second and third layers for task planning then free space planning */
     void generateTaskSpace();
-
-    /** \brief Helper function to calculate connectivity based on dimensionality */
-    std::size_t getEdgesPerVertex();
-
-    /**
-     * \brief Connect vertices wherever possible
-     */
-    void generateEdges();
-
-    /** \brief Collision check edges */
-    void checkEdges();
-
-    /** \brief Collision check edges using threading */
-    void checkEdgesThreaded(const std::vector<DenseEdge>& unvalidatedEdges);
-
-    /** \brief Collision check edges in vector from [startEdge, endEdge] inclusive */
-    void checkEdgesThread(std::size_t startEdge, std::size_t endEdge, base::SpaceInformationPtr si,
-                          const std::vector<DenseEdge>& unvalidatedEdges);
 
     /** \brief Free all the memory allocated by the database */
     void freeMemory();
@@ -499,9 +465,6 @@ class DenseDB
     /** \brief Helper class for storing each plannerData instance */
     //ompl::base::PlannerDataStorage plannerDataStorage_;
 
-    /** \brief Allow the database to save to file (new experiences) */
-    bool savingEnabled_;
-
     /** \brief Nearest neighbors data structure */
     boost::shared_ptr<NearestNeighbors<DenseVertex> > nn_;
 
@@ -529,6 +492,17 @@ class DenseDB
     /** \brief Loading/unloading utility */
     //BoltStorage storage_;
 
+    /** \brief Track vertex for later removal if temporary */
+    std::vector<DenseVertex> tempVerticies_;
+    DenseVertex startConnectorVertex_;
+    DenseVertex endConnectorVertex_;
+    double distanceAcrossCartesian_;
+
+  public:
+
+    /** \brief Allow the database to save to file (new experiences) */
+    bool savingEnabled_;
+
     /** \brief Whether to bias search using popularity of edges */
     bool popularityBiasEnabled_;
 
@@ -538,25 +512,14 @@ class DenseDB
     /** \brief Option to enable debugging output */
     bool verbose_;
 
-    /** \brief Discretization helper */
-    base::State* nextDiscretizedState_;
-
-    /** \brief Track vertex for later removal if temporary */
-    std::vector<DenseVertex> tempVerticies_;
-    DenseVertex startConnectorVertex_;
-    DenseVertex endConnectorVertex_;
-    double distanceAcrossCartesian_;
-
     /** \brief Are we task planning i.e. for hybrid cartesian paths? */
     bool useTaskPlanning_;
 
-  public:
     /** \brief Option to enable debugging output */
     bool snapPathVerbose_;
 
     /** \brief Various options for visualizing the algorithmns performance */
     bool visualizeAstar_;
-    bool visualizeGridGeneration_;
     bool visualizeCartNeighbors_;
     bool visualizeCartPath_;
     bool visualizeSnapPath_;
@@ -565,9 +528,6 @@ class DenseDB
 
     /** \brief Visualization speed of astar search, num of seconds to show each vertex */
     double visualizeAstarSpeed_;
-
-    /** \brief Distance between grid points (discretization level) */
-    double discretization_;
 
     /** \brief Keep the average cost of the graph at this level */
     double desiredAverageCost_;
