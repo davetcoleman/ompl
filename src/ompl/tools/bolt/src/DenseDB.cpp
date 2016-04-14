@@ -145,7 +145,6 @@ otb::DenseDB::DenseDB(base::SpaceInformationPtr si, base::VisualizerPtr visual)
   : si_(si)
   , visual_(visual)
   , graphUnsaved_(false)
-  , savingEnabled_(true)
   // Property accessors of edges
   , edgeWeightProperty_(boost::get(boost::edge_weight, g_))
   , edgeCollisionStateProperty_(boost::get(edge_collision_state_t(), g_))
@@ -154,9 +153,12 @@ otb::DenseDB::DenseDB(base::SpaceInformationPtr si, base::VisualizerPtr visual)
   //, state3Property_(boost::get(vertex_state3_t(), g_))
   , typeProperty_(boost::get(vertex_type_t(), g_))
   , representativesProperty_(boost::get(vertex_sparse_rep_t(), g_))
-  , popularityBiasEnabled_(false)
-  , verbose_(true)
   , distanceAcrossCartesian_(0.0)
+    // public
+  , savingEnabled_(true)
+  , popularityBiasEnabled_(false)
+  , popularityBias_(0) // value TODO
+  , verbose_(true)
   , useTaskPlanning_(false)
   , snapPathVerbose_(false)
   , visualizeAstar_(false)
@@ -621,7 +623,7 @@ bool otb::DenseDB::save(const std::string &fileName)
     // Disabled
     if (!savingEnabled_)
     {
-        OMPL_WARN("Not saving because option disabled for ExperienceDB");
+        OMPL_INFORM("Not saving because option disabled for DenseDB");
         return false;
     }
 
@@ -1049,21 +1051,20 @@ void otb::DenseDB::displayDatabase(bool showVertices)
 {
     OMPL_INFORM("Displaying database");
 
-    // Error check
-    if (getNumVertices() == 0 || getNumEdges() == 0)
-    {
-        OMPL_ERROR("Unable to show database because no vertices/edges available");
-        exit(-1);
-    }
-
     // Clear old database
     visual_->viz1State(NULL, /*deleteAllMarkers*/ 0, 0);
 
     // if (showVertices)
     {
+        // Error check
+        if (getNumVertices() == 0)
+        {
+            OMPL_WARN("Unable to show database because no vertices available");
+        }
+
         // Loop through each vertex
         std::size_t count = 0;
-        std::size_t debugFrequency = std::min(10000, static_cast<int>(getNumEdges() / 10));
+        std::size_t debugFrequency = std::min(10000, static_cast<int>(getNumVertices() / 10));
         std::cout << "Displaying vertices: " << std::flush;
         foreach (DenseVertex v, boost::vertices(g_))
         {
@@ -1086,6 +1087,11 @@ void otb::DenseDB::displayDatabase(bool showVertices)
     }
     // else
     {
+        // Error check
+        if (getNumEdges() == 0)
+        {
+            OMPL_WARN("Unable to show database because no edges available");
+        }
         // Loop through each edge
         std::size_t count = 0;
         std::size_t debugFrequency = std::min(10000, static_cast<int>(getNumEdges() / 10));
@@ -1113,7 +1119,7 @@ void otb::DenseDB::displayDatabase(bool showVertices)
         std::cout << std::endl;
     }
 
-    // Publish remaining edges
+    // Publish remaining markers
     visual_->viz1Trigger();
 }
 
