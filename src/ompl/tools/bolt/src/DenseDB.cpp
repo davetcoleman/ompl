@@ -1683,6 +1683,7 @@ bool DenseDB::checkConnectedComponents()
     }
     else
         OMPL_INFORM("Number of connected components %u", numSets);
+    return true;
 }
 
 }  // namespace bolt

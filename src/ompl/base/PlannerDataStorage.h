@@ -44,7 +44,6 @@
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/utility.hpp>
 #include <fstream>
-#include <iomanip>
 
 namespace ompl
 {
@@ -207,10 +206,6 @@ namespace ompl
                 // to free all memory allocated here.
                 pd.decoupleFromPlanner();
 
-                // TODO: remove the decoupleFromPlanner call and freeState call, below
-                // and check if everything still works. i think it will...
-                OMPL_INFORM("TODO: Remove decoupleFromPlanner() in PlannerDataStorage");
-
                 for (size_t i = 0; i < states.size(); ++i)
                     space->freeState(states[i]);
             }
@@ -220,12 +215,8 @@ namespace ompl
             {
                 const StateSpacePtr &space = pd.getSpaceInformation()->getStateSpace();
                 std::vector<unsigned char> state (space->getSerializationLength());
-                std::size_t feedbackDisplayFrequency = pd.numVertices() / 10;
-                std::cout << "Saving vertices: " << std::flush;
                 for (unsigned int i = 0; i < pd.numVertices(); ++i)
                 {
-                    if (i % feedbackDisplayFrequency == 0)
-                        std::cout << std::fixed << std::setprecision(0) << (i / double(pd.numVertices()) * 100.0) << "% " << std::flush;
                     PlannerDataVertexData vertexData;
 
                     // Serializing all data in the vertex (except the state)
@@ -245,7 +236,6 @@ namespace ompl
 
                     oa << vertexData;
                 }
-                std::cout << std::endl;
             }
 
             /// \brief Read \e numEdges from the binary input \e ia and store them as PlannerData.
@@ -266,40 +256,22 @@ namespace ompl
             /// \brief Serialize and store all edges in \e pd to the binary archive.
             virtual void storeEdges(const PlannerData &pd, boost::archive::binary_oarchive &oa)
             {
-                std::vector<unsigned int> edgeList;
-                std::size_t debugFrequency = pd.numVertices() / 10;
-                std::cout << "Saving edges: " << std::flush;
-                for (unsigned int fromVertex = 0; fromVertex < pd.numVertices(); ++fromVertex)
-                {
-                    if (fromVertex % debugFrequency == 0)
-                        std::cout << std::fixed << std::setprecision(0) << (fromVertex / double(pd.numVertices()) * 100.0) << "% " << std::flush;
-
-                    edgeList.clear();
-
-                    // Get the edges
-                    pd.getEdges(fromVertex, edgeList);  // returns the id of each edge
-
-                    // Process edges
-                    for (std::size_t edgeId = 0; edgeId < edgeList.size(); ++edgeId)
+                for (unsigned int i = 0; i < pd.numVertices(); ++i)
+                    for (unsigned int j = 0; j < pd.numVertices(); ++j)
                     {
-                        unsigned int toVertex = edgeList[edgeId];
+                        if(pd.edgeExists(i, j))
+                        {
+                            PlannerDataEdgeData edgeData;
+                            edgeData.e_ = &pd.getEdge(i, j);
+                            edgeData.endpoints_.first = i;
+                            edgeData.endpoints_.second = j;
+                            Cost weight;
+                            pd.getEdgeWeight(i, j, &weight);
+                            edgeData.weight_ = weight.value();
 
-                        // Get cost
-                        base::Cost weight;
-                        if (!pd.getEdgeWeight(fromVertex, toVertex, &weight))
-                            OMPL_ERROR("Unable to get edge weight");
-
-                        // Convert to new structure
-                        PlannerDataEdgeData edgeData;
-                        edgeData.e_ = &pd.getEdge(fromVertex, toVertex);
-                        edgeData.endpoints_.first = fromVertex;
-                        edgeData.endpoints_.second = toVertex;
-                        edgeData.weight_ = weight.value();
-                        oa << edgeData;
-
-                    } // for each edge
-                }  // for each vertex
-                std::cout << std::endl;
+                            oa << edgeData;
+                        }
+                    }
             }
         };
     }

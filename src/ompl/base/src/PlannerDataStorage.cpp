@@ -76,14 +76,10 @@ void ompl::base::PlannerDataStorage::store(const PlannerData &pd, std::ostream &
         h.marker = OMPL_PLANNER_DATA_ARCHIVE_MARKER;
         h.vertex_count = pd.numVertices();
         h.edge_count = pd.numEdges();
-        OMPL_INFORM("Computing state space signuture");
         si->getStateSpace()->computeSignature(h.signature);
-        OMPL_INFORM("Writing header");
         oa << h;
 
-        OMPL_INFORM("Storing vertices");
         storeVertices(pd, oa);
-        OMPL_INFORM("Storing edges");
         storeEdges(pd, oa);
     }
     catch (boost::archive::archive_exception &ae)

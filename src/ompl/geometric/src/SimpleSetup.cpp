@@ -247,8 +247,3 @@ void ompl::geometric::SimpleSetup::print(std::ostream &out) const
     if (pdef_)
         pdef_->print(out);
 }
-
-// void ompl::geometric::SimpleSetup::setVizState(ompl::base::VizState vizState)
-// {
-//     //planner_->setVizState(vizState);
-// }

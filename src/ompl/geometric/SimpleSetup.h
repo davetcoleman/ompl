@@ -58,7 +58,7 @@ namespace ompl
         /// @endcond
 
         /** \class ompl::geometric::SimpleSetupPtr
-            \brief A boost shared pointer wrapper for ompl::geometric::SimpleSetup */
+            \brief A shared pointer wrapper for ompl::geometric::SimpleSetup */
 
         /** \brief Create the set of classes typically needed to solve a
             geometric problem */
@@ -274,9 +274,6 @@ namespace ompl
                 for planning. The solve() method will call this
                 function automatically. */
             virtual void setup();
-
-            /** \brief Set the callback to visualize/publish a planner's progress */
-            //virtual void setVizState(ompl::base::VizState vizState);
 
         protected:
 

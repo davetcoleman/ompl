@@ -40,6 +40,7 @@
 #define OMPL_TOOLS_BOLT_VISUALIZER_
 
 #include <ompl/base/Planner.h>
+#include <functional>
 
 namespace ompl
 {
@@ -65,31 +66,31 @@ OMPL_CLASS_FORWARD(Visualizer);
      * \param type - different modes/colors/sizes for visualizing the state
      * \param extraData - special extra data for showing a range around a state
      */
-    typedef boost::function<void(const ompl::base::State* v, std::size_t type, double extraData)> VizState;
+    typedef std::function<void(const ompl::base::State* v, std::size_t type, double extraData)> VizState;
     /**
      * \brief Visualization callback hook for external debugging of edges
      * \param v1 - from state that marks beginning of edge
      * \param v2 - to state that marks end of edge
      * \param cost - signifies the weight of the edge using color
      */
-    typedef boost::function<void(const ompl::base::State* v1, const ompl::base::State* v2, double cost)> VizEdge;
+    typedef std::function<void(const ompl::base::State* v1, const ompl::base::State* v2, double cost)> VizEdge;
 
     /**
      * \brief Visualization callback hook for external debugging of paths
      * \param path
      * \param type - style of line
      */
-    typedef boost::function<void(const ompl::base::PathPtr path, std::size_t type)> VizPath;
+    typedef std::function<void(const ompl::base::PathPtr path, std::size_t type)> VizPath;
 
     /**
      * \brief Visualization callback hook for external debugging that triggers the visualizer to render/publish
      */
-    typedef boost::function<void(void)> VizTrigger;
+    typedef std::function<void(void)> VizTrigger;
 
     /**
      * \brief Visualization callback hook for external debugging that tells OMPL when to end early by SIG INT
      */
-    //typedef boost::function<bool(void)> VizCheckSigInt;
+    //typedef std::function<bool(void)> VizCheckSigInt;
 
 
 /** \brief Use an external program to visualize search */

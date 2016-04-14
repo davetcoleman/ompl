@@ -35,7 +35,7 @@
 /* Author: Ioan Sucan */
 
 #include "ompl/util/Console.h"
-#include <boost/thread/mutex.hpp>
+#include <mutex>
 #include <iostream>
 #include <cstdio>
 #include <cstdarg>
@@ -55,7 +55,7 @@ struct DefaultOutputHandler
     ompl::msg::OutputHandler   *output_handler_;
     ompl::msg::OutputHandler   *previous_output_handler_;
     ompl::msg::LogLevel         logLevel_;
-    boost::mutex                lock_; // it is likely the outputhandler does some I/O, so we serialize it
+    std::mutex                  lock_; // it is likely the outputhandler does some I/O, so we serialize it
 };
 
 // we use this function because we want to handle static initialization correctly
@@ -70,7 +70,7 @@ static DefaultOutputHandler* getDOH()
 
 #define USE_DOH                                                                \
     DefaultOutputHandler *doh = getDOH();                                      \
-    boost::mutex::scoped_lock slock(doh->lock_)
+    std::lock_guard<std::mutex> slock(doh->lock_)
 
 #define MAX_BUFFER_SIZE 1024
 
@@ -80,7 +80,7 @@ void ompl::msg::noOutputHandler()
 {
     USE_DOH;
     doh->previous_output_handler_ = doh->output_handler_;
-    doh->output_handler_ = NULL;
+    doh->output_handler_ = nullptr;
 }
 
 void ompl::msg::restorePreviousOutputHandler()
