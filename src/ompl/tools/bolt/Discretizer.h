@@ -41,18 +41,12 @@
 
 // OMPL
 #include <ompl/base/StateSpace.h>
-//#include <ompl/geometric/PathGeometric.h>
-//#include <ompl/base/Planner.h>
-//#include <ompl/base/PlannerData.h>
-//#include <ompl/base/PlannerDataStorage.h>
-#include <ompl/datastructures/NearestNeighbors.h>
 #include <ompl/tools/bolt/Visualizer.h>
-#include <ompl/tools/bolt/SparseDB.h>
 #include <ompl/tools/bolt/BoltGraph.h>
 #include <ompl/tools/bolt/DenseDB.h>
 
 // Boost
-//#include <boost/function.hpp>
+#include <boost/thread/mutex.hpp>
 
 namespace ompl
 {
@@ -85,17 +79,16 @@ class Discretizer
      */
     void generateGrid();
 
+    void createVertices();
+
+    void createVertexThread(double startJointValue, double endJointValue, base::SpaceInformationPtr si);
+
+    void recursiveDiscretization(std::vector<double> &values, std::size_t jointID, base::SpaceInformationPtr si, base::State* candidateState);
+
     /** \brief Helper function to calculate connectivity based on dimensionality */
     static std::size_t getEdgesPerVertex(base::SpaceInformationPtr si);
 
 private:
-
-    /** \brief Recursively discretize
-     *  \param values - the joint positions currently searching over
-     *  \param joint_id - the dimension currently on
-     *  \param desired_depth - how many dimensions to discretize to
-     */
-    void recursiveDiscretization(std::vector<double>& values, std::size_t joint_id, std::size_t desired_depth);
 
     /** \brief Faster method for collision checking vertices */
     void checkVerticesThreaded(const std::vector<DenseVertex>& unvalidatedVertices);
@@ -126,8 +119,8 @@ private:
     /** \brief Class for managing various visualization features */
     base::VisualizerPtr visual_;
 
-    /** \brief Discretization helper */
-    base::State* nextDiscretizedState_;
+    // Prevent two vertices from being added to graph at same time
+    boost::mutex vertexMutex_;
 
 public:
 
