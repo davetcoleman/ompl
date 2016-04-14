@@ -38,10 +38,10 @@
 
 // OMPL
 #include <ompl/tools/bolt/DenseDB.h>
+#include <ompl/tools/bolt/Discretizer.h>
 #include <ompl/base/ScopedState.h>
 #include <ompl/util/Time.h>
 #include <ompl/util/Console.h>
-//#include <ompl/base/PlannerDataStorage.h>
 #include <ompl/datastructures/NearestNeighborsGNATNoThreadSafety.h>
 #include <ompl/base/spaces/RealVectorStateSpace.h>  // TODO: remove, this is not space agnostic
 
@@ -160,14 +160,12 @@ otb::DenseDB::DenseDB(base::SpaceInformationPtr si, base::VisualizerPtr visual)
   , useTaskPlanning_(false)
   , snapPathVerbose_(false)
   , visualizeAstar_(false)
-  , visualizeGridGeneration_(false)
   , visualizeCartNeighbors_(false)
   , visualizeCartPath_(false)
   , visualizeSnapPath_(false)
   , visualizeSnapPathSpeed_(0.001)
   , visualizeAddSample_(false)
   , visualizeAstarSpeed_(0.1)
-  , discretization_(2.0)
   , desiredAverageCost_(90)
 {
     // Add search state
@@ -944,45 +942,11 @@ void otb::DenseDB::initializeQueryState()
     }
 }
 
-/*
-void otb::DenseDB::getPlannerData(base::PlannerData &data) const
-{
-    // If there are even edges here
-    if (boost::num_edges(g_) > 0)
-    {
-        // Adding edges and all other vertices simultaneously
-        foreach (const DenseEdge e, boost::edges(g_))
-        {
-            const DenseVertex v1 = boost::source(e, g_);
-            const DenseVertex v2 = boost::target(e, g_);
-
-            if (!data.addEdge(base::PlannerDataVertex(stateProperty_[v1], (int)typeProperty_[v1]),
-                              base::PlannerDataVertex(stateProperty_[v2], (int)typeProperty_[v2]),
-                              base::PlannerDataEdge(), base::Cost(edgeWeightProperty_[e])))
-            {
-                OMPL_ERROR("Unable to add edge");
-            }
-
-            // OMPL_INFORM("Adding edge from vertex of type %d to vertex of type %d", typeProperty_[v1],
-            // typeProperty_[v2]);
-        }
-    }
-    else
-        OMPL_ERROR("There are no edges in the graph!");
-
-    // Make sure to add edge-less nodes as well
-    foreach (const DenseVertex n, boost::vertices(g_))
-        if (boost::out_degree(n, g_) == 0)
-            data.addVertex(base::PlannerDataVertex(stateProperty_[n], (int)typeProperty_[n]));
-
-    // data.properties["iterations INTEGER"] = boost::lexical_cast<std::string>(iterations_);
-}
-*/
-
 void otb::DenseDB::addVertexFromFile(BoltStorage::BoltVertexData v)
 {
     GuardType type = static_cast<GuardType>(v.type_);
-    DenseVertex vNew = addVertex(v.state_, type);
+    //DenseVertex vNew =
+    addVertex(v.state_, type);
 }
 
 void otb::DenseDB::addEdgeFromFile(BoltStorage::BoltEdgeData e)
@@ -996,85 +960,8 @@ void otb::DenseDB::addEdgeFromFile(BoltStorage::BoltEdgeData e)
     BOOST_ASSERT_MSG(v2 <= getNumVertices(), "Vertex 2 out of range of possible verticies");
 
     // Add edge
-    DenseEdge newE = addEdge(v1, v2, e.weight_);
-}
-
-void otb::DenseDB::generateGrid()
-{
-    OMPL_INFORM("Generating grid");
-
-    if (!si_->isSetup())
-    {
-        OMPL_WARN("Space information setup was not yet called. Calling now.");
-        si_->setup();
-    }
-
-    // Prepare for recursion
-    // TODO(davetcoleman): currently the last joint is not being discretized, so we should set its
-    // default value smartly and not just '0'
-    std::vector<double> values(si_->getStateSpace()->getDimension(), 0);
-
-    // Choose first state to discretize
-    nextDiscretizedState_ =
-        si_->getStateSpace()->allocState();  // Note: it is currently possible the last state is never freed
-
-    const std::size_t starting_joint_id = 0;
-    std::size_t desired_depth = si_->getStateSpace()->getDimension();
-
-    // TODO: This is a custom dimensionality reduction hack, that maybe should not be in this location
-    if (desired_depth > 5)
-    {
-        // OMPL_INFORM("Truncated discretization depth to 5");
-        desired_depth = 6;
-    }
-    else if (desired_depth == 3)
-    {
-        // This is for the 2D case where the third dimension is task
-        OMPL_INFORM("Truncated discretization depth to 2");
-        desired_depth = 2;
-
-        // Set all generated states to a level 0 task space
-        values[2] = 0;
-    }
-
-    // Create vertices
-    recursiveDiscretization(values, starting_joint_id, desired_depth);
-    OMPL_INFORM("Generated %i vertices.", getNumVertices());
-
-    // Error check
-    if (getNumVertices() < 2)
-    {
-        OMPL_ERROR("No vertices generated, failing");
-        exit(-1);
-    }
-
-    // Remove vertices in collision using multithreading
-    // TODO enable
-    // std::vector<DenseVertex> unvalidatedVertices;
-    // checkVerticesThreaded(unvalidatedVertices);
-
-    {
-        // Benchmark runtime
-        time::point start_time = time::now();
-
-        // Create edges ----------------------------------------
-        generateEdges();
-
-        // Benchmark runtime
-        double duration = time::seconds(time::now() - start_time);
-        OMPL_INFORM("Generate edges total time: %f seconds (%f hz)", duration, 1.0 / duration);
-    }
-
-    // Get the average vertex degree (number of connected edges)
-    std::size_t average_degree = (getNumEdges() * 2) / getNumVertices();
-    OMPL_INFORM("Average degree: %i", average_degree);
-
-    // Display
-    if (visualizeGridGeneration_)
-        visual_->viz1Trigger();
-
-    // Mark the graph as ready to be saved
-    graphUnsaved_ = true;
+    //DenseEdge newE =
+    addEdge(v1, v2, e.weight_);
 }
 
 void otb::DenseDB::generateTaskSpace()
@@ -1103,7 +990,7 @@ void otb::DenseDB::generateTaskSpace()
         // Map old vertex to new vertex
         vertexToNewVertex[v] = vNew;
 
-        if (visualizeGridGeneration_)  // Visualize - only do this for 2/3D environments
+        //if (visualizeGridGeneration_)  // Visualize - only do this for 2/3D environments
         {
             visual_->viz1State(newState, /*mode=*/5, 1);  // Candidate node has already (just) been added
             visual_->viz1Trigger();
@@ -1135,7 +1022,7 @@ void otb::DenseDB::generateTaskSpace()
 
         DenseEdge newE = addEdge(vertexToNewVertex[v1], vertexToNewVertex[v2], edgeWeightProperty_[e]);
 
-        if (visualizeGridGeneration_)  // Visualize
+        //if (visualizeGridGeneration_)  // Visualize
         {
             viz1Edge(newE);
             if (i % 100 == 0)
@@ -1146,407 +1033,10 @@ void otb::DenseDB::generateTaskSpace()
         }
     }
 
-    if (visualizeGridGeneration_)  // Visualize
+    //if (visualizeGridGeneration_)  // Visualize
         visual_->viz1Trigger();
 
     OMPL_INFORM("Done generating task space graph");
-}
-
-std::size_t otb::DenseDB::getEdgesPerVertex()
-{
-    // in 2D this creates the regular square with diagonals of 8 edges
-    if (si_->getStateSpace()->getDimension() == 3)
-    {
-        return 8;
-    }
-
-    // full robot
-    return si_->getStateSpace()->getDimension() * 2;
-}
-
-void otb::DenseDB::generateEdges()
-{
-    OMPL_INFORM("Generating edges");
-    bool verbose = false;
-
-    // Benchmark runtime
-    time::point startTime = time::now();
-    std::size_t count = 0;
-
-    // Nearest Neighbor search
-    std::vector<DenseVertex> graphNeighborhood;
-    std::vector<DenseEdge> unvalidatedEdges;
-    std::size_t feedbackFrequency = std::max(static_cast<int>(getNumVertices() / 10), 10);
-
-    // Loop through each vertex
-    for (std::size_t v1 = 1; v1 < getNumVertices(); ++v1)  // 1 because 0 is the search vertex?
-    {
-        if (v1 % feedbackFrequency == 0)
-        {
-            // Benchmark runtime
-            double duration = time::seconds(time::now() - startTime);
-            std::cout << "Edge generation progress: " << double(v1) / getNumVertices() * 100.0 << " % "
-                      << "Total edges: " << count << " Total time: " << duration << std::endl;
-            startTime = time::now();
-        }
-
-        // Add edges
-        graphNeighborhood.clear();
-
-        // How many edges should each vertex connect with?
-        std::size_t findNearestKNeighbors = getEdgesPerVertex();
-        const std::size_t numSameVerticiesFound = 1;  // add 1 to the end because the NN tree always returns itself
-
-        // Search
-        stateProperty_[queryVertex_] = stateProperty_[v1];
-        nn_->nearestK(queryVertex_, findNearestKNeighbors + numSameVerticiesFound, graphNeighborhood);
-        stateProperty_[queryVertex_] = NULL;  // Set search vertex to NULL to prevent segfault on class unload of memory
-
-        if (verbose)
-            OMPL_INFORM("Found %u neighbors", graphNeighborhood.size());
-
-        // For each nearby vertex, add an edge
-        std::size_t errorCheckNumSameVerticies = 0;  // sanity check
-        for (std::size_t i = 0; i < graphNeighborhood.size(); ++i)
-        {
-            if (verbose)
-                OMPL_INFORM("Edge %u", i);
-
-            DenseVertex &v2 = graphNeighborhood[i];
-
-            // Check if these vertices are the same
-            if (v1 == v2)
-            {
-                errorCheckNumSameVerticies++;  // sanity check
-                continue;
-            }
-
-            // Check if these vertices already share an edge
-            if (boost::edge(v1, v2, g_).second)
-                continue;
-
-            if (visualizeGridGeneration_)  // Debug: display edge
-                visual_->viz1Edge(stateProperty_[v1], stateProperty_[v2], 1);
-
-            // Create edge - maybe removed later
-            DenseEdge e = addEdge(v1, v2, desiredAverageCost_);
-            unvalidatedEdges.push_back(e);
-
-            count++;
-        }  // for each v2
-
-        // Make sure one and only one vertex is returned from the NN search that is the same as parent vertex
-        assert(errorCheckNumSameVerticies == 1);
-
-        // Visualize
-        if (visualizeGridGeneration_)
-        {
-            visual_->viz1Trigger();
-            usleep(0.001 * 1000000);
-        }
-
-    }  // for each v1
-
-    OMPL_INFORM("Generated %i edges. Finished generating grid.", getNumEdges());
-
-    // Benchmark runtime
-    time::point startTime3 = time::now();
-    std::size_t numEdgesBeforeCheck = getNumEdges();
-
-    // Collision check all edges using threading
-    checkEdgesThreaded(unvalidatedEdges);
-
-    // Calculate statistics on collision state of robot
-    std::size_t numEdgesAfterCheck = getNumEdges();
-    std::size_t numRemovedEdges = numEdgesBeforeCheck - numEdgesAfterCheck;
-    double duration3 = time::seconds(time::now() - startTime3);
-
-    // User feedback
-    OMPL_INFORM("Collision State of Robot -----------------");
-    OMPL_INFORM("   Removed Edges:        %u", numRemovedEdges);
-    OMPL_INFORM("   Remaining Edges:      %u", numEdgesAfterCheck);
-    OMPL_INFORM("   Percent Removed:      %f %%", numRemovedEdges / double(numEdgesBeforeCheck) * 100.0);
-    OMPL_INFORM("   Total time:           %f sec (%f hz)", duration3, 1.0 / duration3);
-
-    // Calculate cost for each edge
-    std::size_t errorCheckCounter = 0;
-    foreach (const DenseEdge e, boost::edges(g_))
-    {
-        const DenseVertex &v1 = boost::source(e, g_);
-        const DenseVertex &v2 = boost::target(e, g_);
-
-        // Determine cost for edge depending on mode
-        double cost;
-        if (popularityBiasEnabled_)
-        {
-            cost = MAX_POPULARITY_WEIGHT;
-        }
-        else
-        {
-            // cost = distanceFunction2(v1, v2);
-            cost = distanceFunction(v1, v2);
-        }
-        edgeWeightProperty_[e] = cost;
-        errorCheckCounter++;
-
-        if (visualizeGridGeneration_)  // Debug in Rviz
-        {
-            visual_->viz1Edge(stateProperty_[v1], stateProperty_[v2], edgeWeightProperty_[e]);
-            if (errorCheckCounter % 100 == 0)
-            {
-                visual_->viz1Trigger();
-                usleep(0.001 * 1000000);
-            }
-        }
-    }
-    assert(errorCheckCounter == numEdgesAfterCheck);
-}
-
-void otb::DenseDB::checkEdges()  // TODO: deprecated, remove this func
-{
-    OMPL_WARN("Collision checking generated edges without threads");
-    OMPL_ERROR("Has not been updated for remove_edge");
-
-    foreach (const DenseEdge e, boost::edges(g_))
-    {
-        const DenseVertex &v1 = boost::source(e, g_);
-        const DenseVertex &v2 = boost::target(e, g_);
-
-        // Remove any edges that are in collision
-        if (!si_->checkMotion(stateProperty_[v1], stateProperty_[v2]))
-        {
-            edgeCollisionStateProperty_[e] = IN_COLLISION;
-        }
-        else
-        {
-            edgeCollisionStateProperty_[e] = FREE;
-        }
-    }
-}
-
-void otb::DenseDB::checkEdgesThreaded(const std::vector<DenseEdge> &unvalidatedEdges)
-{
-    const bool verbose = false;
-
-    // Error check
-    assert(unvalidatedEdges.size() == getNumEdges());
-
-    // Setup threading
-    static const std::size_t numThreads = boost::thread::hardware_concurrency();
-    OMPL_INFORM("Collision checking %u generated edges using %u threads", unvalidatedEdges.size(), numThreads);
-
-    std::vector<boost::thread *> threads(numThreads);
-    std::size_t numEdges = getNumEdges();  // we copy this number, because it might start shrinking when threads spin up
-    std::size_t edgesPerThread = numEdges / numThreads;  // rounds down
-    std::size_t startEdge = 0;
-    std::size_t endEdge;
-    std::size_t errorCheckTotalEdges = 0;
-
-    // For each thread
-    for (std::size_t i = 0; i < threads.size(); ++i)
-    {
-        endEdge = startEdge + edgesPerThread - 1;
-
-        // Check if this is the last thread
-        if (i == threads.size() - 1)
-        {
-            // have it do remaining edges to check
-            endEdge = numEdges - 1;
-        }
-        errorCheckTotalEdges += (endEdge - startEdge);
-
-        if (verbose)
-            std::cout << "Thread " << i << " has edges from " << startEdge << " to " << endEdge << std::endl;
-
-        base::SpaceInformationPtr si(new base::SpaceInformation(si_->getStateSpace()));
-        si->setStateValidityChecker(si_->getStateValidityChecker());
-        si->setMotionValidator(si_->getMotionValidator());
-
-        threads[i] = new boost::thread(
-            boost::bind(&otb::DenseDB::checkEdgesThread, this, startEdge, endEdge, si, unvalidatedEdges));
-        startEdge += edgesPerThread;
-    }
-
-    // Join threads
-    for (std::size_t i = 0; i < threads.size(); ++i)
-    {
-        threads[i]->join();
-        delete threads[i];
-    }
-
-    // Error check
-    if (errorCheckTotalEdges == getNumEdges())
-    {
-        OMPL_ERROR("Incorrect number of edges were processed");
-        exit(-1);
-    }
-
-    // Sanity check: make sure all remaining edges were validated
-    foreach (const DenseEdge e, boost::edges(g_))
-    {
-        if (edgeCollisionStateProperty_[e] != FREE)
-        {
-            OMPL_ERROR("Remaining edge %u has not been marked free", e);
-        }
-    }
-}
-
-void otb::DenseDB::checkEdgesThread(std::size_t startEdge, std::size_t endEdge, base::SpaceInformationPtr si,
-                                    const std::vector<DenseEdge> &unvalidatedEdges)
-{
-    // Process [startEdge, endEdge] inclusive
-    for (std::size_t edgeID = startEdge; edgeID <= endEdge; ++edgeID)
-    {
-        const DenseEdge &e = unvalidatedEdges[edgeID];
-
-        const DenseVertex &v1 = boost::source(e, g_);
-        const DenseVertex &v2 = boost::target(e, g_);
-
-        // Remove any edges that are in collision
-        if (!si->checkMotion(stateProperty_[v1], stateProperty_[v2]))
-        {
-            boost::remove_edge(v1, v2, g_);
-        }
-        else
-        {
-            edgeCollisionStateProperty_[e] = FREE;
-        }
-    }
-}
-
-void otb::DenseDB::recursiveDiscretization(std::vector<double> &values, std::size_t joint_id, std::size_t desiredDepth)
-{
-    ob::RealVectorBounds bounds = si_->getStateSpace()->getBounds();
-
-    // Error check
-    assert(bounds.high.size() == bounds.low.size());
-    assert(bounds.high.size() == si_->getStateSpace()->getDimension());
-    assert(joint_id < values.size());
-
-    // Loop thorugh current joint
-    for (double value = bounds.low[joint_id]; value <= bounds.high[joint_id]; value += discretization_)
-    {
-        values[joint_id] = value;
-
-        // User feedback
-        if (joint_id == 0)
-        {
-            const double percent =
-                (value - bounds.low[joint_id]) / (bounds.high[joint_id] - bounds.low[joint_id]) * 100.0;
-            std::cout << "Vertex generation progress: " << percent << " % Total vertices: " << getNumVertices()
-                      << std::endl;
-        }
-
-        // Check if we are at the end of the recursion
-        if (joint_id < desiredDepth - 1)
-        {
-            // Keep recursing
-            recursiveDiscretization(values, joint_id + 1, desiredDepth);
-        }
-        else  // this is the end of recursion, create a new state
-        {
-            // TODO(davetcoleman): way to not allocState if in collision?
-            nextDiscretizedState_ = si_->getStateSpace()->allocState();
-
-            // Fill the state with current values
-            si_->getStateSpace()->populateState(nextDiscretizedState_, values);
-
-            // Collision check
-            if (!si_->isValid(nextDiscretizedState_))
-            {
-                // OMPL_ERROR("Found a state that is not valid! ");
-                continue;
-            }
-
-            // Add vertex to graph
-            GuardType type = START;  // TODO(davetcoleman): type START is dummy
-            addVertex(nextDiscretizedState_, type);
-
-            // Visualize
-            if (visualizeGridGeneration_)
-            {
-                // Candidate node has already (just) been added
-                visual_->viz1State(nextDiscretizedState_, /*mode=*/5, 1);
-                visual_->viz1Trigger();
-                usleep(0.001 * 1000000);
-            }
-
-            // Prepare for next new state by allocating now
-            // nextDiscretizedState_ = si_->getStateSpace()->allocState();
-        }
-    }
-}
-
-void otb::DenseDB::checkVerticesThreaded(const std::vector<DenseVertex> &unvalidatedVertices)
-{
-    // TODO(davetcoleman): have not tested this functionality
-    bool verbose = true;
-
-    // Setup threading
-    static const std::size_t numThreads = boost::thread::hardware_concurrency();
-    OMPL_INFORM("Collision checking %u generated vertices using %u threads", unvalidatedVertices.size(), numThreads);
-
-    std::vector<boost::thread *> threads(numThreads);
-    std::size_t verticesPerThread = getNumVertices() / numThreads;  // rounds down
-    std::size_t startVertex = 0;
-    std::size_t endVertex;
-    std::size_t errorCheckTotalVertices = 0;
-
-    // For each thread
-    for (std::size_t i = 0; i < threads.size(); ++i)
-    {
-        endVertex = startVertex + verticesPerThread - 1;
-
-        // Check if this is the last thread
-        if (i == threads.size() - 1)
-        {
-            // have it do remaining vertices to check
-            endVertex = getNumVertices() - 1;
-        }
-        errorCheckTotalVertices += (endVertex - startVertex);
-
-        if (verbose)
-            std::cout << "Thread " << i << " has vertices from " << startVertex << " to " << endVertex << std::endl;
-
-        base::SpaceInformationPtr si(new base::SpaceInformation(si_->getStateSpace()));
-        si->setStateValidityChecker(si_->getStateValidityChecker());
-        // si->setMotionValidator(si_->getMotionValidator());
-
-        threads[i] = new boost::thread(
-            boost::bind(&otb::DenseDB::checkVerticesThread, this, startVertex, endVertex, si, unvalidatedVertices));
-        startVertex += verticesPerThread;
-    }
-
-    // Join threads
-    for (std::size_t i = 0; i < threads.size(); ++i)
-    {
-        threads[i]->join();
-        delete threads[i];
-    }
-
-    // Error check
-    if (errorCheckTotalVertices == getNumVertices())
-    {
-        OMPL_ERROR("Incorrect number of vertices were processed");
-        exit(-1);
-    }
-}
-
-void otb::DenseDB::checkVerticesThread(std::size_t startVertex, std::size_t endVertex, base::SpaceInformationPtr si,
-                                       const std::vector<DenseVertex> &unvalidatedVertices)
-{
-    // Process [startVertex, endVertex] inclusive
-    for (std::size_t vertexID = startVertex; vertexID <= endVertex; ++vertexID)
-    {
-        const DenseVertex &v = unvalidatedVertices[vertexID];
-
-        // Remove any vertices that are in collision
-        if (!si_->isValid(stateProperty_[v]))
-        {
-            boost::remove_vertex(v, g_);
-            std::cout << "found vertex in collision " << std::endl;
-        }
-    }
 }
 
 void otb::DenseDB::clearEdgeCollisionStates()
@@ -1693,6 +1183,8 @@ otb::DenseVertex otb::DenseDB::addVertex(base::State *state, const GuardType &ty
         tempVerticies_.push_back(v1);
     }
 
+    graphUnsaved_ = true;
+
     return v1;
 }
 
@@ -1713,6 +1205,7 @@ otb::DenseEdge otb::DenseDB::addEdge(const DenseVertex &v1, const DenseVertex &v
     // edgeWeightProperty_[e] = distanceFunction(v1, v2);
     edgeCollisionStateProperty_[e] = NOT_CHECKED;
 
+    graphUnsaved_ = true;
     return e;
 }
 
@@ -2065,7 +1558,7 @@ void otb::DenseDB::connectNewVertex(DenseVertex v1)
 
     // Now connect to nearby vertices
     std::vector<DenseVertex> graphNeighborhood;
-    std::size_t findNearestKNeighbors = getEdgesPerVertex();
+    std::size_t findNearestKNeighbors = Discretizer::getEdgesPerVertex(si_);
     OMPL_INFORM("DenseDB.connectNewVertex(): Finding %u nearest neighbors for new vertex", findNearestKNeighbors);
     const std::size_t numSameVerticiesFound = 1;  // add 1 to the end because the NN tree always returns itself
 
@@ -2106,8 +1599,9 @@ void otb::DenseDB::connectNewVertex(DenseVertex v1)
         // Create edge if not in collision
         if (si_->checkMotion(stateProperty_[v1], stateProperty_[v2]))
         {
-            DenseEdge e = addEdge(v1, v2, desiredAverageCost_);
-            std::cout << "added valid edge " << e << std::endl;
+            //DenseEdge e =
+            addEdge(v1, v2, desiredAverageCost_);
+            //std::cout << "added valid edge " << e << std::endl;
 
             if (visualizeAddSample_)  // Debug: display edge
             {

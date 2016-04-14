@@ -76,6 +76,9 @@ void Bolt::initialize()
     // Load the Retrieve repair database. We do it here so that setRepairPlanner() works
     boltPlanner_ = ob::PlannerPtr(new BoltRetrieveRepair(si_, denseDB_));  // TODO(davetcoleman): pass in visual_
 
+    // Load the discretize grid tool
+    discretizer_.reset(new Discretizer(si_, denseDB_, denseDB_->getVisual()));
+
     OMPL_INFORM("Bolt Framework initialized.");
 }
 
@@ -275,8 +278,7 @@ bool Bolt::loadOrGenerate()
             // Benchmark runtime
             time::point startTime = time::now();
 
-            // Discretize grid
-            denseDB_->generateGrid();
+            discretizer_->generateGrid();
 
             // Benchmark runtime
             double duration = time::seconds(time::now() - startTime);
@@ -353,7 +355,7 @@ void Bolt::convertPlannerData(const ob::PlannerDataPtr plannerData, og::PathGeom
         path.append(plannerData->getVertex(i).getState());
 }
 
-DenseDBPtr Bolt::getExperienceDB()
+DenseDBPtr Bolt::getDenseDB()
 {
     return denseDB_;
 }
