@@ -81,7 +81,6 @@ class Discretizer
     static std::size_t getEdgesPerVertex(base::SpaceInformationPtr si);
 
   private:
-
     void generateVertices();
 
     void createVertexThread(std::size_t threadID, double startJointValue, double endJointValue,
@@ -100,8 +99,12 @@ class Discretizer
     void checkEdgesThreaded(const std::vector<DenseEdge>& unvalidatedEdges);
 
     /** \brief Collision check edges in vector from [startEdge, endEdge] inclusive */
-    void checkEdgesThread(std::size_t threadID, std::size_t startEdge, std::size_t endEdge, base::SpaceInformationPtr si,
-                          const std::vector<DenseEdge>& unvalidatedEdges);
+    void checkEdgesThread(std::size_t threadID, std::size_t startEdge, std::size_t endEdge,
+                          base::SpaceInformationPtr si, const std::vector<DenseEdge>& unvalidatedEdges);
+
+    void getVertexNeighborsPreprocess();
+
+    void getVertexNeighbors(std::size_t v1, std::vector<DenseVertex>& graphNeighborhood);
 
     /** \brief The created space information */
     base::SpaceInformationPtr si_;
@@ -114,6 +117,12 @@ class Discretizer
 
     // Prevent two vertices from being added to graph at same time
     boost::mutex vertexMutex_;
+
+    /** \brief Constant used by k-PRM* to determine now many neighbors to connect to milestones */
+    double findNearestKNeighbors_;
+double radiusNeighbors_;
+
+    std::size_t edgeConnectionStrategy_;
 
   public:
     /** \brief Various options for visualizing the algorithmns performance */

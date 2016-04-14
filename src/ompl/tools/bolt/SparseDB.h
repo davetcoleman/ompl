@@ -250,7 +250,7 @@ class SparseDB
     bool reinsertNeighborsIntoSpars(const SparseVertex& newVertex);
 
     /** \brief Helper for counting the number of disjoint sets in the sparse graph */
-    std::size_t getDisjointSets(bool verbose = false);
+    std::size_t getDisjointSetsCount(bool verbose = false);
 
     bool getPopularityOrder(std::vector<WeightedVertex>& vertexInsertionOrder);
     bool getDefaultOrder(std::vector<WeightedVertex>& vertexInsertionOrder);

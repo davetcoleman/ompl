@@ -446,6 +446,11 @@ class DenseDB
      */
     void connectNewVertex(DenseVertex denseV);
 
+    /** \brief Helper for counting the number of disjoint sets in the sparse graph */
+    std::size_t getDisjointSetsCount(bool verbose = false);
+
+    bool checkConnectedComponents();
+
   protected:
     /** \brief The created space information */
     base::SpaceInformationPtr si_;
@@ -489,8 +494,10 @@ class DenseDB
     /** \brief Access to the representatives of the Dense vertices */
     boost::property_map<DenseGraph, vertex_sparse_rep_t>::type representativesProperty_;
 
-    /** \brief Loading/unloading utility */
-    //BoltStorage storage_;
+    /** \brief Data structure that maintains the connected components */
+    boost::disjoint_sets<boost::property_map<DenseGraph, boost::vertex_rank_t>::type,
+                         boost::property_map<DenseGraph, boost::vertex_predecessor_t>::type> disjointSets_;
+
 
     /** \brief Track vertex for later removal if temporary */
     std::vector<DenseVertex> tempVerticies_;

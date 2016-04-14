@@ -43,6 +43,7 @@
 // Boost
 #include <boost/foreach.hpp>
 #include <boost/thread.hpp>
+#include <boost/math/constants/constants.hpp>
 
 #define foreach BOOST_FOREACH
 
@@ -102,6 +103,9 @@ void Discretizer::generateGrid()
     std::size_t average_degree = (denseDB_->getNumEdges() * 2) / denseDB_->getNumVertices();
     OMPL_INFORM("Average degree: %i", average_degree);
 
+    // Check how many disjoint sets are in the dense graph (should be none)
+    denseDB_->checkConnectedComponents();
+
     // Display
     // if (visualizeGridGeneration_)
     // visual_->viz1Trigger();
@@ -125,8 +129,9 @@ void Discretizer::generateVertices()
     // Check that we have enough jointIncrements for all the threads
     if (jointIncrements < numThreads)
     {
-        OMPL_WARN("There are fewer joint_0 increments (%u) at current discretization (%f) than available threads (%u), underutilizing threading",
-            jointIncrements, discretization_, numThreads);
+        OMPL_WARN("There are fewer joint_0 increments (%u) at current discretization (%f) than available threads (%u), "
+                  "underutilizing threading",
+                  jointIncrements, discretization_, numThreads);
         OMPL_INFORM("Optimal discretization: %f", range / double(numThreads));
         numThreads = jointIncrements;
     }
@@ -211,7 +216,7 @@ void Discretizer::createVertexThread(std::size_t threadID, double startJointValu
         maxDiscretizationLevel = 1;  // because the third level (numbered '2') is for task space
         values[2] = 0.0;             // task space
     }
-    else if (si->getStateSpace()->getDimension() == 6)
+    else if (false && si->getStateSpace()->getDimension() == 6)
     {
         maxDiscretizationLevel = 4;  // don't discretize the wrist rotation
         values[5] = 0.0;             // middle rotation of wrist
@@ -228,7 +233,7 @@ void Discretizer::createVertexThread(std::size_t threadID, double startJointValu
         if (threadID == 0)
         {
             const double percent = (value - startJointValue) / (endJointValue - startJointValue) * 100.0;
-            std::cout << "Vertex generation progress: " << percent
+            std::cout << "Vertex generation progress: " << std::setprecision(1) << percent
                       << " % Total vertices: " << denseDB_->getNumVertices() << std::endl;
         }
 
@@ -333,6 +338,9 @@ void Discretizer::generateEdges()
     std::vector<DenseEdge> unvalidatedEdges;
     std::size_t feedbackFrequency = std::max(static_cast<int>(denseDB_->getNumVertices() / 10), 10);
 
+    // Cache certain values
+    getVertexNeighborsPreprocess();
+
     // Loop through each vertex
     for (std::size_t v1 = 1; v1 < denseDB_->getNumVertices(); ++v1)  // 1 because 0 is the search vertex?
     {
@@ -340,7 +348,8 @@ void Discretizer::generateEdges()
         {
             // Benchmark runtime
             double duration = time::seconds(time::now() - startTime);
-            std::cout << "Edge generation progress: " << double(v1) / denseDB_->getNumVertices() * 100.0 << " % "
+            std::cout << "Edge generation progress: " << std::setprecision(1) <<
+                double(v1) / denseDB_->getNumVertices() * 100.0 << " % "
                       << "Total edges: " << count << " Total time: " << duration << std::endl;
             startTime = time::now();
         }
@@ -348,23 +357,8 @@ void Discretizer::generateEdges()
         // Add edges
         graphNeighborhood.clear();
 
-        // Search
-        denseDB_->stateProperty_[denseDB_->queryVertex_] = denseDB_->stateProperty_[v1];
-
-        // QUESTION: How many edges should each vertex connect with?
-
-        // METHOD 1
-        // std::size_t findNearestKNeighbors = getEdgesPerVertex(si_);
-        // const std::size_t numSameVerticiesFound = 1;  // add 1 to the end because the NN tree always returns itself
-        // denseDB_->nn_->nearestK(denseDB_->queryVertex_, findNearestKNeighbors + numSameVerticiesFound,
-        // graphNeighborhood);
-
-        // METHOD 2
-        double radius = sqrt(2 * (discretization_ * discretization_));
-        denseDB_->nn_->nearestR(denseDB_->queryVertex_, radius, graphNeighborhood);
-
-        // Set search vertex to NULL to prevent segfault on class unload of memory
-        denseDB_->stateProperty_[denseDB_->queryVertex_] = NULL;
+        // Choose best strategy
+        getVertexNeighbors(v1, graphNeighborhood);
 
         if (verbose)
             OMPL_INFORM("Found %u neighbors", graphNeighborhood.size());
@@ -468,6 +462,65 @@ void Discretizer::generateEdges()
     OMPL_INFORM("   Total time:           %f sec (%f hz)", duration3, 1.0 / duration3);
 }
 
+void Discretizer::getVertexNeighborsPreprocess()
+{
+    edgeConnectionStrategy_ = 1;
+
+    switch (edgeConnectionStrategy_)
+    {
+        case 1:
+            findNearestKNeighbors_ = getEdgesPerVertex(si_);
+            std::cout << "findNearestKNeighbors: " << findNearestKNeighbors_ << std::endl;
+            break;
+        case 2:
+            radiusNeighbors_ = sqrt(2 * (discretization_ * discretization_));
+            std::cout << "radiusNeighbors_: " << radiusNeighbors_ << std::endl;
+            break;
+        case 3:
+            {
+                // Setup Method 3
+                double kPRMConstant_ = boost::math::constants::e<double>() +
+                    (boost::math::constants::e<double>() / (double)si_->getStateSpace()->getDimension());
+                findNearestKNeighbors_ =
+                    static_cast<unsigned int>(ceil(kPRMConstant_ * log((double)denseDB_->getNumVertices())));
+                std::cout << "findNearestKNeighbors: " << findNearestKNeighbors_ << std::endl;
+            }
+            break;
+        default:
+            OMPL_ERROR("Incorrect edge connection stragety");
+    }
+}
+
+void Discretizer::getVertexNeighbors(std::size_t v1, std::vector<DenseVertex> &graphNeighborhood)
+{
+    const std::size_t numSameVerticiesFound = 1;  // add 1 to the end because the NN tree always returns itself
+
+    // Search
+    denseDB_->stateProperty_[denseDB_->queryVertex_] = denseDB_->stateProperty_[v1];
+
+    // QUESTION: How many edges should each vertex connect with?
+    switch (edgeConnectionStrategy_)
+    {
+        case 1:
+            // METHOD 1
+            denseDB_->nn_->nearestK(denseDB_->queryVertex_, findNearestKNeighbors_ + numSameVerticiesFound,
+                graphNeighborhood);
+            break;
+        case 2:
+            // METHOD 2
+            denseDB_->nn_->nearestR(denseDB_->queryVertex_, radiusNeighbors_, graphNeighborhood);
+            break;
+        case 3:
+            // METHOD 3 - based on k-PRM*
+            denseDB_->nn_->nearestK(denseDB_->queryVertex_, findNearestKNeighbors_ + numSameVerticiesFound, graphNeighborhood);
+            break;
+        default:
+            OMPL_ERROR("Incorrect edge connection stragety");
+    }
+    // Set search vertex to NULL to prevent segfault on class unload of memory
+    denseDB_->stateProperty_[denseDB_->queryVertex_] = NULL;
+}
+
 void Discretizer::checkEdgesThreaded(const std::vector<DenseEdge> &unvalidatedEdges)
 {
     const bool verbose = false;
@@ -536,8 +589,8 @@ void Discretizer::checkEdgesThreaded(const std::vector<DenseEdge> &unvalidatedEd
     }
 }
 
-void Discretizer::checkEdgesThread(std::size_t threadID, std::size_t startEdge, std::size_t endEdge, base::SpaceInformationPtr si,
-                                   const std::vector<DenseEdge> &unvalidatedEdges)
+void Discretizer::checkEdgesThread(std::size_t threadID, std::size_t startEdge, std::size_t endEdge,
+                                   base::SpaceInformationPtr si, const std::vector<DenseEdge> &unvalidatedEdges)
 {
     std::size_t feedbackFrequency = (endEdge - startEdge) / 10;
 
@@ -547,9 +600,8 @@ void Discretizer::checkEdgesThread(std::size_t threadID, std::size_t startEdge, 
         // User feedback on thread 0
         if (threadID == 0 && (edgeID) % feedbackFrequency == 0)
         {
-            std::cout << "Collision checking edges progress: "
-                      << (edgeID - startEdge) / static_cast<double>(endEdge - startEdge) * 100.0
-                      << " %" << std::endl;
+            std::cout << "Collision checking edges progress: " << std::setprecision(1)
+                      << (edgeID - startEdge) / static_cast<double>(endEdge - startEdge) * 100.0 << " %" << std::endl;
         }
 
         const DenseEdge &e = unvalidatedEdges[edgeID];

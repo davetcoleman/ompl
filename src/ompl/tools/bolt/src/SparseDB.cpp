@@ -591,7 +591,7 @@ void SparseDB::createSPARS()
     OMPL_INFORM("  Edges:  %u", getNumEdges());
 
     // Check how many connected components exist, possibly throw error
-    std::size_t numSets = getDisjointSets();
+    std::size_t numSets = getDisjointSetsCount();
     if (numSets > 1)
     {
         OMPL_INFORM("  Number of disjoint sets: %u, attempting to random sample until fully connected", numSets);
@@ -715,14 +715,14 @@ void SparseDB::eliminateDisjointSets()
         }
 
         // Update number of sets
-        numSets = getDisjointSets();
+        numSets = getDisjointSetsCount();
 
         // Debug
         if (disjointVerbose_)
             std::cout << std::string(coutIndent + 4, ' ') << "Remaining disjoint sets: " << numSets << std::endl;
     }  // end while
 
-    // getDisjointSets(true);  // show in verbose mode
+    // getDisjointSetsCount(true);  // show in verbose mode
     // OMPL_ERROR("  Shutting down because there should only be one disjoint set");
     // exit(-1);
 }
@@ -758,7 +758,7 @@ bool SparseDB::reinsertNeighborsIntoSpars(const SparseVertex &newVertex)
     return result;
 }
 
-std::size_t SparseDB::getDisjointSets(bool verbose)
+std::size_t SparseDB::getDisjointSetsCount(bool verbose)
 {
     std::size_t numSets = 0;
     foreach (SparseVertex v, boost::vertices(g_))
