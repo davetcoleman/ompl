@@ -76,11 +76,8 @@ void Discretizer::generateGrid()
     }
 
     // Create vertices
-    createVertices();
+    generateVertices();
     OMPL_INFORM("Generated %i vertices.", denseDB_->getNumVertices());
-
-    std::cout << std::endl;
-    return;
 
     // Error check
     if (denseDB_->getNumVertices() < 2)
@@ -88,11 +85,6 @@ void Discretizer::generateGrid()
         OMPL_ERROR("No vertices generated, failing");
         exit(-1);
     }
-
-    // Remove vertices in collision using multithreading
-    // TODO enable
-    // std::vector<DenseVertex> unvalidatedVertices;
-    // checkVerticesThreaded(unvalidatedVertices);
 
     {
         // Benchmark runtime
@@ -111,46 +103,58 @@ void Discretizer::generateGrid()
     OMPL_INFORM("Average degree: %i", average_degree);
 
     // Display
-    //if (visualizeGridGeneration_)
-    //visual_->viz1Trigger();
+    // if (visualizeGridGeneration_)
+    // visual_->viz1Trigger();
 }
 
-void Discretizer::createVertices()
+void Discretizer::generateVertices()
 {
-    const bool verbose = true;
+    const bool verbose = false;
 
-    // Setup threading
-    static const std::size_t numThreads = boost::thread::hardware_concurrency();
-    std::vector<boost::thread *> threads(numThreads);
-
-    OMPL_INFORM("Generating vertices using %u threads", numThreads);
-
-    // Setup bounds for level 1
+    // Setup bounds for joint 0
     ob::RealVectorBounds bounds = si_->getStateSpace()->getBounds();
     assert(bounds.high.size() == bounds.low.size());
     assert(bounds.high.size() == si_->getStateSpace()->getDimension());
 
     // Divide joint 0 between threads
-    std::size_t jointID = 0;
-    double range = bounds.high[jointID] - bounds.low[jointID];
-    std::size_t jointIncrements = range / discretization_;
+    const std::size_t jointID = 0;
+    const double range = bounds.high[jointID] - bounds.low[jointID];
+    const std::size_t jointIncrements = range / discretization_;
+    std::size_t numThreads = boost::thread::hardware_concurrency();
+
+    // Check that we have enough jointIncrements for all the threads
+    if (jointIncrements < numThreads)
+    {
+        OMPL_WARN("There are fewer joint_0 increments (%u) at current discretization (%f) than available threads (%u), underutilizing threading",
+            jointIncrements, discretization_, numThreads);
+        OMPL_INFORM("Optimal discretization: %f", range / double(numThreads));
+        numThreads = jointIncrements;
+    }
+
+    // Debugging
+    if (false)
+    {
+        OMPL_WARN("Overriding number of threads for testing to 1");
+        numThreads = 1;
+    }
+
+    // Setup threading
+    std::vector<boost::thread *> threads(numThreads);
+    OMPL_INFORM("Generating vertices using %u threads", numThreads);
+
     std::size_t jointIncrementsPerThread = jointIncrements / numThreads;
 
     if (verbose)
     {
+        std::cout << "-------------------------------------------------------" << std::endl;
         std::cout << std::fixed << std::setprecision(4);
         std::cout << "discretization_: " << discretization_ << std::endl;
         std::cout << "low: " << bounds.low[jointID] << " high: " << bounds.high[jointID] << std::endl;
         std::cout << "level 0 range is: " << range << std::endl;
         std::cout << "jointIncrements: " << jointIncrements << std::endl;
         std::cout << "jointIncrementsPerThread: " << jointIncrementsPerThread << std::endl;
-    }
-
-    // Check that we have enough jointIncrements for all the threads
-    if (jointIncrements < numThreads)
-    {
-        OMPL_ERROR("Not enough joint increments (%u) at current discretization for available threads (%u)", jointIncrements, numThreads);
-        exit(-1);
+        std::cout << "numThreads: " << numThreads << std::endl;
+        std::cout << "-------------------------------------------------------" << std::endl;
     }
 
     double startJointValue = bounds.low[jointID];
@@ -176,8 +180,8 @@ void Discretizer::createVertices()
         si->setStateValidityChecker(si_->getStateValidityChecker());
         si->setMotionValidator(si_->getMotionValidator());
 
-        threads[i] =
-            new boost::thread(boost::bind(&Discretizer::createVertexThread, this, startJointValue, endJointValue, si));
+        threads[i] = new boost::thread(
+            boost::bind(&Discretizer::createVertexThread, this, i, startJointValue, endJointValue, si));
 
         startJointValue = endJointValue;
     }
@@ -190,47 +194,63 @@ void Discretizer::createVertices()
     }
 }
 
-void Discretizer::createVertexThread(double startJointValue, double endJointValue, base::SpaceInformationPtr si)
+void Discretizer::createVertexThread(std::size_t threadID, double startJointValue, double endJointValue,
+                                     base::SpaceInformationPtr si)
 {
     std::size_t jointID = 0;
-    ob::RealVectorBounds bounds = si_->getStateSpace()->getBounds();
-
-    // Choose first state to discretize
-    // TODO: it is currently possible the last state is never freed
-
-    base::State *candidateState = si_->getStateSpace()->allocState();  // TODO not thread safe
+    ob::RealVectorBounds bounds = si->getStateSpace()->getBounds();
+    base::State *candidateState = si->getStateSpace()->allocState();
 
     // Prepare for recursion
     std::vector<double> values(si->getStateSpace()->getDimension(), 0);
 
+    // Customize for different state spaces TODO more generic
+    std::size_t maxDiscretizationLevel;
+    if (si->getStateSpace()->getDimension() == 3)
+    {
+        maxDiscretizationLevel = 1;  // because the third level (numbered '2') is for task space
+        values[2] = 0.0;             // task space
+    }
+    else if (si->getStateSpace()->getDimension() == 6)
+    {
+        maxDiscretizationLevel = 4;  // don't discretize the wrist rotation
+        values[5] = 0.0;             // middle rotation of wrist
+    }
+    else
+    {
+        maxDiscretizationLevel = si->getStateSpace()->getDimension() - 1;
+    }
+
     // Loop through current joint
     for (double value = startJointValue; value < endJointValue; value += discretization_)
     {
+        // User feedback on thread 0
+        if (threadID == 0)
+        {
+            const double percent = (value - startJointValue) / (endJointValue - startJointValue) * 100.0;
+            std::cout << "Vertex generation progress: " << percent
+                      << " % Total vertices: " << denseDB_->getNumVertices() << std::endl;
+        }
+
+        // Set first joint value
         values[jointID] = value;
 
-        //std::cout << "Thread " << boost::this_thread::get_id() << " value: " << value << std::endl;
-
-        // User feedback
-        // if (jointID == 0)
-        // {
-        //     const double percent =
-        //         (value - bounds.low[jointID]) / (bounds.high[jointID] - bounds.low[jointID]) * 100.0;
-        //     std::cout << "Vertex generation progress: " << percent << " % Total vertices: " <<
-        //     denseDB_->getNumVertices()
-        //               << std::endl;
-        // }
-
         // Keep recursing
-        recursiveDiscretization(values, jointID + 1, si, candidateState);
+        recursiveDiscretization(threadID, values, jointID + 1, si, candidateState, maxDiscretizationLevel);
     }
 
     // Cleanup
     si->freeState(candidateState);
 }
 
-void Discretizer::recursiveDiscretization(std::vector<double> &values, std::size_t jointID,
-                                          base::SpaceInformationPtr si, base::State *candidateState)
+void Discretizer::recursiveDiscretization(std::size_t threadID, std::vector<double> &values, std::size_t jointID,
+                                          base::SpaceInformationPtr si, base::State *candidateState,
+                                          std::size_t maxDiscretizationLevel)
 {
+    const bool verbose = false;
+    if (verbose)
+        std::cout << "recursiveDiscretization " << jointID << std::endl;
+
     ob::RealVectorBounds bounds = si->getStateSpace()->getBounds();
 
     // Error check
@@ -241,25 +261,21 @@ void Discretizer::recursiveDiscretization(std::vector<double> &values, std::size
     {
         values[jointID] = value;
 
-        // User feedback
-        if (jointID == 0)
-        {
-            const double percent =
-                (value - bounds.low[jointID]) / (bounds.high[jointID] - bounds.low[jointID]) * 100.0;
-            std::cout << "Vertex generation progress: " << percent
-                      << " % Total vertices: " << denseDB_->getNumVertices() << std::endl;
-        }
-
         // Check if we are at the end of the recursion
-        if (jointID < values.size() - 1)
+        if (verbose)
+            std::cout << "jointID " << jointID << " maxDiscretizationLevel " << maxDiscretizationLevel << std::endl;
+
+        if (jointID < maxDiscretizationLevel)
         {
             // Keep recursing
-            recursiveDiscretization(values, jointID + 1, si, candidateState);
+            recursiveDiscretization(threadID, values, jointID + 1, si, candidateState, maxDiscretizationLevel);
         }
         else  // this is the end of recursion, create a new state
         {
             // Fill the state with current values
             si->getStateSpace()->populateState(candidateState, values);
+
+            // denseDB_->debugState(candidateState);
 
             // Collision check
             if (!si->isValid(candidateState))
@@ -272,7 +288,7 @@ void Discretizer::recursiveDiscretization(std::vector<double> &values, std::size
             GuardType type = START;  // TODO(davetcoleman): type START is dummy
 
             // Allocate state before mutex
-            base::State* newState = si->cloneState(candidateState);
+            base::State *newState = si->cloneState(candidateState);
 
             {
                 boost::unique_lock<boost::mutex> scoped_lock(vertexMutex_);
@@ -306,7 +322,7 @@ std::size_t Discretizer::getEdgesPerVertex(base::SpaceInformationPtr si)
 void Discretizer::generateEdges()
 {
     OMPL_INFORM("Generating edges");
-    bool verbose = false;
+    const bool verbose = false;
 
     // Benchmark runtime
     time::point startTime = time::now();
@@ -332,16 +348,23 @@ void Discretizer::generateEdges()
         // Add edges
         graphNeighborhood.clear();
 
-        // How many edges should each vertex connect with?
-        std::size_t findNearestKNeighbors = getEdgesPerVertex(si_);
-        const std::size_t numSameVerticiesFound = 1;  // add 1 to the end because the NN tree always returns itself
-
         // Search
         denseDB_->stateProperty_[denseDB_->queryVertex_] = denseDB_->stateProperty_[v1];
-        denseDB_->nn_->nearestK(denseDB_->queryVertex_, findNearestKNeighbors + numSameVerticiesFound,
-                                graphNeighborhood);
-        denseDB_->stateProperty_[denseDB_->queryVertex_] =
-            NULL;  // Set search vertex to NULL to prevent segfault on class unload of memory
+
+        // QUESTION: How many edges should each vertex connect with?
+
+        // METHOD 1
+        // std::size_t findNearestKNeighbors = getEdgesPerVertex(si_);
+        // const std::size_t numSameVerticiesFound = 1;  // add 1 to the end because the NN tree always returns itself
+        // denseDB_->nn_->nearestK(denseDB_->queryVertex_, findNearestKNeighbors + numSameVerticiesFound,
+        // graphNeighborhood);
+
+        // METHOD 2
+        double radius = sqrt(2 * (discretization_ * discretization_));
+        denseDB_->nn_->nearestR(denseDB_->queryVertex_, radius, graphNeighborhood);
+
+        // Set search vertex to NULL to prevent segfault on class unload of memory
+        denseDB_->stateProperty_[denseDB_->queryVertex_] = NULL;
 
         if (verbose)
             OMPL_INFORM("Found %u neighbors", graphNeighborhood.size());
@@ -397,19 +420,8 @@ void Discretizer::generateEdges()
     // Collision check all edges using threading
     checkEdgesThreaded(unvalidatedEdges);
 
-    // Calculate statistics on collision state of robot
-    std::size_t numEdgesAfterCheck = denseDB_->getNumEdges();
-    std::size_t numRemovedEdges = numEdgesBeforeCheck - numEdgesAfterCheck;
-    double duration3 = time::seconds(time::now() - startTime3);
-
-    // User feedback
-    OMPL_INFORM("Collision State of Robot -----------------");
-    OMPL_INFORM("   Removed Edges:        %u", numRemovedEdges);
-    OMPL_INFORM("   Remaining Edges:      %u", numEdgesAfterCheck);
-    OMPL_INFORM("   Percent Removed:      %f %%", numRemovedEdges / double(numEdgesBeforeCheck) * 100.0);
-    OMPL_INFORM("   Total time:           %f sec (%f hz)", duration3, 1.0 / duration3);
-
     // Calculate cost for each edge
+    OMPL_INFORM("Calculating cost for each edge");
     std::size_t errorCheckCounter = 0;
     foreach (const DenseEdge e, boost::edges(denseDB_->g_))
     {
@@ -440,29 +452,20 @@ void Discretizer::generateEdges()
             }
         }
     }
+
+    // Calculate statistics on collision state of robot
+    std::size_t numEdgesAfterCheck = denseDB_->getNumEdges();
     assert(errorCheckCounter == numEdgesAfterCheck);
-}
 
-void Discretizer::checkEdges()  // TODO: deprecated, remove this func
-{
-    OMPL_WARN("Collision checking generated edges without threads");
-    OMPL_ERROR("Has not been updated for remove_edge");
+    std::size_t numRemovedEdges = numEdgesBeforeCheck - numEdgesAfterCheck;
+    double duration3 = time::seconds(time::now() - startTime3);
 
-    foreach (const DenseEdge e, boost::edges(denseDB_->g_))
-    {
-        const DenseVertex &v1 = boost::source(e, denseDB_->g_);
-        const DenseVertex &v2 = boost::target(e, denseDB_->g_);
-
-        // Remove any edges that are in collision
-        if (!si_->checkMotion(denseDB_->stateProperty_[v1], denseDB_->stateProperty_[v2]))
-        {
-            denseDB_->edgeCollisionStateProperty_[e] = IN_COLLISION;
-        }
-        else
-        {
-            denseDB_->edgeCollisionStateProperty_[e] = FREE;
-        }
-    }
+    // User feedback
+    OMPL_INFORM("Collision State of Robot -----------------");
+    OMPL_INFORM("   Removed Edges:        %u", numRemovedEdges);
+    OMPL_INFORM("   Remaining Edges:      %u", numEdgesAfterCheck);
+    OMPL_INFORM("   Percent Removed:      %f %%", numRemovedEdges / double(numEdgesBeforeCheck) * 100.0);
+    OMPL_INFORM("   Total time:           %f sec (%f hz)", duration3, 1.0 / duration3);
 }
 
 void Discretizer::checkEdgesThreaded(const std::vector<DenseEdge> &unvalidatedEdges)
@@ -477,20 +480,20 @@ void Discretizer::checkEdgesThreaded(const std::vector<DenseEdge> &unvalidatedEd
     OMPL_INFORM("Collision checking %u generated edges using %u threads", unvalidatedEdges.size(), numThreads);
 
     std::vector<boost::thread *> threads(numThreads);
-    std::size_t numEdges =
-        denseDB_->getNumEdges();  // we copy this number, because it might start shrinking when threads spin up
+    // we copy this number, because it might start shrinking when threads spin up
+    std::size_t numEdges = denseDB_->getNumEdges();
     std::size_t edgesPerThread = numEdges / numThreads;  // rounds down
     std::size_t startEdge = 0;
     std::size_t endEdge;
     std::size_t errorCheckTotalEdges = 0;
 
     // For each thread
-    for (std::size_t i = 0; i < threads.size(); ++i)
+    for (std::size_t threadID = 0; threadID < threads.size(); ++threadID)
     {
         endEdge = startEdge + edgesPerThread - 1;
 
         // Check if this is the last thread
-        if (i == threads.size() - 1)
+        if (threadID == threads.size() - 1)
         {
             // have it do remaining edges to check
             endEdge = numEdges - 1;
@@ -498,22 +501,22 @@ void Discretizer::checkEdgesThreaded(const std::vector<DenseEdge> &unvalidatedEd
         errorCheckTotalEdges += (endEdge - startEdge);
 
         if (verbose)
-            std::cout << "Thread " << i << " has edges from " << startEdge << " to " << endEdge << std::endl;
+            std::cout << "Thread " << threadID << " has edges from " << startEdge << " to " << endEdge << std::endl;
 
         base::SpaceInformationPtr si(new base::SpaceInformation(si_->getStateSpace()));
         si->setStateValidityChecker(si_->getStateValidityChecker());
         si->setMotionValidator(si_->getMotionValidator());
 
-        threads[i] = new boost::thread(
-            boost::bind(&Discretizer::checkEdgesThread, this, startEdge, endEdge, si, unvalidatedEdges));
+        threads[threadID] = new boost::thread(
+            boost::bind(&Discretizer::checkEdgesThread, this, threadID, startEdge, endEdge, si, unvalidatedEdges));
         startEdge += edgesPerThread;
     }
 
     // Join threads
-    for (std::size_t i = 0; i < threads.size(); ++i)
+    for (std::size_t threadID = 0; threadID < threads.size(); ++threadID)
     {
-        threads[i]->join();
-        delete threads[i];
+        threads[threadID]->join();
+        delete threads[threadID];
     }
 
     // Error check
@@ -533,12 +536,22 @@ void Discretizer::checkEdgesThreaded(const std::vector<DenseEdge> &unvalidatedEd
     }
 }
 
-void Discretizer::checkEdgesThread(std::size_t startEdge, std::size_t endEdge, base::SpaceInformationPtr si,
+void Discretizer::checkEdgesThread(std::size_t threadID, std::size_t startEdge, std::size_t endEdge, base::SpaceInformationPtr si,
                                    const std::vector<DenseEdge> &unvalidatedEdges)
 {
+    std::size_t feedbackFrequency = (endEdge - startEdge) / 10;
+
     // Process [startEdge, endEdge] inclusive
     for (std::size_t edgeID = startEdge; edgeID <= endEdge; ++edgeID)
     {
+        // User feedback on thread 0
+        if (threadID == 0 && (edgeID) % feedbackFrequency == 0)
+        {
+            std::cout << "Collision checking edges progress: "
+                      << (edgeID - startEdge) / static_cast<double>(endEdge - startEdge) * 100.0
+                      << " %" << std::endl;
+        }
+
         const DenseEdge &e = unvalidatedEdges[edgeID];
 
         const DenseVertex &v1 = boost::source(e, denseDB_->g_);
@@ -552,78 +565,6 @@ void Discretizer::checkEdgesThread(std::size_t startEdge, std::size_t endEdge, b
         else
         {
             denseDB_->edgeCollisionStateProperty_[e] = FREE;
-        }
-    }
-}
-
-void Discretizer::checkVerticesThreaded(const std::vector<DenseVertex> &unvalidatedVertices)
-{
-    // TODO(davetcoleman): have not tested this functionality
-    bool verbose = true;
-
-    // Setup threading
-    static const std::size_t numThreads = boost::thread::hardware_concurrency();
-    OMPL_INFORM("Collision checking %u generated vertices using %u threads", unvalidatedVertices.size(), numThreads);
-
-    std::vector<boost::thread *> threads(numThreads);
-    std::size_t verticesPerThread = denseDB_->getNumVertices() / numThreads;  // rounds down
-    std::size_t startVertex = 0;
-    std::size_t endVertex;
-    std::size_t errorCheckTotalVertices = 0;
-
-    // For each thread
-    for (std::size_t i = 0; i < threads.size(); ++i)
-    {
-        endVertex = startVertex + verticesPerThread - 1;
-
-        // Check if this is the last thread
-        if (i == threads.size() - 1)
-        {
-            // have it do remaining vertices to check
-            endVertex = denseDB_->getNumVertices() - 1;
-        }
-        errorCheckTotalVertices += (endVertex - startVertex);
-
-        if (verbose)
-            std::cout << "Thread " << i << " has vertices from " << startVertex << " to " << endVertex << std::endl;
-
-        base::SpaceInformationPtr si(new base::SpaceInformation(si_->getStateSpace()));
-        si->setStateValidityChecker(si_->getStateValidityChecker());
-        // si->setMotionValidator(si_->getMotionValidator());
-
-        threads[i] = new boost::thread(
-            boost::bind(&Discretizer::checkVerticesThread, this, startVertex, endVertex, si, unvalidatedVertices));
-        startVertex += verticesPerThread;
-    }
-
-    // Join threads
-    for (std::size_t i = 0; i < threads.size(); ++i)
-    {
-        threads[i]->join();
-        delete threads[i];
-    }
-
-    // Error check
-    if (errorCheckTotalVertices == denseDB_->getNumVertices())
-    {
-        OMPL_ERROR("Incorrect number of vertices were processed");
-        exit(-1);
-    }
-}
-
-void Discretizer::checkVerticesThread(std::size_t startVertex, std::size_t endVertex, base::SpaceInformationPtr si,
-                                      const std::vector<DenseVertex> &unvalidatedVertices)
-{
-    // Process [startVertex, endVertex] inclusive
-    for (std::size_t vertexID = startVertex; vertexID <= endVertex; ++vertexID)
-    {
-        const DenseVertex &v = unvalidatedVertices[vertexID];
-
-        // Remove any vertices that are in collision
-        if (!si_->isValid(denseDB_->stateProperty_[v]))
-        {
-            boost::remove_vertex(v, denseDB_->g_);
-            std::cout << "found vertex in collision " << std::endl;
         }
     }
 }

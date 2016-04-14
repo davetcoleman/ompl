@@ -54,7 +54,6 @@ namespace tools
 {
 namespace bolt
 {
-
 /// @cond IGNORE
 OMPL_CLASS_FORWARD(Discretizer);
 /// @endcond
@@ -65,7 +64,6 @@ OMPL_CLASS_FORWARD(Discretizer);
 class Discretizer
 {
   public:
-
     /** \brief Constructor needs the state space used for planning.
      *  \param space - state space
      */
@@ -79,35 +77,30 @@ class Discretizer
      */
     void generateGrid();
 
-    void createVertices();
-
-    void createVertexThread(double startJointValue, double endJointValue, base::SpaceInformationPtr si);
-
-    void recursiveDiscretization(std::vector<double> &values, std::size_t jointID, base::SpaceInformationPtr si, base::State* candidateState);
-
     /** \brief Helper function to calculate connectivity based on dimensionality */
     static std::size_t getEdgesPerVertex(base::SpaceInformationPtr si);
 
-private:
+  private:
 
-    /** \brief Faster method for collision checking vertices */
-    void checkVerticesThreaded(const std::vector<DenseVertex>& unvalidatedVertices);
-    void checkVerticesThread(std::size_t startVertex, std::size_t endVertex, base::SpaceInformationPtr si,
-                             const std::vector<DenseVertex>& unvalidatedVertices);
+    void generateVertices();
+
+    void createVertexThread(std::size_t threadID, double startJointValue, double endJointValue,
+                            base::SpaceInformationPtr si);
+
+    void recursiveDiscretization(std::size_t threadID, std::vector<double>& values, std::size_t jointID,
+                                 base::SpaceInformationPtr si, base::State* candidateState,
+                                 std::size_t maxDiscretizationLevel);
 
     /**
      * \brief Connect vertices wherever possible
      */
     void generateEdges();
 
-    /** \brief Collision check edges */
-    void checkEdges();
-
     /** \brief Collision check edges using threading */
     void checkEdgesThreaded(const std::vector<DenseEdge>& unvalidatedEdges);
 
     /** \brief Collision check edges in vector from [startEdge, endEdge] inclusive */
-    void checkEdgesThread(std::size_t startEdge, std::size_t endEdge, base::SpaceInformationPtr si,
+    void checkEdgesThread(std::size_t threadID, std::size_t startEdge, std::size_t endEdge, base::SpaceInformationPtr si,
                           const std::vector<DenseEdge>& unvalidatedEdges);
 
     /** \brief The created space information */
@@ -122,8 +115,7 @@ private:
     // Prevent two vertices from being added to graph at same time
     boost::mutex vertexMutex_;
 
-public:
-
+  public:
     /** \brief Various options for visualizing the algorithmns performance */
     bool visualizeGridGeneration_;
 

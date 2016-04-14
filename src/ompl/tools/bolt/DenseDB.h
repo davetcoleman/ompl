@@ -341,7 +341,7 @@ class DenseDB
     void clearEdgeCollisionStates();
 
     /** \brief Visualize the stored database in an external program using callbacks */
-    void displayDatabase(bool showVertices = false);
+    void displayDatabase();
 
     /** \brief Keep graph evenly weighted */
     void normalizeGraphEdgeWeights();
@@ -525,6 +525,8 @@ class DenseDB
     bool visualizeSnapPath_;
     double visualizeSnapPathSpeed_;
     bool visualizeAddSample_;
+    bool visualizeDatabaseVertices_;
+    bool visualizeDatabaseEdges_;
 
     /** \brief Visualization speed of astar search, num of seconds to show each vertex */
     double visualizeAstarSpeed_;
