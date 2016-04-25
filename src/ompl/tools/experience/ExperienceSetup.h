@@ -38,7 +38,8 @@
 #ifndef OMPL_TOOLS_EXPERIENCE__EXPERIENCE_SETUP_
 #define OMPL_TOOLS_EXPERIENCE__EXPERIENCE_SETUP_
 
-#include "ompl/geometric/SimpleSetup.h"
+#include <ompl/geometric/SimpleSetup.h>
+#include <ompl/tools/debug/Visualizer.h>
 
 namespace ompl
 {
@@ -221,7 +222,16 @@ namespace ompl
                 return true;
             }
 
+            /** \brief Get class for managing various visualization features */
+            VisualizerPtr getVisual()
+            {
+                return visual_;
+            }
+
         protected:
+
+            /** \brief Class for managing various visualization features */
+            VisualizerPtr visual_;
 
             /// Flag indicating whether recalled plans should be used to find solutions. Enabled by default.
             bool                              recallEnabled_;

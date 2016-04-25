@@ -59,6 +59,9 @@ void ompl::tools::Thunder::initialize()
 {
     OMPL_INFORM("Initializing Thunder Framework");
 
+    // Initalize visualizer class
+    visual_.reset(new Visualizer());
+
     recallEnabled_ = true;
     scratchEnabled_ = true;
     filePath_ = "unloaded";
@@ -67,7 +70,7 @@ void ompl::tools::Thunder::initialize()
     dualThreadScratchEnabled_ = true;
 
     // Load the experience database
-    experienceDB_.reset(new ompl::tools::ThunderDB(si_->getStateSpace()));
+    experienceDB_.reset(new ompl::tools::ThunderDB(si_->getStateSpace(), visual_));
 
     // Load the Retrieve repair database. We do it here so that setRepairPlanner() works
     rrPlanner_ = ob::PlannerPtr(new og::ThunderRetrieveRepair(si_, experienceDB_));
@@ -154,7 +157,7 @@ void ompl::tools::Thunder::setup(void)
             OMPL_INFORM("Calling setup() for SPARSdb");
 
             // Load SPARSdb
-            experienceDB_->getSPARSdb().reset(new ompl::geometric::SPARSdb(si_));
+            experienceDB_->getSPARSdb().reset(new ompl::geometric::SPARSdb(si_, visual_));
             experienceDB_->getSPARSdb()->setProblemDefinition(pdef_);
             experienceDB_->getSPARSdb()->setup();
 
