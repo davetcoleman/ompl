@@ -39,7 +39,7 @@
 #define OMPL_TOOLS_THUNDER_THUNDER_
 
 #include <ompl/tools/experience/ExperienceSetup.h> // the parent class
-
+#include <ompl/tools/debug/Visualizer.h>
 #include <ompl/tools/thunder/ThunderDB.h>
 #include <ompl/geometric/planners/experience/ThunderRetrieveRepair.h>
 
@@ -207,4 +207,3 @@ namespace ompl
 
 } // end of namespace
 #endif
-

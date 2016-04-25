@@ -45,8 +45,9 @@
 // Boost
 #include <boost/filesystem.hpp>
 
-ompl::tools::ThunderDB::ThunderDB(const base::StateSpacePtr &space)
-    : numPathsInserted_(0)
+ompl::tools::ThunderDB::ThunderDB(const base::StateSpacePtr &space, VisualizerPtr visual)
+    : visual_(visual)
+    , numPathsInserted_(0)
     , saving_enabled_(true)
 {
     // Set space information
@@ -303,4 +304,3 @@ void ompl::tools::ThunderDB::debugState(const ompl::base::State* state)
 {
     si_->printState(state, std::cout);
 }
-
