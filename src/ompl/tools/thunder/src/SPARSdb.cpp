@@ -685,7 +685,7 @@ bool ompl::geometric::SPARSdb::addPathToRoadmap(const base::PlannerTerminationCo
     // Try to add the start first, but don't force it
     addStateToRoadmap(ptc, solutionPath.getState(0));
 
-    visual_->viz1State(solutionPath.getState(solutionPath.getStateCount() - 1), 3, tools::RED, sparseDelta_);
+    visual_->viz1State(solutionPath.getState(solutionPath.getStateCount() - 1), tools::LARGE, tools::RED, sparseDelta_);
     visual_->viz1Trigger();
 
     // Add solution states to SPARSdb one by one ---------------------------
@@ -717,7 +717,7 @@ bool ompl::geometric::SPARSdb::addPathToRoadmap(const base::PlannerTerminationCo
             }
 
             // Show the candidate state in Rviz for path insertion of GUARDS
-            visual_->viz1State(solutionPath.getState(i), 1, tools::GREEN, sparseDelta_);
+            visual_->viz1State(solutionPath.getState(i), tools::SMALL, tools::GREEN, sparseDelta_);
             visual_->viz1Trigger();
 
             // Add a single state to the roadmap
@@ -784,7 +784,7 @@ bool ompl::geometric::SPARSdb::addPathToRoadmap(const base::PlannerTerminationCo
         }
 
         // Show the candidate state in Rviz for path insertion of BRIDGES (CONNECTIVITY)
-        visual_->viz1State(connectivityState, 2, tools::BLUE, sparseDelta_);
+        visual_->viz1State(connectivityState, tools::SMALL, tools::BLUE, sparseDelta_);
         visual_->viz1Trigger();
         sleep(0.5);
 
@@ -824,7 +824,7 @@ bool ompl::geometric::SPARSdb::addPathToRoadmap(const base::PlannerTerminationCo
     for (unsigned long shuffledID : shuffledIDs)
     {
 
-        visual_->viz1State(solutionPath.getState(shuffledIDs[i]), 1, tools::GREEN, sparseDelta_);
+        visual_->viz1State(solutionPath.getState(shuffledIDs[i]), tools::SMALL, tools::GREEN, sparseDelta_);
         visual_->viz1Trigger();
 
         // Add a single state to the roadmap
@@ -1614,7 +1614,7 @@ ompl::geometric::SPARSdb::Vertex ompl::geometric::SPARSdb::addGuard(base::State 
     {
         OMPL_INFORM(" ---- addGuard() of type %f", type);
     }
-    visual_->viz1State(state, 4, tools::PURPLE, sparseDelta_); // Candidate node has already (just) been added
+    visual_->viz1State(state, tools::MEDIUM, tools::PURPLE, sparseDelta_); // Candidate node has already (just) been added
     visual_->viz1Trigger();
     sleep(0.1);
 
