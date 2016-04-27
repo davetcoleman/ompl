@@ -59,6 +59,19 @@ OMPL_CLASS_FORWARD(Visualizer);
 /** \class ompl::tools::VisualizerPtr
     \brief A boost shared pointer wrapper for ompl::tools::Visualizer */
 
+// Sizes
+enum sizes
+{
+    DELETE_ALL_MARKERS = 0,
+    SMALL = 1,
+    MEDIUM = 2,
+    LARGE = 3,
+    VARIABLE_SIZE = 4,
+    SMALL_TRANSLUCENT = 5,
+    SCALE = 7,
+    ROBOT = 10
+};
+
 // Colors that correspond with rviz_visual_tools
 enum colors
 {
@@ -85,13 +98,22 @@ enum colors
     DEFAULT = 20  // i.e. 'do not change default color'
 };
 
+enum edgeColors
+{
+    eGREEN = 0,
+    eUGLY_YELLOW = 25,
+    eYELLOW = 50,
+    eORANGE = 75,
+    eRED = 100
+};
+
 /**
  * \brief Visualization callback hook for external debugging of states
  * \param v - state to visualize
  * \param type - different modes/colors/sizes for visualizing the state
  * \param extraData - special extra data for showing a range around a state
  */
-typedef std::function<void(const ompl::base::State* v, std::size_t type, std::size_t color, double extraData)> VizState;
+typedef std::function<void(const ompl::base::State* v, sizes size, colors color, double extraData)> VizState;
 /**
  * \brief Visualization callback hook for external debugging of edges
  * \param v1 - from state that marks beginning of edge
@@ -122,7 +144,7 @@ class Visualizer
 {
   public:
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz1State(const ompl::base::State* state, std::size_t type, std::size_t color, double extraData)
+    void viz1State(const ompl::base::State* state, sizes type, colors color, double extraData)
     {
         if (viz1State_)
             viz1State_(state, type, color, extraData);
@@ -149,6 +171,14 @@ class Visualizer
             viz1Trigger_();
     }
 
+    /** \brief Trigger visualizer to publish graphics */
+    void viz1DeleteAllMarkers()
+    {
+        if (viz1State_)
+            viz1State_(nullptr, tools::DELETE_ALL_MARKERS, tools::DEFAULT, 0);  // black is dummy data
+        // TODO: have an actual function to call instead of using vizState
+    }
+
     /** \brief Set the callback to visualize/publish a planner's progress */
     void setViz1Callbacks(ompl::tools::VizState vizState, ompl::tools::VizEdge vizEdge, ompl::tools::VizPath vizPath,
                           ompl::tools::VizTrigger vizTrigger)
@@ -162,7 +192,7 @@ class Visualizer
     // ------------------------------------------------------------------------------------
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz2State(const ompl::base::State* state, std::size_t type, std::size_t color, double extraData)
+    void viz2State(const ompl::base::State* state, sizes type, colors color, double extraData)
     {
         if (viz2State_)
             viz2State_(state, type, color, extraData);
@@ -189,6 +219,14 @@ class Visualizer
             viz2Trigger_();
     }
 
+    /** \brief Trigger visualizer to publish graphics */
+    void viz2DeleteAllMarkers()
+    {
+        if (viz2State_)
+            viz2State_(nullptr, tools::DELETE_ALL_MARKERS, tools::BLACK, 0);  // black is dummy data
+        // TODO: have an actual function to call instead of using vizState
+    }
+
     /** \brief Set the callback to visualize/publish a planner's progress */
     void setViz2Callbacks(ompl::tools::VizState vizState, ompl::tools::VizEdge vizEdge, ompl::tools::VizPath vizPath,
                           ompl::tools::VizTrigger vizTrigger)
@@ -202,7 +240,7 @@ class Visualizer
     // ------------------------------------------------------------------------------------
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz3State(const ompl::base::State* state, std::size_t type, std::size_t color, double extraData)
+    void viz3State(const ompl::base::State* state, sizes type, colors color, double extraData)
     {
         if (viz3State_)
             viz3State_(state, type, color, extraData);
@@ -229,6 +267,14 @@ class Visualizer
             viz3Trigger_();
     }
 
+    /** \brief Trigger visualizer to publish graphics */
+    void viz3DeleteAllMarkers()
+    {
+        if (viz3State_)
+            viz3State_(nullptr, tools::DELETE_ALL_MARKERS, tools::BLACK, 0);  // black is dummy data
+        // TODO: have an actual function to call instead of using vizState
+    }
+
     /** \brief Set the callback to visualize/publish a planner's progress */
     void setViz3Callbacks(ompl::tools::VizState vizState, ompl::tools::VizEdge vizEdge, ompl::tools::VizPath vizPath,
                           ompl::tools::VizTrigger vizTrigger)
@@ -242,7 +288,7 @@ class Visualizer
     // ------------------------------------------------------------------------------------
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz4State(const ompl::base::State* state, std::size_t type, std::size_t color, double extraData)
+    void viz4State(const ompl::base::State* state, sizes type, colors color, double extraData)
     {
         if (viz4State_)
             viz4State_(state, type, color, extraData);
@@ -269,6 +315,14 @@ class Visualizer
             viz4Trigger_();
     }
 
+    /** \brief Trigger visualizer to publish graphics */
+    void viz4DeleteAllMarkers()
+    {
+        if (viz4State_)
+            viz4State_(nullptr, tools::DELETE_ALL_MARKERS, tools::BLACK, 0);  // black is dummy data
+        // TODO: have an actual function to call instead of using vizState
+    }
+
     /** \brief Set the callback to visualize/publish a planner's progress */
     void setViz4Callbacks(ompl::tools::VizState vizState, ompl::tools::VizEdge vizEdge, ompl::tools::VizPath vizPath,
                           ompl::tools::VizTrigger vizTrigger)
@@ -282,7 +336,7 @@ class Visualizer
     // ------------------------------------------------------------------------------------
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz5State(const ompl::base::State* state, std::size_t type, std::size_t color, double extraData)
+    void viz5State(const ompl::base::State* state, sizes type, colors color, double extraData)
     {
         if (viz5State_)
             viz5State_(state, type, color, extraData);
@@ -309,6 +363,14 @@ class Visualizer
             viz5Trigger_();
     }
 
+    /** \brief Trigger visualizer to publish graphics */
+    void viz5DeleteAllMarkers()
+    {
+        if (viz5State_)
+            viz5State_(nullptr, tools::DELETE_ALL_MARKERS, tools::BLACK, 0);  // black is dummy data
+        // TODO: have an actual function to call instead of using vizState
+    }
+
     /** \brief Set the callback to visualize/publish a planner's progress */
     void setViz5Callbacks(ompl::tools::VizState vizState, ompl::tools::VizEdge vizEdge, ompl::tools::VizPath vizPath,
                           ompl::tools::VizTrigger vizTrigger)
@@ -322,7 +384,7 @@ class Visualizer
     // ------------------------------------------------------------------------------------
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz6State(const ompl::base::State* state, std::size_t type, std::size_t color, double extraData)
+    void viz6State(const ompl::base::State* state, sizes type, colors color, double extraData)
     {
         if (viz6State_)
             viz6State_(state, type, color, extraData);
@@ -349,6 +411,14 @@ class Visualizer
             viz6Trigger_();
     }
 
+    /** \brief Trigger visualizer to publish graphics */
+    void viz6DeleteAllMarkers()
+    {
+        if (viz6State_)
+            viz6State_(nullptr, tools::DELETE_ALL_MARKERS, tools::BLACK, 0);  // black is dummy data
+        // TODO: have an actual function to call instead of using vizState
+    }
+
     /** \brief Set the callback to visualize/publish a planner's progress */
     void setViz6Callbacks(ompl::tools::VizState vizState, ompl::tools::VizEdge vizEdge, ompl::tools::VizPath vizPath,
                           ompl::tools::VizTrigger vizTrigger)
@@ -362,8 +432,7 @@ class Visualizer
     // ------------------------------------------------------------------------------------
 
     /** \brief State callback by vizID */
-    void vizState(const std::size_t vizID, const ompl::base::State* state, std::size_t type, std::size_t color,
-                  double extraData)
+    void vizState(const std::size_t vizID, const ompl::base::State* state, sizes type, colors color, double extraData)
     {
         switch (vizID)
         {
