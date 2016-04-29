@@ -496,7 +496,7 @@ bool ompl::geometric::SPARStwo::checkAddPath( Vertex v )
             InterfaceData& d = getData( v, r, rp );
 
             //Then, if the spanner property is violated
-            if (rm_dist > stretchFactor_ * d.d_)
+            if (rm_dist > stretchFactor_ * d.d_) // TODO - check that d.d_ is not zero!!
             {
                 ret = true; //Report that we added for the path
                 if (si_->checkMotion(stateProperty_[r], stateProperty_[rp]))
@@ -882,4 +882,3 @@ ompl::base::Cost ompl::geometric::SPARStwo::costHeuristic(Vertex u, Vertex v) co
 {
     return opt_->motionCostHeuristic(stateProperty_[u], stateProperty_[v]);
 }
-

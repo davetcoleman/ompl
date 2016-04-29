@@ -431,6 +431,21 @@ class Visualizer
 
     // ------------------------------------------------------------------------------------
 
+    /** \brief Wait for user feedback i.e. through a button or joystick */
+    void waitForUserFeedback()
+    {
+        if (waitForUserFeedback_)
+            waitForUserFeedback_();
+    }
+
+    /** \brief Set the callback to wait for user feedback */
+    void setWaitForUserFeedback(ompl::tools::VizTrigger waitForUserFeedback)
+    {
+        waitForUserFeedback_ = waitForUserFeedback;
+    }
+
+    // ------------------------------------------------------------------------------------
+
     /** \brief State callback by vizID */
     void vizState(const std::size_t vizID, const ompl::base::State* state, sizes type, colors color, double extraData)
     {
@@ -523,6 +538,9 @@ class Visualizer
     VizEdge viz6Edge_;
     VizPath viz6Path_;
     VizTrigger viz6Trigger_;
+
+    /** \brief Callback to wait for user input before proceeding */
+    VizTrigger waitForUserFeedback_;
 
 };  // end of class Visualizer
 }  // namespace tools
