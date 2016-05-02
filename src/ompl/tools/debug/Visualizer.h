@@ -446,6 +446,21 @@ class Visualizer
 
     // ------------------------------------------------------------------------------------
 
+    /** \brief Callback to display the node covereage in 2D */
+    void vizVoronoiDiagram()
+    {
+        if (vizVoronoiDiagram_)
+            vizVoronoiDiagram_();
+    }
+
+    /** \brief Set the callback to wait for user feedback */
+    void setVizVoronoiDiagram(ompl::tools::VizTrigger vizVoronoiDiagram)
+    {
+        vizVoronoiDiagram_ = vizVoronoiDiagram;
+    }
+
+    // ------------------------------------------------------------------------------------
+
     /** \brief State callback by vizID */
     void vizState(const std::size_t vizID, const ompl::base::State* state, sizes type, colors color, double extraData)
     {
@@ -541,6 +556,9 @@ class Visualizer
 
     /** \brief Callback to wait for user input before proceeding */
     VizTrigger waitForUserFeedback_;
+
+    /** \brief Callback to display the node covereage in 2D */
+    VizTrigger vizVoronoiDiagram_;
 
 };  // end of class Visualizer
 }  // namespace tools
