@@ -52,7 +52,7 @@ namespace ompl
         OMPL_CLASS_FORWARD(MinimumClearanceValidStateSampler);
         /// @endcond
 
-        /** \brief Generate valid samples randomly with extra requirement of min for clearance to nearest obstacle */
+        /** \brief Generate valid samples randomly, but with a bias towards higher clearance. */
         class MinimumClearanceValidStateSampler : public ValidStateSampler
         {
         public:
@@ -60,11 +60,11 @@ namespace ompl
             /** \brief Constructor */
             MinimumClearanceValidStateSampler(const SpaceInformation *si);
 
-            ~MinimumClearanceValidStateSampler() override = default;;
+            virtual ~MinimumClearanceValidStateSampler() {};
 
-            bool sample(State *state) override;
+            virtual bool sample(State *state);
 
-            bool sampleNear(State *state, const State *near, const double distance) override;
+            virtual bool sampleNear(State *state, const State *near, const double distance);
 
             /** \brief Set the minimum required distance of sample from nearest obstacle to be considered valid */
             void setMinimumObstacleClearance(double clearance)
