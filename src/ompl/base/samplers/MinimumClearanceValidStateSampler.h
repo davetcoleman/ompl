@@ -52,7 +52,7 @@ namespace ompl
         OMPL_CLASS_FORWARD(MinimumClearanceValidStateSampler);
         /// @endcond
 
-        /** \brief Generate valid samples randomly, but with a bias towards higher clearance. */
+        /** \brief Generate valid samples randomly with extra requirement of min for clearance to nearest obstacle */
         class MinimumClearanceValidStateSampler : public ValidStateSampler
         {
         public:
