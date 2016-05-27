@@ -84,7 +84,7 @@ namespace ompl
             StateSamplerPtr sampler_;
 
             /** \brief Minimum required distance of sample from nearest obstacle to be considered valid */
-            double          clearance_;
+            double clearance_;
         };
 
     }
