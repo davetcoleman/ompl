@@ -135,6 +135,11 @@ typedef std::function<void(const ompl::base::PathPtr path, std::size_t type)> Vi
 typedef std::function<void(void)> VizTrigger;
 
 /**
+ * \brief Visualization callback hook for telling program to wait for user input
+ */
+typedef std::function<void(const std::string&)> VizWaitFeedback;
+
+/**
  * \brief Visualization callback hook for external debugging that tells OMPL when to end early by SIG INT
  */
 // typedef std::function<bool(void)> VizCheckSigInt;
@@ -432,14 +437,14 @@ class Visualizer
     // ------------------------------------------------------------------------------------
 
     /** \brief Wait for user feedback i.e. through a button or joystick */
-    void waitForUserFeedback()
+    void waitForUserFeedback(const std::string& msg)
     {
         if (waitForUserFeedback_)
-            waitForUserFeedback_();
+            waitForUserFeedback_(msg);
     }
 
     /** \brief Set the callback to wait for user feedback */
-    void setWaitForUserFeedback(ompl::tools::VizTrigger waitForUserFeedback)
+    void setWaitForUserFeedback(ompl::tools::VizWaitFeedback waitForUserFeedback)
     {
         waitForUserFeedback_ = waitForUserFeedback;
     }
@@ -555,7 +560,7 @@ class Visualizer
     VizTrigger viz6Trigger_;
 
     /** \brief Callback to wait for user input before proceeding */
-    VizTrigger waitForUserFeedback_;
+    VizWaitFeedback waitForUserFeedback_;
 
     /** \brief Callback to display the node covereage in 2D */
     VizTrigger vizVoronoiDiagram_;
