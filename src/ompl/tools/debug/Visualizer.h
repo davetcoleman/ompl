@@ -40,6 +40,7 @@
 #define OMPL_TOOLS_DEBUG_VISUALIZER_
 
 #include <ompl/base/Planner.h>
+#include <ompl/geometric/PathGeometric.h>
 #include <functional>
 
 namespace ompl
@@ -127,7 +128,7 @@ typedef std::function<void(const ompl::base::State* v1, const ompl::base::State*
  * \param path
  * \param type - style of line
  */
-typedef std::function<void(const ompl::base::PathPtr path, std::size_t type, colors color)> VizPath;
+typedef std::function<void(ompl::geometric::PathGeometric* path, std::size_t type, colors color)> VizPath;
 
 /**
  * \brief Visualization callback hook for external debugging that triggers the visualizer to render/publish
@@ -163,7 +164,7 @@ class Visualizer
     }
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz1Path(const base::PathPtr path, std::size_t type, colors color)
+    void viz1Path(ompl::geometric::PathGeometric* path, std::size_t type, colors color)
     {
         if (viz1Path_)
             viz1Path_(path, type, color);
@@ -211,7 +212,7 @@ class Visualizer
     }
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz2Path(const base::PathPtr path, std::size_t type, colors color)
+    void viz2Path(ompl::geometric::PathGeometric* path, std::size_t type, colors color)
     {
         if (viz2Path_)
             viz2Path_(path, type, color);
@@ -259,7 +260,7 @@ class Visualizer
     }
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz3Path(const base::PathPtr path, std::size_t type, colors color)
+    void viz3Path(ompl::geometric::PathGeometric* path, std::size_t type, colors color)
     {
         if (viz3Path_)
             viz3Path_(path, type, color);
@@ -307,7 +308,7 @@ class Visualizer
     }
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz4Path(const base::PathPtr path, std::size_t type, colors color)
+    void viz4Path(ompl::geometric::PathGeometric* path, std::size_t type, colors color)
     {
         if (viz4Path_)
             viz4Path_(path, type, color);
@@ -348,7 +349,7 @@ class Visualizer
     }
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz5Path(const base::PathPtr path, std::size_t type, colors color)
+    void viz5Path(ompl::geometric::PathGeometric* path, std::size_t type, colors color)
     {
         if (viz5Path_)
             viz5Path_(path, type, color);
@@ -396,7 +397,7 @@ class Visualizer
     }
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz6Path(const base::PathPtr path, std::size_t type, colors color)
+    void viz6Path(ompl::geometric::PathGeometric* path, std::size_t type, colors color)
     {
         if (viz6Path_)
             viz6Path_(path, type, color);
