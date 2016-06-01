@@ -127,7 +127,7 @@ typedef std::function<void(const ompl::base::State* v1, const ompl::base::State*
  * \param path
  * \param type - style of line
  */
-typedef std::function<void(const ompl::base::PathPtr path, std::size_t type)> VizPath;
+typedef std::function<void(const ompl::base::PathPtr path, std::size_t type, colors color)> VizPath;
 
 /**
  * \brief Visualization callback hook for external debugging that triggers the visualizer to render/publish
@@ -163,10 +163,10 @@ class Visualizer
     }
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz1Path(const base::PathPtr path, std::size_t type)
+    void viz1Path(const base::PathPtr path, std::size_t type, colors color)
     {
         if (viz1Path_)
-            viz1Path_(path, type);
+            viz1Path_(path, type, color);
     }
 
     /** \brief Trigger visualizer to publish graphics */
@@ -211,10 +211,10 @@ class Visualizer
     }
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz2Path(const base::PathPtr path, std::size_t type)
+    void viz2Path(const base::PathPtr path, std::size_t type, colors color)
     {
         if (viz2Path_)
-            viz2Path_(path, type);
+            viz2Path_(path, type, color);
     }
 
     /** \brief Trigger visualizer to publish graphics */
@@ -259,10 +259,10 @@ class Visualizer
     }
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz3Path(const base::PathPtr path, std::size_t type)
+    void viz3Path(const base::PathPtr path, std::size_t type, colors color)
     {
         if (viz3Path_)
-            viz3Path_(path, type);
+            viz3Path_(path, type, color);
     }
 
     /** \brief Trigger visualizer to publish graphics */
@@ -307,10 +307,10 @@ class Visualizer
     }
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz4Path(const base::PathPtr path, std::size_t type)
+    void viz4Path(const base::PathPtr path, std::size_t type, colors color)
     {
         if (viz4Path_)
-            viz4Path_(path, type);
+            viz4Path_(path, type, color);
     }
 
     /** \brief Trigger visualizer to publish graphics */
@@ -348,10 +348,10 @@ class Visualizer
     }
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz5Path(const base::PathPtr path, std::size_t type)
+    void viz5Path(const base::PathPtr path, std::size_t type, colors color)
     {
         if (viz5Path_)
-            viz5Path_(path, type);
+            viz5Path_(path, type, color);
     }
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
@@ -396,10 +396,10 @@ class Visualizer
     }
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz6Path(const base::PathPtr path, std::size_t type)
+    void viz6Path(const base::PathPtr path, std::size_t type, colors color)
     {
         if (viz6Path_)
-            viz6Path_(path, type);
+            viz6Path_(path, type, color);
     }
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */

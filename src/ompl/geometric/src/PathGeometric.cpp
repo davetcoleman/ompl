@@ -81,6 +81,7 @@ void ompl::geometric::PathGeometric::copyFrom(const PathGeometric &other)
 
 void ompl::geometric::PathGeometric::freeMemory()
 {
+    OMPL_WARN("PathGeometric::freeMemory()");
     for (unsigned int i = 0 ; i < states_.size() ; ++i)
         si_->freeState(states_[i]);
 }
