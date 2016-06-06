@@ -42,6 +42,7 @@
 #include <ompl/base/Planner.h>
 #include <ompl/geometric/PathGeometric.h>
 #include <functional>
+#include <ompl/tools/debug/VizWindow.h>
 
 namespace ompl
 {
@@ -60,61 +61,13 @@ OMPL_CLASS_FORWARD(Visualizer);
 /** \class ompl::tools::VisualizerPtr
     \brief A boost shared pointer wrapper for ompl::tools::Visualizer */
 
-// Sizes
-enum sizes
-{
-    DELETE_ALL_MARKERS = 0,
-    SMALL = 1,
-    MEDIUM = 2,
-    LARGE = 3,
-    VARIABLE_SIZE = 4,
-    SMALL_TRANSLUCENT = 5,
-    SCALE = 7,
-    ROBOT = 10
-};
-
-// Colors that correspond with rviz_visual_tools
-enum colors
-{
-    BLACK = 0,
-    BROWN = 1,
-    BLUE = 2,
-    CYAN = 3,
-    GREY = 4,
-    DARK_GREY = 5,
-    GREEN = 6,
-    LIME_GREEN = 7,
-    MAGENTA = 8,
-    ORANGE = 9,
-    PURPLE = 10,
-    RED = 11,
-    PINK = 12,
-    WHITE = 13,
-    YELLOW = 14,
-    TRANSLUCENT = 15,
-    TRANSLUCENT_LIGHT = 16,
-    TRANSLUCENT_DARK = 17,
-    RAND = 18,
-    CLEAR = 19,
-    DEFAULT = 20  // i.e. 'do not change default color'
-};
-
-enum edgeColors
-{
-    eGREEN = 0,
-    eUGLY_YELLOW = 25,
-    eYELLOW = 50,
-    eORANGE = 75,
-    eRED = 100
-};
-
 /**
  * \brief Visualization callback hook for external debugging of states
  * \param v - state to visualize
  * \param type - different modes/colors/sizes for visualizing the state
  * \param extraData - special extra data for showing a range around a state
  */
-typedef std::function<void(const ompl::base::State* v, sizes size, colors color, double extraData)> VizState;
+typedef std::function<void(const ompl::base::State* v, VizSizes size, VizColors color, double extraData)> VizState;
 /**
  * \brief Visualization callback hook for external debugging of edges
  * \param v1 - from state that marks beginning of edge
@@ -128,7 +81,7 @@ typedef std::function<void(const ompl::base::State* v1, const ompl::base::State*
  * \param path
  * \param type - style of line
  */
-typedef std::function<void(ompl::geometric::PathGeometric* path, std::size_t type, colors color)> VizPath;
+typedef std::function<void(ompl::geometric::PathGeometric* path, std::size_t type, VizColors color)> VizPath;
 
 /**
  * \brief Visualization callback hook for external debugging that triggers the visualizer to render/publish
@@ -150,7 +103,7 @@ class Visualizer
 {
   public:
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz1State(const ompl::base::State* state, sizes type, colors color, double extraData)
+    void viz1State(const ompl::base::State* state, VizSizes type, VizColors color, double extraData)
     {
         if (viz1State_)
             viz1State_(state, type, color, extraData);
@@ -164,7 +117,7 @@ class Visualizer
     }
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz1Path(ompl::geometric::PathGeometric* path, std::size_t type, colors color)
+    void viz1Path(ompl::geometric::PathGeometric* path, std::size_t type, VizColors color)
     {
         if (viz1Path_)
             viz1Path_(path, type, color);
@@ -198,7 +151,7 @@ class Visualizer
     // ------------------------------------------------------------------------------------
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz2State(const ompl::base::State* state, sizes type, colors color, double extraData)
+    void viz2State(const ompl::base::State* state, VizSizes type, VizColors color, double extraData)
     {
         if (viz2State_)
             viz2State_(state, type, color, extraData);
@@ -212,7 +165,7 @@ class Visualizer
     }
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz2Path(ompl::geometric::PathGeometric* path, std::size_t type, colors color)
+    void viz2Path(ompl::geometric::PathGeometric* path, std::size_t type, VizColors color)
     {
         if (viz2Path_)
             viz2Path_(path, type, color);
@@ -246,7 +199,7 @@ class Visualizer
     // ------------------------------------------------------------------------------------
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz3State(const ompl::base::State* state, sizes type, colors color, double extraData)
+    void viz3State(const ompl::base::State* state, VizSizes type, VizColors color, double extraData)
     {
         if (viz3State_)
             viz3State_(state, type, color, extraData);
@@ -260,7 +213,7 @@ class Visualizer
     }
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz3Path(ompl::geometric::PathGeometric* path, std::size_t type, colors color)
+    void viz3Path(ompl::geometric::PathGeometric* path, std::size_t type, VizColors color)
     {
         if (viz3Path_)
             viz3Path_(path, type, color);
@@ -294,7 +247,7 @@ class Visualizer
     // ------------------------------------------------------------------------------------
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz4State(const ompl::base::State* state, sizes type, colors color, double extraData)
+    void viz4State(const ompl::base::State* state, VizSizes type, VizColors color, double extraData)
     {
         if (viz4State_)
             viz4State_(state, type, color, extraData);
@@ -308,7 +261,7 @@ class Visualizer
     }
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz4Path(ompl::geometric::PathGeometric* path, std::size_t type, colors color)
+    void viz4Path(ompl::geometric::PathGeometric* path, std::size_t type, VizColors color)
     {
         if (viz4Path_)
             viz4Path_(path, type, color);
@@ -342,14 +295,14 @@ class Visualizer
     // ------------------------------------------------------------------------------------
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz5State(const ompl::base::State* state, sizes type, colors color, double extraData)
+    void viz5State(const ompl::base::State* state, VizSizes type, VizColors color, double extraData)
     {
         if (viz5State_)
             viz5State_(state, type, color, extraData);
     }
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz5Path(ompl::geometric::PathGeometric* path, std::size_t type, colors color)
+    void viz5Path(ompl::geometric::PathGeometric* path, std::size_t type, VizColors color)
     {
         if (viz5Path_)
             viz5Path_(path, type, color);
@@ -390,14 +343,14 @@ class Visualizer
     // ------------------------------------------------------------------------------------
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz6State(const ompl::base::State* state, sizes type, colors color, double extraData)
+    void viz6State(const ompl::base::State* state, VizSizes type, VizColors color, double extraData)
     {
         if (viz6State_)
             viz6State_(state, type, color, extraData);
     }
 
     /** \brief Visualize planner's data during runtime, externally, using a function callback */
-    void viz6Path(ompl::geometric::PathGeometric* path, std::size_t type, colors color)
+    void viz6Path(ompl::geometric::PathGeometric* path, std::size_t type, VizColors color)
     {
         if (viz6Path_)
             viz6Path_(path, type, color);
@@ -468,7 +421,7 @@ class Visualizer
     // ------------------------------------------------------------------------------------
 
     /** \brief State callback by vizID */
-    void vizState(const std::size_t vizID, const ompl::base::State* state, sizes type, colors color, double extraData)
+    void vizState(const std::size_t vizID, const ompl::base::State* state, VizSizes type, VizColors color, double extraData)
     {
         switch (vizID)
         {
@@ -523,6 +476,66 @@ class Visualizer
         }
     }
 
+    void setVizWindow1(VizWindowPtr viz1)
+    {
+        viz1_ = viz1;
+    }
+
+    VizWindowPtr viz1()
+    {
+        return viz1_;
+    }
+
+    void setVizWindow2(VizWindowPtr viz2)
+    {
+        viz2_ = viz2;
+    }
+
+    VizWindowPtr viz2()
+    {
+        return viz2_;
+    }
+
+    void setVizWindow3(VizWindowPtr viz3)
+    {
+        viz3_ = viz3;
+    }
+
+    VizWindowPtr viz3()
+    {
+        return viz3_;
+    }
+
+    void setVizWindow4(VizWindowPtr viz4)
+    {
+        viz4_ = viz4;
+    }
+
+    VizWindowPtr viz4()
+    {
+        return viz4_;
+    }
+
+    void setVizWindow5(VizWindowPtr viz5)
+    {
+        viz5_ = viz5;
+    }
+
+    VizWindowPtr viz5()
+    {
+        return viz5_;
+    }
+
+    void setVizWindow6(VizWindowPtr viz6)
+    {
+        viz6_ = viz6;
+    }
+
+    VizWindowPtr viz6()
+    {
+        return viz6_;
+    }
+
   private:
     /** \brief Optional st callbacks for data */
     VizState viz1State_;
@@ -565,6 +578,14 @@ class Visualizer
 
     /** \brief Callback to display the node covereage in 2D */
     VizTrigger vizVoronoiDiagram_;
+
+    // Experiemental
+    VizWindowPtr viz1_;
+    VizWindowPtr viz2_;
+    VizWindowPtr viz3_;
+    VizWindowPtr viz4_;
+    VizWindowPtr viz5_;
+    VizWindowPtr viz6_;
 
 };  // end of class Visualizer
 }  // namespace tools
