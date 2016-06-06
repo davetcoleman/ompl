@@ -685,8 +685,8 @@ bool ompl::geometric::SPARSdb::addPathToRoadmap(const base::PlannerTerminationCo
     // Try to add the start first, but don't force it
     addStateToRoadmap(ptc, solutionPath.getState(0));
 
-    visual_->viz1State(solutionPath.getState(solutionPath.getStateCount() - 1), tools::LARGE, tools::RED, sparseDelta_);
-    visual_->viz1Trigger();
+    visual_->viz1()->state(solutionPath.getState(solutionPath.getStateCount() - 1), tools::LARGE, tools::RED, sparseDelta_);
+    visual_->viz1()->trigger();
 
     // Add solution states to SPARSdb one by one ---------------------------
 
@@ -717,8 +717,8 @@ bool ompl::geometric::SPARSdb::addPathToRoadmap(const base::PlannerTerminationCo
             }
 
             // Show the candidate state in Rviz for path insertion of GUARDS
-            visual_->viz1State(solutionPath.getState(i), tools::SMALL, tools::GREEN, sparseDelta_);
-            visual_->viz1Trigger();
+            visual_->viz1()->state(solutionPath.getState(i), tools::SMALL, tools::GREEN, sparseDelta_);
+            visual_->viz1()->trigger();
 
             // Add a single state to the roadmap
             if (!addStateToRoadmap(ptc, solutionPath.getState(i)))
@@ -784,8 +784,8 @@ bool ompl::geometric::SPARSdb::addPathToRoadmap(const base::PlannerTerminationCo
         }
 
         // Show the candidate state in Rviz for path insertion of BRIDGES (CONNECTIVITY)
-        visual_->viz1State(connectivityState, tools::SMALL, tools::BLUE, sparseDelta_);
-        visual_->viz1Trigger();
+        visual_->viz1()->state(connectivityState, tools::SMALL, tools::BLUE, sparseDelta_);
+        visual_->viz1()->trigger();
         sleep(0.5);
 
         // Add a single state to the roadmap
@@ -824,8 +824,8 @@ bool ompl::geometric::SPARSdb::addPathToRoadmap(const base::PlannerTerminationCo
     for (unsigned long shuffledID : shuffledIDs)
     {
 
-        visual_->viz1State(solutionPath.getState(shuffledIDs[i]), tools::SMALL, tools::GREEN, sparseDelta_);
-        visual_->viz1Trigger();
+        visual_->viz1()->state(solutionPath.getState(shuffledIDs[i]), tools::SMALL, tools::GREEN, sparseDelta_);
+        visual_->viz1()->trigger();
 
         // Add a single state to the roadmap
         addStateToRoadmap(ptc, solutionPath.getState(shuffledID));
@@ -1614,8 +1614,8 @@ ompl::geometric::SPARSdb::Vertex ompl::geometric::SPARSdb::addGuard(base::State 
     {
         OMPL_INFORM(" ---- addGuard() of type %f", type);
     }
-    visual_->viz1State(state, tools::MEDIUM, tools::PURPLE, sparseDelta_); // Candidate node has already (just) been added
-    visual_->viz1Trigger();
+    visual_->viz1()->state(state, tools::MEDIUM, tools::PURPLE, sparseDelta_); // Candidate node has already (just) been added
+    visual_->viz1()->trigger();
     sleep(0.1);
 
 
@@ -1644,8 +1644,8 @@ void ompl::geometric::SPARSdb::connectGuards(Vertex v1, Vertex v2)
     disjointSets_.union_set(v1, v2);
 
     // Debug in Rviz
-    visual_->viz1Edge(stateProperty_[v1], stateProperty_[v2], 100);
-    visual_->viz1Trigger();
+    visual_->viz1()->edge(stateProperty_[v1], stateProperty_[v2], 100);
+    visual_->viz1()->trigger();
     sleep(0.8);
 }
 
