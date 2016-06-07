@@ -80,7 +80,7 @@ namespace ompl
             class StateType : public State
             {
             public:
-                StateType() : State()
+                StateType() : State(), level_(0)
                 {
                 }
 
@@ -100,6 +100,9 @@ namespace ompl
 
                 /** \brief The value of the actual vector in R<sup>n</sup> */
                 double *values;
+
+                /** \brief The discrete mode/level of the state */
+                int level_;
             };
 
             /** \brief Constructor. The dimension of of the space needs to be specified. A space representing
@@ -210,7 +213,6 @@ namespace ompl
 
             /** \brief The size of a state, in bytes */
             std::size_t                         stateBytes_;
-
         };
     }
 }

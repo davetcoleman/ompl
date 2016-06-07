@@ -117,16 +117,12 @@ namespace ompl
             /** \brief Visualize a state during runtime, externally */
             virtual void state(const ompl::base::State *state, VizSizes type, VizColors color, double extraData) = 0;
 
-            /** \brief Visualize a state with a level during runtime, externally */
-            virtual void state(const ompl::base::State *state, std::size_t level, VizSizes type, VizColors color,
-                               double extraData) = 0;
-
             /** \brief Visualize edge during runtime, externally */
             virtual void edge(const ompl::base::State *stateA, const ompl::base::State *stateB, double cost) = 0;
 
             /** \brief Visualize edge with a level during runtime, externally */
-            virtual void edge(const ompl::base::State* stateA, std::size_t levelA, const ompl::base::State* stateB,
-                std::size_t levelB, ompl::tools::VizSizes size, ompl::tools::VizColors color) = 0;
+            virtual void edge(const ompl::base::State* stateA, const ompl::base::State* stateB,
+                ompl::tools::VizSizes size, ompl::tools::VizColors color) = 0;
 
             /** \brief Visualize path during runtime, externally */
             virtual void path(ompl::geometric::PathGeometric *path, std::size_t type, VizColors color) = 0;
