@@ -81,6 +81,11 @@ class Visualizer
 {
   public:
 
+    Visualizer()
+    {
+        viz_.resize(6);
+    }
+
     // ------------------------------------------------------------------------------------
 
     /** \brief Wait for user feedback i.e. through a button or joystick */
@@ -113,64 +118,45 @@ class Visualizer
 
     // ------------------------------------------------------------------------------------
 
-    void setVizWindow1(VizWindowPtr viz1)
+    void setVizWindow(std::size_t id, VizWindowPtr viz)
     {
-        viz1_ = viz1;
+        viz_[id-1] = viz;
+    }
+
+    VizWindowPtr viz(std::size_t id)
+    {
+        assert(id > 0 && id < 7);
+        return viz_[id-1];
     }
 
     VizWindowPtr viz1()
     {
-        return viz1_;
-    }
-
-    void setVizWindow2(VizWindowPtr viz2)
-    {
-        viz2_ = viz2;
+        return viz_[1-1];
     }
 
     VizWindowPtr viz2()
     {
-        return viz2_;
-    }
-
-    void setVizWindow3(VizWindowPtr viz3)
-    {
-        viz3_ = viz3;
+        return viz_[2-1];
     }
 
     VizWindowPtr viz3()
     {
-        return viz3_;
-    }
-
-    void setVizWindow4(VizWindowPtr viz4)
-    {
-        viz4_ = viz4;
+        return viz_[3-1];
     }
 
     VizWindowPtr viz4()
     {
-        return viz4_;
-    }
-
-    void setVizWindow5(VizWindowPtr viz5)
-    {
-        viz5_ = viz5;
+        return viz_[4-1];
     }
 
     VizWindowPtr viz5()
     {
-        return viz5_;
-    }
-
-    void setVizWindow6(VizWindowPtr viz6)
-    {
-        viz6_ = viz6;
+        return viz_[5-1];
     }
 
     VizWindowPtr viz6()
     {
-        return viz6_;
+        return viz_[6-1];
     }
 
   private:
@@ -182,12 +168,7 @@ class Visualizer
     VizTrigger vizVoronoiDiagram_;
 
     // Pointers to visualization windows in another project
-    VizWindowPtr viz1_;
-    VizWindowPtr viz2_;
-    VizWindowPtr viz3_;
-    VizWindowPtr viz4_;
-    VizWindowPtr viz5_;
-    VizWindowPtr viz6_;
+    std::vector<VizWindowPtr> viz_;
 
 };  // end of class Visualizer
 }  // namespace tools
