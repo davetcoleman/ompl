@@ -110,9 +110,7 @@ namespace ompl
         {
         public:
             VizWindow()
-            {
-                OMPL_INFORM("Loading VizWindow()");
-            }
+            {}
 
             /** \brief Visualize a state during runtime, externally */
             virtual void state(const ompl::base::State *state, VizSizes type, VizColors color, double extraData) = 0;
@@ -132,6 +130,9 @@ namespace ompl
 
             /** \brief Trigger visualizer to clear all graphics */
             virtual void deleteAllMarkers() = 0;
+
+            /** \brief Check if SIGINT has been called for shutdown */
+            virtual bool shutdownRequested() = 0;
 
         };  // end of class VizWindow
     }       // namespace tools
