@@ -48,7 +48,7 @@ namespace ompl
         // Sizes
         enum VizSizes
         {
-            DELETE_ALL_MARKERS = 0,
+            DELETE_ALL_MARKERS = 0,  // DEPRECATED, DO NOT USE
             SMALL = 1,
             MEDIUM = 2,
             LARGE = 3,
@@ -123,7 +123,7 @@ namespace ompl
                 ompl::tools::VizSizes size, ompl::tools::VizColors color) = 0;
 
             /** \brief Visualize path during runtime, externally */
-            virtual void path(ompl::geometric::PathGeometric *path, std::size_t type, VizColors color) = 0;
+            virtual void path(ompl::geometric::PathGeometric *path, VizSizes type, VizColors color) = 0;
 
             /** \brief Trigger visualizer to refresh/repaint/display all graphics */
             virtual void trigger() = 0;
