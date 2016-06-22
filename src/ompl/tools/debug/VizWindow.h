@@ -84,15 +84,6 @@ namespace ompl
             DEFAULT = 20  // i.e. 'do not change default color'
         };
 
-        enum VizEdgeColors
-        {
-            eGREEN = 0,
-            eUGLY_YELLOW = 25,
-            eYELLOW = 50,
-            eORANGE = 75,
-            eRED = 100
-        };
-
         /**
            @anchor VizWindow
            @par Short description
