@@ -81,9 +81,12 @@ class Visualizer
 {
   public:
 
+    static const std::size_t NUM_VISUALIZERS = 7;
+
     Visualizer()
     {
-        viz_.resize(6);
+        OMPL_INFORM("Setting visualizers to count %u", NUM_VISUALIZERS);
+        viz_.resize(NUM_VISUALIZERS);
     }
 
     // ------------------------------------------------------------------------------------
@@ -125,7 +128,7 @@ class Visualizer
 
     VizWindowPtr viz(std::size_t id)
     {
-        assert(id > 0 && id < 7);
+        assert(id > 0 && id <= NUM_VISUALIZERS);
         return viz_[id-1];
     }
 
@@ -157,6 +160,11 @@ class Visualizer
     VizWindowPtr viz6()
     {
         return viz_[6-1];
+    }
+
+    VizWindowPtr viz7()
+    {
+        return viz_[7-1];
     }
 
   private:
