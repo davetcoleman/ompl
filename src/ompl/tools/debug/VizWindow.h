@@ -48,14 +48,21 @@ namespace ompl
         // Sizes
         enum VizSizes
         {
-            DELETE_ALL_MARKERS = 0,  // DEPRECATED, DO NOT USE
-            SMALL = 1,
-            MEDIUM = 2,
-            LARGE = 3,
-            VARIABLE_SIZE = 4,
-            SMALL_TRANSLUCENT = 5,
-            SCALE = 7,
-            ROBOT = 10
+            XXSMALL = 1,
+            XSMALL = 2,
+            SMALL = 3,
+            REGULAR = 4,
+            MEDIUM = 4,
+            LARGE = 5,
+            xLARGE = 6,
+            xxLARGE = 7,
+            xxxLARGE = 8,
+            XLARGE = 9,
+            XXLARGE = 10,
+            VARIABLE_SIZE = 11,
+            SMALL_TRANSLUCENT = 12,
+            SCALE = 13,
+            ROBOT = 14
         };
 
         // Colors that correspond with rviz_visual_tools
@@ -101,17 +108,27 @@ namespace ompl
         {
         public:
             VizWindow()
-            {}
+            {
+            }
 
             /** \brief Visualize a state during runtime, externally */
             virtual void state(const ompl::base::State *state, VizSizes type, VizColors color, double extraData) = 0;
+
+            /** \brief Visualize multiple states during runtime, externally */
+            virtual void states(std::vector<const ompl::base::State *> states,
+                                std::vector<ompl::tools::VizColors> colors, ompl::tools::VizSizes size) {}
 
             /** \brief Visualize edge during runtime, externally */
             virtual void edge(const ompl::base::State *stateA, const ompl::base::State *stateB, double cost) = 0;
 
             /** \brief Visualize edge with a level during runtime, externally */
-            virtual void edge(const ompl::base::State* stateA, const ompl::base::State* stateB,
-                ompl::tools::VizSizes size, ompl::tools::VizColors color) = 0;
+            virtual void edge(const ompl::base::State *stateA, const ompl::base::State *stateB,
+                              ompl::tools::VizSizes size, ompl::tools::VizColors color) = 0;
+
+            /** \brief Visualize multiple edges during runtime, externally */
+            virtual void edges(const std::vector<const ompl::base::State *> stateAs,
+                const std::vector<const ompl::base::State *> stateBs,
+                std::vector<ompl::tools::VizColors> colors, ompl::tools::VizSizes size) {}
 
             /** \brief Visualize path during runtime, externally */
             virtual void path(ompl::geometric::PathGeometric *path, VizSizes type, VizColors color) = 0;
