@@ -228,10 +228,16 @@ namespace ompl
                 return visual_;
             }
 
+            /** \brief Set class for managing various visualization features */
+            void setVisual(VisualizerPtr visual)
+            {
+                visual_ = visual;
+            }
+
         protected:
 
             /** \brief Class for managing various visualization features */
-            VisualizerPtr visual_;
+            VisualizerPtr                     visual_;
 
             /// Flag indicating whether recalled plans should be used to find solutions. Enabled by default.
             bool                              recallEnabled_;
