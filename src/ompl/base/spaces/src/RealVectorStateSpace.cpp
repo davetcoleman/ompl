@@ -239,12 +239,21 @@ double ompl::base::RealVectorStateSpace::distance(const State *state1, const Sta
     const double *s1 = static_cast<const StateType*>(state1)->values;
     const double *s2 = static_cast<const StateType*>(state2)->values;
 
+    // L2
+    // for (unsigned int i = 0 ; i < dimension_ ; ++i)
+    // {
+    //     double diff = (*s1++) - (*s2++);
+    //     dist += diff * diff;
+    // }
+    // return sqrt(dist);
+
+    // L1
     for (unsigned int i = 0 ; i < dimension_ ; ++i)
     {
         double diff = (*s1++) - (*s2++);
-        dist += diff * diff;
+        dist += fabs(diff);
     }
-    return sqrt(dist);
+    return dist;
 }
 
 bool ompl::base::RealVectorStateSpace::equalStates(const State *state1, const State *state2) const
