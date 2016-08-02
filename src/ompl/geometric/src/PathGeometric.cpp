@@ -214,10 +214,23 @@ std::pair<bool, bool> ompl::geometric::PathGeometric::checkAndRepair(unsigned in
     base::UniformValidStateSampler *uvss = nullptr;
     bool result = true;
 
+    // Check each state in path
     for (int i = 1 ; i < n1 ; ++i)
+    {
+        std::cout << "checkAndRepair loop " << i << std::endl;
+
+        // Check if path segment is valid
         if (!si_->checkMotion(states_[i-1], states_[i]))
         {
+            std::cout << "Found an invalid motion from " << (i-1) << " to " << i << " of " << n1 << std::endl;
             // we now compute a state around which to sample
+
+            // If this segment only has 2 states, and the path between them is invalid,
+            // return false because we do not modify the endpoints
+            if (n1 == 2)
+                return std::make_pair(false, false);
+
+            // Create temp state and sampler if not already existing
             if (!temp)
                 temp = si_->allocState();
             if (!uvss)
@@ -226,47 +239,20 @@ std::pair<bool, bool> ompl::geometric::PathGeometric::checkAndRepair(unsigned in
                 uvss->setNrAttempts(attempts);
             }
 
-            // and a radius of sampling around that state
-            double radius = 0.0;
-
-            if (si_->isValid(states_[i]))
-            {
-                si_->copyState(temp, states_[i]);
-                radius = si_->distance(states_[i-1], states_[i]);
-            }
+            bool success;
+            if (i < n1 - 1)
+                success = sampleNextState(attempts, i, temp, uvss);
             else
-            {
-                unsigned int nextValid = n1;
-                for (int j = i + 1 ; j < n1 ; ++j)
-                    if (si_->isValid(states_[j]))
-                    {
-                        nextValid = j;
-                        break;
-                    }
-                // we know nextValid will be initialised because n1 is certainly valid.
-                si_->getStateSpace()->interpolate(states_[i - 1], states_[nextValid], 0.5, temp);
-                radius = std::max(si_->distance(states_[i-1], temp), si_->distance(states_[i-1], states_[i]));
-            }
+                success = samplePrevState(attempts, i, temp, uvss);
 
-            bool success = false;
-
-            for (unsigned int a = 0 ; a < attempts ; ++a)
-                if (uvss->sampleNear(states_[i], temp, radius))
-                {
-                    if (si_->checkMotion(states_[i-1], states_[i]))
-                    {
-                        success = true;
-                        break;
-                    }
-                }
-                else
-                    break;
             if (!success)
             {
+                std::cout << "failed to find new state " << std::endl;
                 result = false;
                 break;
             }
         }
+    } // for
 
     // free potentially allocated memory
     if (temp)
@@ -276,6 +262,110 @@ std::pair<bool, bool> ompl::geometric::PathGeometric::checkAndRepair(unsigned in
         delete uvss;
 
     return std::make_pair(originalValid, result);
+}
+
+/**
+ * \brief Helper for checkAndRepair
+ * \param attempts - number of samples to try to draw
+ * \param i - the id of the state to sample
+ * \param temp - an allocated state for temporarily sampling around
+ * \return true if valid state found
+ */
+bool ompl::geometric::PathGeometric::sampleNextState(unsigned int attempts, int i, base::State *temp, base::UniformValidStateSampler *uvss)
+{
+    std::cout << "sampleNextState() " << std::endl;
+
+    // Calculate a radius of sampling around that state
+    double radius = 0.0;
+    if (si_->isValid(states_[i]))
+    {
+        std::cout << "  state " << i << " is valid" << std::endl;
+        si_->copyState(temp, states_[i]); // (destination, source)
+        // Search in a distance the same distance as the current segment length
+        radius = si_->distance(states_[i-1], states_[i]);
+    }
+    else
+    {
+        // The current state is not valid, so sample in a radius the size of the next location
+        // in the path that is valid
+        unsigned int nextValid = states_.size();
+        for (int j = i + 1 ; j < int(states_.size()) ; ++j)
+            if (si_->isValid(states_[j]))
+            {
+                nextValid = j;
+                break;
+            }
+        // we know nextValid will be initialised because the last state is certainly valid.
+        // find the center point between the two bounding states that we know to be valid
+        si_->getStateSpace()->interpolate(states_[i - 1], states_[nextValid], 0.5, temp);
+        // set the search radius to the distance between the two bounding states that we know to be valid
+        radius = std::max(si_->distance(states_[i-1], temp), si_->distance(states_[i-1], states_[i]));
+    }
+
+    // Start sampling for replacement states
+    for (unsigned int a = 0 ; a < attempts ; ++a)
+    {
+        if (uvss->sampleNear(states_[i], temp /*near*/, radius))
+        {
+            if (si_->checkMotion(states_[i-1], states_[i]))
+            {
+                return true;
+            }
+        }
+        else
+            return false;
+    } // for
+    return false;
+}
+
+bool ompl::geometric::PathGeometric::samplePrevState(unsigned int attempts, int i, base::State *temp, base::UniformValidStateSampler *uvss)
+{
+    std::cout << "samplePrevState() " << std::endl;
+
+    // Move state back one so that the samples are for the previous state
+    i -= 1;
+
+    // Calculate a radius of sampling around that state
+    double radius = 0.0;
+    if (si_->isValid(states_[i]))
+    {
+        std::cout << "  state " << i << " is valid" << std::endl;
+        si_->copyState(temp, states_[i]); // (destination, source)
+        // Search in a distance the same distance as the current segment length
+        radius = si_->distance(states_[i], states_[i+1]);
+    }
+    else
+    {
+        // The current state is not valid, so sample in a radius the size of the next location
+        // in the path that is valid
+        unsigned int nextValid = states_.size();
+        for (int j = i + 1 ; j < int(states_.size()) ; ++j)
+            if (si_->isValid(states_[j]))
+            {
+                nextValid = j;
+                break;
+            }
+        // we know nextValid will be initialised because the last state is certainly valid.
+        // find the center point between the two bounding states that we know to be valid
+        si_->getStateSpace()->interpolate(states_[i], states_[nextValid], 0.5, temp);
+        // set the search radius to the distance between the two bounding states that we know to be valid
+        radius = std::max(si_->distance(states_[i], temp), si_->distance(states_[i], states_[i+1]));
+    }
+
+    // Start sampling for replacement states
+    for (unsigned int a = 0 ; a < attempts ; ++a)
+    {
+        if (uvss->sampleNear(states_[i], temp /*near*/, radius))
+        {
+            if (si_->checkMotion(states_[i], states_[i+1]))
+            {
+                return true;
+            }
+        }
+        else
+            return false;
+    } // for
+    return false;
 }
 
 void ompl::geometric::PathGeometric::subdivide()

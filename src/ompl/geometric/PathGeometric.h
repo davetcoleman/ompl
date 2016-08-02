@@ -39,6 +39,7 @@
 
 #include "ompl/base/SpaceInformation.h"
 #include "ompl/base/Path.h"
+#include "ompl/base/samplers/UniformValidStateSampler.h"
 #include <vector>
 #include <utility>
 
@@ -155,7 +156,7 @@ namespace ompl
             /** \brief Check if the path is valid. If it is not,
                 attempts are made to fix the path by sampling around
                 invalid states. Not more than \e attempts samples are
-                drawn.
+                drawn. The endpoints will not be modified
                 \return A pair of boolean values is returned. The first
                 value represents the validity of the path before any
                 change was made. The second value represents the
@@ -164,6 +165,18 @@ namespace ompl
 
                 \note If repairing a path fails, the path may still be altered */
             std::pair<bool, bool> checkAndRepair(unsigned int attempts);
+
+            /**
+             * \brief Helper for checkAndRepair
+             * \param attempts - number of samples to try to draw
+             * \param i - the id of the state to sample
+             * \param temp - an allocated state for temporarily sampling around
+             * \return true if valid state found
+             */
+            bool sampleNextState(unsigned int attempts, int i, base::State *temp,
+                base::UniformValidStateSampler *uvss);
+            bool samplePrevState(unsigned int attempts, int i, base::State *temp,
+                base::UniformValidStateSampler *uvss);
 
             /** \brief Overlay the path \e over on top of the current
                 path. States are added to the current path if needed
