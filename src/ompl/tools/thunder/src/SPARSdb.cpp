@@ -824,7 +824,7 @@ bool ompl::geometric::SPARSdb::addPathToRoadmap(const base::PlannerTerminationCo
     for (unsigned long shuffledID : shuffledIDs)
     {
 
-        visual_->viz1()->state(solutionPath.getState(shuffledIDs[i]), tools::SMALL, tools::GREEN, sparseDelta_);
+        visual_->viz1()->state(solutionPath.getState(shuffledID), tools::SMALL, tools::GREEN, sparseDelta_);
         visual_->viz1()->trigger();
 
         // Add a single state to the roadmap
@@ -999,8 +999,8 @@ bool ompl::geometric::SPARSdb::addStateToRoadmap(const base::PlannerTerminationC
                         if (verbose_)
                             OMPL_INFORM(" ------ Looping through close representatives");
 
-                        updatePairPoints(visibleNeighborhood[0], candidateState, it->first, it->second);
-                        updatePairPoints(it->first, it->second, visibleNeighborhood[0], candidateState);
+                        updatePairPoints(visibleNeighborhood[0], candidateState, closeRepresentative.first, closeRepresentative.second);
+                        updatePairPoints(closeRepresentative.first, closeRepresentative.second, visibleNeighborhood[0], candidateState);
                     }
                     if (verbose_)
                         OMPL_INFORM(" ------ checkAddPath()");
@@ -1202,7 +1202,7 @@ bool ompl::geometric::SPARSdb::checkAddPath( Vertex v )
             InterfaceData& d = getData( v, r, rp );
 
             //Then, if the spanner property is violated
-            if (rm_dist > stretchFactor_ * d.last_distance_)
+            if (rm_dist > stretchFactor_ * d.d_)
             {
                 spannerPropertyWasViolated = true; //Report that we added for the path
                 if (si_->checkMotion(stateProperty_[r], stateProperty_[rp]))
@@ -1374,14 +1374,10 @@ void ompl::geometric::SPARSdb::findCloseRepresentatives(base::State *workState, 
     std::map<Vertex, base::State*> &closeRepresentatives,
     const base::PlannerTerminationCondition &ptc)
 {
-<<<<<<< HEAD
     // Properly clear the vector by also deleting previously sampled unused states
     for (auto & closeRepresentative : closeRepresentatives)
         si_->freeState(closeRepresentative.second);
     closeRepresentatives.clear();
-=======
-    assert(closeRepresentatives.empty());
->>>>>>> Added Visualier to main OMPL repo
 
     //denseDelta_ = 0.25 * sparseDelta_;
     //nearSamplePoints_ /= 10; // HACK - this makes it look for the same number of samples as dimensions

@@ -124,7 +124,7 @@ namespace ompl
                 base::State *sigmaB_;
 
                 /** \brief Last known distance between the two interfaces supported by points_ and sigmas. */
-                double       last_distance_;
+                double       d_;
 
                 /** \brief Constructor */
                 InterfaceData() :
@@ -159,7 +159,7 @@ namespace ompl
                         si->freeState(sigmaB_);
                         sigmaB_ = nullptr;
                     }
-                    last_distance_ = std::numeric_limits<double>::infinity();
+                    d_ = std::numeric_limits<double>::infinity();
                 }
 
                 /** \brief Sets information for the first interface (i.e. interface with smaller index vertex). */
@@ -174,7 +174,7 @@ namespace ompl
                     else
                         sigmaA_ = si->cloneState(s);
                     if (pointB_)
-                        last_distance_ = si->distance(pointA_, pointB_);
+                        d_ = si->distance(pointA_, pointB_);
                 }
 
                 /** \brief Sets information for the second interface (i.e. interface with larger index vertex). */
@@ -189,7 +189,7 @@ namespace ompl
                     else
                         sigmaB_ = si->cloneState(s);
                     if (pointA_)
-                        last_distance_ = si->distance(pointA_, pointB_);
+                        d_ = si->distance(pointA_, pointB_);
                 }
             };
 

@@ -138,7 +138,7 @@ void ompl::base::GoalLazySamples::sampleGoal(base::State *st) const
     GoalStates::sampleGoal(st);
 }
 
-void ompl::base::GoalLazySamples::setNewState(const NewStateFn &callback)
+void ompl::base::GoalLazySamples::setNewStateCallback(const NewStateCallbackFn &callback)
 {
     callback_ = callback;
 }

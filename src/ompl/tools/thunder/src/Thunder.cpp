@@ -337,8 +337,8 @@ ompl::base::PlannerStatus ompl::tools::Thunder::solve(const base::PlannerTermina
                 queuedSolutionPaths_.push_back(solutionPath);
 
                 // Logging
-                log.insertion_failed = false; // TODO this is wrong logging data
-                log.is_saved = "always_attempt";
+                log.insertionFailed = false; // TODO this is wrong logging data
+                log.isSaved = "always_attempt";
             }
             else // never add when from recall
             {
@@ -381,7 +381,7 @@ ompl::base::PlannerStatus ompl::tools::Thunder::solve(const base::PlannerTermina
                 // Queue the solution path for future insertion into experience database (post-processing)
                 queuedSolutionPaths_.push_back(solutionPath);
 
-                log.insertion_failed = false; // TODO fix this wrong logging info
+                log.insertionFailed = false; // TODO fix this wrong logging info
             }
         }
     }

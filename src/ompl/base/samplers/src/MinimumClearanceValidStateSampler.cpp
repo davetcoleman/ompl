@@ -76,7 +76,6 @@ bool ompl::base::MinimumClearanceValidStateSampler::sampleNear(State *state, con
     unsigned int attempts = 0;
     bool valid = false;
     double dist = 0.0;
-
     do
     {
         sampler_->sampleUniformNear(state, near, distance);

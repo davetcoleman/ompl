@@ -25,5 +25,6 @@ src/ompl/config.h
 tests/BoostTestTeamCityReporter.h
 tests/resources/config.h
 _symlinks.sh
+package.xml
 .dir-locals.el
 .clang-format

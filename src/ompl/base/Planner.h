@@ -66,6 +66,7 @@ namespace ompl
         /** \class ompl::base::PlannerPtr
             \brief A shared pointer wrapper for ompl::base::Planner */
 
+
         /** \brief Helper class to extract valid start & goal
             states. Usually used internally by planners.
 
