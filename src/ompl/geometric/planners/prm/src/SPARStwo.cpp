@@ -239,6 +239,7 @@ void ompl::geometric::SPARStwo::copyPasteState(std::size_t numSets) const
               << 0 << ", " // useCheckRemoveCloseVertices
               << 0 << ", " // useClearEdgesNearVertex_
               << 0 << ", " // useOriginalSmoother_
+              << 0 << ", " // useEdgeImprovementRule_
               << 0 << ", " // fourthCriteriaAfterFailures_
               << maxFailures_ << ", "
               << consecutiveFailures_ << ", "
