@@ -46,8 +46,6 @@
 #include <boost/foreach.hpp>
 
 // Allow hooks for visualizing planner
-//#define OMPL_THUNDER_DEBUG
-
 #define foreach BOOST_FOREACH
 #define foreach_reverse BOOST_REVERSE_FOREACH
 
@@ -95,28 +93,25 @@ void ompl::geometric::SPARSdb::CustomVisitor::examine_vertex(Vertex u, const Gra
 
 // SPARSdb methods ////////////////////////////////////////////////////////////////////////////////////////
 
-ompl::geometric::SPARSdb::SPARSdb(const base::SpaceInformationPtr &si)
+ompl::geometric::SPARSdb::SPARSdb(const base::SpaceInformationPtr &si, tools::VisualizerPtr visual)
   : base::Planner(si, "SPARSdb")
-  ,
+  , visual_(visual)
   // Numeric variables
-  stretchFactor_(3.)
+  , stretchFactor_(3.)
   , sparseDeltaFraction_(.25)
   , denseDeltaFraction_(.001)
   , maxFailures_(5000)
   , numPathInsertionFailures_(0)
   , nearSamplePoints_((2 * si_->getStateDimension()))
-  ,
   // Property accessors of edges
-  edgeWeightProperty_(boost::get(boost::edge_weight, g_))
+  , edgeWeightProperty_(boost::get(boost::edge_weight, g_))
   , edgeCollisionStateProperty_(boost::get(edge_collision_state_t(), g_))
-  ,
   // Property accessors of vertices
-  stateProperty_(boost::get(vertex_state_t(), g_))
+  , stateProperty_(boost::get(vertex_state_t(), g_))
   , colorProperty_(boost::get(vertex_color_t(), g_))
   , interfaceDataProperty_(boost::get(vertex_interface_data_t(), g_))
-  ,
   // Disjoint set accessors
-  disjointSets_(boost::get(boost::vertex_rank, g_), boost::get(boost::vertex_predecessor, g_))
+  , disjointSets_(boost::get(boost::vertex_rank, g_), boost::get(boost::vertex_predecessor, g_))
   , addedSolution_(false)
   , consecutiveFailures_(0)
   , iterations_(0)
@@ -397,7 +392,6 @@ bool ompl::geometric::SPARSdb::lazyCollisionSearch(const Vertex &start, const Ve
                             "combos");
 
             // no path found what so ever
-            // return false;
             return false;
         }
         havePartialSolution = true;  // we have found at least one path at this point. may be invalid
@@ -421,7 +415,7 @@ bool ompl::geometric::SPARSdb::lazyCollisionSearch(const Vertex &start, const Ve
             return true;
         }
         // else, loop with updated graph that has the invalid edges/states disabled
-    }  // while
+    }  // end while
 
     // we never found a valid path
     return false;
@@ -565,6 +559,11 @@ bool ompl::geometric::SPARSdb::sameComponent(Vertex m1, Vertex m2)
     return boost::same_component(m1, m2, disjointSets_);
 }
 
+double ompl::geometric::SPARSdb::distanceFunction(const Vertex a, const Vertex b) const
+{
+    return si_->distance(stateProperty_[a], stateProperty_[b]);
+}
+
 bool ompl::geometric::SPARSdb::reachedFailureLimit() const
 {
     return consecutiveFailures_ >= maxFailures_;
@@ -695,9 +694,9 @@ bool ompl::geometric::SPARSdb::addPathToRoadmap(const base::PlannerTerminationCo
     // Try to add the start first, but don't force it
     addStateToRoadmap(ptc, solutionPath.getState(0));
 
-#ifdef OMPL_THUNDER_DEBUG
-    visualizeStateCallback(solutionPath.getState(solutionPath.getStateCount() - 1), 3, sparseDelta_);
-#endif
+    visual_->viz1()->state(solutionPath.getState(solutionPath.getStateCount() - 1), tools::LARGE, tools::RED,
+                           sparseDelta_);
+    visual_->viz1()->trigger();
 
     // Add solution states to SPARSdb one by one ---------------------------
 
@@ -728,10 +727,9 @@ bool ompl::geometric::SPARSdb::addPathToRoadmap(const base::PlannerTerminationCo
                 OMPL_INFORM("Adding state %d of %d", i, solutionPath.getStateCount());
             }
 
-// Show the candidate state in Rviz for path insertion of GUARDS
-#ifdef OMPL_THUNDER_DEBUG
-            visualizeStateCallback(solutionPath.getState(i), 1, sparseDelta_);
-#endif
+            // Show the candidate state in Rviz for path insertion of GUARDS
+            visual_->viz1()->state(solutionPath.getState(i), tools::SMALL, tools::GREEN, sparseDelta_);
+            visual_->viz1()->trigger();
 
             // Add a single state to the roadmap
             if (!addStateToRoadmap(ptc, solutionPath.getState(i)))
@@ -795,11 +793,10 @@ bool ompl::geometric::SPARSdb::addPathToRoadmap(const base::PlannerTerminationCo
             OMPL_INFORM("Adding connectvity state ", i);
         }
 
-#ifdef OMPL_THUNDER_DEBUG
         // Show the candidate state in Rviz for path insertion of BRIDGES (CONNECTIVITY)
-        visualizeStateCallback(connectivityState, 2, sparseDelta_);
+        visual_->viz1()->state(connectivityState, tools::SMALL, tools::BLUE, sparseDelta_);
+        visual_->viz1()->trigger();
         sleep(0.5);
-#endif
 
         // Add a single state to the roadmap
         addStateToRoadmap(ptc, connectivityState);
@@ -836,9 +833,8 @@ bool ompl::geometric::SPARSdb::addPathToRoadmap(const base::PlannerTerminationCo
     // Add each state randomly
     for (unsigned long shuffledID : shuffledIDs)
     {
-#ifdef OMPL_THUNDER_DEBUG
-        visualizeStateCallback(solutionPath.getState(shuffledIDs[i]), 1, sparseDelta_);
-#endif
+        visual_->viz1()->state(solutionPath.getState(shuffledID), tools::SMALL, tools::GREEN, sparseDelta_);
+        visual_->viz1()->trigger();
 
         // Add a single state to the roadmap
         addStateToRoadmap(ptc, solutionPath.getState(shuffledID));
@@ -958,7 +954,7 @@ bool ompl::geometric::SPARSdb::addStateToRoadmap(const base::PlannerTerminationC
     checkQueryStateInitialization();
 
     // Deep copy
-    base::State *qNew = si_->cloneState(newState);
+    base::State *candidateState = si_->cloneState(newState);  // TODO why clone it??
     base::State *workState = si_->allocState();
 
     /* The whole neighborhood set which has been most recently computed */
@@ -968,7 +964,7 @@ bool ompl::geometric::SPARSdb::addStateToRoadmap(const base::PlannerTerminationC
 
     ++iterations_;
 
-    findGraphNeighbors(qNew, graphNeighborhood, visibleNeighborhood);
+    findGraphNeighbors(candidateState, graphNeighborhood, visibleNeighborhood);
 
     if (verbose_)
     {
@@ -977,24 +973,25 @@ bool ompl::geometric::SPARSdb::addStateToRoadmap(const base::PlannerTerminationC
 
         foreach (Vertex v, visibleNeighborhood)
         {
-            OMPL_INFORM("Visible neighbor is vertex %f with distance %f ", v, si_->distance(qNew, stateProperty_[v]));
+            OMPL_INFORM("Visible neighbor is vertex %f with distance %f ", v,
+                        si_->distance(candidateState, stateProperty_[v]));
         }
     }
 
     if (verbose_)
         OMPL_INFORM(" - checkAddCoverage() Are other nodes around it visible?");
     // Coverage criterion
-    if (!checkAddCoverage(qNew,
+    if (!checkAddCoverage(candidateState,
                           visibleNeighborhood))  // Always add a node if no other nodes around it are visible (GUARD)
     {
         if (verbose_)
             OMPL_INFORM(" -- checkAddConnectivity() Does this node connect neighboring nodes that are not connected? ");
         // Connectivity criterion
-        if (!checkAddConnectivity(qNew, visibleNeighborhood))
+        if (!checkAddConnectivity(candidateState, visibleNeighborhood))
         {
             if (verbose_)
                 OMPL_INFORM(" --- checkAddInterface() Does this node's neighbor's need it to better connect them? ");
-            if (!checkAddInterface(qNew, graphNeighborhood, visibleNeighborhood))
+            if (!checkAddInterface(candidateState, graphNeighborhood, visibleNeighborhood))
             {
                 if (verbose_)
                     OMPL_INFORM(" ---- Ensure SPARS asymptotic optimality");
@@ -1004,7 +1001,8 @@ bool ompl::geometric::SPARSdb::addStateToRoadmap(const base::PlannerTerminationC
                     if (verbose_)
                         OMPL_INFORM(" ----- findCloseRepresentatives()");
 
-                    findCloseRepresentatives(workState, qNew, visibleNeighborhood[0], closeRepresentatives, ptc);
+                    findCloseRepresentatives(workState, candidateState, visibleNeighborhood[0], closeRepresentatives,
+                                             ptc);
                     if (verbose_)
                         OMPL_INFORM("------ Found %d close representatives", closeRepresentatives.size());
 
@@ -1012,10 +1010,11 @@ bool ompl::geometric::SPARSdb::addStateToRoadmap(const base::PlannerTerminationC
                     {
                         if (verbose_)
                             OMPL_INFORM(" ------ Looping through close representatives");
-                        updatePairPoints(visibleNeighborhood[0], qNew, closeRepresentative.first,
+
+                        updatePairPoints(visibleNeighborhood[0], candidateState, closeRepresentative.first,
                                          closeRepresentative.second);
                         updatePairPoints(closeRepresentative.first, closeRepresentative.second, visibleNeighborhood[0],
-                                         qNew);
+                                         candidateState);
                     }
                     if (verbose_)
                         OMPL_INFORM(" ------ checkAddPath()");
@@ -1057,7 +1056,7 @@ bool ompl::geometric::SPARSdb::addStateToRoadmap(const base::PlannerTerminationC
         ++consecutiveFailures_;
 
     si_->freeState(workState);
-    si_->freeState(qNew);
+    si_->freeState(candidateState);
 
     return stateAdded;
 }
@@ -1077,21 +1076,23 @@ ompl::base::PlannerStatus ompl::geometric::SPARSdb::solve(const base::PlannerTer
     return base::PlannerStatus::TIMEOUT;
 }
 
-bool ompl::geometric::SPARSdb::checkAddCoverage(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood)
+bool ompl::geometric::SPARSdb::checkAddCoverage(const base::State *candidateState,
+                                                std::vector<Vertex> &visibleNeighborhood)
 {
     if (visibleNeighborhood.size() > 0)
         return false;
     // No free paths means we add for coverage
     if (verbose_)
         OMPL_INFORM(" --- Adding node for COVERAGE ");
-    Vertex v = addGuard(si_->cloneState(qNew), COVERAGE);
+    Vertex v = addGuard(si_->cloneState(candidateState), COVERAGE);
     if (verbose_)
         OMPL_INFORM("       Added vertex %f", v);
 
     return true;
 }
 
-bool ompl::geometric::SPARSdb::checkAddConnectivity(const base::State *qNew, std::vector<Vertex> &visibleNeighborhood)
+bool ompl::geometric::SPARSdb::checkAddConnectivity(const base::State *candidateState,
+                                                    std::vector<Vertex> &visibleNeighborhood)
 {
     // Identify visibile nodes around our new state that are unconnected (in different connected components)
     // and connect them
@@ -1121,7 +1122,7 @@ bool ompl::geometric::SPARSdb::checkAddConnectivity(const base::State *qNew, std
             if (verbose_)
                 OMPL_INFORM(" --- Adding node for CONNECTIVITY ");
             // Add the node
-            Vertex newVertex = addGuard(si_->cloneState(qNew), CONNECTIVITY);
+            Vertex newVertex = addGuard(si_->cloneState(candidateState), CONNECTIVITY);
 
             for (unsigned long statesInDiffConnectedComponent : statesInDiffConnectedComponents)
             {
@@ -1142,7 +1143,8 @@ bool ompl::geometric::SPARSdb::checkAddConnectivity(const base::State *qNew, std
     return false;
 }
 
-bool ompl::geometric::SPARSdb::checkAddInterface(const base::State *qNew, std::vector<Vertex> &graphNeighborhood,
+bool ompl::geometric::SPARSdb::checkAddInterface(const base::State *candidateState,
+                                                 std::vector<Vertex> &graphNeighborhood,
                                                  std::vector<Vertex> &visibleNeighborhood)
 {
     // If we have at least 2 neighbors
@@ -1171,7 +1173,7 @@ bool ompl::geometric::SPARSdb::checkAddInterface(const base::State *qNew, std::v
                     // Add the new node to the graph, to bridge the interface
                     if (verbose_)
                         OMPL_INFORM(" --- Adding node for INTERFACE  ");
-                    Vertex v = addGuard(si_->cloneState(qNew), INTERFACE);
+                    Vertex v = addGuard(si_->cloneState(candidateState), INTERFACE);
                     connectGuards(v, visibleNeighborhood[0]);
                     connectGuards(v, visibleNeighborhood[1]);
                     if (verbose_)
@@ -1189,9 +1191,9 @@ bool ompl::geometric::SPARSdb::checkAddPath(Vertex v)
 {
     bool spannerPropertyWasViolated = false;
 
-    std::vector<Vertex> rs;
+    std::vector<Vertex> adjVertices;
     foreach (Vertex r, boost::adjacent_vertices(v, g_))
-        rs.push_back(r);
+        adjVertices.push_back(r);
 
     /* Candidate x vertices as described in the method, filled by function computeX(). */
     std::vector<Vertex> Xs;
@@ -1199,9 +1201,9 @@ bool ompl::geometric::SPARSdb::checkAddPath(Vertex v)
     /* Candidate v" vertices as described in the method, filled by function computeVPP(). */
     std::vector<Vertex> VPPs;
 
-    for (std::size_t i = 0; i < rs.size() && !spannerPropertyWasViolated; ++i)
+    for (std::size_t i = 0; i < adjVertices.size() && !spannerPropertyWasViolated; ++i)
     {
-        Vertex r = rs[i];
+        Vertex r = adjVertices[i];
         computeVPP(v, r, VPPs);
         foreach (Vertex rp, VPPs)
         {
@@ -1358,36 +1360,36 @@ void ompl::geometric::SPARSdb::approachGraph(Vertex v)
         connectGuards(v, vp);
 }
 
-ompl::geometric::SPARSdb::Vertex ompl::geometric::SPARSdb::findGraphRepresentative(base::State *st)
+ompl::geometric::SPARSdb::Vertex ompl::geometric::SPARSdb::findGraphRepresentative(base::State *state)
 {
-    std::vector<Vertex> nbh;
-    stateProperty_[queryVertex_] = st;
-    nn_->nearestR(queryVertex_, sparseDelta_, nbh);
+    std::vector<Vertex> graphNeighbors;
+    stateProperty_[queryVertex_] = state;
+    nn_->nearestR(queryVertex_, sparseDelta_, graphNeighbors);
     stateProperty_[queryVertex_] = nullptr;
 
     if (verbose_)
-        OMPL_INFORM(" ------- findGraphRepresentative found %d nearest neighbors of distance %f", nbh.size(),
+        OMPL_INFORM(" ------- findGraphRepresentative found %d nearest neighbors of distance %f", graphNeighbors.size(),
                     sparseDelta_);
 
     Vertex result = boost::graph_traits<Graph>::null_vertex();
 
-    for (std::size_t i = 0; i < nbh.size(); ++i)
+    for (std::size_t i = 0; i < graphNeighbors.size(); ++i)
     {
         if (verbose_)
-            OMPL_INFORM(" -------- Checking motion of graph rep candidate %d", i);
-        if (si_->checkMotion(st, stateProperty_[nbh[i]]))
+            OMPL_INFORM(" -------- Checking motion of graph representative candidate %d", i);
+        if (si_->checkMotion(state, stateProperty_[graphNeighbors[i]]))
         {
             if (verbose_)
                 OMPL_INFORM(" --------- VALID ");
-            result = nbh[i];
+            result = graphNeighbors[i];
             break;
         }
     }
     return result;
 }
 
-void ompl::geometric::SPARSdb::findCloseRepresentatives(base::State *workState, const base::State *qNew,
-                                                        const Vertex qRep,
+void ompl::geometric::SPARSdb::findCloseRepresentatives(base::State *workState, const base::State *candidateState,
+                                                        const Vertex candidateRep,
                                                         std::map<Vertex, base::State *> &closeRepresentatives,
                                                         const base::PlannerTerminationCondition &ptc)
 {
@@ -1397,57 +1399,54 @@ void ompl::geometric::SPARSdb::findCloseRepresentatives(base::State *workState, 
     closeRepresentatives.clear();
 
     // denseDelta_ = 0.25 * sparseDelta_;
-    nearSamplePoints_ /= 10;  // HACK - this makes it look for the same number of samples as dimensions
+    // nearSamplePoints_ /= 10; // HACK - this makes it look for the same number of samples as dimensions
 
     if (verbose_)
         OMPL_INFORM(" ----- nearSamplePoints: %f, denseDelta: %f", nearSamplePoints_, denseDelta_);
 
-    // Then, begin searching the space around new potential state qNew
-    for (unsigned int i = 0; i < nearSamplePoints_ && ptc == false; ++i)
+    // Then, begin searching the space around new potential state candidateState
+    for (unsigned int i = 0; i < nearSamplePoints_; ++i)
     {
-        do
-        {
-            sampler_->sampleNear(workState, qNew, denseDelta_);
+        if (ptc)  // Check if out of time
+            break;
 
-#ifdef OMPL_THUNDER_DEBUG
-            visualizeStateCallback(workState, 3, sparseDelta_);
-            sleep(0.1);
-#endif
+        while (true)
+        {
+            sampler_->sampleNear(workState, candidateState, denseDelta_);
 
             if (verbose_)
-            {
                 OMPL_INFORM(" ------ findCloseRepresentatives sampled state ");
 
-                if (!si_->isValid(workState))
-                {
-                    OMPL_INFORM(" ------ isValid ");
-                }
-                if (si_->distance(qNew, workState) > denseDelta_)
-                {
-                    OMPL_INFORM(" ------ Distance too far ");
-                }
-                if (!si_->checkMotion(qNew, workState))
-                {
-                    OMPL_INFORM(" ------ Motion invalid ");
-                }
+            if (ptc)  // Check if out of time
+                break;
+
+            if (!si_->isValid(workState))
+            {
+                if (verbose_)
+                    OMPL_INFORM(" ------ notValid ");
+                continue;
             }
-
-        } while ((!si_->isValid(workState) || si_->distance(qNew, workState) > denseDelta_ ||
-                  !si_->checkMotion(qNew, workState)) &&
-                 ptc == false);
-
-        // if we were not successful at sampling a desirable state, we are out of time
-        if (ptc == true)
-        {
-            if (verbose_)
-                OMPL_INFORM(" ------ We are out of time ");
-            break;
+            if (si_->distance(candidateState, workState) > denseDelta_)
+            {
+                if (verbose_)
+                    OMPL_INFORM(" ------ Distance too far ");
+                continue;
+            }
+            if (!si_->checkMotion(candidateState, workState))
+            {
+                if (verbose_)
+                    OMPL_INFORM(" ------ Motion invalid ");
+                continue;
+            }
         }
+
+        if (ptc)  // Check if out of time
+            break;
 
         if (verbose_)
             OMPL_INFORM(" ------ Find graph representative ");
 
-        // Compute who his graph neighbors are
+        // Compute which sparse vertex represents this new candidate vertex
         Vertex representative = findGraphRepresentative(workState);
 
         // Assuming this sample is actually seen by somebody (which he should be in all likelihood)
@@ -1456,11 +1455,11 @@ void ompl::geometric::SPARSdb::findCloseRepresentatives(base::State *workState, 
             if (verbose_)
                 OMPL_INFORM(" ------ Representative is not null ");
 
-            // If his representative is different than qNew
-            if (qRep != representative)
+            // If its representative is different than candidateState
+            if (candidateRep != representative)
             {
                 if (verbose_)
-                    OMPL_INFORM(" ------ qRep != representative ");
+                    OMPL_INFORM(" ------ candidateRep != representative ");
 
                 // And we haven't already tracked this representative
                 if (closeRepresentatives.find(representative) == closeRepresentatives.end())
@@ -1474,13 +1473,13 @@ void ompl::geometric::SPARSdb::findCloseRepresentatives(base::State *workState, 
             else
             {
                 if (verbose_)
-                    OMPL_INFORM(" ------ qRep == representative, no good ");
+                    OMPL_INFORM(" ------ candidateRep == representative, no good ");
             }
         }
         else
         {
             if (verbose_)
-                OMPL_INFORM(" ------ Rep is null ");
+                OMPL_INFORM(" ------ Representative is null ");
 
             // This guy can't be seen by anybody, so we should take this opportunity to add him
             if (verbose_)
@@ -1489,7 +1488,7 @@ void ompl::geometric::SPARSdb::findCloseRepresentatives(base::State *workState, 
 
             if (verbose_)
             {
-                OMPL_INFORM(" ------ STOP EFFORS TO ADD A DENSE PATH");
+                OMPL_INFORM(" ------ STOP EFFORTS TO ADD A DENSE PATH");
             }
 
             // We should also stop our efforts to add a dense path
@@ -1630,40 +1629,39 @@ ompl::geometric::SPARSdb::Vertex ompl::geometric::SPARSdb::addGuard(base::State 
     {
         OMPL_INFORM(" ---- addGuard() of type %f", type);
     }
-#ifdef OMPL_THUNDER_DEBUG
-    visualizeStateCallback(state, 4, sparseDelta_);  // Candidate node has already (just) been added
+    visual_->viz1()->state(state, tools::MEDIUM, tools::PURPLE,
+                           sparseDelta_);  // Candidate node has already (just) been added
+    visual_->viz1()->trigger();
     sleep(0.1);
-#endif
 
     return m;
 }
 
-void ompl::geometric::SPARSdb::connectGuards(Vertex v, Vertex vp)
+void ompl::geometric::SPARSdb::connectGuards(Vertex v1, Vertex v2)
 {
     // OMPL_INFORM("connectGuards called ---------------------------------------------------------------- ");
-    assert(v <= getNumVertices());
-    assert(vp <= getNumVertices());
+    assert(v1 <= getNumVertices());
+    assert(v2 <= getNumVertices());
 
     if (verbose_)
     {
-        OMPL_INFORM(" ------- connectGuards/addEdge: Connecting vertex %f to vertex %f", v, vp);
+        OMPL_INFORM(" ------- connectGuards/addEdge: Connecting vertex %f to vertex %f", v1, v2);
     }
 
     // Create the new edge
-    Edge e = (boost::add_edge(v, vp, g_)).first;
+    Edge e = (boost::add_edge(v1, v2, g_)).first;
 
     // Add associated properties to the edge
-    edgeWeightProperty_[e] = distanceFunction(v, vp);  // TODO: use this value with astar
+    edgeWeightProperty_[e] = distanceFunction(v1, v2);  // TODO: use this value with astar
     edgeCollisionStateProperty_[e] = NOT_CHECKED;
 
     // Add the edge to the incrementeal connected components datastructure
-    disjointSets_.union_set(v, vp);
+    disjointSets_.union_set(v1, v2);
 
-// Debug in Rviz
-#ifdef OMPL_THUNDER_DEBUG
-    visualizeEdgeCallback(stateProperty_[v], stateProperty_[vp]);
+    // Debug in Rviz
+    visual_->viz1()->edge(stateProperty_[v1], stateProperty_[v2], 100);
+    visual_->viz1()->trigger();
     sleep(0.8);
-#endif
 }
 
 bool ompl::geometric::SPARSdb::convertVertexPathToStatePath(std::vector<Vertex> &vertexPath,

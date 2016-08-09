@@ -52,7 +52,6 @@ bool ompl::base::DiscreteMotionValidator::checkMotion(const State *s1, const Sta
 
     bool result = true;
     int nd = stateSpace_->validSegmentCount(s1, s2);
-
     if (nd > 1)
     {
         /* temporary storage for the checked state */
@@ -61,7 +60,7 @@ bool ompl::base::DiscreteMotionValidator::checkMotion(const State *s1, const Sta
         for (int j = 1; j < nd; ++j)
         {
             stateSpace_->interpolate(s1, s2, (double)j / (double)nd, test);
-            if (!si_->isValid(test))
+            if (!isValid(test))
             {
                 lastValid.second = (double)(j - 1) / (double)nd;
                 if (lastValid.first)
@@ -74,7 +73,7 @@ bool ompl::base::DiscreteMotionValidator::checkMotion(const State *s1, const Sta
     }
 
     if (result)
-        if (!si_->isValid(s2))
+        if (!isValid(s2))
         {
             lastValid.second = (double)(nd - 1) / (double)nd;
             if (lastValid.first)
@@ -93,7 +92,7 @@ bool ompl::base::DiscreteMotionValidator::checkMotion(const State *s1, const Sta
 bool ompl::base::DiscreteMotionValidator::checkMotion(const State *s1, const State *s2) const
 {
     /* assume motion starts in a valid configuration so s1 is valid */
-    if (!si_->isValid(s2))
+    if (!isValid(s2))
     {
         invalid_++;
         return false;
@@ -119,7 +118,7 @@ bool ompl::base::DiscreteMotionValidator::checkMotion(const State *s1, const Sta
             int mid = (x.first + x.second) / 2;
             stateSpace_->interpolate(s1, s2, (double)mid / (double)nd, test);
 
-            if (!si_->isValid(test))
+            if (!isValid(test))
             {
                 result = false;
                 break;
@@ -142,4 +141,23 @@ bool ompl::base::DiscreteMotionValidator::checkMotion(const State *s1, const Sta
         invalid_++;
 
     return result;
+}
+
+bool ompl::base::DiscreteMotionValidator::isValid(const State *state) const
+{
+    // If a clearance has been specified, add an extra check
+    if (clearance_ > std::numeric_limits<double>::epsilon())
+    {
+        double dist;
+        if (!si_->getStateValidityChecker()->isValid(state, dist))  // TODO: calculate dist after checking validity
+                                                                    // instead of same time?
+            return false;                                           // state not valid, do not bother checking clearance
+
+        if (dist < clearance_)
+            return false;  // not enough clearance
+
+        return true;
+    }
+    else  // No clearance check necessary
+        return si_->isValid(state);
 }

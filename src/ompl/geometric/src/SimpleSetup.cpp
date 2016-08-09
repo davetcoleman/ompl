@@ -90,6 +90,12 @@ void ompl::geometric::SimpleSetup::clear()
 void ompl::geometric::SimpleSetup::setStartAndGoalStates(const base::ScopedState<> &start,
                                                          const base::ScopedState<> &goal, const double threshold)
 {
+    setStartAndGoalStates(start.get(), goal.get(), threshold);
+}
+
+void ompl::geometric::SimpleSetup::setStartAndGoalStates(const base::State *start, const base::State *goal,
+                                                         const double threshold)
+{
     pdef_->setStartAndGoalStates(start, goal, threshold);
 
     // Clear any past solutions since they no longer correspond to our start and goal states
@@ -158,7 +164,7 @@ void ompl::geometric::SimpleSetup::simplifySolution(const base::PlannerTerminati
             std::size_t numStates = path.getStateCount();
             psk_->simplify(path, ptc);
             simplifyTime_ = time::seconds(time::now() - start);
-            OMPL_INFORM("SimpleSetup: Path simplification took %f seconds and changed from %d to %d states",
+            OMPL_INFORM("SimpleSetup(ptc): Path simplification took %f seconds and changed from %d to %d states",
                         simplifyTime_, numStates, path.getStateCount());
             return;
         }
@@ -181,7 +187,7 @@ void ompl::geometric::SimpleSetup::simplifySolution(double duration)
             else
                 psk_->simplify(static_cast<PathGeometric &>(*p), duration);
             simplifyTime_ = time::seconds(time::now() - start);
-            OMPL_INFORM("SimpleSetup: Path simplification took %f seconds and changed from %d to %d states",
+            OMPL_INFORM("SimpleSetup(duration): Path simplification took %f seconds and changed from %d to %d states",
                         simplifyTime_, numStates, path.getStateCount());
             return;
         }

@@ -45,7 +45,8 @@
 // Boost
 #include <boost/filesystem.hpp>
 
-ompl::tools::ThunderDB::ThunderDB(const base::StateSpacePtr &space) : numPathsInserted_(0), saving_enabled_(true)
+ompl::tools::ThunderDB::ThunderDB(const base::StateSpacePtr &space, VisualizerPtr visual)
+  : visual_(visual), numPathsInserted_(0), saving_enabled_(true)
 {
     // Set space information
     si_ = std::make_shared<base::SpaceInformation>(space);

@@ -155,12 +155,29 @@ namespace ompl
                 return specs_;
             }
 
+            /** \brief Getter for clearance search distance */
+            const double &getClearanceSearchDistance() const
+            {
+                return clearanceSearchDistance_;
+            }
+
+            /** \brief Setter for clearance search distance */
+            void setClearanceSearchDistance(const double &clearanceSearchDistance)
+            {
+                clearanceSearchDistance_ = clearanceSearchDistance;
+            }
+
         protected:
             /** \brief The instance of space information this state validity checker operates on */
             SpaceInformation *si_;
 
             /** \brief The specifications of the state validity checker (its capabilities) */
             StateValidityCheckerSpecs specs_;
+
+            /** \brief For some clearance computation types such as APPROXIMATE,
+                the search distance to look for nearby obstacles. This is likely the
+                same value as your minimum required clearance. */
+            double clearanceSearchDistance_;
         };
 
         /** \brief The simplest state validity checker: all states are valid */

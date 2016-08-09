@@ -38,7 +38,8 @@
 #ifndef OMPL_TOOLS_EXPERIENCE__EXPERIENCE_SETUP_
 #define OMPL_TOOLS_EXPERIENCE__EXPERIENCE_SETUP_
 
-#include "ompl/geometric/SimpleSetup.h"
+#include <ompl/geometric/SimpleSetup.h>
+#include <ompl/tools/debug/Visualizer.h>
 
 namespace ompl
 {
@@ -115,37 +116,37 @@ namespace ompl
             {
                 ExperienceLog()
                     // Defaults
-                    : planning_time(0.0),
-                      insertion_time(0.0),
+                    : planningTime(0.0),
+                      insertionTime(0.0),
                       planner("NA"),
                       result("NA"),
-                      is_saved("NA"),
+                      isSaved("NA"),
                       approximate(0.0),
-                      too_short(0.0),
-                      insertion_failed(0.0),
+                      tooShort(0.0),
+                      insertionFailed(0.0),
                       score(0.0),
-                      num_vertices(0.0),
-                      num_edges(0.0),
-                      num_connected_components(0.0)
+                      numVertices(0.0),
+                      numEdges(0.0),
+                      numConnectedComponents(0.0)
                 {
                 }
                 // Times
-                double planning_time;
-                double insertion_time;
+                double planningTime;
+                double insertionTime;
                 // Solution properties
                 std::string planner;
                 std::string result;
-                std::string is_saved;
+                std::string isSaved;
                 // Failure booleans
                 bool approximate;
-                bool too_short;
-                bool insertion_failed;
+                bool tooShort;
+                bool insertionFailed;
                 // Lightning properties
                 double score;
                 // Thunder (SPARS) properties
-                std::size_t num_vertices;
-                std::size_t num_edges;
-                std::size_t num_connected_components;
+                std::size_t numVertices;
+                std::size_t numEdges;
+                std::size_t numConnectedComponents;
             };
 
             /** \brief Constructor needs the state space used for planning. */
@@ -219,7 +220,16 @@ namespace ompl
                 return true;
             }
 
+            /** \brief Get class for managing various visualization features */
+            VisualizerPtr getVisual()
+            {
+                return visual_;
+            }
+
         protected:
+            /** \brief Class for managing various visualization features */
+            VisualizerPtr visual_;
+
             /// Flag indicating whether recalled plans should be used to find solutions. Enabled by default.
             bool recallEnabled_;
 
