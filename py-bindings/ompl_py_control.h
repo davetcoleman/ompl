@@ -40,7 +40,6 @@
 #include "ompl/control/ODESolver.h"
 #include "py_std_function.hpp"
 
-
 namespace ompl
 {
     namespace control

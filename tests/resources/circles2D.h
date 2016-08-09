@@ -44,7 +44,7 @@ struct Circles2D
 {
     struct Circle
     {
-        Circle(double x, double y, double r) : x_(x), y_(y), r_(r), r2_(r*r)
+        Circle(double x, double y, double r) : x_(x), y_(y), r_(r), r2_(r * r)
         {
         }
 
@@ -77,8 +77,9 @@ struct Circles2D
             fin >> id >> x >> y >> r;
             if (fin.eof() || !fin.good())
                 break;
-            circles_.emplace_back(x,y,r);
-            //      std::cout << "Added circle " << id << " at center " << x << ", " << y << " of radius " << r << std::endl;
+            circles_.emplace_back(x, y, r);
+            //      std::cout << "Added circle " << id << " at center " << x << ", " << y << " of radius " << r <<
+            //      std::endl;
         }
         fin.close();
 
@@ -92,7 +93,7 @@ struct Circles2D
         {
             minX_ = minY_ = std::numeric_limits<double>::infinity();
             maxX_ = maxY_ = -std::numeric_limits<double>::infinity();
-            for (std::size_t i = 0 ; i < circles_.size() ; ++i)
+            for (std::size_t i = 0; i < circles_.size(); ++i)
             {
                 if (circles_[i].x_ - circles_[i].r_ < minX_)
                     minX_ = circles_[i].x_ - circles_[i].r_;
@@ -104,7 +105,8 @@ struct Circles2D
                     maxY_ = circles_[i].y_ + circles_[i].r_;
             }
         }
-        //    std::cout << "Bounding box is [" << minX_ << ", " << minY_ << "] x [" << maxX_ << ", " << maxY_ << "]" << std::endl;
+        //    std::cout << "Bounding box is [" << minX_ << ", " << minY_ << "] x [" << maxX_ << ", " << maxY_ << "]" <<
+        //    std::endl;
     }
 
     void loadQueries(const std::string &filename)
@@ -122,7 +124,7 @@ struct Circles2D
         }
     }
 
-    const Query& getQuery(std::size_t index) const
+    const Query &getQuery(std::size_t index) const
     {
         return queries_[index];
     }
@@ -134,7 +136,7 @@ struct Circles2D
 
     bool noOverlap(double x, double y) const
     {
-        for (std::size_t i = 0 ; i < circles_.size() ; ++i)
+        for (std::size_t i = 0; i < circles_.size(); ++i)
         {
             double dx = circles_[i].x_ - x;
             double dy = circles_[i].y_ - y;

@@ -44,7 +44,7 @@ class KoulesGoal : public ompl::base::GoalSampleableRegion
 {
 public:
     KoulesGoal(const ompl::base::SpaceInformationPtr &si)
-        : ompl::base::GoalSampleableRegion(si), stateSampler_(si->allocStateSampler())
+      : ompl::base::GoalSampleableRegion(si), stateSampler_(si->allocStateSampler())
     {
         threshold_ = 0.01;
     }
@@ -57,7 +57,6 @@ public:
     {
         return 100;
     }
-
 
 private:
     mutable ompl::RNG rng_;

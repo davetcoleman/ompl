@@ -56,7 +56,7 @@ public:
     {
         return radius_[i];
     }
-    bool isDead(const ompl::base::State* state, unsigned int i) const;
+    bool isDead(const ompl::base::State *state, unsigned int i) const;
 
 protected:
     std::vector<double> mass_;

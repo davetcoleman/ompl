@@ -53,7 +53,7 @@ namespace
         return theta;
     }
 
-    inline void normalize2(double* v)
+    inline void normalize2(double *v)
     {
         double nrm = std::sqrt(v[0] * v[0] + v[1] * v[1]);
         if (nrm > std::numeric_limits<double>::epsilon())
@@ -67,11 +67,11 @@ namespace
             v[1] = 0.;
         }
     }
-    inline double dot2(double* v, double* w)
+    inline double dot2(double *v, double *w)
     {
         return v[0] * w[0] + v[1] * w[1];
     }
-    inline void vadd2(double* v, double s, double* w)
+    inline void vadd2(double *v, double s, double *w)
     {
         v[0] += s * w[0];
         v[1] += s * w[1];
@@ -80,14 +80,14 @@ namespace
     {
         return i ? 4 * i + 1 : 0;
     }
-    inline void ode(double* y, double* dydx)
+    inline void ode(double *y, double *dydx)
     {
         dydx[0] = y[2];
         dydx[1] = y[3];
         dydx[2] = (.5 * sideLength - y[0]) * lambda_c - y[2] * h;
         dydx[3] = (.5 * sideLength - y[1]) * lambda_c - y[3] * h;
     }
-    inline void rungeKutta4(double* y, double h, double* yout)
+    inline void rungeKutta4(double *y, double h, double *yout)
     {
         double hh = h * .5, h6 = h / 6.;
         static double yt[4], dydx[4], dym[4], dyt[4];
@@ -111,20 +111,20 @@ namespace
     const float eps = std::numeric_limits<float>::epsilon();
 }
 
-KoulesSimulator::KoulesSimulator(const ompl::control::SpaceInformation* si) :
-    si_(si),
-    numDimensions_(si->getStateSpace()->getDimension()),
-    numKoules_((numDimensions_ - 5) / 4),
-    qcur_(numDimensions_),
-    qnext_(numDimensions_),
-    dead_(numKoules_ + 1)
+KoulesSimulator::KoulesSimulator(const ompl::control::SpaceInformation *si)
+  : si_(si)
+  , numDimensions_(si->getStateSpace()->getDimension())
+  , numKoules_((numDimensions_ - 5) / 4)
+  , qcur_(numDimensions_)
+  , qnext_(numDimensions_)
+  , dead_(numKoules_ + 1)
 {
 }
 
-void KoulesSimulator::updateShip(const oc::Control* control, double t)
+void KoulesSimulator::updateShip(const oc::Control *control, double t)
 {
-    const double* cval = control->as<KoulesControlSpace::ControlType>()->values;
-    double v[2] = { cval[0] - qcur_[2], cval[1] - qcur_[3] };
+    const double *cval = control->as<KoulesControlSpace::ControlType>()->values;
+    double v[2] = {cval[0] - qcur_[2], cval[1] - qcur_[3]};
     double deltaTheta = normalizeAngle(atan2(v[1], v[0]) - qcur_[4]);
     double accel = 0., omega = 0.;
 
@@ -144,7 +144,7 @@ void KoulesSimulator::updateShip(const oc::Control* control, double t)
         qnext_[3] = qcur_[3];
         qcur_[4] = normalizeAngle(qcur_[4] + omega * t);
     }
-    else // omega == 0.
+    else  // omega == 0.
     {
         double ax = accel * cos(qcur_[4]);
         double ay = accel * sin(qcur_[4]);
@@ -170,8 +170,8 @@ void KoulesSimulator::initCollisionEvents()
                 if (!dead_[j])
                 {
                     jj = ind(j);
-                    rij = ri  + si_->getStateSpace()->as<KoulesStateSpace>()->getRadius(j);
-                    r[0] = qcur_[jj    ] - qcur_[ii    ];
+                    rij = ri + si_->getStateSpace()->as<KoulesStateSpace>()->getRadius(j);
+                    r[0] = qcur_[jj] - qcur_[ii];
                     r[1] = qcur_[jj + 1] - qcur_[ii + 1];
                     d = r[0] * r[0] + r[1] * r[1];
                     if (d < rij * rij)
@@ -182,9 +182,9 @@ void KoulesSimulator::initCollisionEvents()
                         r[0] *= bad * (1. + eps) * .5;
                         r[1] /= d;
                         r[1] *= bad * (1. + eps) * .5;
-                        qcur_[ii    ] -= r[0];
+                        qcur_[ii] -= r[0];
                         qcur_[ii + 1] -= r[1];
-                        qcur_[jj    ] += r[0];
+                        qcur_[jj] += r[0];
                         qcur_[jj + 1] += r[1];
                     }
                 }
@@ -221,8 +221,8 @@ void KoulesSimulator::computeCollisionEvent(unsigned int i, unsigned int j)
     else
     {
         unsigned int ii = ind(i), jj = ind(j);
-        double u[2] = { qcur_[ii + 2] - qcur_[jj + 2], qcur_[ii + 3] - qcur_[jj + 3] };
-        double v[2] = { qcur_[ii    ] - qcur_[jj    ], qcur_[ii + 1] - qcur_[jj + 1] };
+        double u[2] = {qcur_[ii + 2] - qcur_[jj + 2], qcur_[ii + 3] - qcur_[jj + 3]};
+        double v[2] = {qcur_[ii] - qcur_[jj], qcur_[ii + 1] - qcur_[jj + 1]};
         double a = u[0] * u[0] + u[1] * u[1];
         if (a == 0.)
             t = -1.;
@@ -253,7 +253,7 @@ void KoulesSimulator::computeCollisionEvent(unsigned int i, unsigned int j)
 void KoulesSimulator::elasticCollision(unsigned int i, unsigned int j)
 {
     double *a = &qcur_[ind(i)], *b = &qcur_[ind(j)];
-    double d[2] = { b[0] - a[0], b[1] - a[1] };
+    double d[2] = {b[0] - a[0], b[1] - a[1]};
     normalize2(d);
     double va = dot2(a + 2, d), vb = dot2(b + 2, d);
     if (va - vb <= 0.)
@@ -290,7 +290,7 @@ void KoulesSimulator::advance(double t)
     qcur_[1] += qcur_[3] * dt;
     for (unsigned int i = 5; i < numDimensions_; i += 4)
     {
-        qcur_[i    ] += qcur_[i + 2] * dt;
+        qcur_[i] += qcur_[i + 2] * dt;
         qcur_[i + 1] += qcur_[i + 3] * dt;
     }
     time_ = t;
@@ -303,8 +303,7 @@ void KoulesSimulator::markAsDead(unsigned int i)
     qcur_[ii + 1] = qcur_[ii + 2] = qcur_[ii + 3] = 0.;
 }
 
-void KoulesSimulator::step(const ob::State *start, const oc::Control* control,
-    const double t, ob::State *result)
+void KoulesSimulator::step(const ob::State *start, const oc::Control *control, const double t, ob::State *result)
 {
     unsigned int ii;
 
@@ -321,7 +320,7 @@ void KoulesSimulator::step(const ob::State *start, const oc::Control* control,
         {
             if (i)
                 rungeKutta4(&qcur_[ii], t, &qnext_[ii]);
-            qcur_[ii + 2] = (qnext_[ii    ] - qcur_[ii    ]) / t;
+            qcur_[ii + 2] = (qnext_[ii] - qcur_[ii]) / t;
             qcur_[ii + 3] = (qnext_[ii + 1] - qcur_[ii + 1]) / t;
         }
     }

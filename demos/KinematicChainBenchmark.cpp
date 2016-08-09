@@ -49,8 +49,7 @@
 // a 2D line segment
 struct Segment
 {
-    Segment(double p0_x, double p0_y, double p1_x, double p1_y)
-        : x0(p0_x), y0(p0_y), x1(p1_x), y1(p1_y)
+    Segment(double p0_x, double p0_y, double p1_x, double p1_y) : x0(p0_x), y0(p0_y), x1(p1_x), y1(p1_y)
     {
     }
     double x0, y0, x1, y1;
@@ -63,10 +62,9 @@ using Environment = std::vector<Segment>;
 class KinematicChainProjector : public ompl::base::ProjectionEvaluator
 {
 public:
-    KinematicChainProjector(const ompl::base::StateSpace *space)
-        : ompl::base::ProjectionEvaluator(space)
+    KinematicChainProjector(const ompl::base::StateSpace *space) : ompl::base::ProjectionEvaluator(space)
     {
-        int dimension = std::max(2, (int)ceil(log((double) space->getDimension())));
+        int dimension = std::max(2, (int)ceil(log((double)space->getDimension())));
         projectionMatrix_.computeRandom(space->getDimension(), dimension);
     }
     unsigned int getDimension() const override
@@ -79,16 +77,16 @@ public:
         space_->copyToReals(v, state);
         projectionMatrix_.project(&v[0], projection);
     }
+
 protected:
     ompl::base::ProjectionMatrix projectionMatrix_;
 };
-
 
 class KinematicChainSpace : public ompl::base::CompoundStateSpace
 {
 public:
     KinematicChainSpace(unsigned int numLinks, double linkLength, Environment *env = nullptr)
-        : ompl::base::CompoundStateSpace(), linkLength_(linkLength), environment_(env)
+      : ompl::base::CompoundStateSpace(), linkLength_(linkLength), environment_(env)
     {
         for (unsigned int i = 0; i < numLinks; ++i)
             addSubspace(std::make_shared<ompl::base::SO2StateSpace>(), 1.);
@@ -120,28 +118,26 @@ public:
     {
         return linkLength_;
     }
-    const Environment* environment() const
+    const Environment *environment() const
     {
         return environment_;
     }
 
 protected:
     double linkLength_;
-    Environment* environment_;
+    Environment *environment_;
 };
-
 
 class KinematicChainValidityChecker : public ompl::base::StateValidityChecker
 {
 public:
-    KinematicChainValidityChecker(const ompl::base::SpaceInformationPtr &si)
-        : ompl::base::StateValidityChecker(si)
+    KinematicChainValidityChecker(const ompl::base::SpaceInformationPtr &si) : ompl::base::StateValidityChecker(si)
     {
     }
 
     bool isValid(const ompl::base::State *state) const override
     {
-        const KinematicChainSpace* space = si_->getStateSpace()->as<KinematicChainSpace>();
+        const KinematicChainSpace *space = si_->getStateSpace()->as<KinematicChainSpace>();
         const KinematicChainSpace::StateType *s = state->as<KinematicChainSpace::StateType>();
         unsigned int n = si_->getStateDimension();
         Environment segments;
@@ -149,7 +145,7 @@ public:
         double theta = 0., x = 0., y = 0., xN, yN;
 
         segments.reserve(n + 1);
-        for(unsigned int i = 0; i < n; ++i)
+        for (unsigned int i = 0; i < n; ++i)
         {
             theta += s->as<ompl::base::SO2StateSpace::StateType>(i)->value;
             xN = x + cos(theta) * linkLength;
@@ -161,13 +157,12 @@ public:
         xN = x + cos(theta) * 0.001;
         yN = y + sin(theta) * 0.001;
         segments.emplace_back(x, y, xN, yN);
-        return selfIntersectionTest(segments)
-            && environmentIntersectionTest(segments, *space->environment());
+        return selfIntersectionTest(segments) && environmentIntersectionTest(segments, *space->environment());
     }
 
 protected:
     // return true iff env does *not* include a pair of intersecting segments
-    bool selfIntersectionTest(const Environment& env) const
+    bool selfIntersectionTest(const Environment &env) const
     {
         for (unsigned int i = 0; i < env.size(); ++i)
             for (unsigned int j = i + 1; j < env.size(); ++j)
@@ -176,16 +171,16 @@ protected:
         return true;
     }
     // return true iff no segment in env0 intersects any segment in env1
-    bool environmentIntersectionTest(const Environment& env0, const Environment& env1) const
+    bool environmentIntersectionTest(const Environment &env0, const Environment &env1) const
     {
-        for (const auto & i : env0)
-            for (const auto & j : env1)
+        for (const auto &i : env0)
+            for (const auto &j : env1)
                 if (intersectionTest(i, j))
                     return false;
         return true;
     }
     // return true iff segment s0 intersects segment s1
-    bool intersectionTest(const Segment& s0, const Segment& s1) const
+    bool intersectionTest(const Segment &s0, const Segment &s1) const
     {
         // adopted from:
         // http://stackoverflow.com/questions/563198/how-do-you-detect-where-two-line-segments-intersect/1201356#1201356
@@ -195,36 +190,35 @@ protected:
         double s32_y = s1.y1 - s1.y0;
         double denom = s10_x * s32_y - s32_x * s10_y;
         if (fabs(denom) < std::numeric_limits<double>::epsilon())
-            return false; // Collinear
+            return false;  // Collinear
         bool denomPositive = denom > 0;
 
         double s02_x = s0.x0 - s1.x0;
         double s02_y = s0.y0 - s1.y0;
         double s_numer = s10_x * s02_y - s10_y * s02_x;
         if ((s_numer < std::numeric_limits<float>::epsilon()) == denomPositive)
-            return false; // No collision
+            return false;  // No collision
         double t_numer = s32_x * s02_y - s32_y * s02_x;
         if ((t_numer < std::numeric_limits<float>::epsilon()) == denomPositive)
-            return false; // No collision
-        if (((s_numer - denom > -std::numeric_limits<float>::epsilon()) == denomPositive)
-            || ((t_numer - denom > std::numeric_limits<float>::epsilon()) == denomPositive))
-            return false; // No collision
+            return false;  // No collision
+        if (((s_numer - denom > -std::numeric_limits<float>::epsilon()) == denomPositive) ||
+            ((t_numer - denom > std::numeric_limits<float>::epsilon()) == denomPositive))
+            return false;  // No collision
         return true;
     }
 };
-
 
 Environment createHornEnvironment(unsigned int d, double eps)
 {
     std::ofstream envFile("environment.dat");
     std::vector<Segment> env;
     double w = 1. / (double)d, x = w, y = -eps, xN, yN, theta = 0.,
-        scale = w * (1. + boost::math::constants::pi<double>() * eps);
+           scale = w * (1. + boost::math::constants::pi<double>() * eps);
 
     envFile << x << " " << y << std::endl;
-    for(unsigned int i = 0; i < d - 1; ++i)
+    for (unsigned int i = 0; i < d - 1; ++i)
     {
-        theta += boost::math::constants::pi<double>() / (double) d;
+        theta += boost::math::constants::pi<double>() / (double)d;
         xN = x + cos(theta) * scale;
         yN = y + sin(theta) * scale;
         env.emplace_back(x, y, xN, yN);
@@ -238,7 +232,7 @@ Environment createHornEnvironment(unsigned int d, double eps)
     y = eps;
     envFile << x << " " << y << std::endl;
     scale = w * (1.0 - boost::math::constants::pi<double>() * eps);
-    for(unsigned int i = 0; i < d - 1; ++i)
+    for (unsigned int i = 0; i < d - 1; ++i)
     {
         theta += boost::math::constants::pi<double>() / d;
         xN = x + cos(theta) * scale;
@@ -251,7 +245,6 @@ Environment createHornEnvironment(unsigned int d, double eps)
     envFile.close();
     return env;
 }
-
 
 int main(int argc, char **argv)
 {
@@ -292,7 +285,7 @@ int main(int argc, char **argv)
 
         ompl::geometric::PathGeometric path = ss.getSolutionPath();
         std::vector<double> v;
-        for(unsigned int i = 0; i < path.getStateCount(); ++i)
+        for (unsigned int i = 0; i < path.getStateCount(); ++i)
         {
             chain->copyToReals(v, path.getState(i));
             std::copy(v.begin(), v.end(), std::ostream_iterator<double>(std::cout, " "));

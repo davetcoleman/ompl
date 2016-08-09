@@ -48,14 +48,14 @@ public:
     KoulesStatePropagator(const ompl::control::SpaceInformationPtr &si);
     ~KoulesStatePropagator();
 
-    virtual void propagate(const ompl::base::State *start, const ompl::control::Control* control,
-        const double duration, ompl::base::State *result) const;
+    virtual void propagate(const ompl::base::State *start, const ompl::control::Control *control, const double duration,
+                           ompl::base::State *result) const;
 
 protected:
     // The simulator_ is mutable. This is normally a very BAD idea, since
     // planners can be multi-threaded. However, none of the planners used
     // here are multi-threaded, so it's safe.
-    mutable KoulesSimulator* simulator_;
+    mutable KoulesSimulator *simulator_;
 };
 
 #endif

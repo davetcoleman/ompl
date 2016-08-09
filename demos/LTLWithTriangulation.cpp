@@ -60,82 +60,81 @@ using Vertex = oc::PropositionalTriangularDecomposition::Vertex;
 class MyDecomposition : public oc::PropositionalTriangularDecomposition
 {
 public:
-    MyDecomposition(const ob::RealVectorBounds& bounds)
-        : oc::PropositionalTriangularDecomposition(bounds) { }
+    MyDecomposition(const ob::RealVectorBounds &bounds) : oc::PropositionalTriangularDecomposition(bounds)
+    {
+    }
     ~MyDecomposition() override = default;
 
-    void project(const ob::State* s, std::vector<double>& coord) const override
+    void project(const ob::State *s, std::vector<double> &coord) const override
     {
         coord.resize(2);
         coord[0] = s->as<ob::SE2StateSpace::StateType>()->getX();
         coord[1] = s->as<ob::SE2StateSpace::StateType>()->getY();
     }
 
-    void sampleFullState(const ob::StateSamplerPtr& sampler, const std::vector<double>& coord, ob::State* s) const override
+    void sampleFullState(const ob::StateSamplerPtr &sampler, const std::vector<double> &coord,
+                         ob::State *s) const override
     {
-       sampler->sampleUniform(s);
-       ob::SE2StateSpace::StateType* ws = s->as<ob::SE2StateSpace::StateType>();
-       ws->setXY(coord[0], coord[1]);
+        sampler->sampleUniform(s);
+        ob::SE2StateSpace::StateType *ws = s->as<ob::SE2StateSpace::StateType>();
+        ws->setXY(coord[0], coord[1]);
     }
 };
 
 void addObstaclesAndPropositions(std::shared_ptr<oc::PropositionalTriangularDecomposition> &decomp)
 {
     Polygon obstacle(4);
-    obstacle.pts[0] = Vertex(0.,.9);
-    obstacle.pts[1] = Vertex(1.1,.9);
-    obstacle.pts[2] = Vertex(1.1,1.1);
-    obstacle.pts[3] = Vertex(0.,1.1);
+    obstacle.pts[0] = Vertex(0., .9);
+    obstacle.pts[1] = Vertex(1.1, .9);
+    obstacle.pts[2] = Vertex(1.1, 1.1);
+    obstacle.pts[3] = Vertex(0., 1.1);
     decomp->addHole(obstacle);
 
     Polygon p0(4);
-    p0.pts[0] = Vertex(.9,.3);
-    p0.pts[1] = Vertex(1.1,.3);
-    p0.pts[2] = Vertex(1.1,.5);
-    p0.pts[3] = Vertex(.9,.5);
+    p0.pts[0] = Vertex(.9, .3);
+    p0.pts[1] = Vertex(1.1, .3);
+    p0.pts[2] = Vertex(1.1, .5);
+    p0.pts[3] = Vertex(.9, .5);
     decomp->addProposition(p0);
 
     Polygon p1(4);
-    p1.pts[0] = Vertex(1.5,1.6);
-    p1.pts[1] = Vertex(1.6,1.6);
-    p1.pts[2] = Vertex(1.6,1.7);
-    p1.pts[3] = Vertex(1.5,1.7);
+    p1.pts[0] = Vertex(1.5, 1.6);
+    p1.pts[1] = Vertex(1.6, 1.6);
+    p1.pts[2] = Vertex(1.6, 1.7);
+    p1.pts[3] = Vertex(1.5, 1.7);
     decomp->addProposition(p1);
 
     Polygon p2(4);
-    p2.pts[0] = Vertex(.2,1.7);
-    p2.pts[1] = Vertex(.3,1.7);
-    p2.pts[2] = Vertex(.3,1.8);
-    p2.pts[3] = Vertex(.2,1.8);
+    p2.pts[0] = Vertex(.2, 1.7);
+    p2.pts[1] = Vertex(.3, 1.7);
+    p2.pts[2] = Vertex(.3, 1.8);
+    p2.pts[3] = Vertex(.2, 1.8);
     decomp->addProposition(p2);
 }
 
 /* Returns whether a point (x,y) is within a given polygon.
    We are assuming that the polygon is a axis-aligned rectangle, with vertices stored
    in counter-clockwise order, beginning with the bottom-left vertex. */
-bool polyContains(const Polygon& poly, double x, double y)
+bool polyContains(const Polygon &poly, double x, double y)
 {
-    return x >= poly.pts[0].x && x <= poly.pts[2].x
-        && y >= poly.pts[0].y && y <= poly.pts[2].y;
+    return x >= poly.pts[0].x && x <= poly.pts[2].x && y >= poly.pts[0].y && y <= poly.pts[2].y;
 }
 
 /* Our state validity checker queries the decomposition for its obstacles,
    and checks for collisions against them.
    This is to prevent us from having to redefine the obstacles in multiple places. */
-bool isStateValid(
-    const oc::SpaceInformation *si,
-    const std::shared_ptr<oc::PropositionalTriangularDecomposition> &decomp,
-    const ob::State *state)
+bool isStateValid(const oc::SpaceInformation *si,
+                  const std::shared_ptr<oc::PropositionalTriangularDecomposition> &decomp, const ob::State *state)
 {
     if (!si->satisfiesBounds(state))
         return false;
-    const ob::SE2StateSpace::StateType* se2 = state->as<ob::SE2StateSpace::StateType>();
+    const ob::SE2StateSpace::StateType *se2 = state->as<ob::SE2StateSpace::StateType>();
 
     double x = se2->getX();
     double y = se2->getY();
-    const std::vector<Polygon>& obstacles = decomp->getHoles();
+    const std::vector<Polygon> &obstacles = decomp->getHoles();
     using ObstacleIter = std::vector<Polygon>::const_iterator;
-    for (const auto & obstacle : obstacles)
+    for (const auto &obstacle : obstacles)
     {
         if (polyContains(obstacle, x, y))
             return false;
@@ -145,20 +144,20 @@ bool isStateValid(
 
 void propagate(const ob::State *start, const oc::Control *control, const double duration, ob::State *result)
 {
-    const ob::SE2StateSpace::StateType* se2 = start->as<ob::SE2StateSpace::StateType>();
-    const oc::RealVectorControlSpace::ControlType* rctrl = control->as<oc::RealVectorControlSpace::ControlType>();
+    const ob::SE2StateSpace::StateType *se2 = start->as<ob::SE2StateSpace::StateType>();
+    const oc::RealVectorControlSpace::ControlType *rctrl = control->as<oc::RealVectorControlSpace::ControlType>();
 
-    double xout = se2->getX() + rctrl->values[0]*duration*cos(se2->getYaw());
-    double yout = se2->getY() + rctrl->values[0]*duration*sin(se2->getYaw());
+    double xout = se2->getX() + rctrl->values[0] * duration * cos(se2->getYaw());
+    double yout = se2->getY() + rctrl->values[0] * duration * sin(se2->getYaw());
     double yawout = se2->getYaw() + rctrl->values[1];
 
-    ob::SE2StateSpace::StateType* se2out = result->as<ob::SE2StateSpace::StateType>();
+    ob::SE2StateSpace::StateType *se2out = result->as<ob::SE2StateSpace::StateType>();
     se2out->setXY(xout, yout);
     se2out->setYaw(yawout);
 
-    ob::SO2StateSpace::StateType* so2out = se2out->as<ob::SO2StateSpace::StateType>(1);
+    ob::SO2StateSpace::StateType *so2out = se2out->as<ob::SO2StateSpace::StateType>(1);
     ob::SO2StateSpace SO2;
-    SO2.enforceBounds (so2out);
+    SO2.enforceBounds(so2out);
 }
 
 void plan()
@@ -190,26 +189,25 @@ void plan()
     cspace->setBounds(cbounds);
 
     oc::SpaceInformationPtr si(std::make_shared<oc::SpaceInformation>(space, cspace));
-    si->setStateValidityChecker(
-        [&si, ptd](const ob::State *state)
-        {
-            return isStateValid(si.get(), ptd, state);
-        });
+    si->setStateValidityChecker([&si, ptd](const ob::State *state)
+                                {
+                                    return isStateValid(si.get(), ptd, state);
+                                });
     si->setStatePropagator(propagate);
     si->setPropagationStepSize(0.025);
 
-    //LTL co-safety sequencing formula: visit p2,p0 in that order
+    // LTL co-safety sequencing formula: visit p2,p0 in that order
     std::vector<unsigned int> sequence(2);
     sequence[0] = 2;
     sequence[1] = 0;
     oc::AutomatonPtr cosafety = oc::Automaton::SequenceAutomaton(3, sequence);
 
-    //LTL safety avoidance formula: never visit p1
+    // LTL safety avoidance formula: never visit p1
     std::vector<unsigned int> toAvoid(1);
     toAvoid[0] = 1;
     oc::AutomatonPtr safety = oc::Automaton::AvoidanceAutomaton(3, toAvoid);
 
-    //construct product graph (propDecomp x A_{cosafety} x A_{safety})
+    // construct product graph (propDecomp x A_{cosafety} x A_{safety})
     auto product(std::make_shared<oc::ProductGraph>(ptd, cosafety, safety));
 
     // LTLSpaceInformation creates a hybrid space of robot state space x product graph.
@@ -237,7 +235,7 @@ void plan()
     // starting states in both automata), and adds that as an official start state.
     pdef->addLowerStartState(start.get());
 
-    //LTL planner (input: LTL space information, product automaton)
+    // LTL planner (input: LTL space information, product automaton)
     oc::LTLPlanner ltlPlanner(ltlsi, product);
     ltlPlanner.setProblemDefinition(pdef);
 

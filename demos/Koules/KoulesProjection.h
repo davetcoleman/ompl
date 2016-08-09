@@ -43,8 +43,8 @@
 class KoulesProjection : public ompl::base::ProjectionEvaluator
 {
 public:
-    KoulesProjection(const ompl::base::StateSpace* space, unsigned int numDimensions = 3)
-        : ompl::base::ProjectionEvaluator(space), numDimensions_(numDimensions)
+    KoulesProjection(const ompl::base::StateSpace *space, unsigned int numDimensions = 3)
+      : ompl::base::ProjectionEvaluator(space), numDimensions_(numDimensions)
     {
         unsigned int n = (space_->getDimension() - 1) / 2 + 1;
         if (numDimensions_ > n)
@@ -66,7 +66,7 @@ public:
     // the koules (up to the dimensionality of the projection)
     virtual void project(const ompl::base::State *state, ompl::base::EuclideanProjection &projection) const
     {
-        const double* x = state->as<ompl::base::RealVectorStateSpace::StateType>()->values;
+        const double *x = state->as<ompl::base::RealVectorStateSpace::StateType>()->values;
         unsigned int numKoules = (numDimensions_ - 3) / 2;
         projection[0] = x[0];
         projection[1] = x[1];
@@ -77,6 +77,7 @@ public:
             projection[2 * i + 4] = x[4 * i + 6];
         }
     }
+
 protected:
     unsigned int numDimensions_;
 };

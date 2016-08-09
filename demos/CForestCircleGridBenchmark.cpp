@@ -51,12 +51,12 @@ namespace po = boost::program_options;
 bool isStateValid(double radiusSquared, const ob::State *state)
 {
     const ob::SE2StateSpace::StateType *s = state->as<ob::SE2StateSpace::StateType>();
-    double x=s->getX(), y=s->getY();
+    double x = s->getX(), y = s->getY();
     x = std::abs(x - std::floor(x));
     y = std::abs(y - std::floor(y));
     x = std::min(x, 1. - x);
     y = std::min(y, 1. - y);
-    return x*x + y*y > radiusSquared;
+    return x * x + y * y > radiusSquared;
 }
 
 int main(int argc, char **argv)
@@ -68,18 +68,15 @@ int main(int argc, char **argv)
 
     po::options_description desc("Options");
 
-    desc.add_options()
-        ("help", "show help message")
-        ("dubins", "use Dubins state space")
-        ("dubinssym", "use symmetrized Dubins state space")
-        ("reedsshepp", "use Reeds-Shepp state space")
-        ("distance", po::value<int>(&distance)->default_value(3), "integer grid distance between start and goal")
-        ("obstacle-radius", po::value<double>(&obstacleRadius)->default_value(.25), "radius of obstacles")
-        ("turning-radius", po::value<double>(&turningRadius)->default_value(.5), "turning radius of robot (ignored for default point robot)")
-        ("grid-limit", po::value<int>(&gridLimit)->default_value(10), "size of the grid")
-        ("runtime-limit", po::value<double>(&runtimeLimit)->default_value(2), "time limit for every test")
-        ("run-count", po::value<int>(&runCount)->default_value(100), "number of times to run each planner")
-    ;
+    desc.add_options()("help", "show help message")("dubins", "use Dubins state space")(
+        "dubinssym", "use symmetrized Dubins state space")("reedsshepp", "use Reeds-Shepp state space")(
+        "distance", po::value<int>(&distance)->default_value(3), "integer grid distance between start and goal")(
+        "obstacle-radius", po::value<double>(&obstacleRadius)->default_value(.25),
+        "radius of obstacles")("turning-radius", po::value<double>(&turningRadius)->default_value(.5),
+                               "turning radius of robot (ignored for default point robot)")(
+        "grid-limit", po::value<int>(&gridLimit)->default_value(10), "size of the grid")(
+        "runtime-limit", po::value<double>(&runtimeLimit)->default_value(2), "time limit for every test")(
+        "run-count", po::value<int>(&runCount)->default_value(100), "number of times to run each planner");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -109,11 +106,10 @@ int main(int argc, char **argv)
 
     // set state validity checking for this space
     double radiusSquared = obstacleRadius * obstacleRadius;
-    ss.setStateValidityChecker(
-        [radiusSquared](const ob::State *state)
-        {
-            return isStateValid(radiusSquared, state);
-        });
+    ss.setStateValidityChecker([radiusSquared](const ob::State *state)
+                               {
+                                   return isStateValid(radiusSquared, state);
+                               });
 
     // define start & goal states
     ob::ScopedState<ob::SE2StateSpace> start(space), goal(space);
@@ -140,5 +136,3 @@ int main(int argc, char **argv)
 
     exit(0);
 }
-
-

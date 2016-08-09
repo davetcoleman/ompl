@@ -55,7 +55,7 @@ public:
     // in state and a random point in the workspace
     virtual void sample(ompl::control::Control *control, const ompl::base::State *state);
     virtual void sampleNext(ompl::control::Control *control, const ompl::control::Control * /* previous */,
-        const ompl::base::State *state)
+                            const ompl::base::State *state)
     {
         sample(control, state);
     }
@@ -75,7 +75,5 @@ public:
         return std::make_shared<KoulesControlSampler>(this);
     }
 };
-
-
 
 #endif

@@ -70,19 +70,17 @@ ompl::control::DirectedControlSamplerPtr KoulesDirectedControlSamplerAllocator(
     return std::make_shared<KoulesDirectedControlSampler>(si, goal, propagateMax);
 }
 
-
-KoulesSetup::KoulesSetup(unsigned int numKoules, const std::string& plannerName,
-    const std::vector<double>& stateVec)
-    : ompl::control::SimpleSetup(std::make_shared<KoulesControlSpace>(numKoules))
+KoulesSetup::KoulesSetup(unsigned int numKoules, const std::string &plannerName, const std::vector<double> &stateVec)
+  : ompl::control::SimpleSetup(std::make_shared<KoulesControlSpace>(numKoules))
 {
     initialize(numKoules, plannerName, stateVec);
 }
 
-KoulesSetup::KoulesSetup(unsigned int numKoules, const std::string& plannerName, double kouleVel)
-    : ompl::control::SimpleSetup(std::make_shared<KoulesControlSpace>(numKoules))
+KoulesSetup::KoulesSetup(unsigned int numKoules, const std::string &plannerName, double kouleVel)
+  : ompl::control::SimpleSetup(std::make_shared<KoulesControlSpace>(numKoules))
 {
     initialize(numKoules, plannerName);
-    double* state = getProblemDefinition()->getStartState(0)->as<KoulesStateSpace::StateType>()->values;
+    double *state = getProblemDefinition()->getStartState(0)->as<KoulesStateSpace::StateType>()->values;
     double theta;
     ompl::RNG rng;
     for (unsigned int i = 0; i < numKoules; ++i)
@@ -93,10 +91,10 @@ KoulesSetup::KoulesSetup(unsigned int numKoules, const std::string& plannerName,
     }
 }
 
-void KoulesSetup::initialize(unsigned int numKoules, const std::string& plannerName,
-    const std::vector<double>& stateVec)
+void KoulesSetup::initialize(unsigned int numKoules, const std::string &plannerName,
+                             const std::vector<double> &stateVec)
 {
-    const ob::StateSpacePtr& space = getStateSpace();
+    const ob::StateSpacePtr &space = getStateSpace();
     space->setup();
     // setup start state
     ob::ScopedState<> start(space);
@@ -108,7 +106,7 @@ void KoulesSetup::initialize(unsigned int numKoules, const std::string& plannerN
         // increasing distance from the center. The ship's initial position is
         // at the center. Initial velocities are 0.
         std::vector<double> startVec(space->getDimension(), 0.);
-        double r, theta = boost::math::constants::pi<double>(), delta = 2.*theta / numKoules;
+        double r, theta = boost::math::constants::pi<double>(), delta = 2. * theta / numKoules;
         startVec[0] = .5 * sideLength;
         startVec[1] = .5 * sideLength;
         startVec[4] = .5 * delta;
@@ -129,12 +127,11 @@ void KoulesSetup::initialize(unsigned int numKoules, const std::string& plannerN
     si_->setMinMaxControlDuration(propagationMinSteps, propagationMaxSteps);
     // set directed control sampler; when using the PDST planner, propagate as long as possible
     bool isPDST = plannerName == "pdst";
-    const ompl::base::GoalPtr& goal = getGoal();
-    si_->setDirectedControlSamplerAllocator(
-        [&goal, isPDST](const ompl::control::SpaceInformation *si)
-        {
-            return KoulesDirectedControlSamplerAllocator(si,  goal, isPDST);
-        });
+    const ompl::base::GoalPtr &goal = getGoal();
+    si_->setDirectedControlSamplerAllocator([&goal, isPDST](const ompl::control::SpaceInformation *si)
+                                            {
+                                                return KoulesDirectedControlSamplerAllocator(si, goal, isPDST);
+                                            });
     // set planner
     setPlanner(getConfiguredPlannerInstance(plannerName));
     // set validity checker
@@ -143,7 +140,7 @@ void KoulesSetup::initialize(unsigned int numKoules, const std::string& plannerN
     setStatePropagator(std::make_shared<KoulesStatePropagator>(si_));
 }
 
-ob::PlannerPtr KoulesSetup::getConfiguredPlannerInstance(const std::string& plannerName)
+ob::PlannerPtr KoulesSetup::getConfiguredPlannerInstance(const std::string &plannerName)
 {
     if (plannerName == "rrt")
     {
@@ -158,8 +155,7 @@ ob::PlannerPtr KoulesSetup::getConfiguredPlannerInstance(const std::string& plan
     else
     {
         auto pdstplanner(std::make_shared<oc::PDST>(si_));
-        pdstplanner->setProjectionEvaluator(
-            si_->getStateSpace()->getProjection("PDSTProjection"));
+        pdstplanner->setProjectionEvaluator(si_->getStateSpace()->getProjection("PDSTProjection"));
         return pdstplanner;
     }
 }

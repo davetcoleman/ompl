@@ -42,15 +42,13 @@
 
 namespace ompl
 {
-
     namespace base
     {
-
-        /** \brief A motion validator that only uses the state validity checker. Motions are checked for validity at a specified resolution. */
+        /** \brief A motion validator that only uses the state validity checker. Motions are checked for validity at a
+         * specified resolution. */
         class DiscreteMotionValidator : public MotionValidator
         {
         public:
-
             /** \brief Constructor */
             DiscreteMotionValidator(SpaceInformation *si) : MotionValidator(si)
             {
@@ -67,7 +65,7 @@ namespace ompl
 
             bool checkMotion(const State *s1, const State *s2) const override;
 
-            bool checkMotion(const State *s1, const State *s2, std::pair<State*, double> &lastValid) const override;
+            bool checkMotion(const State *s1, const State *s2, std::pair<State *, double> &lastValid) const override;
 
             bool isValid(const State *state) const;
 
@@ -77,7 +75,6 @@ namespace ompl
             }
 
         private:
-
             StateSpace *stateSpace_;
 
             void defaultSettings();
@@ -85,7 +82,6 @@ namespace ompl
             /** \brief Minimum required distance of sample from nearest obstacle to be considered valid */
             double clearance_;
         };
-
     }
 }
 

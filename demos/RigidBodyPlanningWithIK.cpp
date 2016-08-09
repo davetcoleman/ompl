@@ -50,7 +50,6 @@ namespace og = ompl::geometric;
 class MyGoalRegion : public ob::GoalRegion
 {
 public:
-
     MyGoalRegion(const ob::SpaceInformationPtr &si) : ob::GoalRegion(si)
     {
         setThreshold(1e-2);
@@ -59,13 +58,12 @@ public:
     double distanceGoal(const ob::State *state) const override
     {
         // goal region is given by states where x + y = z and orientation is close to identity
-        double d = fabs(state->as<ob::SE3StateSpace::StateType>()->getX()
-                        + state->as<ob::SE3StateSpace::StateType>()->getY()
-                        - state->as<ob::SE3StateSpace::StateType>()->getZ())
-            + fabs(state->as<ob::SE3StateSpace::StateType>()->rotation().w - 1.0);
+        double d =
+            fabs(state->as<ob::SE3StateSpace::StateType>()->getX() + state->as<ob::SE3StateSpace::StateType>()->getY() -
+                 state->as<ob::SE3StateSpace::StateType>()->getZ()) +
+            fabs(state->as<ob::SE3StateSpace::StateType>()->rotation().w - 1.0);
         return d;
     }
-
 };
 
 // Goal regions such as the one above cannot be sampled, so
@@ -75,14 +73,15 @@ public:
 // with some other algorithm. Genetic algorithms that essentially
 // perform inverse kinematics in the general sense can be used:
 
-bool regionSamplingWithGS(const ob::SpaceInformationPtr &si, const ob::ProblemDefinitionPtr &pd, const ob::GoalRegion *region, const ob::GoalLazySamples *gls, ob::State *result)
+bool regionSamplingWithGS(const ob::SpaceInformationPtr &si, const ob::ProblemDefinitionPtr &pd,
+                          const ob::GoalRegion *region, const ob::GoalLazySamples *gls, ob::State *result)
 {
     og::GeneticSearch g(si);
 
     // we can use a larger time duration for solve(), but we want to demo the ability
     // of GeneticSearch to continue from where it left off
     bool cont = false;
-    for (int i = 0 ; i < 100 ; ++i)
+    for (int i = 0; i < 100; ++i)
         if (g.solve(0.05, *region, result))
         {
             cont = true;
@@ -95,7 +94,8 @@ bool regionSamplingWithGS(const ob::SpaceInformationPtr &si, const ob::ProblemDe
         si->printState(result);
     }
 
-    // we continue sampling while we are able to find solutions, we have found not more than 2 previous solutions and we have not yet solved the problem
+    // we continue sampling while we are able to find solutions, we have found not more than 2 previous solutions and we
+    // have not yet solved the problem
     return cont && gls->maxSampleCount() < 3 && !pd->hasSolution();
 }
 
@@ -128,10 +128,9 @@ void planWithIK()
     // check if new samples are different from ones previously computed as
     // this is pefromed automatically by GoalLazySamples
     ob::GoalSamplingFn samplingFunction = [&ss, &region](const ob::GoalLazySamples *gls, ob::State *result)
-        {
-            return regionSamplingWithGS(ss.getSpaceInformation(), ss.getProblemDefinition(), &region,
-                gls, result);
-        };
+    {
+        return regionSamplingWithGS(ss.getSpaceInformation(), ss.getProblemDefinition(), &region, gls, result);
+    };
 
     // create an instance of GoalLazySamples:
     auto goal(std::make_shared<ob::GoalLazySamples>(ss.getSpaceInformation(), samplingFunction));

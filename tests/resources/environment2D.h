@@ -41,10 +41,10 @@
 #include <vector>
 #include <string>
 
-static const int T_FREE     = 0;
+static const int T_FREE = 0;
 static const int T_OBSTACLE = 1;
-static const int T_PATH     = 2;
-static const int T_ERROR    = 3;
+static const int T_PATH = 2;
+static const int T_ERROR = 3;
 
 /** \brief Representation of a 2D environment */
 struct Environment2D
@@ -54,13 +54,13 @@ struct Environment2D
         width = height = 0;
     }
 
-    std::pair<int, int>             start;
-    std::pair<int, int>             goal;
-    int                             width;
-    int                             height;
-    std::vector< std::vector<int> > grid;
+    std::pair<int, int> start;
+    std::pair<int, int> goal;
+    int width;
+    int height;
+    std::vector<std::vector<int>> grid;
 
-    Environment2D& operator=(const Environment2D &other)
+    Environment2D &operator=(const Environment2D &other)
     {
         start = other.start;
         goal = other.goal;
@@ -69,7 +69,6 @@ struct Environment2D
         grid = other.grid;
         return *this;
     }
-
 };
 
 /** Load a grid representing the environment */
@@ -84,46 +83,42 @@ static void loadEnvironment(const char *filename, Environment2D &env)
         {
             in >> env.width >> env.height;
             env.grid.resize(env.width);
-            for (unsigned int i = 0 ; i < env.grid.size() ; ++i)
+            for (unsigned int i = 0; i < env.grid.size(); ++i)
                 env.grid[i].resize(env.height, 0);
         }
-        else
-            if (name == "start(cells):")
-                in >> env.start.first >> env.start.second;
-            else
-                if (name == "end(cells):")
-                    in >> env.goal.first >> env.goal.second;
-                else
-                    if (name == "environment:")
-                    {
-                        for (unsigned int i = 0 ; i < env.grid.size() ; ++i)
-                            for (unsigned int j = 0 ; j < env.grid[i].size() ; ++j)
-                                in >> env.grid[i][j];
-                    }
+        else if (name == "start(cells):")
+            in >> env.start.first >> env.start.second;
+        else if (name == "end(cells):")
+            in >> env.goal.first >> env.goal.second;
+        else if (name == "environment:")
+        {
+            for (unsigned int i = 0; i < env.grid.size(); ++i)
+                for (unsigned int j = 0; j < env.grid[i].size(); ++j)
+                    in >> env.grid[i][j];
+        }
     }
     in.close();
 }
 
 static void printEnvironment(std::ostream &out, const Environment2D &env)
 {
-
-    for (unsigned int i = 0 ; i < env.grid.size() ; ++i)
+    for (unsigned int i = 0; i < env.grid.size(); ++i)
     {
-        for (unsigned int j = 0 ; j < env.grid[i].size() ; ++j)
+        for (unsigned int j = 0; j < env.grid[i].size(); ++j)
         {
             switch (env.grid[i][j])
             {
-            case T_PATH:
-                out << "* ";
-                break;
-            case T_ERROR:
-                out << "X ";
-                break;
-            case T_FREE:
-            case T_OBSTACLE:
-            default:
-                out << env.grid[i][j] << " ";
-                break;
+                case T_PATH:
+                    out << "* ";
+                    break;
+                case T_ERROR:
+                    out << "X ";
+                    break;
+                case T_FREE:
+                case T_OBSTACLE:
+                default:
+                    out << env.grid[i][j] << " ";
+                    break;
             }
         }
         out << std::endl;

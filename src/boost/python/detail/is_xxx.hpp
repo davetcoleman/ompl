@@ -3,11 +3,10 @@
 // accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
 #ifndef IS_XXX_DWA2003224_HPP
-# define IS_XXX_DWA2003224_HPP
+#define IS_XXX_DWA2003224_HPP
 
-# include <boost/detail/is_xxx.hpp>
+#include <boost/detail/is_xxx.hpp>
 
-#  define BOOST_PYTHON_IS_XXX_DEF(name, qualified_name, nargs) \
-    BOOST_DETAIL_IS_XXX_DEF(name, qualified_name, nargs)
+#define BOOST_PYTHON_IS_XXX_DEF(name, qualified_name, nargs) BOOST_DETAIL_IS_XXX_DEF(name, qualified_name, nargs)
 
-#endif // IS_XXX_DWA2003224_HPP
+#endif  // IS_XXX_DWA2003224_HPP

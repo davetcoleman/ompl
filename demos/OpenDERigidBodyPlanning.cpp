@@ -49,7 +49,6 @@ namespace oc = ompl::control;
 class RigidBodyEnvironment : public oc::OpenDEEnvironment
 {
 public:
-
     RigidBodyEnvironment() : oc::OpenDEEnvironment()
     {
         createWorld();
@@ -88,7 +87,7 @@ public:
         dBodyAddForce(boxBody, control[0], control[1], control[2]);
     }
 
-    bool isValidCollision(dGeomID /*geom1*/, dGeomID /*geom2*/, const dContact& /*contact*/) const override
+    bool isValidCollision(dGeomID /*geom1*/, dGeomID /*geom2*/, const dContact & /*contact*/) const override
     {
         return false;
     }
@@ -101,7 +100,6 @@ public:
     }
 
     /**************************************************/
-
 
     // OMPL does not require this function here; we implement it here
     // for convenience. This function is only OpenDE code to create a
@@ -124,22 +122,19 @@ public:
     dSpaceID space;
 
     // the car mass
-    dMass    m;
+    dMass m;
 
     // the body geom
-    dGeomID  boxGeom;
+    dGeomID boxGeom;
 
     // the body
-    dBodyID  boxBody;
-
+    dBodyID boxBody;
 };
-
 
 // Define the goal we want to reach
 class RigidBodyGoal : public ob::GoalRegion
 {
 public:
-
     RigidBodyGoal(const ob::SpaceInformationPtr &si) : ob::GoalRegion(si)
     {
         threshold_ = 0.5;
@@ -153,15 +148,12 @@ public:
         double dz = fabs(pos[2] - 35);
         return sqrt(dx * dx + dy * dy + dz * dz);
     }
-
 };
-
 
 // Define how we project a state
 class RigidBodyStateProjectionEvaluator : public ob::ProjectionEvaluator
 {
 public:
-
     RigidBodyStateProjectionEvaluator(const ob::StateSpace *space) : ob::ProjectionEvaluator(space)
     {
     }
@@ -186,14 +178,12 @@ public:
         projection[1] = pos[1];
         projection[2] = pos[2];
     }
-
 };
 
 // Define our own space, to include a distance function we want and register a default projection
 class RigidBodyStateSpace : public oc::OpenDEStateSpace
 {
 public:
-
     RigidBodyStateSpace(const oc::OpenDEEnvironmentPtr &env) : oc::OpenDEStateSpace(env)
     {
     }
@@ -210,10 +200,8 @@ public:
 
     void registerProjections() override
     {
-        registerDefaultProjection(
-            std::make_shared<RigidBodyStateProjectionEvaluator>(this));
+        registerDefaultProjection(std::make_shared<RigidBodyStateProjectionEvaluator>(this));
     }
-
 };
 
 /// @endcond
@@ -229,7 +217,8 @@ int main(int, char **)
     // create the state space and the control space for planning
     auto stateSpace = std::make_shared<RigidBodyStateSpace>(env);
 
-    // this will take care of setting a proper collision checker and the starting state for the planner as the initial OpenDE state
+    // this will take care of setting a proper collision checker and the starting state for the planner as the initial
+    // OpenDE state
     oc::OpenDESimpleSetup ss(stateSpace);
 
     // set the goal we would like to reach
@@ -255,13 +244,6 @@ int main(int, char **)
 
     return 0;
 }
-
-
-
-
-
-
-
 
 /// @cond IGNORE
 

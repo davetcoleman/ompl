@@ -45,16 +45,17 @@ OMPL_CLASS_FORWARD(KoulesSetup);
 class KoulesSetup : public ompl::control::SimpleSetup
 {
 public:
-    KoulesSetup(unsigned int numKoules, const std::string& plannerName,
-        const std::vector<double>& stateVec = std::vector<double>());
-    KoulesSetup(unsigned int numKoules, const std::string& plannerName, double kouleVel);
+    KoulesSetup(unsigned int numKoules, const std::string &plannerName,
+                const std::vector<double> &stateVec = std::vector<double>());
+    KoulesSetup(unsigned int numKoules, const std::string &plannerName, double kouleVel);
 
     // Given a planner name, return a planner instance that has been configured
     // for the koules problem.
-    ompl::base::PlannerPtr getConfiguredPlannerInstance(const std::string& plannerName);
+    ompl::base::PlannerPtr getConfiguredPlannerInstance(const std::string &plannerName);
+
 private:
-    void initialize(unsigned int numKoules, const std::string& plannerName,
-        const std::vector<double>& stateVec = std::vector<double>());
+    void initialize(unsigned int numKoules, const std::string &plannerName,
+                    const std::vector<double> &stateVec = std::vector<double>());
 };
 /// @endcond
 

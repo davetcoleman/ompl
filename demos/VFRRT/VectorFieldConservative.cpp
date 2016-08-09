@@ -48,7 +48,12 @@
 namespace ob = ompl::base;
 namespace og = ompl::geometric;
 
-enum PlannerType { VFRRT = 0, TRRT, RRTSTAR };
+enum PlannerType
+{
+    VFRRT = 0,
+    TRRT,
+    RRTSTAR
+};
 
 /** Gradient of the potential function 1 + sin(x[0]) * sin(x[1]). */
 Eigen::VectorXd field(const ob::State *state)
@@ -95,14 +100,12 @@ og::SimpleSetupPtr setupProblem(PlannerType plannerType)
     // make the optimization objectives for TRRT and RRT*, and set the planner
     if (plannerType == TRRT)
     {
-        ss->setOptimizationObjective(
-            std::make_shared<ob::VFMechanicalWorkOptimizationObjective>(si, field));
+        ss->setOptimizationObjective(std::make_shared<ob::VFMechanicalWorkOptimizationObjective>(si, field));
         ss->setPlanner(std::make_shared<og::TRRT>(ss->getSpaceInformation()));
     }
     else if (plannerType == RRTSTAR)
     {
-        ss->setOptimizationObjective(
-            std::make_shared<ob::VFUpstreamCriterionOptimizationObjective>(si, field));
+        ss->setOptimizationObjective(std::make_shared<ob::VFUpstreamCriterionOptimizationObjective>(si, field));
         ss->setPlanner(std::make_shared<og::RRTstar>(ss->getSpaceInformation()));
     }
     else if (plannerType == VFRRT)
@@ -110,7 +113,8 @@ og::SimpleSetupPtr setupProblem(PlannerType plannerType)
         double explorationSetting = 0.7;
         double lambda = 1;
         unsigned int update_freq = 100;
-        ss->setPlanner(std::make_shared<og::VFRRT>(ss->getSpaceInformation(), field, explorationSetting, lambda, update_freq));
+        ss->setPlanner(
+            std::make_shared<og::VFRRT>(ss->getSpaceInformation(), field, explorationSetting, lambda, update_freq));
     }
     else
     {
@@ -161,8 +165,8 @@ int main(int argc, char **argv)
             std::ofstream f(problemName(PlannerType(n)).c_str());
             ompl::geometric::PathGeometric p = ss->getSolutionPath();
             p.interpolate();
-            auto upstream(std::make_shared<ob::VFUpstreamCriterionOptimizationObjective>(
-                ss->getSpaceInformation(), field));
+            auto upstream(
+                std::make_shared<ob::VFUpstreamCriterionOptimizationObjective>(ss->getSpaceInformation(), field));
             p.printAsMatrix(f);
             std::cout << "Total upstream cost: " << p.cost(upstream) << "\n";
         }

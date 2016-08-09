@@ -5,11 +5,10 @@
 #include "ompl/extensions/morse/MorseStateSpace.h"
 #include "py_std_function.hpp"
 
-#define DeclareStateType(T) \
-    inline int __dummy##T() \
-    { \
-        return sizeof(ompl::base::ScopedState<T##StateSpace>) + \
-        sizeof(ompl::base::T##StateSpace::StateType); \
+#define DeclareStateType(T)                                                                                            \
+    inline int __dummy##T()                                                                                            \
+    {                                                                                                                  \
+        return sizeof(ompl::base::ScopedState<T##StateSpace>) + sizeof(ompl::base::T##StateSpace::StateType);          \
     }
 
 namespace ompl

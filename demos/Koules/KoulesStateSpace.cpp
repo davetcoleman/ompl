@@ -41,8 +41,7 @@
 namespace ob = ompl::base;
 
 KoulesStateSpace::KoulesStateSpace(unsigned int numKoules)
-    : RealVectorStateSpace(4 * numKoules + 5), mass_(numKoules + 1, kouleMass),
-    radius_(numKoules + 1, kouleRadius)
+  : RealVectorStateSpace(4 * numKoules + 5), mass_(numKoules + 1, kouleMass), radius_(numKoules + 1, kouleRadius)
 {
     mass_[0] = shipMass;
     radius_[0] = shipRadius;
@@ -88,8 +87,8 @@ void KoulesStateSpace::registerProjections()
     registerProjection("PDSTProjection", std::make_shared<KoulesProjection>(this, (getDimension() - 1) / 2 + 1));
 }
 
-bool KoulesStateSpace::isDead(const ompl::base::State* state, unsigned int i) const
+bool KoulesStateSpace::isDead(const ompl::base::State *state, unsigned int i) const
 {
-    const StateType* s = static_cast<const StateType*>(state);
+    const StateType *s = static_cast<const StateType *>(state);
     return s->values[i ? 4 * i + 1 : 0] == -2. * kouleRadius;
 }

@@ -54,12 +54,10 @@ namespace ompl
 {
     namespace geometric
     {
-
         /** \brief Define a two-dimensional state space with an updated distance definition (Manhattan distance) */
         class StateSpace2DMap : public base::RealVectorStateSpace
         {
         public:
-
             StateSpace2DMap() : base::RealVectorStateSpace(2)
             {
             }
@@ -67,9 +65,9 @@ namespace ompl
             virtual double distance(const base::State *state1, const base::State *state2) const
             {
                 double dx = state1->as<base::RealVectorStateSpace::StateType>()->values[0] -
-                    state2->as<base::RealVectorStateSpace::StateType>()->values[0];
+                            state2->as<base::RealVectorStateSpace::StateType>()->values[0];
                 double dy = state1->as<base::RealVectorStateSpace::StateType>()->values[1] -
-                    state2->as<base::RealVectorStateSpace::StateType>()->values[1];
+                            state2->as<base::RealVectorStateSpace::StateType>()->values[1];
 
                 return sqrt(dx * dx + dy * dy);
             }
@@ -80,9 +78,8 @@ namespace ompl
         class StateValidityChecker2DMap : public base::StateValidityChecker
         {
         public:
-
-            StateValidityChecker2DMap(const base::SpaceInformationPtr &si, const std::vector< std::vector<int> > &grid) :
-                base::StateValidityChecker(si), grid_(grid)
+            StateValidityChecker2DMap(const base::SpaceInformationPtr &si, const std::vector<std::vector<int>> &grid)
+              : base::StateValidityChecker(si), grid_(grid)
             {
             }
 
@@ -91,28 +88,24 @@ namespace ompl
                 /* planning is done in a continuous space, but our collision space representation is discrete */
                 int x = (int)(state->as<base::RealVectorStateSpace::StateType>()->values[0]);
                 int y = (int)(state->as<base::RealVectorStateSpace::StateType>()->values[1]);
-                return grid_[x][y] == 0; // 0 means valid state
+                return grid_[x][y] == 0;  // 0 means valid state
             }
 
         protected:
-
             /** \brief Map of environment */
-            std::vector< std::vector<int> > grid_;
+            std::vector<std::vector<int>> grid_;
         };
 
         /** \brief Given a description of the environment, construct a complete planning context */
         class SimpleSetup2DMap : public SimpleSetup
         {
         public:
-
-            SimpleSetup2DMap(const std::string &fileName)
-                : SimpleSetup(std::make_shared<StateSpace2DMap>())
+            SimpleSetup2DMap(const std::string &fileName) : SimpleSetup(std::make_shared<StateSpace2DMap>())
             {
                 loadTestFile(fileName);
             }
 
-            SimpleSetup2DMap(const Environment2D &env)
-                : SimpleSetup(std::make_shared<StateSpace2DMap>()), env_(env)
+            SimpleSetup2DMap(const Environment2D &env) : SimpleSetup(std::make_shared<StateSpace2DMap>()), env_(env)
             {
                 configure2DMap();
             }
@@ -128,7 +121,6 @@ namespace ompl
             }
 
         protected:
-
             /** \brief Set the bounds and the state validity checker */
             void configure2DMap()
             {
@@ -147,8 +139,7 @@ namespace ompl
 
                 getStateSpace()->as<StateSpace2DMap>()->setBounds(sbounds);
                 getSpaceInformation()->setStateValidityCheckingResolution(0.016);
-                setStateValidityChecker(std::make_shared<StateValidityChecker2DMap>(
-                    getSpaceInformation(), env_.grid));
+                setStateValidityChecker(std::make_shared<StateValidityChecker2DMap>(getSpaceInformation(), env_.grid));
 
                 /* set the initial state; the memory for this is automatically cleaned by SpaceInformation */
                 base::ScopedState<base::RealVectorStateSpace> state(getStateSpace());
@@ -162,16 +153,14 @@ namespace ompl
                 gstate->values[0] = env_.goal.first;
                 gstate->values[1] = env_.goal.second;
                 goal->setState(gstate);
-                goal->setThreshold(1e-3); // this basically means 0, but we want to account for numerical instabilities
+                goal->setThreshold(1e-3);  // this basically means 0, but we want to account for numerical instabilities
                 setGoal(goal);
                 // we could have used setGoalState() as well
             }
 
             /** \brief Representation of environment */
             Environment2D env_;
-
         };
-
 
         /** \brief Construct an instance of space information (done automatically when using SimpleSetup) */
         static base::SpaceInformationPtr spaceInformation2DMap(const Environment2D &env)
@@ -204,7 +193,8 @@ namespace ompl
         }
 
         /** \brief Construct a problem definition  (done automatically when using SimpleSetup) */
-        static base::ProblemDefinitionPtr problemDefinition2DMap(const base::SpaceInformationPtr &si, const Environment2D &env)
+        static base::ProblemDefinitionPtr problemDefinition2DMap(const base::SpaceInformationPtr &si,
+                                                                 const Environment2D &env)
         {
             auto pdef(std::make_shared<base::ProblemDefinition>(si));
 
@@ -220,14 +210,12 @@ namespace ompl
             gstate->values[0] = env.goal.first;
             gstate->values[1] = env.goal.second;
             goal->setState(gstate);
-            goal->setThreshold(1e-3); // this is basically 0, but we want to account for numerical instabilities
+            goal->setThreshold(1e-3);  // this is basically 0, but we want to account for numerical instabilities
             pdef->setGoal(goal);
 
             return pdef;
         }
-
     }
-
 }
 
 #endif

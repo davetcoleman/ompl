@@ -57,7 +57,7 @@ BOOST_AUTO_TEST_CASE(SimpleIK)
 
     if (env.width * env.height == 0)
     {
-        BOOST_FAIL( "The environment has a 0 dimension. Cannot continue" );
+        BOOST_FAIL("The environment has a 0 dimension. Cannot continue");
     }
 
     /* instantiate space information */
@@ -77,7 +77,7 @@ BOOST_AUTO_TEST_CASE(SimpleIK)
     double time = 0.0;
 
     const int N = 100;
-    for (int i = 0 ; i < N ; ++i)
+    for (int i = 0; i < N; ++i)
     {
         ompl::time::point startTime = ompl::time::now();
         bool solved = gaik.solve(1.0, goal, found.get());

@@ -116,7 +116,9 @@ namespace ompl
 
             /** \brief Visualize multiple states during runtime, externally */
             virtual void states(std::vector<const ompl::base::State *> states,
-                                std::vector<ompl::tools::VizColors> colors, ompl::tools::VizSizes size) {}
+                                std::vector<ompl::tools::VizColors> colors, ompl::tools::VizSizes size)
+            {
+            }
 
             /** \brief Visualize edge during runtime, externally */
             virtual void edge(const ompl::base::State *stateA, const ompl::base::State *stateB, double cost) = 0;
@@ -127,8 +129,10 @@ namespace ompl
 
             /** \brief Visualize multiple edges during runtime, externally */
             virtual void edges(const std::vector<const ompl::base::State *> stateAs,
-                const std::vector<const ompl::base::State *> stateBs,
-                std::vector<ompl::tools::VizColors> colors, ompl::tools::VizSizes size) {}
+                               const std::vector<const ompl::base::State *> stateBs,
+                               std::vector<ompl::tools::VizColors> colors, ompl::tools::VizSizes size)
+            {
+            }
 
             /** \brief Visualize path during runtime, externally */
             virtual void path(ompl::geometric::PathGeometric *path, VizSizes type, VizColors color) = 0;

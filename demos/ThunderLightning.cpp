@@ -52,7 +52,6 @@ namespace ot = ompl::tools;
 class Plane2DEnvironment
 {
 public:
-
     Plane2DEnvironment(const char *ppm_file, bool useThunder = true)
     {
         bool ok = false;
@@ -61,7 +60,7 @@ public:
             ppm_.loadFile(ppm_file);
             ok = true;
         }
-        catch(ompl::Exception &ex)
+        catch (ompl::Exception &ex)
         {
             OMPL_ERROR("Unable to load %s.\n%s", ppm_file, ex.what());
         }
@@ -84,13 +83,15 @@ public:
             }
             // set state validity checking for this space
             expPlanner_->setStateValidityChecker([this](const ob::State *state)
-                { return isStateValid(state); });
+                                                 {
+                                                     return isStateValid(state);
+                                                 });
             space->setup();
             expPlanner_->getSpaceInformation()->setStateValidityCheckingResolution(1.0 / space->getMaximumExtent());
             vss_ = expPlanner_->getSpaceInformation()->allocValidStateSampler();
 
             // DTC
-            //experience_setup_->setPlanner(std::make_shared<og::RRTConnect>(si_));
+            // experience_setup_->setPlanner(std::make_shared<og::RRTConnect>(si_));
             // Set the repair planner
             // experience_setup_->setRepairPlanner(std::make_shared<og::RRTConnect>(si_));
         }
@@ -122,8 +123,7 @@ public:
 
         bool solved = expPlanner_->solve(10.);
         if (solved)
-            OMPL_INFORM("Found solution in %g seconds",
-                expPlanner_->getLastPlanComputationTime());
+            OMPL_INFORM("Found solution in %g seconds", expPlanner_->getLastPlanComputationTime());
         else
             OMPL_INFORM("No solution found");
 
@@ -133,7 +133,6 @@ public:
     }
 
 private:
-
     bool isStateValid(const ob::State *state) const
     {
         const int w = std::min((int)state->as<ob::RealVectorStateSpace::StateType>()->values[0], maxWidth_);
@@ -155,7 +154,7 @@ int main(int argc, char *argv[])
     std::cout << "OMPL version: " << OMPL_VERSION << std::endl;
 
     boost::filesystem::path path(TEST_RESOURCES_DIR);
-    Plane2DEnvironment env((path / "ppm" / "floor.ppm").string().c_str(), argc==1);
+    Plane2DEnvironment env((path / "ppm" / "floor.ppm").string().c_str(), argc == 1);
 
     for (unsigned int i = 0; i < 100; ++i)
         env.plan();

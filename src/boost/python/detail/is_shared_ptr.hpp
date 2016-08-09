@@ -3,15 +3,20 @@
 // accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
 #ifndef IS_SHARED_PTR_DWA2003224_HPP
-# define IS_SHARED_PTR_DWA2003224_HPP
+#define IS_SHARED_PTR_DWA2003224_HPP
 
-# include <boost/python/detail/is_xxx.hpp>
-# include <memory>
+#include <boost/python/detail/is_xxx.hpp>
+#include <memory>
 
-namespace boost { namespace python { namespace detail { 
+namespace boost
+{
+    namespace python
+    {
+        namespace detail
+        {
+            BOOST_PYTHON_IS_XXX_DEF(shared_ptr, std::shared_ptr, 1)
+        }
+    }
+}  // namespace boost::python::detail
 
-BOOST_PYTHON_IS_XXX_DEF(shared_ptr, std::shared_ptr, 1)
-    
-}}} // namespace boost::python::detail
-
-#endif // IS_SHARED_PTR_DWA2003224_HPP
+#endif  // IS_SHARED_PTR_DWA2003224_HPP

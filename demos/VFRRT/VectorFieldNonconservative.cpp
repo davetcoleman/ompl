@@ -46,7 +46,6 @@
 namespace ob = ompl::base;
 namespace og = ompl::geometric;
 
-
 /** Basic unit-norm rotation field. */
 Eigen::VectorXd field(const ob::State *state)
 {
@@ -74,8 +73,7 @@ int main(int argc, char **argv)
     og::SimpleSetup ss(space);
 
     // set state validity checking for this space
-    ss.setStateValidityChecker(
-        std::make_shared<ob::AllValidStateValidityChecker>(si));
+    ss.setStateValidityChecker(std::make_shared<ob::AllValidStateValidityChecker>(si));
 
     // create a start state
     ob::ScopedState<> start(space);
@@ -94,8 +92,8 @@ int main(int argc, char **argv)
     double explorationSetting = 0.7;
     double lambda = 1;
     unsigned int update_freq = 100;
-    ss.setPlanner(std::make_shared<og::VFRRT>(
-        ss.getSpaceInformation(), field, explorationSetting, lambda, update_freq));
+    ss.setPlanner(
+        std::make_shared<og::VFRRT>(ss.getSpaceInformation(), field, explorationSetting, lambda, update_freq));
     ss.setup();
 
     // attempt to solve the problem
@@ -112,8 +110,7 @@ int main(int argc, char **argv)
         std::ofstream f("vfrrt-nonconservative.path");
         ompl::geometric::PathGeometric p = ss.getSolutionPath();
         p.interpolate();
-        auto upstream(std::make_shared<ob::VFUpstreamCriterionOptimizationObjective>(
-            ss.getSpaceInformation(), field));
+        auto upstream(std::make_shared<ob::VFUpstreamCriterionOptimizationObjective>(ss.getSpaceInformation(), field));
         p.printAsMatrix(f);
         std::cout << "Total upstream cost: " << p.cost(upstream) << "\n";
     }

@@ -51,12 +51,10 @@ namespace ompl
 {
     namespace geometric
     {
-
         /** \brief Define a one-dimensional state space with an updated distance definition (Manhattan distance) */
         class StateSpace2DMap1 : public base::RealVectorStateSpace
         {
         public:
-
             StateSpace2DMap1() : base::RealVectorStateSpace(1)
             {
             }
@@ -68,15 +66,16 @@ namespace ompl
             }
         };
 
-        /** \brief Define a state validity checking function that assumes a compound state space for the 2DMap environment */
-        static bool isValidFn2DMap1(const std::vector< std::vector<int> > *grid, const base::State *state)
+        /** \brief Define a state validity checking function that assumes a compound state space for the 2DMap
+         * environment */
+        static bool isValidFn2DMap1(const std::vector<std::vector<int>> *grid, const base::State *state)
         {
             const base::CompoundState *cstate = state->as<base::CompoundState>();
 
             /* planning is done in a continuous space, but our collision space representation is discrete */
             int x = (int)(cstate->as<base::RealVectorStateSpace::StateType>(0)->values[0]);
             int y = (int)(cstate->as<base::RealVectorStateSpace::StateType>(1)->values[0]);
-            return (*grid)[x][y] == 0; // 0 means valid state
+            return (*grid)[x][y] == 0;  // 0 means valid state
         }
 
         /** \brief Given a description of the environment, construct a
@@ -87,7 +86,6 @@ namespace ompl
         class SimpleSetup2DMap1 : public SimpleSetup
         {
         public:
-
             SimpleSetup2DMap1(const std::string &fileName) : SimpleSetup(constructSpace())
             {
                 loadTestFile(fileName);
@@ -109,7 +107,6 @@ namespace ompl
             }
 
         protected:
-
             base::StateSpacePtr constructSpace()
             {
                 return std::make_shared<StateSpace2DMap1>() + std::make_shared<StateSpace2DMap1>();
@@ -127,9 +124,9 @@ namespace ompl
                 getStateSpace()->as<base::CompoundStateSpace>()->as<StateSpace2DMap1>(1)->setBounds(bounds);
 
                 setStateValidityChecker([this](const base::State *state)
-                    {
-                        return isValidFn2DMap1(&env_.grid, state);
-                    });
+                                        {
+                                            return isValidFn2DMap1(&env_.grid, state);
+                                        });
 
                 base::ScopedState<base::CompoundStateSpace> state(getSpaceInformation());
                 state->as<base::RealVectorStateSpace::StateType>(0)->values[0] = env_.start.first;
@@ -146,5 +143,4 @@ namespace ompl
             Environment2D env_;
         };
     }
-
 }

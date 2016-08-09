@@ -94,7 +94,6 @@ BOOST_AUTO_TEST_CASE(ReedsShepp_Simple)
     d->sanityChecks();
 }
 
-
 BOOST_AUTO_TEST_CASE(Discrete_Simple)
 {
     auto d(std::make_shared<base::DiscreteStateSpace>(0, 2));
@@ -189,13 +188,12 @@ BOOST_AUTO_TEST_CASE(SO2_Sampler)
     base::ScopedState<base::SO2StateSpace> x(m);
     base::ScopedState<base::SO2StateSpace> y(m);
     x.random();
-    for (int i = 0 ; i < 100 ; ++i)
+    for (int i = 0; i < 100; ++i)
     {
         s->sampleUniformNear(y.get(), x.get(), 10000);
         BOOST_CHECK(y.satisfiesBounds());
     }
 }
-
 
 BOOST_AUTO_TEST_CASE(SO3_Simple)
 {
@@ -207,7 +205,7 @@ BOOST_AUTO_TEST_CASE(SO3_Simple)
     mt.test();
 
     BOOST_CHECK_EQUAL(m->getDimension(), 3u);
-    BOOST_CHECK_EQUAL(m->getMaximumExtent(), .5*PI);
+    BOOST_CHECK_EQUAL(m->getMaximumExtent(), .5 * PI);
 
     base::ScopedState<base::SO3StateSpace> s1(m);
     base::ScopedState<base::SO3StateSpace> s2(m);
@@ -221,16 +219,19 @@ BOOST_AUTO_TEST_CASE(SO3_Simple)
     s2.random();
 
     base::SpaceInformation si(m);
-    si.setStateValidityChecker([](const base::State *) { return true; });
+    si.setStateValidityChecker([](const base::State *)
+                               {
+                                   return true;
+                               });
     si.setup();
 
-    std::vector<base::State*> states;
+    std::vector<base::State *> states;
     unsigned int ns = 100;
     unsigned int count = si.getMotionStates(s1.get(), s2.get(), states, ns, true, true);
     BOOST_CHECK(states.size() == count);
     BOOST_CHECK(ns + 2 == count);
 
-    for (auto & state : states)
+    for (auto &state : states)
     {
         double nrm = m->as<base::SO3StateSpace>()->norm(state->as<base::SO3StateSpace::StateType>());
         BOOST_OMPL_EXPECT_NEAR(nrm, 1.0, 1e-15);
@@ -339,7 +340,7 @@ BOOST_AUTO_TEST_CASE(Time_Simple)
     t->as<base::TimeStateSpace>()->setBounds(-1, 1);
     t->setup();
 
-    for (int i = 0 ; i < 100 ; ++i)
+    for (int i = 0; i < 100; ++i)
     {
         ss.random();
         if (fabs(ss->position) > 0.0)
@@ -374,8 +375,8 @@ BOOST_AUTO_TEST_CASE(Compound_Simple)
     base::StateSpacePtr s = m1 + m2 + m3;
     BOOST_CHECK(s + s == s);
     BOOST_CHECK(s - s + s == s);
-    BOOST_CHECK(s + s - s + s  == s);
-    BOOST_CHECK(s * s  == s);
+    BOOST_CHECK(s + s - s + s == s);
+    BOOST_CHECK(s * s == s);
     BOOST_CHECK(s * m2 == m2);
     BOOST_CHECK(m1 * s == m1);
     BOOST_CHECK(m1 + s == s);

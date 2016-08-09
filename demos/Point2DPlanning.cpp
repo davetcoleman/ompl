@@ -52,7 +52,6 @@ namespace og = ompl::geometric;
 class Plane2DEnvironment
 {
 public:
-
     Plane2DEnvironment(const char *ppm_file)
     {
         bool ok = false;
@@ -61,7 +60,7 @@ public:
             ppm_.loadFile(ppm_file);
             ok = true;
         }
-        catch(ompl::Exception &ex)
+        catch (ompl::Exception &ex)
         {
             OMPL_ERROR("Unable to load %s.\n%s", ppm_file, ex.what());
         }
@@ -75,7 +74,10 @@ public:
             ss_ = std::make_shared<og::SimpleSetup>(space);
 
             // set state validity checking for this space
-            ss_->setStateValidityChecker([this](const ob::State *state) { return isStateValid(state); });
+            ss_->setStateValidityChecker([this](const ob::State *state)
+                                         {
+                                             return isStateValid(state);
+                                         });
             space->setup();
             ss_->getSpaceInformation()->setStateValidityCheckingResolution(1.0 / space->getMaximumExtent());
             //      ss_->setPlanner(std::make_shared<og::RRTConnect>(ss_->getSpaceInformation()));
@@ -94,7 +96,7 @@ public:
         goal[1] = goal_col;
         ss_->setStartAndGoalStates(start, goal);
         // generate a few solutions; all will be added to the goal;
-        for (int i = 0 ; i < 10 ; ++i)
+        for (int i = 0; i < 10; ++i)
         {
             if (ss_->getPlanner())
                 ss_->getPlanner()->clear();
@@ -120,10 +122,11 @@ public:
             return;
         og::PathGeometric &p = ss_->getSolutionPath();
         p.interpolate();
-        for (std::size_t i = 0 ; i < p.getStateCount() ; ++i)
+        for (std::size_t i = 0; i < p.getStateCount(); ++i)
         {
             const int w = std::min(maxWidth_, (int)p.getState(i)->as<ob::RealVectorStateSpace::StateType>()->values[0]);
-            const int h = std::min(maxHeight_, (int)p.getState(i)->as<ob::RealVectorStateSpace::StateType>()->values[1]);
+            const int h =
+                std::min(maxHeight_, (int)p.getState(i)->as<ob::RealVectorStateSpace::StateType>()->values[1]);
             ompl::PPM::Color &c = ppm_.getPixel(h, w);
             c.red = 255;
             c.green = 0;
@@ -139,7 +142,6 @@ public:
     }
 
 private:
-
     bool isStateValid(const ob::State *state) const
     {
         const int w = std::min((int)state->as<ob::RealVectorStateSpace::StateType>()->values[0], maxWidth_);
@@ -153,7 +155,6 @@ private:
     int maxWidth_;
     int maxHeight_;
     ompl::PPM ppm_;
-
 };
 
 int main(int, char **)

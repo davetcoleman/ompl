@@ -55,8 +55,8 @@ const double edgeWidth = 0.1;
 // s[i]>=1-edgewidth.
 bool isStateValid(const ompl::base::State *state)
 {
-    const ompl::base::RealVectorStateSpace::StateType *s
-        = static_cast<const ompl::base::RealVectorStateSpace::StateType*>(state);
+    const ompl::base::RealVectorStateSpace::StateType *s =
+        static_cast<const ompl::base::RealVectorStateSpace::StateType *>(state);
     bool foundMaxDim = false;
 
     for (int i = ndim - 1; i >= 0; i--)
@@ -67,12 +67,12 @@ bool isStateValid(const ompl::base::State *state)
         }
         else if ((*s)[i] < (1. - edgeWidth))
             return false;
-        return true;
+    return true;
 }
 
-void addPlanner(ompl::tools::Benchmark& benchmark, const ompl::base::PlannerPtr& planner, double range)
+void addPlanner(ompl::tools::Benchmark &benchmark, const ompl::base::PlannerPtr &planner, double range)
 {
-    ompl::base::ParamSet& params = planner->params();
+    ompl::base::ParamSet &params = planner->params();
     if (params.hasParam(std::string("range")))
         params.setParam(std::string("range"), std::to_string(range));
     benchmark.addPlanner(planner);
@@ -80,7 +80,7 @@ void addPlanner(ompl::tools::Benchmark& benchmark, const ompl::base::PlannerPtr&
 
 int main(int argc, char **argv)
 {
-    if(argc > 1)
+    if (argc > 1)
         ndim = boost::lexical_cast<size_t>(argv[1]);
 
     double range = edgeWidth * 0.5;
@@ -94,7 +94,7 @@ int main(int argc, char **argv)
     space->setBounds(bounds);
     ss.setStateValidityChecker(&isStateValid);
     ss.getSpaceInformation()->setStateValidityCheckingResolution(0.001);
-    for(unsigned int i = 0; i < ndim; ++i)
+    for (unsigned int i = 0; i < ndim; ++i)
     {
         start[i] = 0.;
         goal[i] = 1.;

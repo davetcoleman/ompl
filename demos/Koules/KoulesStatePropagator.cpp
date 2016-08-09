@@ -42,8 +42,8 @@
 namespace ob = ompl::base;
 namespace oc = ompl::control;
 
-KoulesStatePropagator::KoulesStatePropagator(const ompl::control::SpaceInformationPtr &si) :
-    ompl::control::StatePropagator(si), simulator_(new KoulesSimulator(si.get()))
+KoulesStatePropagator::KoulesStatePropagator(const ompl::control::SpaceInformationPtr &si)
+  : ompl::control::StatePropagator(si), simulator_(new KoulesSimulator(si.get()))
 {
 }
 
@@ -52,8 +52,8 @@ KoulesStatePropagator::~KoulesStatePropagator()
     delete simulator_;
 }
 
-void KoulesStatePropagator::propagate(const ob::State *start, const oc::Control* control,
-    const double duration, ob::State *result) const
+void KoulesStatePropagator::propagate(const ob::State *start, const oc::Control *control, const double duration,
+                                      ob::State *result) const
 {
     simulator_->step(start, control, duration, result);
 }

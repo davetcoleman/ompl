@@ -49,12 +49,10 @@
 namespace ob = ompl::base;
 namespace oc = ompl::control;
 
-
 /// Model defining the motion of the robot
 class KinematicCarModel
 {
 public:
-
     KinematicCarModel(const ob::StateSpace *space) : space_(space), carLength_(0.2)
     {
     }
@@ -82,19 +80,15 @@ public:
     }
 
 private:
-
     const ob::StateSpace *space_;
-    const double          carLength_;
-
+    const double carLength_;
 };
 
-
 /// Simple integrator: Euclidean method
-template<typename F>
+template <typename F>
 class EulerIntegrator
 {
 public:
-
     EulerIntegrator(const ob::StateSpace *space, double timeStep) : space_(space), timeStep_(timeStep), ode_(space)
     {
     }
@@ -128,12 +122,10 @@ public:
     }
 
 private:
-
     const ob::StateSpace *space_;
-    double                   timeStep_;
-    F                        ode_;
+    double timeStep_;
+    F ode_;
 };
-
 
 bool isStateValid(const oc::SpaceInformation *si, const ob::State *state)
 {
@@ -149,16 +141,14 @@ bool isStateValid(const oc::SpaceInformation *si, const ob::State *state)
 
     /// check validity of state defined by pos & rot
 
-
     // return a value that is always true but uses the two variables we define, so we avoid compiler warnings
-    return si->satisfiesBounds(state) && (const void*)rot != (const void*)pos;
+    return si->satisfiesBounds(state) && (const void *)rot != (const void *)pos;
 }
 
 /// @cond IGNORE
 class DemoControlSpace : public oc::RealVectorControlSpace
 {
 public:
-
     DemoControlSpace(const ob::StateSpacePtr &stateSpace) : oc::RealVectorControlSpace(stateSpace, 2)
     {
     }
@@ -167,13 +157,12 @@ public:
 class DemoStatePropagator : public oc::StatePropagator
 {
 public:
-
-    DemoStatePropagator(oc::SpaceInformation *si) : oc::StatePropagator(si),
-                                                    integrator_(si->getStateSpace().get(), 0.0)
+    DemoStatePropagator(oc::SpaceInformation *si) : oc::StatePropagator(si), integrator_(si->getStateSpace().get(), 0.0)
     {
     }
 
-    void propagate(const ob::State *state, const oc::Control* control, const double duration, ob::State *result) const override
+    void propagate(const ob::State *state, const oc::Control *control, const double duration,
+                   ob::State *result) const override
     {
         integrator_.propagate(state, control, duration, result);
     }
@@ -220,8 +209,10 @@ void planWithSimpleSetup()
 
     /// set state validity checking for this space
     oc::SpaceInformation *si = ss.getSpaceInformation().get();
-    ss.setStateValidityChecker(
-        [si](const ob::State *state) { return isStateValid(si, state); });
+    ss.setStateValidityChecker([si](const ob::State *state)
+                               {
+                                   return isStateValid(si, state);
+                               });
 
     /// set the propagation routine for this space
     auto propagator(std::make_shared<DemoStatePropagator>(si));

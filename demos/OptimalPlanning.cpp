@@ -51,7 +51,6 @@
 #include <ompl/geometric/planners/prm/PRMstar.h>
 #include <ompl/geometric/planners/rrt/RRTstar.h>
 
-
 // For boost program options
 #include <boost/program_options.hpp>
 // For string comparison (boost::iequals)
@@ -60,7 +59,6 @@
 #include <memory>
 
 #include <fstream>
-
 
 namespace ob = ompl::base;
 namespace og = ompl::geometric;
@@ -88,7 +86,8 @@ enum planningObjective
 };
 
 // Parse the command-line arguments
-bool argParse(int argc, char** argv, double *runTime, optimalPlanner *plannerPtr, planningObjective *objectivePtr, std::string *outputFilePtr);
+bool argParse(int argc, char **argv, double *runTime, optimalPlanner *plannerPtr, planningObjective *objectivePtr,
+              std::string *outputFilePtr);
 
 // Our "collision checker". For this demo, our robot's state space
 // lies in [0,1]x[0,1], with a circular obstacle of radius 0.25
@@ -97,24 +96,24 @@ bool argParse(int argc, char** argv, double *runTime, optimalPlanner *plannerPtr
 class ValidityChecker : public ob::StateValidityChecker
 {
 public:
-    ValidityChecker(const ob::SpaceInformationPtr& si) :
-        ob::StateValidityChecker(si) {}
+    ValidityChecker(const ob::SpaceInformationPtr &si) : ob::StateValidityChecker(si)
+    {
+    }
 
     // Returns whether the given state's position overlaps the
     // circular obstacle
-    bool isValid(const ob::State* state) const override
+    bool isValid(const ob::State *state) const override
     {
         return this->clearance(state) > 0.0;
     }
 
     // Returns the distance from the given state's position to the
     // boundary of the circular obstacle.
-    double clearance(const ob::State* state) const override
+    double clearance(const ob::State *state) const override
     {
         // We know we're working with a RealVectorStateSpace in this
         // example, so we downcast state into the specific type.
-        const ob::RealVectorStateSpace::StateType* state2D =
-            state->as<ob::RealVectorStateSpace::StateType>();
+        const ob::RealVectorStateSpace::StateType *state2D = state->as<ob::RealVectorStateSpace::StateType>();
 
         // Extract the robot's (x,y) position from its state
         double x = state2D->values[0];
@@ -122,21 +121,21 @@ public:
 
         // Distance formula between two points, offset by the circle's
         // radius
-        return sqrt((x-0.5)*(x-0.5) + (y-0.5)*(y-0.5)) - 0.25;
+        return sqrt((x - 0.5) * (x - 0.5) + (y - 0.5) * (y - 0.5)) - 0.25;
     }
 };
 
-ob::OptimizationObjectivePtr getPathLengthObjective(const ob::SpaceInformationPtr& si);
+ob::OptimizationObjectivePtr getPathLengthObjective(const ob::SpaceInformationPtr &si);
 
-ob::OptimizationObjectivePtr getThresholdPathLengthObj(const ob::SpaceInformationPtr& si);
+ob::OptimizationObjectivePtr getThresholdPathLengthObj(const ob::SpaceInformationPtr &si);
 
-ob::OptimizationObjectivePtr getClearanceObjective(const ob::SpaceInformationPtr& si);
+ob::OptimizationObjectivePtr getClearanceObjective(const ob::SpaceInformationPtr &si);
 
-ob::OptimizationObjectivePtr getBalancedObjective1(const ob::SpaceInformationPtr& si);
+ob::OptimizationObjectivePtr getBalancedObjective1(const ob::SpaceInformationPtr &si);
 
-ob::OptimizationObjectivePtr getBalancedObjective2(const ob::SpaceInformationPtr& si);
+ob::OptimizationObjectivePtr getBalancedObjective2(const ob::SpaceInformationPtr &si);
 
-ob::OptimizationObjectivePtr getPathLengthObjWithCostToGo(const ob::SpaceInformationPtr& si);
+ob::OptimizationObjectivePtr getPathLengthObjWithCostToGo(const ob::SpaceInformationPtr &si);
 
 ob::PlannerPtr allocatePlanner(ob::SpaceInformationPtr si, optimalPlanner plannerType)
 {
@@ -157,7 +156,7 @@ ob::PlannerPtr allocatePlanner(ob::SpaceInformationPtr si, optimalPlanner planne
             return std::make_shared<og::FMT>(si);
             break;
         }
-		case PLANNER_BFMTSTAR:
+        case PLANNER_BFMTSTAR:
         {
             return std::make_shared<og::BFMT>(si);
             break;
@@ -180,13 +179,13 @@ ob::PlannerPtr allocatePlanner(ob::SpaceInformationPtr si, optimalPlanner planne
         default:
         {
             OMPL_ERROR("Planner-type enum is not implemented in allocation function.");
-            return ob::PlannerPtr(); // Address compiler warning re: no return value.
+            return ob::PlannerPtr();  // Address compiler warning re: no return value.
             break;
         }
     }
 }
 
-ob::OptimizationObjectivePtr allocateObjective(const ob::SpaceInformationPtr& si, planningObjective objectiveType)
+ob::OptimizationObjectivePtr allocateObjective(const ob::SpaceInformationPtr &si, planningObjective objectiveType)
 {
     switch (objectiveType)
     {
@@ -209,7 +208,7 @@ ob::OptimizationObjectivePtr allocateObjective(const ob::SpaceInformationPtr& si
     }
 }
 
-void plan(double runTime, optimalPlanner plannerType, planningObjective objectiveType, const std::string& outputFile)
+void plan(double runTime, optimalPlanner plannerType, planningObjective objectiveType, const std::string &outputFile)
 {
     // Construct the robot state space in which we're planning. We're
     // planning in [0,1]x[0,1], a subset of R^2.
@@ -262,20 +261,16 @@ void plan(double runTime, optimalPlanner plannerType, planningObjective objectiv
     if (solved)
     {
         // Output the length of the path found
-        std::cout
-            << optimizingPlanner->getName()
-            << " found a solution of length "
-            << pdef->getSolutionPath()->length()
-            << " with an optimization objective value of "
-            << pdef->getSolutionPath()->cost(pdef->getOptimizationObjective()) << std::endl;
+        std::cout << optimizingPlanner->getName() << " found a solution of length " << pdef->getSolutionPath()->length()
+                  << " with an optimization objective value of "
+                  << pdef->getSolutionPath()->cost(pdef->getOptimizationObjective()) << std::endl;
 
         // If a filename was specified, output the path as a matrix to
         // that file for visualization
         if (!outputFile.empty())
         {
             std::ofstream outFile(outputFile.c_str());
-            std::static_pointer_cast<og::PathGeometric>(pdef->getSolutionPath())->
-                printAsMatrix(outFile);
+            std::static_pointer_cast<og::PathGeometric>(pdef->getSolutionPath())->printAsMatrix(outFile);
             outFile.close();
         }
     }
@@ -283,7 +278,7 @@ void plan(double runTime, optimalPlanner plannerType, planningObjective objectiv
         std::cout << "No solution found." << std::endl;
 }
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
     // The parsed arguments
     double runTime;
@@ -311,7 +306,7 @@ int main(int argc, char** argv)
     for optimal motion planning. This method returns an objective
     which attempts to minimize the length in configuration space of
     computed paths. */
-ob::OptimizationObjectivePtr getPathLengthObjective(const ob::SpaceInformationPtr& si)
+ob::OptimizationObjectivePtr getPathLengthObjective(const ob::SpaceInformationPtr &si)
 {
     return std::make_shared<ob::PathLengthOptimizationObjective>(si);
 }
@@ -319,7 +314,7 @@ ob::OptimizationObjectivePtr getPathLengthObjective(const ob::SpaceInformationPt
 /** Returns an optimization objective which attempts to minimize path
     length that is satisfied when a path of length shorter than 1.51
     is found. */
-ob::OptimizationObjectivePtr getThresholdPathLengthObj(const ob::SpaceInformationPtr& si)
+ob::OptimizationObjectivePtr getThresholdPathLengthObj(const ob::SpaceInformationPtr &si)
 {
     auto obj(std::make_shared<ob::PathLengthOptimizationObjective>(si));
     obj->setCostThreshold(ob::Cost(1.51));
@@ -341,8 +336,7 @@ ob::OptimizationObjectivePtr getThresholdPathLengthObj(const ob::SpaceInformatio
 class ClearanceObjective : public ob::StateCostIntegralObjective
 {
 public:
-    ClearanceObjective(const ob::SpaceInformationPtr& si) :
-        ob::StateCostIntegralObjective(si, true)
+    ClearanceObjective(const ob::SpaceInformationPtr &si) : ob::StateCostIntegralObjective(si, true)
     {
     }
 
@@ -351,7 +345,7 @@ public:
     // minimization. Therefore, we set each state's cost to be the
     // reciprocal of its clearance, so that as state clearance
     // increases, the state cost decreases.
-    ob::Cost stateCost(const ob::State* s) const override
+    ob::Cost stateCost(const ob::State *s) const override
     {
         return ob::Cost(1 / si_->getStateValidityChecker()->clearance(s));
     }
@@ -359,7 +353,7 @@ public:
 
 /** Return an optimization objective which attempts to steer the robot
     away from obstacles. */
-ob::OptimizationObjectivePtr getClearanceObjective(const ob::SpaceInformationPtr& si)
+ob::OptimizationObjectivePtr getClearanceObjective(const ob::SpaceInformationPtr &si)
 {
     return std::make_shared<ClearanceObjective>(si);
 }
@@ -376,7 +370,7 @@ ob::OptimizationObjectivePtr getClearanceObjective(const ob::SpaceInformationPtr
     optimal planning. If no weight is specified, the weight defaults to
     1.0.
 */
-ob::OptimizationObjectivePtr getBalancedObjective1(const ob::SpaceInformationPtr& si)
+ob::OptimizationObjectivePtr getBalancedObjective1(const ob::SpaceInformationPtr &si)
 {
     auto lengthObj(std::make_shared<ob::PathLengthOptimizationObjective>(si));
     auto clearObj(std::make_shared<ClearanceObjective>(si));
@@ -390,18 +384,18 @@ ob::OptimizationObjectivePtr getBalancedObjective1(const ob::SpaceInformationPtr
 /** Create an optimization objective equivalent to the one returned by
     getBalancedObjective1(), but use an alternate syntax.
  */
-ob::OptimizationObjectivePtr getBalancedObjective2(const ob::SpaceInformationPtr& si)
+ob::OptimizationObjectivePtr getBalancedObjective2(const ob::SpaceInformationPtr &si)
 {
     auto lengthObj(std::make_shared<ob::PathLengthOptimizationObjective>(si));
     auto clearObj(std::make_shared<ClearanceObjective>(si));
 
-    return 10.0*lengthObj + clearObj;
+    return 10.0 * lengthObj + clearObj;
 }
 
 /** Create an optimization objective for minimizing path length, and
     specify a cost-to-go heuristic suitable for this optimal planning
     problem. */
-ob::OptimizationObjectivePtr getPathLengthObjWithCostToGo(const ob::SpaceInformationPtr& si)
+ob::OptimizationObjectivePtr getPathLengthObjWithCostToGo(const ob::SpaceInformationPtr &si)
 {
     auto obj(std::make_shared<ob::PathLengthOptimizationObjective>(si));
     obj->setCostToGoHeuristic(&ob::goalRegionCostToGo);
@@ -409,19 +403,26 @@ ob::OptimizationObjectivePtr getPathLengthObjWithCostToGo(const ob::SpaceInforma
 }
 
 /** Parse the command line arguments into a string for an output file and the planner/optimization types */
-bool argParse(int argc, char** argv, double* runTimePtr, optimalPlanner *plannerPtr, planningObjective *objectivePtr, std::string *outputFilePtr)
+bool argParse(int argc, char **argv, double *runTimePtr, optimalPlanner *plannerPtr, planningObjective *objectivePtr,
+              std::string *outputFilePtr)
 {
     namespace bpo = boost::program_options;
 
     // Declare the supported options.
     bpo::options_description desc("Allowed options");
-    desc.add_options()
-        ("help,h", "produce help message")
-        ("runtime,t", bpo::value<double>()->default_value(1.0), "(Optional) Specify the runtime in seconds. Defaults to 1 and must be greater than 0.")
-        ("planner,p", bpo::value<std::string>()->default_value("RRTstar"), "(Optional) Specify the optimal planner to use, defaults to RRTstar if not given. Valid options are BITstar, CForest, FMTstar, BFMTstar, InformedRRTstar, PRMstar, and RRTstar.") //Alphabetical order
-        ("objective,o", bpo::value<std::string>()->default_value("PathLength"), "(Optional) Specify the optimization objective, defaults to PathLength if not given. Valid options are PathClearance, PathLength, ThresholdPathLength, and WeightedLengthAndClearanceCombo.") //Alphabetical order
-        ("file,f", bpo::value<std::string>()->default_value(""), "(Optional) Specify an output path for the found solution path.")
-        ("info,i", bpo::value<unsigned int>()->default_value(0u), "(Optional) Set the OMPL log level. 0 for WARN, 1 for INFO, 2 for DEBUG. Defaults to WARN.");
+    desc.add_options()("help,h", "produce help message")("runtime,t", bpo::value<double>()->default_value(1.0),
+                                                         "(Optional) Specify the runtime in seconds. Defaults to 1 and "
+                                                         "must be greater than 0.")(
+        "planner,p", bpo::value<std::string>()->default_value("RRTstar"),
+        "(Optional) Specify the optimal planner to use, defaults to RRTstar if not given. Valid options are BITstar, "
+        "CForest, FMTstar, BFMTstar, InformedRRTstar, PRMstar, and RRTstar.")  // Alphabetical order
+        ("objective,o", bpo::value<std::string>()->default_value("PathLength"),
+         "(Optional) Specify the optimization objective, defaults to PathLength if not given. Valid options are "
+         "PathClearance, PathLength, ThresholdPathLength, and WeightedLengthAndClearanceCombo.")  // Alphabetical order
+        ("file,f", bpo::value<std::string>()->default_value(""), "(Optional) Specify an output path for the found "
+                                                                 "solution path.")(
+            "info,i", bpo::value<unsigned int>()->default_value(0u), "(Optional) Set the OMPL log level. 0 for WARN, 1 "
+                                                                     "for INFO, 2 for DEBUG. Defaults to WARN.");
     bpo::variables_map vm;
     bpo::store(bpo::parse_command_line(argc, argv, desc), vm);
     bpo::notify(vm);
@@ -451,7 +452,9 @@ bool argParse(int argc, char** argv, double* runTimePtr, optimalPlanner *planner
     }
     else
     {
-        std::cout << "Invalid log-level integer." << std::endl << std::endl << desc << std::endl;
+        std::cout << "Invalid log-level integer." << std::endl
+                  << std::endl
+                  << desc << std::endl;
         return false;
     }
 
@@ -461,7 +464,9 @@ bool argParse(int argc, char** argv, double* runTimePtr, optimalPlanner *planner
     // Sanity check
     if (*runTimePtr <= 0.0)
     {
-        std::cout << "Invalid runtime." << std::endl << std::endl << desc << std::endl;
+        std::cout << "Invalid runtime." << std::endl
+                  << std::endl
+                  << desc << std::endl;
         return false;
     }
 
@@ -499,7 +504,9 @@ bool argParse(int argc, char** argv, double* runTimePtr, optimalPlanner *planner
     }
     else
     {
-        std::cout << "Invalid planner string." << std::endl << std::endl << desc << std::endl;
+        std::cout << "Invalid planner string." << std::endl
+                  << std::endl
+                  << desc << std::endl;
         return false;
     }
 
@@ -525,7 +532,9 @@ bool argParse(int argc, char** argv, double* runTimePtr, optimalPlanner *planner
     }
     else
     {
-        std::cout << "Invalid objective string." << std::endl << std::endl << desc << std::endl;
+        std::cout << "Invalid objective string." << std::endl
+                  << std::endl
+                  << desc << std::endl;
         return false;
     }
 

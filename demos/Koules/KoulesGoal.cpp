@@ -39,8 +39,8 @@
 double KoulesGoal::distanceGoal(const ompl::base::State *st) const
 {
     double minX, minY;
-    const double* v = st->as<KoulesStateSpace::StateType>()->values;
-    const KoulesStateSpace* space = si_->getStateSpace().get()->as<KoulesStateSpace>();
+    const double *v = st->as<KoulesStateSpace::StateType>()->values;
+    const KoulesStateSpace *space = si_->getStateSpace().get()->as<KoulesStateSpace>();
     std::size_t numKoules = (space->getDimension() - 5) / 4, liveKoules = numKoules;
     double minDist = sideLength;
 
@@ -50,19 +50,19 @@ double KoulesGoal::distanceGoal(const ompl::base::State *st) const
             liveKoules--;
         else
         {
-            minX = std::min(v[j    ], sideLength - v[j    ]);
+            minX = std::min(v[j], sideLength - v[j]);
             minY = std::min(v[j + 1], sideLength - v[j + 1]);
             minDist = std::min(minDist, std::min(minX, minY) - kouleRadius + threshold_);
         }
     }
     if (minDist < 0 || liveKoules == 0)
         minDist = 0;
-   return .5 * sideLength * (double) liveKoules + minDist;
+    return .5 * sideLength * (double)liveKoules + minDist;
 }
 
 void KoulesGoal::sampleGoal(ompl::base::State *st) const
 {
-    double* v = st->as<KoulesStateSpace::StateType>()->values;
+    double *v = st->as<KoulesStateSpace::StateType>()->values;
     std::size_t dim = si_->getStateDimension();
     stateSampler_->sampleUniform(st);
     for (std::size_t i = 5; i < dim; i += 4)
@@ -70,12 +70,12 @@ void KoulesGoal::sampleGoal(ompl::base::State *st) const
         // randomly pick an edge for each koule to collide
         if (rng_.uniformBool())
         {
-            v[i    ] = rng_.uniformBool() ? 0. : sideLength;
+            v[i] = rng_.uniformBool() ? 0. : sideLength;
             v[i + 1] = rng_.uniformReal(0., sideLength);
         }
         else
         {
-            v[i    ] = rng_.uniformReal(0., sideLength);
+            v[i] = rng_.uniformReal(0., sideLength);
             v[i + 1] = rng_.uniformBool() ? 0. : sideLength;
         }
     }

@@ -62,7 +62,6 @@ BOOST_AUTO_TEST_CASE(Simple)
     BOOST_CHECK(g.has(coord));
     BOOST_OMPL_EXPECT_NEAR(g.fracExternal(), 1.0, 1e-12);
 
-
     coord[1] = 1;
     BOOST_CHECK_EQUAL(g.has(coord), false);
     GridB<int>::Cell *cell2 = g.createCell(coord);
@@ -98,7 +97,7 @@ BOOST_AUTO_TEST_CASE(Simple)
 
     BOOST_CHECK_EQUAL((unsigned int)3, g.size());
     int sum = 0;
-    for (const auto & it : g)
+    for (const auto &it : g)
         sum += it.second->data;
     BOOST_CHECK_EQUAL(6, sum);
 
@@ -137,7 +136,7 @@ BOOST_AUTO_TEST_CASE(Simple)
 
     BOOST_CHECK_EQUAL((unsigned int)4, g.size());
     sum = 0;
-    for (const auto & it : g)
+    for (const auto &it : g)
         sum += it.second->data;
     BOOST_CHECK_EQUAL(14, sum);
 }

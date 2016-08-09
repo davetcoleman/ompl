@@ -46,19 +46,19 @@
 class KoulesSimulator
 {
 public:
-    KoulesSimulator(const ompl::control::SpaceInformation* si);
+    KoulesSimulator(const ompl::control::SpaceInformation *si);
 
     // A propagate step.
-    void step(const ompl::base::State *start, const ompl::control::Control* control,
-        const double t, ompl::base::State *result);
+    void step(const ompl::base::State *start, const ompl::control::Control *control, const double t,
+              ompl::base::State *result);
 
 protected:
     // A tuple containing the time and id's of two objects colliding
     using CollisionEvent = std::tuple<double, unsigned int, unsigned int>;
     // A priority queue of events, s.t. the top element is the collision
     // that will happen first.
-    using CollisionEventQueue = std::priority_queue<CollisionEvent,
-        std::vector<CollisionEvent>, std::greater<CollisionEvent>>;
+    using CollisionEventQueue =
+        std::priority_queue<CollisionEvent, std::vector<CollisionEvent>, std::greater<CollisionEvent>>;
 
     // Compute the collision events based on current positions and velocities.
     // Push objects apart if they are slightly overlapping.
@@ -78,10 +78,10 @@ protected:
     // the ship has id 0.
     void markAsDead(unsigned int i);
     // Analytic solution for ship's motion from time 0 to t.
-    void updateShip(const ompl::control::Control* control, double t);
+    void updateShip(const ompl::control::Control *control, double t);
 
     // Pointer to Koules' SpaceInformation.
-    const ompl::control::SpaceInformation* si_;
+    const ompl::control::SpaceInformation *si_;
     // Number of dimensions in state space.
     unsigned int numDimensions_;
     // Number of koules.

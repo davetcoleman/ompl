@@ -57,16 +57,17 @@ using namespace ompl;
 // define a convenience macro
 #define BOOST_OMPL_EXPECT_NEAR(a, b, diff) BOOST_CHECK_SMALL((a) - (b), diff)
 
-const int n = 200; // # random numbers in test set
-const int approx_correct = n/20; // number of times an approximate method has to return exact nearest neighbor on n trials
-const int k = 10; // # nearest neighbors
-const int maxk = 30; // max. nearest neighbors (when sampling random values for k)
+const int n = 200;  // # random numbers in test set
+const int approx_correct =
+    n / 20;           // number of times an approximate method has to return exact nearest neighbor on n trials
+const int k = 10;     // # nearest neighbors
+const int maxk = 30;  // max. nearest neighbors (when sampling random values for k)
 // Integers will be sampled in the range of [0,range].
 // Since we are actually storing pointers to ints, there are issues with
 // storing and removing the same value multiple times, so range is chosen
 // to be "large" to minimize the probability of this happening.
 const int range = std::numeric_limits<int>::max();
-const double eps = 1e-6; // tolerance on distance for equality test
+const double eps = 1e-6;  // tolerance on distance for equality test
 
 // fixture
 struct NearestNeighborConfig
@@ -81,58 +82,57 @@ struct NearestNeighborConfig
     ~NearestNeighborConfig() = default;
 
     base::DiscreteStateSpace space0;
-    base::SE3StateSpace     space1;
+    base::SE3StateSpace space1;
 };
 
 // a GNAT with a small number of data points per leaf and small cache
 // for removed points, so that more corner cases will be hit by the tests.
-template<typename _T>
+template <typename _T>
 class NearestNeighborsGNATs : public NearestNeighborsGNAT<_T>
 {
 public:
-    NearestNeighborsGNATs() : NearestNeighborsGNAT<_T>(4,2,6,5,5)
+    NearestNeighborsGNATs() : NearestNeighborsGNAT<_T>(4, 2, 6, 5, 5)
     {
     }
 };
-template<typename _T>
+template <typename _T>
 class NearestNeighborsGNATNoThreadSafetys : public NearestNeighborsGNATNoThreadSafety<_T>
 {
 public:
-    NearestNeighborsGNATNoThreadSafetys() : NearestNeighborsGNATNoThreadSafety<_T>(4,2,6,5,5)
+    NearestNeighborsGNATNoThreadSafetys() : NearestNeighborsGNATNoThreadSafety<_T>(4, 2, 6, 5, 5)
     {
     }
 };
-
 
 NearestNeighborConfig nnConfig;
 
 // helper function to determine if a state is stored in a vector of states
-bool find(base::State* s, std::vector<base::State*> states)
+bool find(base::State *s, std::vector<base::State *> states)
 {
-    for (auto & state : states)
+    for (auto &state : states)
         if (s == state)
             return true;
     return false;
 }
 
-void stateSpaceTest(base::StateSpace& space, NearestNeighbors<base::State*>& proximity, bool approximate=false)
+void stateSpaceTest(base::StateSpace &space, NearestNeighbors<base::State *> &proximity, bool approximate = false)
 {
     int i, j;
     base::StateSamplerPtr sampler(space.allocStateSampler());
-    std::vector<base::State*> states(n), nghbr, nghbrGroundTruth;
-    NearestNeighborsLinear<base::State*> proximityLinear;
-    base::State* s;
+    std::vector<base::State *> states(n), nghbr, nghbrGroundTruth;
+    NearestNeighborsLinear<base::State *> proximityLinear;
+    base::State *s;
 
     proximity.setDistanceFunction([&space](const base::State *a, const base::State *b)
-        {
-            return space.distance(a, b);
-        });
+                                  {
+                                      return space.distance(a, b);
+                                  });
     proximityLinear.setDistanceFunction([&space](const base::State *a, const base::State *b)
-        {
-            return space.distance(a, b);
-        });
+                                        {
+                                            return space.distance(a, b);
+                                        });
 
-    for(i=0; i<n; ++i)
+    for (i = 0; i < n; ++i)
     {
         states[i] = space.allocState();
         sampler->sampleUniform(states[i]);
@@ -143,12 +143,13 @@ void stateSpaceTest(base::StateSpace& space, NearestNeighbors<base::State*>& pro
     BOOST_CHECK_EQUAL((int)proximity.size(), n);
 
     proximity.list(nghbr);
-    BOOST_CHECK_EQUAL(nghbr.size(),proximity.size());
+    BOOST_CHECK_EQUAL(nghbr.size(), proximity.size());
 
-    for(i=0,j=0; i<n; ++i)
+    for (i = 0, j = 0; i < n; ++i)
     {
         s = proximity.nearest(states[i]);
-        if (space.distance(s,states[i])<eps) j++;
+        if (space.distance(s, states[i]) < eps)
+            j++;
 
         proximity.nearestK(states[i], k, nghbr);
         BOOST_CHECK_EQUAL(nghbr.size(), (unsigned int)k);
@@ -156,9 +157,9 @@ void stateSpaceTest(base::StateSpace& space, NearestNeighbors<base::State*>& pro
         if (!approximate)
         {
             proximityLinear.nearestK(states[i], nghbr.size(), nghbrGroundTruth);
-            for (unsigned int k=0; k<nghbr.size(); ++k)
+            for (unsigned int k = 0; k < nghbr.size(); ++k)
                 BOOST_OMPL_EXPECT_NEAR(space.distance(states[i], nghbrGroundTruth[k]),
-                    space.distance(states[i], nghbr[k]), eps);
+                                       space.distance(states[i], nghbr[k]), eps);
         }
 
         proximity.nearestR(states[i], std::numeric_limits<double>::infinity(), nghbr);
@@ -168,25 +169,25 @@ void stateSpaceTest(base::StateSpace& space, NearestNeighbors<base::State*>& pro
         if (!approximate)
         {
             proximityLinear.nearestR(states[i], std::numeric_limits<double>::infinity(), nghbrGroundTruth);
-            for (unsigned int k=0; k<nghbr.size(); ++k)
+            for (unsigned int k = 0; k < nghbr.size(); ++k)
                 BOOST_OMPL_EXPECT_NEAR(space.distance(states[i], nghbrGroundTruth[k]),
-                    space.distance(states[i], nghbr[k]), eps);
+                                       space.distance(states[i], nghbr[k]), eps);
         }
 
-        proximity.nearestK(states[i], 2*n, nghbr);
-        BOOST_CHECK_EQUAL((int) nghbr.size(), n);
+        proximity.nearestK(states[i], 2 * n, nghbr);
+        BOOST_CHECK_EQUAL((int)nghbr.size(), n);
         BOOST_CHECK(find(states[i], nghbr));
         if (!approximate)
         {
             proximityLinear.nearestK(states[i], nghbr.size(), nghbrGroundTruth);
-            for (unsigned int k=0; k<nghbr.size(); ++k)
+            for (unsigned int k = 0; k < nghbr.size(); ++k)
                 BOOST_OMPL_EXPECT_NEAR(space.distance(states[i], nghbrGroundTruth[k]),
-                    space.distance(states[i], nghbr[k]), eps);
+                                       space.distance(states[i], nghbr[k]), eps);
         }
     }
     BOOST_CHECK_GE(j, approx_correct);
 
-    for(i=n-1; i>=0; --i)
+    for (i = n - 1; i >= 0; --i)
     {
         proximity.remove(states[i]);
         BOOST_CHECK_EQUAL((int)proximity.size(), i);
@@ -197,40 +198,40 @@ void stateSpaceTest(base::StateSpace& space, NearestNeighbors<base::State*>& pro
     {
         s = proximity.nearest(states[0]);
     }
-    catch (std::exception& e)
+    catch (std::exception &e)
     {
         BOOST_CHECK_EQUAL("No elements found", std::string(e.what()).substr(0, 17));
     }
 
-    for(i=0; i<n; ++i)
+    for (i = 0; i < n; ++i)
         space.freeState(states[i]);
 }
 
-void randomAccessPatternTest(base::StateSpace& space, NearestNeighbors<base::State*>& proximity)
+void randomAccessPatternTest(base::StateSpace &space, NearestNeighbors<base::State *> &proximity)
 {
     RNG rng;
-    int i, j, k, m = n, n = m/20;
+    int i, j, k, m = n, n = m / 20;
     unsigned int p;
     base::StateSamplerPtr sampler(space.allocStateSampler());
-    std::vector<base::State*> nghbr, nghbrGroundTruth;
-    NearestNeighborsLinear<base::State*> proximityLinear;
-    std::unordered_set<base::State*> states;
-    std::unordered_set<base::State*>::iterator it;
-    base::State* s;
+    std::vector<base::State *> nghbr, nghbrGroundTruth;
+    NearestNeighborsLinear<base::State *> proximityLinear;
+    std::unordered_set<base::State *> states;
+    std::unordered_set<base::State *>::iterator it;
+    base::State *s;
     double r;
 
     proximity.setDistanceFunction([&space](const base::State *a, const base::State *b)
-        {
-            return space.distance(a, b);
-        });
+                                  {
+                                      return space.distance(a, b);
+                                  });
     proximityLinear.setDistanceFunction([&space](const base::State *a, const base::State *b)
-        {
-            return space.distance(a, b);
-        });
+                                        {
+                                            return space.distance(a, b);
+                                        });
 
-    for (i=0; i<m; ++i)
+    for (i = 0; i < m; ++i)
     {
-        for (j=0; j<n; ++j)
+        for (j = 0; j < n; ++j)
         {
             s = space.allocState();
             sampler->sampleUniform(s);
@@ -239,7 +240,7 @@ void randomAccessPatternTest(base::StateSpace& space, NearestNeighbors<base::Sta
             proximityLinear.add(*it);
         }
 
-        for (j=0; j<n; ++j)
+        for (j = 0; j < n; ++j)
         {
             s = space.allocState();
             sampler->sampleUniform(s);
@@ -248,22 +249,22 @@ void randomAccessPatternTest(base::StateSpace& space, NearestNeighbors<base::Sta
             proximityLinear.nearestK(s, k, nghbrGroundTruth);
             proximity.nearestK(s, k, nghbr);
             BOOST_CHECK_EQUAL(nghbr.size(), nghbrGroundTruth.size());
-            for (p=0; p<nghbr.size(); ++p)
+            for (p = 0; p < nghbr.size(); ++p)
                 BOOST_OMPL_EXPECT_NEAR(space.distance(s, nghbrGroundTruth[p]), space.distance(s, nghbr[p]), eps);
 
             r = rng.uniformReal(0, 3);
             proximityLinear.nearestR(s, r, nghbrGroundTruth);
             proximity.nearestR(s, r, nghbr);
             BOOST_CHECK_EQUAL(nghbr.size(), nghbrGroundTruth.size());
-            for (p=0; p<nghbr.size(); ++p)
+            for (p = 0; p < nghbr.size(); ++p)
                 BOOST_OMPL_EXPECT_NEAR(space.distance(s, nghbrGroundTruth[p]), space.distance(s, nghbr[p]), eps);
 
             space.freeState(s);
         }
 
-        for (it=states.begin(); it!=states.end(); )
+        for (it = states.begin(); it != states.end();)
         {
-            if (rng.uniform01()<.5)
+            if (rng.uniform01() < .5)
             {
                 unsigned int szLinear = proximityLinear.size(), sz = proximity.size();
                 /* bool removedLinear = */ proximityLinear.remove(*it);
@@ -271,7 +272,7 @@ void randomAccessPatternTest(base::StateSpace& space, NearestNeighbors<base::Sta
                 space.freeState(*it);
                 it = states.erase(it);
                 BOOST_CHECK(removed);
-                BOOST_CHECK_EQUAL(proximity.size(), sz-1);
+                BOOST_CHECK_EQUAL(proximity.size(), sz - 1);
                 BOOST_CHECK_EQUAL(sz, szLinear);
                 BOOST_CHECK_EQUAL(proximity.size(), states.size());
                 proximity.list(nghbr);
@@ -283,31 +284,31 @@ void randomAccessPatternTest(base::StateSpace& space, NearestNeighbors<base::Sta
         }
     }
 
-    for(it = states.begin(); it != states.end(); ++it)
+    for (it = states.begin(); it != states.end(); ++it)
         space.freeState(*it);
 }
 
-#define NN_TEST_CASES(T,approx)                          \
-BOOST_AUTO_TEST_CASE(Int##T)                             \
-{                                                        \
-    NearestNeighbors##T<base::State*> proximity;         \
-    stateSpaceTest(nnConfig.space0, proximity, approx);  \
-}                                                        \
-BOOST_AUTO_TEST_CASE(SE3##T)                             \
-{                                                        \
-    NearestNeighbors##T<base::State*> proximity;         \
-    stateSpaceTest(nnConfig.space1, proximity, approx);  \
-}                                                        \
-BOOST_AUTO_TEST_CASE(RandomAccessPatternInt##T)          \
-{                                                        \
-    NearestNeighbors##T<base::State*> proximity;         \
-    randomAccessPatternTest(nnConfig.space0, proximity); \
-}                                                        \
-BOOST_AUTO_TEST_CASE(RandomAccessPatternSE3##T)          \
-{                                                        \
-    NearestNeighbors##T<base::State*> proximity;         \
-    randomAccessPatternTest(nnConfig.space1, proximity); \
-}
+#define NN_TEST_CASES(T, approx)                                                                                       \
+    BOOST_AUTO_TEST_CASE(Int##T)                                                                                       \
+    {                                                                                                                  \
+        NearestNeighbors##T<base::State *> proximity;                                                                  \
+        stateSpaceTest(nnConfig.space0, proximity, approx);                                                            \
+    }                                                                                                                  \
+    BOOST_AUTO_TEST_CASE(SE3##T)                                                                                       \
+    {                                                                                                                  \
+        NearestNeighbors##T<base::State *> proximity;                                                                  \
+        stateSpaceTest(nnConfig.space1, proximity, approx);                                                            \
+    }                                                                                                                  \
+    BOOST_AUTO_TEST_CASE(RandomAccessPatternInt##T)                                                                    \
+    {                                                                                                                  \
+        NearestNeighbors##T<base::State *> proximity;                                                                  \
+        randomAccessPatternTest(nnConfig.space0, proximity);                                                           \
+    }                                                                                                                  \
+    BOOST_AUTO_TEST_CASE(RandomAccessPatternSE3##T)                                                                    \
+    {                                                                                                                  \
+        NearestNeighbors##T<base::State *> proximity;                                                                  \
+        randomAccessPatternTest(nnConfig.space1, proximity);                                                           \
+    }
 
 NN_TEST_CASES(Linear, false)
 NN_TEST_CASES(SqrtApprox, true)

@@ -53,17 +53,16 @@ struct Metadata
     {
     }
 
-    int   tag1;
+    int tag1;
     float tag2;
 
-    template<typename Archive>
-    void serialize(Archive & ar, const unsigned int /*version*/)
+    template <typename Archive>
+    void serialize(Archive &ar, const unsigned int /*version*/)
     {
-        ar & tag1;
-        ar & tag2;
+        ar &tag1;
+        ar &tag2;
     }
 };
-
 
 BOOST_AUTO_TEST_CASE(Store)
 {
@@ -77,7 +76,7 @@ BOOST_AUTO_TEST_CASE(Store)
     base::StateStorage ss(space);
     base::ScopedState<> s(space);
     base::State *x = space->allocState();
-    for (int i = 0 ; i < 1000 ; ++i)
+    for (int i = 0; i < 1000; ++i)
     {
         s.random();
         space->copyState(x, s.get());

@@ -50,7 +50,6 @@
 
 namespace ompl
 {
-
     namespace tools
     {
         /**
@@ -72,7 +71,6 @@ namespace ompl
         class ThunderDB
         {
         public:
-
             /** \brief Constructor needs the state space used for planning.
              *  \param space - state space
              */
@@ -86,7 +84,7 @@ namespace ompl
              * \param fileName - name of database file
              * \return true if file loaded successfully
              */
-            bool load(const std::string& fileName);
+            bool load(const std::string &fileName);
 
             /**
              * \brief Add a new solution path to our database. Des not actually save to file so
@@ -95,21 +93,21 @@ namespace ompl
              * \param returned insertion time to add to db
              * \return true on success
              */
-            bool addPath(ompl::geometric::PathGeometric& solutionPath, double& insertionTime);
+            bool addPath(ompl::geometric::PathGeometric &solutionPath, double &insertionTime);
 
             /**
              * \brief Save loaded database to file, except skips saving if no paths have been added
              * \param fileName - name of database file
              * \return true if file saved successfully
              */
-            bool saveIfChanged(const std::string& fileName);
+            bool saveIfChanged(const std::string &fileName);
 
             /**
              * \brief Save loaded database to file
              * \param fileName - name of database file
              * \return true if file saved successfully
              */
-            bool save(const std::string& fileName);
+            bool save(const std::string &fileName);
 
             /**
              * \brief Get a vector of all the planner datas in the database
@@ -120,16 +118,16 @@ namespace ompl
             void setSPARSdb(ompl::tools::SPARSdbPtr &prm);
 
             /** \brief Hook for debugging */
-            ompl::tools::SPARSdbPtr& getSPARSdb();
+            ompl::tools::SPARSdbPtr &getSPARSdb();
 
             /** \brief Find the k nearest paths to our queries one */
-            bool findNearestStartGoal(int nearestK, const base::State* start, const base::State* goal,
+            bool findNearestStartGoal(int nearestK, const base::State *start, const base::State *goal,
                                       ompl::geometric::SPARSdb::CandidateSolution &candidateSolution,
-                                      const base::PlannerTerminationCondition& ptc);
+                                      const base::PlannerTerminationCondition &ptc);
 
             /** \brief Print info to screen */
-            void debugVertex(const ompl::base::PlannerDataVertex& vertex);
-            void debugState(const ompl::base::State* state);
+            void debugVertex(const ompl::base::PlannerDataVertex &vertex);
+            void debugState(const ompl::base::State *state);
 
             /** \brief Get number of unsaved paths */
             int getNumPathsInserted() const
@@ -159,9 +157,8 @@ namespace ompl
             }
 
         protected:
-
             /// The created space information
-            base::SpaceInformationPtr     si_; // TODO: is this even necessary?
+            base::SpaceInformationPtr si_;  // TODO: is this even necessary?
 
             /** \brief Class for managing various visualization features */
             VisualizerPtr visual_;
@@ -178,9 +175,9 @@ namespace ompl
             // Allow the database to save to file (new experiences)
             bool saving_enabled_;
 
-        }; // end of class ThunderDB
+        };  // end of class ThunderDB
 
-    } // end of namespace
+    }  // end of namespace
 
-} // end of namespace
+}  // end of namespace
 #endif

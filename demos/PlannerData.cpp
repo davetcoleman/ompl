@@ -61,9 +61,8 @@ bool isStateValid(const ob::State *state)
 
     // check validity of state defined by pos & rot
 
-
     // return a value that is always true but uses the two variables we define, so we avoid compiler warnings
-    return (const void*)rot != (const void*)pos;
+    return (const void *)rot != (const void *)pos;
 }
 
 void planWithSimpleSetup()
@@ -82,7 +81,10 @@ void planWithSimpleSetup()
     og::SimpleSetup ss(space);
 
     // set state validity checking for this space
-    ss.setStateValidityChecker([](const ob::State *state) { return isStateValid(state); });
+    ss.setStateValidityChecker([](const ob::State *state)
+                               {
+                                   return isStateValid(state);
+                               });
 
     // create a random start state
     ob::ScopedState<> start(space);
@@ -105,9 +107,10 @@ void planWithSimpleSetup()
         og::PathGeometric slnPath = ss.getSolutionPath();
 
         std::cout << std::endl;
-        std::cout << "Found solution with " << slnPath.getStateCount() << " states and length " << slnPath.length() << std::endl;
+        std::cout << "Found solution with " << slnPath.getStateCount() << " states and length " << slnPath.length()
+                  << std::endl;
         // print the path to screen
-        //slnPath.print(std::cout);
+        // slnPath.print(std::cout);
 
         std::cout << "Writing PlannerData to file './myPlannerData'" << std::endl;
         ob::PlannerData data(ss.getSpaceInformation());
@@ -121,11 +124,9 @@ void planWithSimpleSetup()
 }
 
 // Used for A* search.  Computes the heuristic distance from vertex v1 to the goal
-ob::Cost distanceHeuristic(ob::PlannerData::Graph::Vertex v1,
-                           const ob::GoalState* goal,
-                           const ob::OptimizationObjective* obj,
-                           const boost::property_map<ob::PlannerData::Graph::Type,
-                           vertex_type_t>::type& plannerDataVertices)
+ob::Cost
+distanceHeuristic(ob::PlannerData::Graph::Vertex v1, const ob::GoalState *goal, const ob::OptimizationObjective *obj,
+                  const boost::property_map<ob::PlannerData::Graph::Type, vertex_type_t>::type &plannerDataVertices)
 {
     return ob::Cost(obj->costToGo(plannerDataVertices[v1]->getState(), goal));
 }
@@ -156,7 +157,7 @@ void readPlannerData()
         data.computeEdgeWeights(opt);
 
         // Getting a handle to the raw Boost.Graph data
-        ob::PlannerData::Graph::Type& graph = data.toBoostGraph();
+        ob::PlannerData::Graph::Type &graph = data.toBoostGraph();
 
         // Now we can apply any Boost.Graph algorithm.  How about A*!
 
@@ -171,17 +172,25 @@ void readPlannerData()
         goal.setState(data.getGoalVertex(0).getState());
         ob::PlannerData::Graph::Vertex start = boost::vertex(data.getStartIndex(0), graph);
         boost::astar_search(graph, start,
-            [&goal, &opt, &vertices](ob::PlannerData::Graph::Vertex v1) { return distanceHeuristic(v1, &goal, &opt, vertices); },
-            boost::predecessor_map(prev).
-            distance_compare([&opt](ob::Cost c1, ob::Cost c2) { return opt.isCostBetterThan(c1, c2); }).
-            distance_combine([&opt](ob::Cost c1, ob::Cost c2) { return opt.combineCosts(c1, c2); }).
-            distance_inf(opt.infiniteCost()).
-            distance_zero(opt.identityCost()));
+                            [&goal, &opt, &vertices](ob::PlannerData::Graph::Vertex v1)
+                            {
+                                return distanceHeuristic(v1, &goal, &opt, vertices);
+                            },
+                            boost::predecessor_map(prev)
+                                .distance_compare([&opt](ob::Cost c1, ob::Cost c2)
+                                                  {
+                                                      return opt.isCostBetterThan(c1, c2);
+                                                  })
+                                .distance_combine([&opt](ob::Cost c1, ob::Cost c2)
+                                                  {
+                                                      return opt.combineCosts(c1, c2);
+                                                  })
+                                .distance_inf(opt.infiniteCost())
+                                .distance_zero(opt.identityCost()));
 
         // Extracting the path
         og::PathGeometric path(si);
-        for (ob::PlannerData::Graph::Vertex pos = boost::vertex(data.getGoalIndex(0), graph);
-             prev[pos] != pos;
+        for (ob::PlannerData::Graph::Vertex pos = boost::vertex(data.getGoalIndex(0), graph); prev[pos] != pos;
              pos = prev[pos])
         {
             path.append(vertices[pos]->getState());
@@ -190,8 +199,9 @@ void readPlannerData()
         path.reverse();
 
         // print the path to screen
-        //path.print(std::cout);
-        std::cout << "Found stored solution with " << path.getStateCount() << " states and length " << path.length() << std::endl;
+        // path.print(std::cout);
+        std::cout << "Found stored solution with " << path.getStateCount() << " states and length " << path.length()
+                  << std::endl;
     }
 }
 

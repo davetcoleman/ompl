@@ -49,34 +49,33 @@ class MyEnvironment : public base::MorseEnvironment
 {
 public:
     MyEnvironment(const unsigned int rigidBodies, const unsigned int controlDim,
-        const std::vector<double> &controlBounds, const std::vector<double> &positionBounds,
-        const std::vector<double> &linvelBounds, const std::vector<double> &angvelBounds)
-        : base::MorseEnvironment(controlDim, controlBounds, rigidBodies, positionBounds, linvelBounds, angvelBounds,
-            1.0/60, 30, 90)
+                  const std::vector<double> &controlBounds, const std::vector<double> &positionBounds,
+                  const std::vector<double> &linvelBounds, const std::vector<double> &angvelBounds)
+      : base::MorseEnvironment(controlDim, controlBounds, rigidBodies, positionBounds, linvelBounds, angvelBounds,
+                               1.0 / 60, 30, 90)
     {
     }
     void readState(base::State *state)
     {
         // load fake state data into state
         base::MorseStateSpace::StateType *mstate = state->as<base::MorseStateSpace::StateType>();
-        for (unsigned int i = 0; i < 4*rigidBodies_; i+=4)
+        for (unsigned int i = 0; i < 4 * rigidBodies_; i += 4)
         {
             double *pos = mstate->as<base::RealVectorStateSpace::StateType>(i)->values;
-            double *lin = mstate->as<base::RealVectorStateSpace::StateType>(i+1)->values;
-            double *ang = mstate->as<base::RealVectorStateSpace::StateType>(i+2)->values;
+            double *lin = mstate->as<base::RealVectorStateSpace::StateType>(i + 1)->values;
+            double *ang = mstate->as<base::RealVectorStateSpace::StateType>(i + 2)->values;
             for (unsigned int j = 0; j < 3; j++)
             {
                 pos[j] = 1.0;
                 lin[j] = 1.0;
                 ang[j] = 1.0;
             }
-            base::SO3StateSpace::StateType *quat = mstate->as<base::SO3StateSpace::StateType>(i+3);
+            base::SO3StateSpace::StateType *quat = mstate->as<base::SO3StateSpace::StateType>(i + 3);
             quat->w = 1.0;
             quat->x = 0.0;
             quat->y = 0.0;
             quat->z = 0.0;
         }
-
     }
     void writeState(const base::State *state)
     {
@@ -95,18 +94,18 @@ public:
 class MyGoal : public base::MorseGoal
 {
 public:
-    MyGoal(base::SpaceInformationPtr si)
-        : base::MorseGoal(si), c(0)
+    MyGoal(base::SpaceInformationPtr si) : base::MorseGoal(si), c(0)
     {
     }
     bool isSatisfied_Py(const base::State *state) const
     {
         // goal is "reached" the 10th time this is called
-        distance_ = 10-(c++);
+        distance_ = 10 - (c++);
         if (distance_ == 0)
             return true;
         return false;
     }
+
 private:
     mutable unsigned int c;
 };
@@ -155,4 +154,3 @@ int main()
 
     return 0;
 }
-

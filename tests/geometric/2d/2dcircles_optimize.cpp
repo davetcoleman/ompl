@@ -68,19 +68,15 @@ public:
 
     virtual base::PlannerPtr newPlanner(const base::SpaceInformationPtr &si) = 0;
 
-
-    virtual void test2DCircles(const Circles2D& circles)
+    virtual void test2DCircles(const Circles2D &circles)
     {
         base::SpaceInformationPtr si = geometric::spaceInformation2DCircles(circles);
         test2DCirclesGeneral(circles, si, 1.0);
     }
 
 protected:
-
     /* test a planner in a planar environment with circular obstacles */
-    void test2DCirclesGeneral(const Circles2D &circles,
-                              const base::SpaceInformationPtr &si,
-                              double solutionTime)
+    void test2DCirclesGeneral(const Circles2D &circles, const base::SpaceInformationPtr &si, double solutionTime)
     {
         /* instantiate problem definition */
         auto pdef(std::make_shared<base::ProblemDefinition>(si));
@@ -109,12 +105,13 @@ protected:
             pdef->clearSolutionPaths();
         }
 
-        for (std::size_t i = 0 ; i < nt ; ++i)
+        for (std::size_t i = 0; i < nt; ++i)
         {
             const Circles2D::Query &q = circles.getQuery(i);
             setupProblem(q, si, pdef);
 
-            base::Cost min_cost(std::sqrt(std::pow(q.goalX_ - q.startX_, 2.0) + std::pow(q.goalY_ - q.startY_, 2.0))); //The straight-line cost
+            base::Cost min_cost(std::sqrt(std::pow(q.goalX_ - q.startX_, 2.0) +
+                                          std::pow(q.goalY_ - q.startY_, 2.0)));  // The straight-line cost
 
             planner->clear();
             pdef->clearSolutionPaths();
@@ -126,46 +123,47 @@ protected:
             bool solved = planner->solve(solutionTime);
             if (solved)
             {
-              // we change the optimization objective so the planner runs until timeout
-              opt->setCostThreshold(base::Cost(std::numeric_limits<double>::epsilon()));
+                // we change the optimization objective so the planner runs until timeout
+                opt->setCostThreshold(base::Cost(std::numeric_limits<double>::epsilon()));
 
-              geometric::PathGeometric *path = static_cast<geometric::PathGeometric*>(pdef->getSolutionPath().get());
-              base::Cost ini_cost = path->cost(pdef->getOptimizationObjective());
-              base::Cost prev_cost = ini_cost;
-              double time_spent = time::seconds(time::now() - start);
+                geometric::PathGeometric *path = static_cast<geometric::PathGeometric *>(pdef->getSolutionPath().get());
+                base::Cost ini_cost = path->cost(pdef->getOptimizationObjective());
+                base::Cost prev_cost = ini_cost;
+                double time_spent = time::seconds(time::now() - start);
 
-              while (time_spent + DT_SOLUTION_TIME < solutionTime)
-              {
-                pdef->clearSolutionPaths();
-                solved = planner->solve(DT_SOLUTION_TIME);
-                BOOST_CHECK(solved);
-                if (solved)
+                while (time_spent + DT_SOLUTION_TIME < solutionTime)
                 {
-                    geometric::PathGeometric *path = static_cast<geometric::PathGeometric*>(pdef->getSolutionPath().get());
-                    base::Cost new_cost = path->cost(pdef->getOptimizationObjective());
+                    pdef->clearSolutionPaths();
+                    solved = planner->solve(DT_SOLUTION_TIME);
+                    BOOST_CHECK(solved);
+                    if (solved)
+                    {
+                        geometric::PathGeometric *path =
+                            static_cast<geometric::PathGeometric *>(pdef->getSolutionPath().get());
+                        base::Cost new_cost = path->cost(pdef->getOptimizationObjective());
 
-                    BOOST_CHECK(!opt->isCostBetterThan(prev_cost, new_cost));
+                        BOOST_CHECK(!opt->isCostBetterThan(prev_cost, new_cost));
 
-                    prev_cost = new_cost;
-                    BOOST_CHECK(!pdef->hasOptimizedSolution());
-                    BOOST_CHECK(!pdef->hasApproximateSolution());
+                        prev_cost = new_cost;
+                        BOOST_CHECK(!pdef->hasOptimizedSolution());
+                        BOOST_CHECK(!pdef->hasApproximateSolution());
+                    }
+                    time_spent = time::seconds(time::now() - start);
                 }
-                time_spent = time::seconds(time::now() - start);
-              }
-              BOOST_CHECK(!opt->isCostBetterThan(ini_cost, prev_cost));
+                BOOST_CHECK(!opt->isCostBetterThan(ini_cost, prev_cost));
 
-              pdef->clearSolutionPaths();
-              // we change the optimization objective so the planner can achieve the objective
-              opt->setCostThreshold(ini_cost);
-              if (planner->solve(DT_SOLUTION_TIME))
-              {
-                  path = static_cast<geometric::PathGeometric*>(pdef->getSolutionPath().get());
-                  prev_cost  = path->cost(pdef->getOptimizationObjective());
-                  BOOST_CHECK(pdef->hasOptimizedSolution() || opt->isCostEquivalentTo(ini_cost, prev_cost));
-              }
+                pdef->clearSolutionPaths();
+                // we change the optimization objective so the planner can achieve the objective
+                opt->setCostThreshold(ini_cost);
+                if (planner->solve(DT_SOLUTION_TIME))
+                {
+                    path = static_cast<geometric::PathGeometric *>(pdef->getSolutionPath().get());
+                    prev_cost = path->cost(pdef->getOptimizationObjective());
+                    BOOST_CHECK(pdef->hasOptimizedSolution() || opt->isCostEquivalentTo(ini_cost, prev_cost));
+                }
 
-              // make sure not better than the minimum
-              BOOST_CHECK(!opt->isCostBetterThan(prev_cost, min_cost));
+                // make sure not better than the minimum
+                BOOST_CHECK(!opt->isCostBetterThan(prev_cost, min_cost));
             }
         }
     }
@@ -174,9 +172,7 @@ protected:
     // decreasing cost. This is because in this test we do not expect
     // to find goal states, so the planner effectively optimizes for
     // nearness to goal instead of path cost.
-    void test2DCirclesNoGoalBias(const Circles2D &circles,
-                                 const base::SpaceInformationPtr &si,
-                                 double solutionTime)
+    void test2DCirclesNoGoalBias(const Circles2D &circles, const base::SpaceInformationPtr &si, double solutionTime)
     {
         /* instantiate problem definition */
         auto pdef(std::make_shared<base::ProblemDefinition>(si));
@@ -205,7 +201,7 @@ protected:
             pdef->clearSolutionPaths();
         }
 
-        for (std::size_t i = 0 ; i < nt ; ++i)
+        for (std::size_t i = 0; i < nt; ++i)
         {
             const Circles2D::Query &q = circles.getQuery(i);
             setupProblem(q, si, pdef);
@@ -220,44 +216,44 @@ protected:
             bool solved = planner->solve(solutionTime);
             if (solved)
             {
-              // we change the optimization objective so the planner runs until timeout
-              opt->setCostThreshold(base::Cost(std::numeric_limits<double>::epsilon()));
+                // we change the optimization objective so the planner runs until timeout
+                opt->setCostThreshold(base::Cost(std::numeric_limits<double>::epsilon()));
 
-              geometric::PathGeometric *path = static_cast<geometric::PathGeometric*>(pdef->getSolutionPath().get());
-              base::Cost ini_cost = path->cost(pdef->getOptimizationObjective());
-              base::Cost prev_cost = ini_cost;
-              double time_spent = time::seconds(time::now() - start);
+                geometric::PathGeometric *path = static_cast<geometric::PathGeometric *>(pdef->getSolutionPath().get());
+                base::Cost ini_cost = path->cost(pdef->getOptimizationObjective());
+                base::Cost prev_cost = ini_cost;
+                double time_spent = time::seconds(time::now() - start);
 
-              while (time_spent + DT_SOLUTION_TIME < solutionTime)
-              {
-                pdef->clearSolutionPaths();
-                solved = planner->solve(DT_SOLUTION_TIME);
-                BOOST_CHECK(solved);
-                if (solved)
+                while (time_spent + DT_SOLUTION_TIME < solutionTime)
                 {
-                    geometric::PathGeometric *path = static_cast<geometric::PathGeometric*>(pdef->getSolutionPath().get());
-                    base::Cost new_cost = path->cost(pdef->getOptimizationObjective());
+                    pdef->clearSolutionPaths();
+                    solved = planner->solve(DT_SOLUTION_TIME);
+                    BOOST_CHECK(solved);
+                    if (solved)
+                    {
+                        geometric::PathGeometric *path =
+                            static_cast<geometric::PathGeometric *>(pdef->getSolutionPath().get());
+                        base::Cost new_cost = path->cost(pdef->getOptimizationObjective());
 
-                    BOOST_CHECK(!opt->isCostBetterThan(prev_cost, new_cost));
+                        BOOST_CHECK(!opt->isCostBetterThan(prev_cost, new_cost));
 
-                    prev_cost = new_cost;
-                    BOOST_CHECK(!pdef->hasOptimizedSolution());
-                    BOOST_CHECK(!pdef->hasApproximateSolution());
+                        prev_cost = new_cost;
+                        BOOST_CHECK(!pdef->hasOptimizedSolution());
+                        BOOST_CHECK(!pdef->hasApproximateSolution());
+                    }
+                    time_spent = time::seconds(time::now() - start);
                 }
-                time_spent = time::seconds(time::now() - start);
-              }
 
-              // In dubins no-goal-bias case, we can't guarantee that
-              // ini_cost is actually greater than prev_cost
-              BOOST_CHECK(ini_cost.value() >= prev_cost.value());
+                // In dubins no-goal-bias case, we can't guarantee that
+                // ini_cost is actually greater than prev_cost
+                BOOST_CHECK(ini_cost.value() >= prev_cost.value());
 
-              pdef->clearSolutionPaths();
+                pdef->clearSolutionPaths();
             }
         }
     }
 
-    static void setupProblem(const Circles2D::Query &q,
-                             const base::SpaceInformationPtr &si,
+    static void setupProblem(const Circles2D::Query &q, const base::SpaceInformationPtr &si,
                              base::ProblemDefinitionPtr &pdef)
     {
         base::ScopedState<> start(si);
@@ -272,8 +268,7 @@ protected:
         pdef->setGoal(goal);
     }
 
-    static base::GoalPtr genGoalFromQuery(const Circles2D::Query &q,
-                                          const base::SpaceInformationPtr &si)
+    static base::GoalPtr genGoalFromQuery(const Circles2D::Query &q, const base::SpaceInformationPtr &si)
     {
         base::ScopedState<> goal2D(si);
         goal2D[0] = q.goalX_;
@@ -289,7 +284,6 @@ protected:
 class RRTstarTest : public TestPlanner
 {
 protected:
-
     base::PlannerPtr newPlanner(const base::SpaceInformationPtr &si) override
     {
         auto rrt(std::make_shared<geometric::RRTstar>(si));
@@ -300,7 +294,6 @@ protected:
 class PRMstarTest : public TestPlanner
 {
 protected:
-
     base::PlannerPtr newPlanner(const base::SpaceInformationPtr &si) override
     {
         auto prm(std::make_shared<geometric::PRMstar>(si));
@@ -311,7 +304,6 @@ protected:
 class PRMTest : public TestPlanner
 {
 protected:
-
     base::PlannerPtr newPlanner(const base::SpaceInformationPtr &si) override
     {
         auto prm(std::make_shared<geometric::PRM>(si));
@@ -322,7 +314,6 @@ protected:
 class CForestTest : public TestPlanner
 {
 protected:
-
     base::PlannerPtr newPlanner(const base::SpaceInformationPtr &si) override
     {
         auto cforest(std::make_shared<geometric::CForest>(si));
@@ -343,13 +334,12 @@ static const InitializeRandomSeed seed_initializer;
 class PlanTest
 {
 public:
-
     void run2DCirclesTest(TestPlanner *p)
     {
         p->test2DCircles(circles_);
     }
 
-    template<typename T>
+    template <typename T>
     void runAllTests()
     {
         TestPlanner *p = new T();
@@ -358,7 +348,6 @@ public:
     }
 
 protected:
-
     PlanTest()
     {
         verbose_ = VERBOSE;
@@ -367,21 +356,21 @@ protected:
         circles_.loadQueries((path / "circle_queries.txt").string());
     }
 
-    Circles2D     circles_;
-    bool          verbose_;
+    Circles2D circles_;
+    bool verbose_;
 };
 
 BOOST_FIXTURE_TEST_SUITE(MyPlanTestFixture, PlanTest)
 
 // define boost tests for a planner assuming the naming convention is followed
-#define OMPL_PLANNER_TEST(Name)                                                \
-    BOOST_AUTO_TEST_CASE(geometric_##Name)                                \
-    {                                                                        \
-        if (VERBOSE)                                                        \
-            printf("\n\n\n*****************************\nTesting %s ...\n", #Name); \
-        runAllTests<Name##Test>();                                        \
-        if (VERBOSE)                                                        \
-            printf("Done with %s.\n", #Name);                                \
+#define OMPL_PLANNER_TEST(Name)                                                                                        \
+    BOOST_AUTO_TEST_CASE(geometric_##Name)                                                                             \
+    {                                                                                                                  \
+        if (VERBOSE)                                                                                                   \
+            printf("\n\n\n*****************************\nTesting %s ...\n", #Name);                                    \
+        runAllTests<Name##Test>();                                                                                     \
+        if (VERBOSE)                                                                                                   \
+            printf("Done with %s.\n", #Name);                                                                          \
     }
 
 OMPL_PLANNER_TEST(PRMstar)

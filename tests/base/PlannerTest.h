@@ -39,17 +39,14 @@
 
 namespace ompl
 {
-
     namespace base
     {
-
         /** \brief Encapsulate basic tests for planners. This class
             should be used for every planner included with ompl, to
             ensure basic functionality works. */
         class PlannerTest
         {
         public:
-
             /** \brief Construct a testing setup for planner \e planner */
             PlannerTest(const PlannerPtr &planner) : planner_(planner)
             {
@@ -97,9 +94,7 @@ namespace ompl
             }
 
         private:
-
             PlannerPtr planner_;
-
         };
     }
 }

@@ -49,14 +49,11 @@ namespace ompl
 {
     namespace geometric
     {
-
         class StateValidityChecker2DCircles : public base::StateValidityChecker
         {
         public:
-
-            StateValidityChecker2DCircles(const base::SpaceInformationPtr &si, const Circles2D &circles) :
-                base::StateValidityChecker(si),
-                circles_(circles)
+            StateValidityChecker2DCircles(const base::SpaceInformationPtr &si, const Circles2D &circles)
+              : base::StateValidityChecker(si), circles_(circles)
             {
             }
 
@@ -76,14 +73,11 @@ namespace ompl
             space->addDimension(circles.minX_, circles.maxX_);
             space->addDimension(circles.minY_, circles.maxY_);
             auto si(std::make_shared<base::SpaceInformation>(space));
-            si->setStateValidityChecker(
-                std::make_shared<StateValidityChecker2DCircles>(si, circles));
+            si->setStateValidityChecker(std::make_shared<StateValidityChecker2DCircles>(si, circles));
             si->setStateValidityCheckingResolution(0.002);
             si->setup();
             return si;
         }
-
-
     }
 }
 

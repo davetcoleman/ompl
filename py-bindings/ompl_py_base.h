@@ -48,18 +48,16 @@
 #include "ompl/base/PlannerData.h"
 #include "py_std_function.hpp"
 
-#define DeclareStateType(T) \
-    inline int __dummy##T() \
-    { \
-        return sizeof(ompl::base::ScopedState<T##StateSpace>) + \
-        sizeof(ompl::base::T##StateSpace::StateType); \
+#define DeclareStateType(T)                                                                                            \
+    inline int __dummy##T()                                                                                            \
+    {                                                                                                                  \
+        return sizeof(ompl::base::ScopedState<T##StateSpace>) + sizeof(ompl::base::T##StateSpace::StateType);          \
     }
 
-#define DeclareSpecificParamType(n, T) \
-    inline int __dummySP##n() \
-    { \
-        return sizeof(ompl::base::SpecificParam<T>("dummy", \
-            ompl::base::SpecificParam<T>::SetterFn())); \
+#define DeclareSpecificParamType(n, T)                                                                                 \
+    inline int __dummySP##n()                                                                                          \
+    {                                                                                                                  \
+        return sizeof(ompl::base::SpecificParam<T>("dummy", ompl::base::SpecificParam<T>::SetterFn()));                \
     }
 
 namespace ompl
@@ -88,8 +86,8 @@ namespace ompl
 
         inline int dummySTLContainerSize()
         {
-            return sizeof(std::vector<ompl::base::PlannerSolution>)
-                + sizeof(std::map<unsigned int, ompl::base::PlannerDataEdge const *>);
+            return sizeof(std::vector<ompl::base::PlannerSolution>) +
+                   sizeof(std::map<unsigned int, ompl::base::PlannerDataEdge const *>);
         }
     }
 }

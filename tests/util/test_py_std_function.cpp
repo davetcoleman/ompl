@@ -42,39 +42,59 @@ namespace bp = boost::python;
 
 struct IntClass
 {
-    IntClass(int i=0) : value(i) {}
+    IntClass(int i = 0) : value(i)
+    {
+    }
     int value;
 };
 
-PYDECLARE_FUNCTION(IntClass(IntClass,int),         IntClassFun0_t)
-PYDECLARE_FUNCTION(IntClass(IntClass&,int),        IntClassFun1_t)
-PYDECLARE_FUNCTION(IntClass(const IntClass&,int),  IntClassFun2_t)
-PYDECLARE_FUNCTION(IntClass(IntClass&,int&),       IntClassFun3_t)
-PYDECLARE_FUNCTION(void(IntClass*,int),            IntClassFun4_t)
+PYDECLARE_FUNCTION(IntClass(IntClass, int), IntClassFun0_t)
+PYDECLARE_FUNCTION(IntClass(IntClass &, int), IntClassFun1_t)
+PYDECLARE_FUNCTION(IntClass(const IntClass &, int), IntClassFun2_t)
+PYDECLARE_FUNCTION(IntClass(IntClass &, int &), IntClassFun3_t)
+PYDECLARE_FUNCTION(void(IntClass *, int), IntClassFun4_t)
 
-IntClass intClassFun0(IntClass i, int j) { i.value = j; return i; }
-IntClass intClassFun1(IntClass& i, int j) { i.value = j; return i; }
-IntClass intClassFun2(const IntClass& i, int j) { IntClass i2(i); i2.value = j; return i2; }
-IntClass intClassFun3(IntClass& i, int& j) { i.value = j; return i; }
-void intClassFun4(IntClass* i, int j) { i->value = j; }
+IntClass intClassFun0(IntClass i, int j)
+{
+    i.value = j;
+    return i;
+}
+IntClass intClassFun1(IntClass &i, int j)
+{
+    i.value = j;
+    return i;
+}
+IntClass intClassFun2(const IntClass &i, int j)
+{
+    IntClass i2(i);
+    i2.value = j;
+    return i2;
+}
+IntClass intClassFun3(IntClass &i, int &j)
+{
+    i.value = j;
+    return i;
+}
+void intClassFun4(IntClass *i, int j)
+{
+    i->value = j;
+}
 
-std::function<IntClass(IntClass,int)>            intClassFun0_obj(intClassFun0);
-std::function<IntClass(IntClass&,int)>           intClassFun1_obj(intClassFun1);
-std::function<IntClass(const IntClass&,int)>     intClassFun2_obj(intClassFun2);
-std::function<IntClass(IntClass&,int&)>          intClassFun3_obj(intClassFun3);
-std::function<void(IntClass*,int)>               intClassFun4_obj(intClassFun4);
-
+std::function<IntClass(IntClass, int)> intClassFun0_obj(intClassFun0);
+std::function<IntClass(IntClass &, int)> intClassFun1_obj(intClassFun1);
+std::function<IntClass(const IntClass &, int)> intClassFun2_obj(intClassFun2);
+std::function<IntClass(IntClass &, int &)> intClassFun3_obj(intClassFun3);
+std::function<void(IntClass *, int)> intClassFun4_obj(intClassFun4);
 
 BOOST_PYTHON_MODULE(py_std_function)
 {
-    bp::class_<IntClass>("IntClass", bp::init<int>())
-        .def_readwrite("value", &IntClass::value);
+    bp::class_<IntClass>("IntClass", bp::init<int>()).def_readwrite("value", &IntClass::value);
 
-    PYREGISTER_FUNCTION(IntClass(IntClass,int),         IntClassFun0_t, "IntClassFun0_t")
-    PYREGISTER_FUNCTION(IntClass(IntClass&,int),        IntClassFun1_t, "IntClassFun1_t")
-    PYREGISTER_FUNCTION(IntClass(const IntClass&,int),  IntClassFun2_t, "IntClassFun2_t")
-    PYREGISTER_FUNCTION(IntClass(IntClass&,int&),       IntClassFun3_t, "IntClassFun3_t")
-    PYREGISTER_FUNCTION(void(IntClass*,int),            IntClassFun4_t, "IntClassFun4_t")
+    PYREGISTER_FUNCTION(IntClass(IntClass, int), IntClassFun0_t, "IntClassFun0_t")
+    PYREGISTER_FUNCTION(IntClass(IntClass &, int), IntClassFun1_t, "IntClassFun1_t")
+    PYREGISTER_FUNCTION(IntClass(const IntClass &, int), IntClassFun2_t, "IntClassFun2_t")
+    PYREGISTER_FUNCTION(IntClass(IntClass &, int &), IntClassFun3_t, "IntClassFun3_t")
+    PYREGISTER_FUNCTION(void(IntClass *, int), IntClassFun4_t, "IntClassFun4_t")
 
     bp::scope().attr("intClassFun0_obj") = intClassFun0_obj;
     bp::scope().attr("intClassFun1_obj") = intClassFun1_obj;

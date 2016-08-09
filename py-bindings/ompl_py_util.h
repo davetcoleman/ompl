@@ -46,18 +46,12 @@ namespace ompl
     {
         inline int dummySTLContainerSize()
         {
-            return sizeof(std::vector<std::size_t>) +
-                sizeof(std::vector<bool>) +
-                sizeof(std::vector<int>) +
-                sizeof(std::vector<unsigned long>) +
-                sizeof(std::vector<double>) +
-                sizeof(std::vector<unsigned int>) +
-                sizeof(std::vector<std::string>) +
-                sizeof(std::vector< std::vector<int> >) +
-                sizeof(std::vector< std::vector<unsigned int> >) +
-                sizeof(std::vector< std::vector<double> >) +
-                sizeof(std::vector< std::map< std::string, std::string > >) +
-                sizeof(std::map< std::string, std::string >);
+            return sizeof(std::vector<std::size_t>) + sizeof(std::vector<bool>) + sizeof(std::vector<int>) +
+                   sizeof(std::vector<unsigned long>) + sizeof(std::vector<double>) +
+                   sizeof(std::vector<unsigned int>) + sizeof(std::vector<std::string>) +
+                   sizeof(std::vector<std::vector<int>>) + sizeof(std::vector<std::vector<unsigned int>>) +
+                   sizeof(std::vector<std::vector<double>>) + sizeof(std::vector<std::map<std::string, std::string>>) +
+                   sizeof(std::map<std::string, std::string>);
         }
     }
 }

@@ -37,9 +37,7 @@
 #include "ompl/config.h"
 
 #ifndef OMPL_VERSION_VALUE
-#define OMPL_VERSION_VALUE ( OMPL_MAJOR_VERSION * 1000000       \
-                             + OMPL_MINOR_VERSION * 1000        \
-                             + OMPL_PATCH_VERSION)
+#define OMPL_VERSION_VALUE (OMPL_MAJOR_VERSION * 1000000 + OMPL_MINOR_VERSION * 1000 + OMPL_PATCH_VERSION)
 #endif
 
 // This is copied from the latest version.
@@ -87,10 +85,13 @@ using namespace ompl;
 using tools::Benchmark;
 #endif
 
-template<unsigned int PROBLEM>
-std::string problemName() { return ""; }
+template <unsigned int PROBLEM>
+std::string problemName()
+{
+    return "";
+}
 
-template<typename T, unsigned int PROBLEM>
+template <typename T, unsigned int PROBLEM>
 void addPlanner(Benchmark &benchmark, const base::SpaceInformationPtr &si)
 {
     benchmark.addPlanner(std::make_shared<T>(si));
@@ -98,7 +99,7 @@ void addPlanner(Benchmark &benchmark, const base::SpaceInformationPtr &si)
 
 #include "RegressionTestCirclesProblem.inl.h"
 
-template<unsigned int PROBLEM>
+template <unsigned int PROBLEM>
 void addAllPlanners(Benchmark &b, geometric::SimpleSetup &ss)
 {
     // EST
@@ -118,14 +119,14 @@ void addAllPlanners(Benchmark &b, geometric::SimpleSetup &ss)
     // PRM
     addPlanner<geometric::PRM, PROBLEM>(b, ss.getSpaceInformation());
 
-    // PDST
+// PDST
 #if OMPL_VERSION_VALUE >= 13000
     addPlanner<geometric::PDST, PROBLEM>(b, ss.getSpaceInformation());
 #endif
 }
 
 // Setup a problem from the known set of problems included with the regression tests.
-template<unsigned int PROBLEM>
+template <unsigned int PROBLEM>
 std::shared_ptr<geometric::SimpleSetup> setupProblem()
 {
     if (PROBLEM == CIRCLES_ID)
@@ -134,7 +135,7 @@ std::shared_ptr<geometric::SimpleSetup> setupProblem()
     return std::shared_ptr<geometric::SimpleSetup>();
 }
 
-template<unsigned int PROBLEM>
+template <unsigned int PROBLEM>
 void runProblem(double runtime_limit, double memory_limit, int run_count)
 {
     std::shared_ptr<geometric::SimpleSetup> ss = setupProblem<PROBLEM>();

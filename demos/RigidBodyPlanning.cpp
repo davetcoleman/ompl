@@ -58,9 +58,8 @@ bool isStateValid(const ob::State *state)
 
     // check validity of state defined by pos & rot
 
-
     // return a value that is always true but uses the two variables we define, so we avoid compiler warnings
-    return (const void*)rot != (const void*)pos;
+    return (const void *)rot != (const void *)pos;
 }
 
 void plan()
@@ -104,7 +103,6 @@ void plan()
     // perform setup steps for the planner
     planner->setup();
 
-
     // print the settings for this space
     si->printSettings(std::cout);
 
@@ -144,7 +142,10 @@ void planWithSimpleSetup()
     og::SimpleSetup ss(space);
 
     // set state validity checking for this space
-    ss.setStateValidityChecker([](const ob::State *state) { return isStateValid(state); });
+    ss.setStateValidityChecker([](const ob::State *state)
+                               {
+                                   return isStateValid(state);
+                               });
 
     // create a random start state
     ob::ScopedState<> start(space);
@@ -181,7 +182,8 @@ int main(int, char **)
 
     plan();
 
-    std::cout << std::endl << std::endl;
+    std::cout << std::endl
+              << std::endl;
 
     planWithSimpleSetup();
 

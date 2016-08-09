@@ -102,10 +102,16 @@ public:
 
             Environment2D temp = env;
             /* display the solution */
-            for (unsigned int i = 0 ; i < path.getStateCount() ; ++i)
+            for (unsigned int i = 0; i < path.getStateCount(); ++i)
             {
-                int x = (int)path.getState(i)->as<base::CompoundState>()->as<base::RealVectorStateSpace::StateType>(0)->values[0];
-                int y = (int)path.getState(i)->as<base::CompoundState>()->as<base::RealVectorStateSpace::StateType>(1)->values[0];
+                int x = (int)path.getState(i)
+                            ->as<base::CompoundState>()
+                            ->as<base::RealVectorStateSpace::StateType>(0)
+                            ->values[0];
+                int y = (int)path.getState(i)
+                            ->as<base::CompoundState>()
+                            ->as<base::RealVectorStateSpace::StateType>(1)
+                            ->values[0];
                 if (temp.grid[x][y] == T_FREE || temp.grid[x][y] == T_PATH)
                     temp.grid[x][y] = T_PATH;
                 else
@@ -128,7 +134,6 @@ public:
 class PlanTest
 {
 public:
-
     PlanTest()
     {
         verbose = true;
@@ -146,18 +151,18 @@ public:
 
     void runPlanTest(TestPlanner *p, double *success, double *avgruntime, double *avglength)
     {
-        double time   = 0.0;
+        double time = 0.0;
         double length = 0.0;
-        int    good   = 0;
-        int    N      = 100;
+        int good = 0;
+        int N = 100;
 
-        for (int i = 0 ; i < N ; ++i)
+        for (int i = 0; i < N; ++i)
             if (p->execute(env, false, &time, &length))
                 good++;
 
-        *success    = 100.0 * (double)good / (double)N;
+        *success = 100.0 * (double)good / (double)N;
         *avgruntime = time / (double)N;
-        *avglength  = length / (double)N;
+        *avglength = length / (double)N;
 
         if (verbose)
         {
@@ -168,18 +173,17 @@ public:
     }
 
 protected:
-
     Environment2D env;
-    bool          verbose;
+    bool verbose;
 };
 
-BOOST_FIXTURE_TEST_SUITE( MyPlanTestFixture, PlanTest )
+BOOST_FIXTURE_TEST_SUITE(MyPlanTestFixture, PlanTest)
 
 BOOST_AUTO_TEST_CASE(Simple)
 {
-    double success    = 0.0;
+    double success = 0.0;
     double avgruntime = 0.0;
-    double avglength  = 0.0;
+    double avglength = 0.0;
 
     TestPlanner p;
     runPlanTest(&p, &success, &avgruntime, &avglength);

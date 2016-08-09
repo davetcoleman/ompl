@@ -34,7 +34,6 @@
 
 /* Author: Alcides Viamontes Esquivel, Mark Moll */
 
-
 /******************************************************************************
  * How to wrap C++11 std::function objects with boost.python and use them both from
  * C++ and Python.
@@ -90,8 +89,6 @@
  *
  */
 
-
-
 #ifndef PY_BINDINGS_PY_STD_FUNCTION_
 #define PY_BINDINGS_PY_STD_FUNCTION_
 
@@ -114,36 +111,40 @@
 
 #include <iostream>
 
-namespace detail {
-
+namespace detail
+{
     template <typename FT, typename RT, int arity>
     struct pyobject_invoker;
 
     template <typename RT>
-    struct pyobject_invoker<RT(), RT, 0 >
+    struct pyobject_invoker<RT(), RT, 0>
     {
-        pyobject_invoker(boost::python::object o) : callable(o) {}
+        pyobject_invoker(boost::python::object o) : callable(o)
+        {
+        }
 
-        RT operator( )( )
+        RT operator()()
         {
             PyGILState_STATE gstate = PyGILState_Ensure();
-            RT result = boost::python::extract<RT>( callable( ) );
-            PyGILState_Release( gstate );
+            RT result = boost::python::extract<RT>(callable());
+            PyGILState_Release(gstate);
             return result;
         }
 
         boost::python::object callable;
     };
     template <>
-    struct pyobject_invoker<void(), void, 0 >
+    struct pyobject_invoker<void(), void, 0>
     {
-        pyobject_invoker(boost::python::object o) : callable(o) {}
+        pyobject_invoker(boost::python::object o) : callable(o)
+        {
+        }
 
-        void operator( )( )
+        void operator()()
         {
             PyGILState_STATE gstate = PyGILState_Ensure();
-            callable( );
-            PyGILState_Release( gstate );
+            callable();
+            PyGILState_Release(gstate);
         }
 
         boost::python::object callable;
@@ -152,111 +153,123 @@ namespace detail {
     template <typename T, bool isPointer, bool isReference>
     struct wrapType
     {
-        static inline T wrap(T& t) { return t; }
+        static inline T wrap(T &t)
+        {
+            return t;
+        }
     };
 
     template <typename T>
     struct wrapType<T, true, false>
     {
-        static inline boost::python::pointer_wrapper<T> wrap(T t) { return boost::python::ptr(t); }
+        static inline boost::python::pointer_wrapper<T> wrap(T t)
+        {
+            return boost::python::ptr(t);
+        }
     };
     template <typename T, bool B>
     struct wrapHelper
     {
         typedef boost::reference_wrapper<typename boost::remove_reference<T>::type> return_type;
-        static inline return_type wrap(T t) { return boost::ref(t); }
+        static inline return_type wrap(T t)
+        {
+            return boost::ref(t);
+        }
     };
-    template<typename T>
+    template <typename T>
     struct wrapHelper<T, true>
     {
         typedef typename boost::remove_reference<T>::type return_type;
-        static inline return_type wrap(T t) { return t; }
+        static inline return_type wrap(T t)
+        {
+            return t;
+        }
     };
     template <typename T>
     struct wrapType<T, false, true>
     {
-        typedef boost::is_fundamental<typename boost::remove_cv<typename boost::remove_reference<T>::type>::type> isFunType;
+        typedef boost::is_fundamental<typename boost::remove_cv<typename boost::remove_reference<T>::type>::type>
+            isFunType;
 
         static inline typename wrapHelper<T, isFunType::value>::return_type wrap(T t)
         {
             return wrapHelper<T, isFunType::value>::wrap(t);
         }
     };
-#define WRAP_TYPE_ARG(z,n,FT) \
-    BOOST_PP_COMMA_IF(BOOST_PP_DEC(n)) wrapType<\
-        typename boost::function_traits<FT>::arg##n##_type, \
-        boost::is_pointer<typename boost::function_traits<FT>::arg##n##_type>::value, \
-        boost::is_reference<typename boost::function_traits<FT>::arg##n##_type>::value \
-        >::wrap(arg##n)
-#define WRAP_BINARY_TYPE_ARG(z,n,FT) \
+#define WRAP_TYPE_ARG(z, n, FT)                                                                                        \
+    BOOST_PP_COMMA_IF(BOOST_PP_DEC(n))                                                                                 \
+        wrapType<typename boost::function_traits<FT>::arg##n##_type,                                                   \
+                 boost::is_pointer<typename boost::function_traits<FT>::arg##n##_type>::value,                         \
+                 boost::is_reference<typename boost::function_traits<FT>::arg##n##_type>::value>::wrap(arg##n)
+#define WRAP_BINARY_TYPE_ARG(z, n, FT)                                                                                 \
     BOOST_PP_COMMA_IF(BOOST_PP_DEC(n)) typename boost::function_traits<FT>::arg##n##_type arg##n
 
-#define MAKE_PYOBJECT_INVOKER(z, n, data) \
-    template <typename FT, typename RT>                                                           \
-    struct pyobject_invoker<FT,RT,n>                                                              \
-    {                                                                                             \
-        pyobject_invoker(boost::python::object o) : callable(o) {}                                \
-                                                                                                  \
-        RT operator()(BOOST_PP_REPEAT_FROM_TO( 1, BOOST_PP_INC(n), WRAP_BINARY_TYPE_ARG, FT ) )   \
-        {                                                                                         \
-            PyGILState_STATE gstate = PyGILState_Ensure();                                        \
-            RT result = boost::python::extract<RT>(callable(                                      \
-                BOOST_PP_REPEAT_FROM_TO( 1, BOOST_PP_INC(n), WRAP_TYPE_ARG, FT ) ) );             \
-            PyGILState_Release( gstate );                                                         \
-            return result;                                                                        \
-        }                                                                                         \
-                                                                                                  \
-        boost::python::object callable;                                                           \
-    };                                                                                            \
-    template <typename FT>                                                                        \
-    struct pyobject_invoker<FT,void,n>                                                            \
-    {                                                                                             \
-        pyobject_invoker(boost::python::object o) : callable(o) {}                                \
-                                                                                                  \
-        void operator()(BOOST_PP_REPEAT_FROM_TO( 1, BOOST_PP_INC(n), WRAP_BINARY_TYPE_ARG, FT ) ) \
-        {                                                                                         \
-            PyGILState_STATE gstate = PyGILState_Ensure();                                        \
-            callable(BOOST_PP_REPEAT_FROM_TO( 1, BOOST_PP_INC(n), WRAP_TYPE_ARG, FT ) );          \
-            PyGILState_Release( gstate );                                                         \
-        }                                                                                         \
-                                                                                                  \
-        boost::python::object callable;                                                           \
+#define MAKE_PYOBJECT_INVOKER(z, n, data)                                                                              \
+    template <typename FT, typename RT>                                                                                \
+    struct pyobject_invoker<FT, RT, n>                                                                                 \
+    {                                                                                                                  \
+        pyobject_invoker(boost::python::object o) : callable(o)                                                        \
+        {                                                                                                              \
+        }                                                                                                              \
+                                                                                                                       \
+        RT operator()(BOOST_PP_REPEAT_FROM_TO(1, BOOST_PP_INC(n), WRAP_BINARY_TYPE_ARG, FT))                           \
+        {                                                                                                              \
+            PyGILState_STATE gstate = PyGILState_Ensure();                                                             \
+            RT result =                                                                                                \
+                boost::python::extract<RT>(callable(BOOST_PP_REPEAT_FROM_TO(1, BOOST_PP_INC(n), WRAP_TYPE_ARG, FT)));  \
+            PyGILState_Release(gstate);                                                                                \
+            return result;                                                                                             \
+        }                                                                                                              \
+                                                                                                                       \
+        boost::python::object callable;                                                                                \
+    };                                                                                                                 \
+    template <typename FT>                                                                                             \
+    struct pyobject_invoker<FT, void, n>                                                                               \
+    {                                                                                                                  \
+        pyobject_invoker(boost::python::object o) : callable(o)                                                        \
+        {                                                                                                              \
+        }                                                                                                              \
+                                                                                                                       \
+        void operator()(BOOST_PP_REPEAT_FROM_TO(1, BOOST_PP_INC(n), WRAP_BINARY_TYPE_ARG, FT))                         \
+        {                                                                                                              \
+            PyGILState_STATE gstate = PyGILState_Ensure();                                                             \
+            callable(BOOST_PP_REPEAT_FROM_TO(1, BOOST_PP_INC(n), WRAP_TYPE_ARG, FT));                                  \
+            PyGILState_Release(gstate);                                                                                \
+        }                                                                                                              \
+                                                                                                                       \
+        boost::python::object callable;                                                                                \
     };
 
-BOOST_PP_REPEAT_FROM_TO( 1, 6, MAKE_PYOBJECT_INVOKER, nothing );
+    BOOST_PP_REPEAT_FROM_TO(1, 6, MAKE_PYOBJECT_INVOKER, nothing);
 
 #undef MAKE_PYOBJECT_INVOKER
-} // namespace detail
+}  // namespace detail
 
 template <typename FT>
-void def_function(const char* func_name, const char* func_doc)
+void def_function(const char *func_name, const char *func_doc)
 {
-    BOOST_STATIC_ASSERT( boost::function_types::is_function< FT >::value ) ;
+    BOOST_STATIC_ASSERT(boost::function_types::is_function<FT>::value);
     namespace bp = boost::python;
     typedef std::function<FT> function_t;
-    bp::class_< function_t >
-    (func_name, func_doc, bp::no_init)
-        .def("__call__", &function_t::operator() )
-    ;
-} // def_function
+    bp::class_<function_t>(func_name, func_doc, bp::no_init).def("__call__", &function_t::operator());
+}  // def_function
 
-#define PYDECLARE_FUNCTION(FT, func_name)                                                      \
-namespace detail                                                                               \
-{                                                                                              \
-    std::function<FT> func_name(boost::python::object o)                                       \
-    {                                                                                          \
-        return detail::pyobject_invoker<FT, boost::function_traits<FT>::result_type,           \
-            boost::function_traits< FT >::arity>(o);                                           \
-    }                                                                                          \
-}
+#define PYDECLARE_FUNCTION(FT, func_name)                                                                              \
+    namespace detail                                                                                                   \
+    {                                                                                                                  \
+        std::function<FT> func_name(boost::python::object o)                                                           \
+        {                                                                                                              \
+            return detail::pyobject_invoker<FT, boost::function_traits<FT>::result_type,                               \
+                                            boost::function_traits<FT>::arity>(o);                                     \
+        }                                                                                                              \
+    }
 
-#define PYREGISTER_FUNCTION(FT,func_name,func_doc)                                             \
-    BOOST_STATIC_ASSERT( boost::function_types::is_function< FT >::value );                    \
-    boost::python::def(BOOST_PP_STRINGIZE(func_name), &detail::func_name, func_doc);           \
-    def_function<FT>(BOOST_PP_STRINGIZE(func_name##_t), func_doc);                             \
-    boost::python::implicitly_convertible<boost::python::object,                               \
-        detail::pyobject_invoker<FT, boost::function_traits<FT>::result_type,                  \
-            boost::function_traits< FT >::arity> >();
+#define PYREGISTER_FUNCTION(FT, func_name, func_doc)                                                                   \
+    BOOST_STATIC_ASSERT(boost::function_types::is_function<FT>::value);                                                \
+    boost::python::def(BOOST_PP_STRINGIZE(func_name), &detail::func_name, func_doc);                                   \
+    def_function<FT>(BOOST_PP_STRINGIZE(func_name##_t), func_doc);                                                     \
+    boost::python::implicitly_convertible<                                                                             \
+        boost::python::object,                                                                                         \
+        detail::pyobject_invoker<FT, boost::function_traits<FT>::result_type, boost::function_traits<FT>::arity>>();
 
-#endif // PY_BINDINGS_PY_BOOST_FUNCTION_
-
+#endif  // PY_BINDINGS_PY_BOOST_FUNCTION_

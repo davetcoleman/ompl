@@ -34,14 +34,14 @@
 
 /* Author: Ioan Sucan, James D. Marble */
 
-ompl::base::PlannerStatus PRM_wrapper::default_solve(const ompl::base::PlannerTerminationCondition& ptc)
+ompl::base::PlannerStatus PRM_wrapper::default_solve(const ompl::base::PlannerTerminationCondition &ptc)
 {
     using namespace ompl;
 
     checkValidity();
 
-    static const unsigned int MAX_RANDOM_BOUNCE_STEPS   = 5;
-    base::GoalSampleableRegion *goal = dynamic_cast<base::GoalSampleableRegion*>(pdef_->getGoal().get());
+    static const unsigned int MAX_RANDOM_BOUNCE_STEPS = 5;
+    base::GoalSampleableRegion *goal = dynamic_cast<base::GoalSampleableRegion *>(pdef_->getGoal().get());
 
     if (!goal)
     {
@@ -87,7 +87,7 @@ ompl::base::PlannerStatus PRM_wrapper::default_solve(const ompl::base::PlannerTe
     unsigned int nrStartStates = boost::num_vertices(g_);
     OMPL_INFORM("Starting with %u states", nrStartStates);
 
-    std::vector<base::State*> xstates(MAX_RANDOM_BOUNCE_STEPS);
+    std::vector<base::State *> xstates(MAX_RANDOM_BOUNCE_STEPS);
     si_->allocStates(xstates);
     bool grow = true;
 
@@ -110,28 +110,34 @@ ompl::base::PlannerStatus PRM_wrapper::default_solve(const ompl::base::PlannerTe
         // maintain a 2:1 ratio for growing/expansion of roadmap
         // call growRoadmap() twice as long for every call of expandRoadmap()
         if (grow)
-            ompl::geometric::PRM::growRoadmap(base::plannerOrTerminationCondition(ptc, base::timedPlannerTerminationCondition(2.0*roadmap_build_time)), xstates[0]);
+            ompl::geometric::PRM::growRoadmap(
+                base::plannerOrTerminationCondition(ptc,
+                                                    base::timedPlannerTerminationCondition(2.0 * roadmap_build_time)),
+                xstates[0]);
         else
-            ompl::geometric::PRM::expandRoadmap(base::plannerOrTerminationCondition(ptc, base::timedPlannerTerminationCondition(roadmap_build_time)), xstates);
+            ompl::geometric::PRM::expandRoadmap(
+                base::plannerOrTerminationCondition(ptc, base::timedPlannerTerminationCondition(roadmap_build_time)),
+                xstates);
         grow = !grow;
 
         // Check for a solution
-        addedNewSolution_ = maybeConstructSolution (startM_, goalM_, sln);
+        addedNewSolution_ = maybeConstructSolution(startM_, goalM_, sln);
     }
 
     OMPL_INFORM("Created %u states", boost::num_vertices(g_) - nrStartStates);
 
     if (sln)
     {
-        if(addedNewSolution_)
-            pdef_->addSolutionPath (sln);
+        if (addedNewSolution_)
+            pdef_->addSolutionPath(sln);
         else
             // the solution is exact, but not as short as we'd like it to be
-            pdef_->addSolutionPath (sln, true, 0.0);
+            pdef_->addSolutionPath(sln, true, 0.0);
     }
 
     si_->freeStates(xstates);
 
     // Return true if any solution was found.
-    return sln ? (addedNewSolution_ ? base::PlannerStatus::EXACT_SOLUTION : base::PlannerStatus::APPROXIMATE_SOLUTION) : base::PlannerStatus::TIMEOUT;
+    return sln ? (addedNewSolution_ ? base::PlannerStatus::EXACT_SOLUTION : base::PlannerStatus::APPROXIMATE_SOLUTION) :
+                 base::PlannerStatus::TIMEOUT;
 }

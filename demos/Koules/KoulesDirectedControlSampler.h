@@ -52,29 +52,33 @@ public:
     // propagateMax flag indicates that the motion is always extended
     // upto the maximum control duration (rather than a randomly sampled limit
     // between the min and max control duration)
-    KoulesDirectedControlSampler(const ompl::control::SpaceInformation *si,
-        const ompl::base::GoalPtr &goal, bool propagateMax)
-        : DirectedControlSampler(si), cs_(si->getControlSpace().get()),
-        goal_(goal), statePropagator_(si->getStatePropagator()),
-        propagateMax_(propagateMax)
+    KoulesDirectedControlSampler(const ompl::control::SpaceInformation *si, const ompl::base::GoalPtr &goal,
+                                 bool propagateMax)
+      : DirectedControlSampler(si)
+      , cs_(si->getControlSpace().get())
+      , goal_(goal)
+      , statePropagator_(si->getStatePropagator())
+      , propagateMax_(propagateMax)
     {
     }
     // This sampleTo implementation contains a modified version of the method
     // ompl::control::SpaceInformation::propagateWhileValid, with the key difference
     // that sampleTo also terminates when the goal is reached.
-    virtual unsigned int sampleTo(ompl::control::Control *control, const ompl::base::State *source, ompl::base::State *dest);
+    virtual unsigned int sampleTo(ompl::control::Control *control, const ompl::base::State *source,
+                                  ompl::base::State *dest);
 
     virtual unsigned int sampleTo(ompl::control::Control *control, const ompl::control::Control * /* previous */,
-        const ompl::base::State *source, ompl::base::State *dest)
+                                  const ompl::base::State *source, ompl::base::State *dest)
     {
         return sampleTo(control, source, dest);
     }
+
 protected:
-    KoulesControlSampler                     cs_;
-    ompl::RNG                                rng_;
-    const ompl::base::GoalPtr                goal_;
-    const ompl::control::StatePropagatorPtr  statePropagator_;
-    bool                                     propagateMax_;
+    KoulesControlSampler cs_;
+    ompl::RNG rng_;
+    const ompl::base::GoalPtr goal_;
+    const ompl::control::StatePropagatorPtr statePropagator_;
+    bool propagateMax_;
 };
 
 #endif
