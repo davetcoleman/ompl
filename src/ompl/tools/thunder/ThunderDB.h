@@ -46,6 +46,7 @@
 #include <ompl/base/SpaceInformation.h>
 #include <ompl/datastructures/NearestNeighbors.h>
 #include <ompl/tools/thunder/SPARSdb.h>
+#include <ompl/tools/debug/Visualizer.h>
 
 namespace ompl
 {
@@ -73,7 +74,7 @@ namespace ompl
             /** \brief Constructor needs the state space used for planning.
              *  \param space - state space
              */
-            ThunderDB(const base::StateSpacePtr &space);
+            ThunderDB(const base::StateSpacePtr &space, VisualizerPtr visual);
 
             /** \brief Deconstructor */
             virtual ~ThunderDB();
@@ -158,6 +159,9 @@ namespace ompl
         protected:
             /// The created space information
             base::SpaceInformationPtr si_;  // TODO: is this even necessary?
+
+            /** \brief Class for managing various visualization features */
+            VisualizerPtr visual_;
 
             /// Helper class for storing each plannerData instance
             ompl::base::PlannerDataStorage plannerDataStorage_;

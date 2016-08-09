@@ -42,6 +42,7 @@
 #include "ompl/geometric/PathSimplifier.h"
 #include "ompl/util/Time.h"
 #include "ompl/util/Hash.h"
+#include "ompl/tools/debug/Visualizer.h"
 
 #include <boost/range/adaptor/map.hpp>
 #include <unordered_map>
@@ -59,6 +60,13 @@ namespace ompl
 {
     namespace geometric
     {
+        /// @cond IGNORE
+        OMPL_CLASS_FORWARD(SPARStwo);
+        /// @endcond
+
+        /** \class ompl::geometric::SPARStwoPtr
+            \brief A shared pointer wrapper for ompl::geometric::SPARStwo */
+
         /**
            @anchor gSPARStwo
            @par Short description
@@ -284,6 +292,9 @@ namespace ompl
                 return stretchFactor_;
             }
 
+            /** \brief Output debug info about the graph */
+            void copyPasteState(std::size_t numSets) const;
+
             /** \brief While the termination condition permits, construct the spanner graph */
             void constructRoadmap(const base::PlannerTerminationCondition &ptc);
 
@@ -337,6 +348,12 @@ namespace ompl
                 return boost::num_vertices(g_);
             }
 
+            /** \brief Get the number of edges in the sparse roadmap. */
+            unsigned int getNumEdges() const
+            {
+                return boost::num_edges(g_);
+            }
+
             void getPlannerData(base::PlannerData &data) const override;
 
             /** \brief Print debug information about planner */
@@ -353,9 +370,23 @@ namespace ompl
                 return boost::lexical_cast<std::string>(bestCost_);
             }
 
+            /** \brief Get class for managing various visualization features */
+            ompl::tools::VisualizerPtr getVisual()
+            {
+                return visual_;
+            }
+
+            /** \brief Set class for managing various visualization features */
+            void setVisual(ompl::tools::VisualizerPtr visual)
+            {
+                visual_ = visual;
+            }
+
         protected:
             /** \brief Free all the memory allocated by the planner */
             void freeMemory();
+
+            void showFailureProgress();
 
             /** \brief Check that the query vertex is initialized (used for internal nearest neighbor searches) */
             void checkQueryStateInitialization();
@@ -515,6 +546,8 @@ namespace ompl
 
             /** \brief A counter for the number of consecutive failed iterations of the algorithm */
             unsigned int consecutiveFailures_;
+            unsigned int maxConsecutiveFailures_;
+            unsigned int maxPercentComplete_;
 
             /** \brief Maximum visibility range for nodes in the graph */
             double sparseDelta_;
@@ -538,6 +571,10 @@ namespace ompl
             long unsigned int iterations_;
             /** \brief Best cost found so far by algorithm */
             base::Cost bestCost_;
+
+            /** \brief Class for managing various visualization features */
+            ompl::tools::VisualizerPtr visual_;
+            time::point timeDiscretizeAndRandomStarted_;
         };
     }
 }
