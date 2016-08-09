@@ -41,38 +41,35 @@
 
 namespace ompl
 {
+namespace geometric
+{
+/**
+   @anchor gLazyPRMstar
+   Run LazyPRM with the "star strategy". Instead of setting the
+   value "k" for how many neighbors to connect, automatically
+   compute it based on the coverage of the space, guaranteeing
+   optimality of solutions.
+   @par Short description
+   @par External documentation
+   R. Bohlin and L.E. Kavraki
+   Path Planning Using Lazy PRM
+   <em>IEEE International Conference on Robotics and Automation</em>, San Francisco, pp. 521–528, 2000.
+   DOI: [10.1109/ROBOT.2000.844107](http://dx.doi.org/10.1109/ROBOT.2000.844107)<br>
+   S. Karaman and E. Frazzoli, Sampling-based
+   Algorithms for Optimal Motion Planning, International Journal of Robotics
+   Research, vol. 30, no.7, pp. 846-894, 2011.
+   DOI: [10.1177/0278364911406761](http://dx.doi.org/10.1177/0278364911406761)<br>
+   [[more]](http://www.kavrakilab.org/robotics/lazyprm.html)
+*/
 
-    namespace geometric
-    {
-
-        /**
-           @anchor gLazyPRMstar
-           Run LazyPRM with the "star strategy". Instead of setting the
-           value "k" for how many neighbors to connect, automatically
-           compute it based on the coverage of the space, guaranteeing
-           optimality of solutions.
-           @par Short description
-           @par External documentation
-           R. Bohlin and L.E. Kavraki
-           Path Planning Using Lazy PRM
-           <em>IEEE International Conference on Robotics and Automation</em>, San Francisco, pp. 521–528, 2000.
-           DOI: [10.1109/ROBOT.2000.844107](http://dx.doi.org/10.1109/ROBOT.2000.844107)<br>
-           S. Karaman and E. Frazzoli, Sampling-based
-           Algorithms for Optimal Motion Planning, International Journal of Robotics
-           Research, vol. 30, no.7, pp. 846-894, 2011.
-           DOI: [10.1177/0278364911406761](http://dx.doi.org/10.1177/0278364911406761)<br>
-           [[more]](http://www.kavrakilab.org/robotics/lazyprm.html)
-        */
-
-        /** \brief PRM* planner */
-        class LazyPRMstar : public LazyPRM
-        {
-        public:
-
-            /** \brief Constructor */
-            LazyPRMstar(const base::SpaceInformationPtr &si);
-        };
-    }
+/** \brief PRM* planner */
+class LazyPRMstar : public LazyPRM
+{
+public:
+  /** \brief Constructor */
+  LazyPRMstar(const base::SpaceInformationPtr &si);
+};
+}
 }
 
 #endif

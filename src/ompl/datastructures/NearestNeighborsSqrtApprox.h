@@ -43,96 +43,93 @@
 
 namespace ompl
 {
-    /** \brief A nearest neighbors datastructure that uses linear
-        search. The linear search is done over sqrt(n) elements
-        only. (Every sqrt(n) elements are skipped).
+/** \brief A nearest neighbors datastructure that uses linear
+    search. The linear search is done over sqrt(n) elements
+    only. (Every sqrt(n) elements are skipped).
 
-        \li Search for nearest neighbor is O(sqrt(n)).
-        \li Search for k-nearest neighbors is  O(n log(k)).
-        \li Search for neighbors within a range is O(n log(n)).
-        \li Adding an element to the datastructure is O(1).
-        \li Removing an element from the datastructure O(n).
-    */
-    template<typename _T>
-    class NearestNeighborsSqrtApprox : public NearestNeighborsLinear<_T>
+    \li Search for nearest neighbor is O(sqrt(n)).
+    \li Search for k-nearest neighbors is  O(n log(k)).
+    \li Search for neighbors within a range is O(n log(n)).
+    \li Adding an element to the datastructure is O(1).
+    \li Removing an element from the datastructure O(n).
+*/
+template <typename _T>
+class NearestNeighborsSqrtApprox : public NearestNeighborsLinear<_T>
+{
+public:
+  NearestNeighborsSqrtApprox() : NearestNeighborsLinear<_T>(), checks_(0), offset_(0)
+  {
+  }
+
+  ~NearestNeighborsSqrtApprox() override = default;
+
+  void clear() override
+  {
+    NearestNeighborsLinear<_T>::clear();
+    checks_ = 0;
+    offset_ = 0;
+  }
+
+  void add(const _T &data) override
+  {
+    NearestNeighborsLinear<_T>::add(data);
+    updateCheckCount();
+  }
+
+  void add(const std::vector<_T> &data) override
+  {
+    NearestNeighborsLinear<_T>::add(data);
+    updateCheckCount();
+  }
+
+  bool remove(const _T &data) override
+  {
+    bool result = NearestNeighborsLinear<_T>::remove(data);
+    if (result)
+      updateCheckCount();
+    return result;
+  }
+
+  _T nearest(const _T &data) const override
+  {
+    const std::size_t n = NearestNeighborsLinear<_T>::data_.size();
+    std::size_t pos = n;
+
+    if (checks_ > 0 && n > 0)
     {
-    public:
-        NearestNeighborsSqrtApprox() : NearestNeighborsLinear<_T>(), checks_(0), offset_(0)
+      double dmin = 0.0;
+      for (std::size_t j = 0; j < checks_; ++j)
+      {
+        std::size_t i = (j * checks_ + offset_) % n;
+
+        double distance = NearestNeighbors<_T>::distFun_(NearestNeighborsLinear<_T>::data_[i], data);
+        if (pos == n || dmin > distance)
         {
+          pos = i;
+          dmin = distance;
         }
+      }
+      offset_ = (offset_ + 1) % checks_;
+    }
+    if (pos != n)
+      return NearestNeighborsLinear<_T>::data_[pos];
 
-        ~NearestNeighborsSqrtApprox() override = default;
+    throw Exception("No elements found in nearest neighbors data structure");
+  }
 
-        void clear() override
-        {
-            NearestNeighborsLinear<_T>::clear();
-            checks_ = 0;
-            offset_ = 0;
-        }
+protected:
+  /** \brief The maximum number of checks to perform when searching for a nearest neighbor */
+  inline void updateCheckCount()
+  {
+    checks_ = 1 + (std::size_t)floor(sqrt((double)NearestNeighborsLinear<_T>::data_.size()));
+  }
 
-        void add(const _T &data) override
-        {
-            NearestNeighborsLinear<_T>::add(data);
-            updateCheckCount();
-        }
+  /** \brief The number of checks to be performed when looking for a nearest neighbor */
+  std::size_t checks_;
 
-        void add(const std::vector<_T> &data) override
-        {
-            NearestNeighborsLinear<_T>::add(data);
-            updateCheckCount();
-        }
-
-        bool remove(const _T &data) override
-        {
-            bool result = NearestNeighborsLinear<_T>::remove(data);
-            if (result)
-                updateCheckCount();
-            return result;
-        }
-
-        _T nearest(const _T &data) const override
-        {
-            const std::size_t n = NearestNeighborsLinear<_T>::data_.size();
-            std::size_t pos = n;
-
-            if (checks_ > 0 && n > 0)
-            {
-                double dmin = 0.0;
-                for (std::size_t j = 0 ; j < checks_ ; ++j)
-                {
-                    std::size_t i = (j * checks_ + offset_) % n;
-
-                    double distance = NearestNeighbors<_T>::distFun_(NearestNeighborsLinear<_T>::data_[i], data);
-                    if (pos == n || dmin > distance)
-                    {
-                        pos = i;
-                        dmin = distance;
-                    }
-                }
-                offset_ = (offset_ + 1) % checks_;
-            }
-            if (pos != n)
-                return NearestNeighborsLinear<_T>::data_[pos];
-
-            throw Exception("No elements found in nearest neighbors data structure");
-        }
-
-    protected:
-
-        /** \brief The maximum number of checks to perform when searching for a nearest neighbor */
-        inline void updateCheckCount()
-        {
-            checks_ = 1 + (std::size_t)floor(sqrt((double)NearestNeighborsLinear<_T>::data_.size()));
-        }
-
-        /** \brief The number of checks to be performed when looking for a nearest neighbor */
-        std::size_t         checks_;
-
-        /** \brief The offset to start checking at (between 0 and \e checks_) */
-        mutable std::size_t offset_;
-
-    };
-
+  /** \brief The offset to start checking at (between 0 and \e checks_) */
+  mutable std::size_t offset_;
+};
 }
 
 #endif

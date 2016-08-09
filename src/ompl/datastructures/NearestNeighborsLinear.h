@@ -43,140 +43,133 @@
 
 namespace ompl
 {
+/** \brief A nearest neighbors datastructure that uses linear
+    search.
 
-    /** \brief A nearest neighbors datastructure that uses linear
-        search.
+    \li Search for nearest neighbor is O(n).
+    \li Search for k-nearest neighbors is  O(n log(k)).
+    \li Search for neighbors within a range is O(n log(n)).
+    \li Adding an element to the datastructure is O(1).
+    \li Removing an element from the datastructure O(n).
+*/
+template <typename _T>
+class NearestNeighborsLinear : public NearestNeighbors<_T>
+{
+public:
+  NearestNeighborsLinear() : NearestNeighbors<_T>()
+  {
+  }
 
-        \li Search for nearest neighbor is O(n).
-        \li Search for k-nearest neighbors is  O(n log(k)).
-        \li Search for neighbors within a range is O(n log(n)).
-        \li Adding an element to the datastructure is O(1).
-        \li Removing an element from the datastructure O(n).
-    */
-    template<typename _T>
-    class NearestNeighborsLinear : public NearestNeighbors<_T>
+  ~NearestNeighborsLinear() override = default;
+
+  void clear() override
+  {
+    data_.clear();
+  }
+
+  bool reportsSortedResults() const override
+  {
+    return true;
+  }
+
+  void add(const _T &data) override
+  {
+    data_.push_back(data);
+  }
+
+  void add(const std::vector<_T> &data) override
+  {
+    data_.reserve(data_.size() + data.size());
+    data_.insert(data_.end(), data.begin(), data.end());
+  }
+
+  bool remove(const _T &data) override
+  {
+    if (!data_.empty())
+      for (int i = data_.size() - 1; i >= 0; --i)
+        if (data_[i] == data)
+        {
+          data_.erase(data_.begin() + i);
+          return true;
+        }
+    return false;
+  }
+
+  _T nearest(const _T &data) const override
+  {
+    const std::size_t sz = data_.size();
+    std::size_t pos = sz;
+    double dmin = 0.0;
+    for (std::size_t i = 0; i < sz; ++i)
     {
-    public:
-        NearestNeighborsLinear() : NearestNeighbors<_T>()
-        {
-        }
+      double distance = NearestNeighbors<_T>::distFun_(data_[i], data);
+      if (pos == sz || dmin > distance)
+      {
+        pos = i;
+        dmin = distance;
+      }
+    }
+    if (pos != sz)
+      return data_[pos];
 
-        ~NearestNeighborsLinear() override = default;
+    throw Exception("No elements found in nearest neighbors data structure");
+  }
 
-        void clear() override
-        {
-            data_.clear();
-        }
+  /// Return the k nearest neighbors in sorted order
+  void nearestK(const _T &data, std::size_t k, std::vector<_T> &nbh) const override
+  {
+    nbh = data_;
+    if (nbh.size() > k)
+    {
+      std::partial_sort(nbh.begin(), nbh.begin() + k, nbh.end(), ElemSort(data, NearestNeighbors<_T>::distFun_));
+      nbh.resize(k);
+    }
+    else
+    {
+      std::sort(nbh.begin(), nbh.end(), ElemSort(data, NearestNeighbors<_T>::distFun_));
+    }
+  }
 
-        bool reportsSortedResults() const override
-        {
-            return true;
-        }
+  /// Return the nearest neighbors within distance \c radius in sorted order
+  void nearestR(const _T &data, double radius, std::vector<_T> &nbh) const override
+  {
+    nbh.clear();
+    for (std::size_t i = 0; i < data_.size(); ++i)
+      if (NearestNeighbors<_T>::distFun_(data_[i], data) <= radius)
+        nbh.push_back(data_[i]);
+    std::sort(nbh.begin(), nbh.end(), ElemSort(data, NearestNeighbors<_T>::distFun_));
+  }
 
-        void add(const _T &data) override
-        {
-            data_.push_back(data);
-        }
+  std::size_t size() const override
+  {
+    return data_.size();
+  }
 
-        void add(const std::vector<_T> &data) override
-        {
-            data_.reserve(data_.size() + data.size());
-            data_.insert(data_.end(), data.begin(), data.end());
-        }
+  void list(std::vector<_T> &data) const override
+  {
+    data = data_;
+  }
 
-        bool remove(const _T &data) override
-        {
-            if (!data_.empty())
-                for (int i = data_.size() - 1 ; i >= 0 ; --i)
-                    if (data_[i] == data)
-                    {
-                        data_.erase(data_.begin() + i);
-                        return true;
-                    }
-            return false;
-        }
+protected:
+  /** \brief The data elements stored in this structure */
+  std::vector<_T> data_;
 
-        _T nearest(const _T &data) const override
-        {
-            const std::size_t sz = data_.size();
-            std::size_t pos = sz;
-            double dmin = 0.0;
-            for (std::size_t i = 0 ; i < sz ; ++i)
-            {
-                double distance = NearestNeighbors<_T>::distFun_(data_[i], data);
-                if (pos == sz || dmin > distance)
-                {
-                    pos = i;
-                    dmin = distance;
-                }
-            }
-            if (pos != sz)
-                return data_[pos];
+private:
+  struct ElemSort
+  {
+    ElemSort(const _T &e, const typename NearestNeighbors<_T>::DistanceFunction &df) : e_(e), df_(df)
+    {
+    }
 
-            throw Exception("No elements found in nearest neighbors data structure");
-        }
+    bool operator()(const _T &a, const _T &b) const
+    {
+      return df_(a, e_) < df_(b, e_);
+    }
 
-        /// Return the k nearest neighbors in sorted order
-        void nearestK(const _T &data, std::size_t k, std::vector<_T> &nbh) const override
-        {
-            nbh = data_;
-            if (nbh.size() > k)
-            {
-                std::partial_sort(nbh.begin(), nbh.begin() + k, nbh.end(),
-                                  ElemSort(data, NearestNeighbors<_T>::distFun_));
-                nbh.resize(k);
-            }
-            else
-            {
-                std::sort(nbh.begin(), nbh.end(), ElemSort(data, NearestNeighbors<_T>::distFun_));
-            }
-        }
-
-        /// Return the nearest neighbors within distance \c radius in sorted order
-        void nearestR(const _T &data, double radius, std::vector<_T> &nbh) const override
-        {
-            nbh.clear();
-            for (std::size_t i = 0 ; i < data_.size() ; ++i)
-                if (NearestNeighbors<_T>::distFun_(data_[i], data) <= radius)
-                    nbh.push_back(data_[i]);
-            std::sort(nbh.begin(), nbh.end(), ElemSort(data, NearestNeighbors<_T>::distFun_));
-        }
-
-        std::size_t size() const override
-        {
-            return data_.size();
-        }
-
-        void list(std::vector<_T> &data) const override
-        {
-            data = data_;
-        }
-
-    protected:
-
-        /** \brief The data elements stored in this structure */
-        std::vector<_T>   data_;
-
-    private:
-
-        struct ElemSort
-        {
-            ElemSort(const _T &e, const typename NearestNeighbors<_T>::DistanceFunction &df) : e_(e), df_(df)
-            {
-            }
-
-            bool operator()(const _T &a, const _T &b) const
-            {
-                return df_(a, e_) < df_(b, e_);
-            }
-
-            const _T                                              &e_;
-            const typename NearestNeighbors<_T>::DistanceFunction &df_;
-        };
-
-    };
-
-
+    const _T &e_;
+    const typename NearestNeighbors<_T>::DistanceFunction &df_;
+  };
+};
 }
 
 #endif

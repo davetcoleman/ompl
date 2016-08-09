@@ -44,157 +44,153 @@
 
 namespace ompl
 {
-    namespace tools
-    {
-        OMPL_CLASS_FORWARD(LightningDB);
-    }
+namespace tools
+{
+OMPL_CLASS_FORWARD(LightningDB);
+}
 
-    namespace geometric
-    {
+namespace geometric
+{
+/// @cond IGNORE
+/** \brief Forward declaration of ompl::base::LightningRetrieveRepair */
+OMPL_CLASS_FORWARD(LightningRetrieveRepair);
+/// @endcond
 
-        /// @cond IGNORE
-        /** \brief Forward declaration of ompl::base::LightningRetrieveRepair */
-        OMPL_CLASS_FORWARD(LightningRetrieveRepair);
-        /// @endcond
+/** \class ompl::base::LightningRetrieveRepairPtr
+    \brief A shared pointer wrapper for ompl::base::LightningRetrieveRepair */
 
-        /** \class ompl::base::LightningRetrieveRepairPtr
-            \brief A shared pointer wrapper for ompl::base::LightningRetrieveRepair */
+/**
+   @anchor LightningRetrieveRepair - Lightning Retrieve and Repair
+   @par Short description
+   LightningRetrieveRepair is an experienced-based motion planner
+   that recalls from a database of previous actions the most similar
+   one to the current planning problem and attempts to repair it.
+   @par External documentation
+   Berenson, Dmitry, Pieter Abbeel, and Ken Goldberg: A robot path
+   planning framework that learns from experience, in _IEEE Intl.
+   Conf. Robotics and Automation (ICRA)_, 2012.
+   [[PDF]](http://users.wpi.edu/~dberenson/lightning.pdf)
+*/
 
-        /**
-           @anchor LightningRetrieveRepair - Lightning Retrieve and Repair
-           @par Short description
-           LightningRetrieveRepair is an experienced-based motion planner
-           that recalls from a database of previous actions the most similar
-           one to the current planning problem and attempts to repair it.
-           @par External documentation
-           Berenson, Dmitry, Pieter Abbeel, and Ken Goldberg: A robot path
-           planning framework that learns from experience, in _IEEE Intl.
-           Conf. Robotics and Automation (ICRA)_, 2012.
-           [[PDF]](http://users.wpi.edu/~dberenson/lightning.pdf)
-        */
+/** \brief The Lightning Framework's Retrieve-Repair component */
+class LightningRetrieveRepair : public base::Planner
+{
+public:
+  /** \brief Constructor */
+  LightningRetrieveRepair(const base::SpaceInformationPtr &si, tools::LightningDBPtr experienceDB);
 
-        /** \brief The Lightning Framework's Retrieve-Repair component */
-        class LightningRetrieveRepair : public base::Planner
-        {
-        public:
+  ~LightningRetrieveRepair() override;
 
-            /** \brief Constructor */
-            LightningRetrieveRepair(const base::SpaceInformationPtr &si, tools::LightningDBPtr experienceDB);
+  /** \brief Get information about the exploration data structure the planning from scratch motion planner used. */
+  void getPlannerData(base::PlannerData &data) const override;
 
-            ~LightningRetrieveRepair() override;
+  /**
+   *  \brief Get debug information about the top recalled paths that were chosen for further filtering
+   *  \return data - vector of PlannerData objects that each hold a single path
+   */
+  const std::vector<base::PlannerDataPtr> &getLastRecalledNearestPaths() const;
 
-            /** \brief Get information about the exploration data structure the planning from scratch motion planner used. */
-            void getPlannerData(base::PlannerData &data) const override;
+  /**
+   *  \brief Get debug information about the top recalled paths that were chosen for further filtering
+   *  \return chosenID - the index of the PlannerData object that was chosen for repair
+   */
+  std::size_t getLastRecalledNearestPathChosen() const;
 
-            /**
-             *  \brief Get debug information about the top recalled paths that were chosen for further filtering
-             *  \return data - vector of PlannerData objects that each hold a single path
-             */
-            const std::vector<base::PlannerDataPtr>& getLastRecalledNearestPaths() const;
+  /**
+   * \brief Get the chosen path used from database for repair
+   * \return PlannerData of chosen path
+   */
+  base::PlannerDataPtr getChosenRecallPath() const;
 
-            /**
-             *  \brief Get debug information about the top recalled paths that were chosen for further filtering
-             *  \return chosenID - the index of the PlannerData object that was chosen for repair
-             */
-            std::size_t getLastRecalledNearestPathChosen() const;
+  /** \brief Get information about the exploration data structure the repair motion planner used each call. */
+  void getRepairPlannerDatas(std::vector<base::PlannerDataPtr> &data) const;
 
-            /**
-             * \brief Get the chosen path used from database for repair
-             * \return PlannerData of chosen path
-             */
-            base::PlannerDataPtr getChosenRecallPath() const;
+  base::PlannerStatus solve(const base::PlannerTerminationCondition &ptc) override;
 
-            /** \brief Get information about the exploration data structure the repair motion planner used each call. */
-            void getRepairPlannerDatas(std::vector<base::PlannerDataPtr> &data) const;
+  void clear() override;
 
-            base::PlannerStatus solve(const base::PlannerTerminationCondition &ptc) override;
+  /** \brief Pass a pointer of the database from the lightning framework */
+  void setLightningDB(const tools::LightningDBPtr &experienceDB);
 
-            void clear() override;
+  /** \brief Set the planner that will be used for repairing invalid paths recalled from experience */
+  void setRepairPlanner(const base::PlannerPtr &planner);
 
-            /** \brief Pass a pointer of the database from the lightning framework */
-            void setLightningDB(const tools::LightningDBPtr &experienceDB);
+  void setup() override;
 
-            /** \brief Set the planner that will be used for repairing invalid paths recalled from experience */
-            void setRepairPlanner(const base::PlannerPtr &planner);
+  /**
+   * \brief Repairs a path to be valid in the current planning environment
+   * \param path - old from experience
+   * \param ptc - when to stop attempting repair
+   * \return true if no error
+   */
+  bool repairPath(const base::PlannerTerminationCondition &ptc, geometric::PathGeometric &path);
 
-            void setup() override;
+  /**
+   * \brief Use our secondary planner to find a valid path between start and goal, and return that path
+   * \param start
+   * \param goal
+   * \param newPathSegment - the solution
+   * \return true if path found
+   */
+  bool replan(const base::State *start, const base::State *goal, geometric::PathGeometric &newPathSegment,
+              const base::PlannerTerminationCondition &ptc);
 
-            /**
-             * \brief Repairs a path to be valid in the current planning environment
-             * \param path - old from experience
-             * \param ptc - when to stop attempting repair
-             * \return true if no error
-             */
-            bool repairPath(const base::PlannerTerminationCondition &ptc, geometric::PathGeometric &path);
+  /**
+   * \brief Getter for number of 'k' close solutions to choose from database for further filtering
+   */
+  int getNumNearestSolutions() const
+  {
+    return nearestK_;
+  }
 
-            /**
-             * \brief Use our secondary planner to find a valid path between start and goal, and return that path
-             * \param start
-             * \param goal
-             * \param newPathSegment - the solution
-             * \return true if path found
-             */
-            bool replan(const base::State *start, const base::State *goal, geometric::PathGeometric &newPathSegment,
-                        const base::PlannerTerminationCondition &ptc);
+  /**
+   * \brief Setter for number of 'k' close solutions to choose from database for further filtering
+   */
+  void setNumNearestSolutions(int nearestK)
+  {
+    nearestK_ = nearestK;
+  }
 
-            /**
-             * \brief Getter for number of 'k' close solutions to choose from database for further filtering
-             */
-            int getNumNearestSolutions() const
-            {
-              return nearestK_;
-            }
+protected:
+  /**
+   * \brief Count the number of states along the discretized path that are in collision
+   *        Note: This is kind of an ill-defined score though. It depends on the resolution of collision checking.
+   *        I am more inclined to try to compute the percent of the length of the motion that is valid.
+   *        That could go in SpaceInformation, as a utility function.
+   */
+  std::size_t checkMotionScore(const base::State *s1, const base::State *s2) const;
 
-            /**
-             * \brief Setter for number of 'k' close solutions to choose from database for further filtering
-             */
-            void setNumNearestSolutions(int nearestK)
-            {
-              nearestK_ = nearestK;
-            }
+  /**
+   * \brief Filters the top n paths in nearestPaths_ to the top 1, based on state validity with current environment
+   * \return true if no error
+   */
+  bool findBestPath(const base::State *startState, const base::State *goalState, base::PlannerDataPtr &chosenPath);
 
-        protected:
+  /** \brief The database of motions to search through */
+  tools::LightningDBPtr experienceDB_;
 
-            /**
-             * \brief Count the number of states along the discretized path that are in collision
-             *        Note: This is kind of an ill-defined score though. It depends on the resolution of collision checking.
-             *        I am more inclined to try to compute the percent of the length of the motion that is valid.
-             *        That could go in SpaceInformation, as a utility function.
-             */
-            std::size_t checkMotionScore(const base::State *s1, const base::State *s2) const;
+  /** \brief Recall the nearest paths and store this in planner data for introspection later */
+  std::vector<base::PlannerDataPtr> nearestPaths_;
 
-            /**
-             * \brief Filters the top n paths in nearestPaths_ to the top 1, based on state validity with current environment
-             * \return true if no error
-             */
-            bool findBestPath(const base::State *startState, const base::State *goalState, base::PlannerDataPtr& chosenPath);
+  /** \brief the ID within nearestPaths_ of the path that was chosen for repair */
+  std::size_t nearestPathsChosenID_;
 
-            /** \brief The database of motions to search through */
-            tools::LightningDBPtr                            experienceDB_;
+  /** \brief A secondary planner for replanning */
+  base::PlannerPtr repairPlanner_;
 
-            /** \brief Recall the nearest paths and store this in planner data for introspection later */
-            std::vector<base::PlannerDataPtr>                nearestPaths_;
+  /** \brief A secondary problem definition for the repair planner to use */
+  base::ProblemDefinitionPtr repairProblemDef_;
 
-            /** \brief the ID within nearestPaths_ of the path that was chosen for repair */
-            std::size_t                                      nearestPathsChosenID_;
+  /** \brief Debug the repair planner by saving its planner data each time it is used */
+  std::vector<base::PlannerDataPtr> repairPlannerDatas_;
 
-            /** \brief A secondary planner for replanning */
-            base::PlannerPtr                                 repairPlanner_;
+  /** \brief The instance of the path simplifier */
+  geometric::PathSimplifierPtr psk_;
 
-            /** \brief A secondary problem definition for the repair planner to use */
-            base::ProblemDefinitionPtr                       repairProblemDef_;
-
-            /** \brief Debug the repair planner by saving its planner data each time it is used */
-            std::vector<base::PlannerDataPtr>                repairPlannerDatas_;
-
-            /** \brief The instance of the path simplifier */
-            geometric::PathSimplifierPtr                     psk_;
-
-            /** \brief Number of 'k' close solutions to choose from database for further filtering */
-            int                                              nearestK_;
-        };
-
-    }
+  /** \brief Number of 'k' close solutions to choose from database for further filtering */
+  int nearestK_;
+};
+}
 }
 
 #endif

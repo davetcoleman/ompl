@@ -48,43 +48,46 @@
 
 double ompl::nBallMeasure(unsigned int N, double r)
 {
-    return std::pow(std::sqrt(boost::math::constants::pi<double>()) * r, static_cast<double>(N)) / std::tgamma(static_cast<double>(N)/2.0 + 1.0);
+  return std::pow(std::sqrt(boost::math::constants::pi<double>()) * r, static_cast<double>(N)) /
+         std::tgamma(static_cast<double>(N) / 2.0 + 1.0);
 }
 
 double ompl::unitNBallMeasure(unsigned int N)
 {
-    // This is the radius version with r removed (as it is 1) for efficiency
-    return std::pow(std::sqrt(boost::math::constants::pi<double>()), static_cast<double>(N)) / std::tgamma(static_cast<double>(N)/2.0 + 1.0);
+  // This is the radius version with r removed (as it is 1) for efficiency
+  return std::pow(std::sqrt(boost::math::constants::pi<double>()), static_cast<double>(N)) /
+         std::tgamma(static_cast<double>(N) / 2.0 + 1.0);
 }
 
 double ompl::prolateHyperspheroidMeasure(unsigned int N, double dFoci, double dTransverse)
 {
-    // Sanity check input
-    if (dTransverse < dFoci)
-    {
-        throw Exception("Transverse diameter cannot be less than the minimum transverse diameter.");
-    }
+  // Sanity check input
+  if (dTransverse < dFoci)
+  {
+    throw Exception("Transverse diameter cannot be less than the minimum transverse diameter.");
+  }
 
-    // Variable
-    // The conjugate diameter:
-    double conjugateDiameter;
-    // The Lebesgue measure return value
-    double lmeas;
+  // Variable
+  // The conjugate diameter:
+  double conjugateDiameter;
+  // The Lebesgue measure return value
+  double lmeas;
 
-    // Calculate the conjugate diameter:
-    conjugateDiameter = std::sqrt(dTransverse * dTransverse - dFoci * dFoci);
+  // Calculate the conjugate diameter:
+  conjugateDiameter = std::sqrt(dTransverse * dTransverse - dFoci * dFoci);
 
-    // Calculate the volume
-    // First multiply together the radii, noting that the first radius is the transverse diameter/2.0, and the other N-1 are the conjugate diameter/2.0
-    lmeas = dTransverse/2.0;
-    for (unsigned int i = 1u; i < N; ++i)
-    {
-        lmeas = lmeas * conjugateDiameter/2.0;
-    }
+  // Calculate the volume
+  // First multiply together the radii, noting that the first radius is the transverse diameter/2.0, and the other N-1
+  // are the conjugate diameter/2.0
+  lmeas = dTransverse / 2.0;
+  for (unsigned int i = 1u; i < N; ++i)
+  {
+    lmeas = lmeas * conjugateDiameter / 2.0;
+  }
 
-    // Then multiply by the volume of the unit n-ball.
-    lmeas = lmeas * unitNBallMeasure(N);
+  // Then multiply by the volume of the unit n-ball.
+  lmeas = lmeas * unitNBallMeasure(N);
 
-    // Finally return:
-    return lmeas;
+  // Finally return:
+  return lmeas;
 }

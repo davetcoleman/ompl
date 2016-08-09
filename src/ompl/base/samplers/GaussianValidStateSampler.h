@@ -42,45 +42,40 @@
 
 namespace ompl
 {
-    namespace base
-    {
+namespace base
+{
+/** \brief Generate valid samples using the Gaussian sampling strategy */
+class GaussianValidStateSampler : public ValidStateSampler
+{
+public:
+  /** \brief Constructor */
+  GaussianValidStateSampler(const SpaceInformation *si);
 
-        /** \brief Generate valid samples using the Gaussian sampling strategy */
-        class GaussianValidStateSampler : public ValidStateSampler
-        {
-        public:
+  ~GaussianValidStateSampler() override = default;
 
-            /** \brief Constructor */
-            GaussianValidStateSampler(const SpaceInformation *si);
+  bool sample(State *state) override;
+  bool sampleNear(State *state, const State *near, const double distance) override;
 
-            ~GaussianValidStateSampler() override = default;
+  /** \brief Get the standard deviation used when sampling */
+  double getStdDev() const
+  {
+    return stddev_;
+  }
 
-            bool sample(State *state) override;
-            bool sampleNear(State *state, const State *near, const double distance) override;
+  /** \brief Set the standard deviation to use when sampling */
+  void setStdDev(double stddev)
+  {
+    stddev_ = stddev;
+  }
 
-            /** \brief Get the standard deviation used when sampling */
-            double getStdDev() const
-            {
-                return stddev_;
-            }
+protected:
+  /** \brief The sampler to build upon */
+  StateSamplerPtr sampler_;
 
-            /** \brief Set the standard deviation to use when sampling */
-            void setStdDev(double stddev)
-            {
-                stddev_ = stddev;
-            }
-
-        protected:
-
-            /** \brief The sampler to build upon */
-            StateSamplerPtr sampler_;
-
-            /** \brief The standard deviation to use in the sampling process */
-            double                  stddev_;
-        };
-
-    }
+  /** \brief The standard deviation to use in the sampling process */
+  double stddev_;
+};
 }
-
+}
 
 #endif

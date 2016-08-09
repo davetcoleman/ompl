@@ -48,7 +48,6 @@ namespace ompl
 {
 namespace tools
 {
-
 namespace og = ompl::geometric;
 
 /// @cond IGNORE
@@ -61,38 +60,37 @@ OMPL_CLASS_FORWARD(DynamicTimeWarp);
 class DynamicTimeWarp
 {
 public:
-    explicit DynamicTimeWarp(base::SpaceInformationPtr si);
+  explicit DynamicTimeWarp(base::SpaceInformationPtr si);
 
-    /**
-     * \brief Use Dynamic Timewarping to score two paths
-     * \param path1
-     * \param path2
-     * \return score
-     */
-    double calcDTWDistance(const og::PathGeometric &path1, const og::PathGeometric &path2) const;
+  /**
+   * \brief Use Dynamic Timewarping to score two paths
+   * \param path1
+   * \param path2
+   * \return score
+   */
+  double calcDTWDistance(const og::PathGeometric &path1, const og::PathGeometric &path2) const;
 
-    /**
-     * \brief Use dynamic time warping to compare the similarity of two paths
-     *        Note: this will interpolate both of the paths and it returns the change by reference
-     *        Note: before calling this function you might want to reverse one of the paths so that their
-     *        start and goals are property aligned (and match better)
-     * \param path1
-     * \param path2
-     * \return score
-     */
-    double getPathsScore(const og::PathGeometric &path1, const og::PathGeometric &path2) const;
+  /**
+   * \brief Use dynamic time warping to compare the similarity of two paths
+   *        Note: this will interpolate both of the paths and it returns the change by reference
+   *        Note: before calling this function you might want to reverse one of the paths so that their
+   *        start and goals are property aligned (and match better)
+   * \param path1
+   * \param path2
+   * \return score
+   */
+  double getPathsScore(const og::PathGeometric &path1, const og::PathGeometric &path2) const;
 
 private:
+  /** \brief The created space information */
+  base::SpaceInformationPtr si_;
 
-    /** \brief The created space information */
-    base::SpaceInformationPtr     si_;
+  /** \brief Distance matrix */
+  mutable boost::numeric::ublas::matrix<double> table_;
 
-    /** \brief Distance matrix */
-    mutable boost::numeric::ublas::matrix<double> table_;
+};  // end of class
 
-}; // end of class
-
-} // namespace
-} // namespace
+}  // namespace
+}  // namespace
 
 #endif

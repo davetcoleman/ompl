@@ -47,62 +47,65 @@
 
 namespace ompl
 {
-    namespace control
-    {
-        /** \brief A GridDecomposition is a Decomposition implemented using a grid. */
-        class GridDecomposition : public Decomposition
-        {
-        public:
-            /** \brief Constructor. Creates a GridDecomposition as a hypercube with a given dimension, side length, and bounds.
-                The cells of the hypercube are referenced by integer coordinates of the form
-                \f$(r_1,\ldots,r_k)\f$, where \f$ 0 \leq r_i < \texttt{len}\f$. */
-            GridDecomposition(int len, int dim, const base::RealVectorBounds &b);
+namespace control
+{
+/** \brief A GridDecomposition is a Decomposition implemented using a grid. */
+class GridDecomposition : public Decomposition
+{
+public:
+  /** \brief Constructor. Creates a GridDecomposition as a hypercube with a given dimension, side length, and bounds.
+      The cells of the hypercube are referenced by integer coordinates of the form
+      \f$(r_1,\ldots,r_k)\f$, where \f$ 0 \leq r_i < \texttt{len}\f$. */
+  GridDecomposition(int len, int dim, const base::RealVectorBounds& b);
 
-            ~GridDecomposition() override = default;
+  ~GridDecomposition() override = default;
 
-            int getNumRegions() const override { return numGridCells_; }
+  int getNumRegions() const override
+  {
+    return numGridCells_;
+  }
 
-            double getRegionVolume(int /*rid*/) override
-            {
-                return cellVolume_;
-            }
+  double getRegionVolume(int /*rid*/) override
+  {
+    return cellVolume_;
+  }
 
-            void getNeighbors(int rid, std::vector<int>& neighbors) const override;
+  void getNeighbors(int rid, std::vector<int>& neighbors) const override;
 
-            int locateRegion(const base::State *s) const override;
+  int locateRegion(const base::State* s) const override;
 
-            void sampleFromRegion(int rid, RNG &rng, std::vector<double>& coord) const override;
+  void sampleFromRegion(int rid, RNG& rng, std::vector<double>& coord) const override;
 
-        protected:
-            /** \brief Helper method to return the bounds of a given region. */
-            virtual const base::RealVectorBounds& getRegionBounds(int rid) const;
+protected:
+  /** \brief Helper method to return the bounds of a given region. */
+  virtual const base::RealVectorBounds& getRegionBounds(int rid) const;
 
-            /** \brief Converts a given region to a coordinate in the grid. */
-            void regionToGridCoord(int rid, std::vector<int>& coord) const;
+  /** \brief Converts a given region to a coordinate in the grid. */
+  void regionToGridCoord(int rid, std::vector<int>& coord) const;
 
-            /** \brief Converts the given grid coordinate to its corresponding region ID. */
-            int gridCoordToRegion (const std::vector<int> &coord) const;
+  /** \brief Converts the given grid coordinate to its corresponding region ID. */
+  int gridCoordToRegion(const std::vector<int>& coord) const;
 
-            /** \brief Converts a decomposition space coordinate to the ID of the region that contains iit. */
-            int coordToRegion(const std::vector<double>& coord) const;
+  /** \brief Converts a decomposition space coordinate to the ID of the region that contains iit. */
+  int coordToRegion(const std::vector<double>& coord) const;
 
-            /** \brief Converts a decomposition space coordinate to a grid coordinate. */
-            void coordToGridCoord(const std::vector<double>& coord, std::vector<int>& gridCoord) const;
+  /** \brief Converts a decomposition space coordinate to a grid coordinate. */
+  void coordToGridCoord(const std::vector<double>& coord, std::vector<int>& gridCoord) const;
 
-            /** \brief Computes the neighbors of the given region in a n-dimensional grid */
-            void computeGridNeighbors (int rid, std::vector <int> &neighbors) const;
+  /** \brief Computes the neighbors of the given region in a n-dimensional grid */
+  void computeGridNeighbors(int rid, std::vector<int>& neighbors) const;
 
-            /** Recursive subroutine for grid neighbor computation */
-            void computeGridNeighborsSub (const std::vector<int>& coord, std::vector<int>& neighbors,
-                                          int dim, std::vector<int>& candidate) const;
+  /** Recursive subroutine for grid neighbor computation */
+  void computeGridNeighborsSub(const std::vector<int>& coord, std::vector<int>& neighbors, int dim,
+                               std::vector<int>& candidate) const;
 
-            int length_;
-            double cellVolume_;
-            mutable std::unordered_map<int, std::shared_ptr<base::RealVectorBounds> > regToBounds_;
+  int length_;
+  double cellVolume_;
+  mutable std::unordered_map<int, std::shared_ptr<base::RealVectorBounds> > regToBounds_;
 
-        private:
-            const int numGridCells_;
-        };
-    }
+private:
+  const int numGridCells_;
+};
+}
 }
 #endif

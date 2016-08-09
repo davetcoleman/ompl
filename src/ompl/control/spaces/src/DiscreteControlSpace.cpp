@@ -39,79 +39,79 @@
 
 void ompl::control::DiscreteControlSampler::sample(Control *control)
 {
-    control->as<DiscreteControlSpace::ControlType>()->value =
-        rng_.uniformInt(space_->as<DiscreteControlSpace>()->getLowerBound(),
-                        space_->as<DiscreteControlSpace>()->getUpperBound());
+  control->as<DiscreteControlSpace::ControlType>()->value = rng_.uniformInt(
+      space_->as<DiscreteControlSpace>()->getLowerBound(), space_->as<DiscreteControlSpace>()->getUpperBound());
 }
 
 unsigned int ompl::control::DiscreteControlSpace::getDimension() const
 {
-    return 1;
+  return 1;
 }
 
 void ompl::control::DiscreteControlSpace::copyControl(Control *destination, const Control *source) const
 {
-    destination->as<ControlType>()->value = source->as<ControlType>()->value;
+  destination->as<ControlType>()->value = source->as<ControlType>()->value;
 }
 
 bool ompl::control::DiscreteControlSpace::equalControls(const Control *control1, const Control *control2) const
 {
-    return control1->as<ControlType>()->value == control2->as<ControlType>()->value;
+  return control1->as<ControlType>()->value == control2->as<ControlType>()->value;
 }
 
 ompl::control::ControlSamplerPtr ompl::control::DiscreteControlSpace::allocDefaultControlSampler() const
 {
-    return ControlSamplerPtr(new DiscreteControlSampler(this));
+  return ControlSamplerPtr(new DiscreteControlSampler(this));
 }
 
-ompl::control::Control* ompl::control::DiscreteControlSpace::allocControl() const
+ompl::control::Control *ompl::control::DiscreteControlSpace::allocControl() const
 {
-    return new ControlType();
+  return new ControlType();
 }
 
 void ompl::control::DiscreteControlSpace::freeControl(Control *control) const
 {
-    delete static_cast<ControlType*>(control);
+  delete static_cast<ControlType *>(control);
 }
 
 void ompl::control::DiscreteControlSpace::nullControl(Control *control) const
 {
-    control->as<ControlType>()->value = lowerBound_;
+  control->as<ControlType>()->value = lowerBound_;
 }
 
 void ompl::control::DiscreteControlSpace::printControl(const Control *control, std::ostream &out) const
 {
-    out << "DiscreteControl [";
-    if (control)
-        out << control->as<ControlType>()->value;
-    else
-        out << "nullptr";
-    out << ']' << std::endl;
+  out << "DiscreteControl [";
+  if (control)
+    out << control->as<ControlType>()->value;
+  else
+    out << "nullptr";
+  out << ']' << std::endl;
 }
 
 void ompl::control::DiscreteControlSpace::printSettings(std::ostream &out) const
 {
-    out << "Discrete control space '" << getName() << "' with bounds [" << lowerBound_ << ", " << upperBound_ << "]" << std::endl;
+  out << "Discrete control space '" << getName() << "' with bounds [" << lowerBound_ << ", " << upperBound_ << "]"
+      << std::endl;
 }
 
 void ompl::control::DiscreteControlSpace::setup()
 {
-    if (lowerBound_ > upperBound_)
-        throw Exception("Lower bound cannot be larger than upper bound for a discrete space");
-    ControlSpace::setup();
+  if (lowerBound_ > upperBound_)
+    throw Exception("Lower bound cannot be larger than upper bound for a discrete space");
+  ControlSpace::setup();
 }
 
 unsigned int ompl::control::DiscreteControlSpace::getSerializationLength() const
 {
-    return sizeof(int);
+  return sizeof(int);
 }
 
 void ompl::control::DiscreteControlSpace::serialize(void *serialization, const Control *ctrl) const
 {
-    memcpy(serialization, &ctrl->as<ControlType>()->value, sizeof(int));
+  memcpy(serialization, &ctrl->as<ControlType>()->value, sizeof(int));
 }
 
 void ompl::control::DiscreteControlSpace::deserialize(Control *ctrl, const void *serialization) const
 {
-    memcpy(&ctrl->as<ControlType>()->value, serialization, sizeof(int));
+  memcpy(&ctrl->as<ControlType>()->value, serialization, sizeof(int));
 }

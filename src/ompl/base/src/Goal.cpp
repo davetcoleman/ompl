@@ -38,19 +38,18 @@
 #include <limits>
 #include <utility>
 
-ompl::base::Goal::Goal(SpaceInformationPtr si) :
-    type_(GOAL_ANY), si_(std::move(si))
+ompl::base::Goal::Goal(SpaceInformationPtr si) : type_(GOAL_ANY), si_(std::move(si))
 {
 }
 
 bool ompl::base::Goal::isSatisfied(const State *st, double *distance) const
 {
-    if (distance != nullptr)
-        *distance = std::numeric_limits<double>::max();
-    return isSatisfied(st);
+  if (distance != nullptr)
+    *distance = std::numeric_limits<double>::max();
+  return isSatisfied(st);
 }
 
 void ompl::base::Goal::print(std::ostream &out) const
 {
-    out << "Goal memory address " << this << std::endl;
+  out << "Goal memory address " << this << std::endl;
 }

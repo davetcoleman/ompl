@@ -49,52 +49,50 @@
 
 namespace ompl
 {
-    namespace control
-    {
-        /** \brief A PropositionalTriangularDecomposition is a triangulation that ignores
-            obstacles and respects propositional regions of interest. Practically speaking,
-            it is both a TriangularDecomposition and a PropositionalDecomposition, but it is
-            implemented without using multiple inheritance. */
-        class PropositionalTriangularDecomposition : public PropositionalDecomposition
-        {
-        public:
-            using Polygon = TriangularDecomposition::Polygon;
-            using Vertex = TriangularDecomposition::Vertex;
+namespace control
+{
+/** \brief A PropositionalTriangularDecomposition is a triangulation that ignores
+    obstacles and respects propositional regions of interest. Practically speaking,
+    it is both a TriangularDecomposition and a PropositionalDecomposition, but it is
+    implemented without using multiple inheritance. */
+class PropositionalTriangularDecomposition : public PropositionalDecomposition
+{
+public:
+  using Polygon = TriangularDecomposition::Polygon;
+  using Vertex = TriangularDecomposition::Vertex;
 
-            /** \brief Creates a PropositionalTriangularDecomposition over the given bounds,
-                which must be 2-dimensional.
-                The underlying mesh will be a conforming Delaunay triangulation.
-                The triangulation will ignore any obstacles, given as a list of polygons.
-                The triangulation will respect the boundaries of any propositional regions
-                of interest, given as a list of polygons. */
-            PropositionalTriangularDecomposition(
-                const base::RealVectorBounds& bounds,
-                const std::vector<Polygon>& holes = std::vector<Polygon>(),
-                const std::vector<Polygon>& props = std::vector<Polygon>()
-            );
+  /** \brief Creates a PropositionalTriangularDecomposition over the given bounds,
+      which must be 2-dimensional.
+      The underlying mesh will be a conforming Delaunay triangulation.
+      The triangulation will ignore any obstacles, given as a list of polygons.
+      The triangulation will respect the boundaries of any propositional regions
+      of interest, given as a list of polygons. */
+  PropositionalTriangularDecomposition(const base::RealVectorBounds& bounds,
+                                       const std::vector<Polygon>& holes = std::vector<Polygon>(),
+                                       const std::vector<Polygon>& props = std::vector<Polygon>());
 
-            ~PropositionalTriangularDecomposition() override = default;
+  ~PropositionalTriangularDecomposition() override = default;
 
-            int getNumProps() const override;
+  int getNumProps() const override;
 
-            World worldAtRegion(int triID) override;
+  World worldAtRegion(int triID) override;
 
-            void setup();
+  void setup();
 
-            void addHole(const Polygon& hole);
+  void addHole(const Polygon& hole);
 
-            void addProposition(const Polygon& prop);
+  void addProposition(const Polygon& prop);
 
-            const std::vector<Polygon>& getHoles() const;
+  const std::vector<Polygon>& getHoles() const;
 
-            const std::vector<Polygon>& getPropositions() const;
+  const std::vector<Polygon>& getPropositions() const;
 
-            //Debug method: prints this decomposition as a list of polygons
-            void print(std::ostream& out) const;
+  // Debug method: prints this decomposition as a list of polygons
+  void print(std::ostream& out) const;
 
-        protected:
-            TriangularDecomposition* triDecomp_;
-        };
-    }
+protected:
+  TriangularDecomposition* triDecomp_;
+};
+}
 }
 #endif

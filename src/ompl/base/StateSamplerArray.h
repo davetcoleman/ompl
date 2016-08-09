@@ -44,111 +44,105 @@
 
 namespace ompl
 {
-    namespace base
+namespace base
+{
+/** \brief Depending on the type of state sampler, we have different allocation routines
+
+    This struct will provide that allocation routine,
+    depending on the template argument of ompl::base::SamplerType.*/
+template <typename T>
+struct SamplerSelector
+{
+};
+
+/** \cond IGNORE */
+template <>
+struct SamplerSelector<StateSampler>
+{
+  using Sampler = StateSampler;
+  using SamplerPtr = StateSamplerPtr;
+
+  SamplerPtr allocStateSampler(const SpaceInformation *si)
+  {
+    return si->allocStateSampler();
+  }
+};
+
+template <>
+struct SamplerSelector<ValidStateSampler>
+{
+  using Sampler = ValidStateSampler;
+  using SamplerPtr = ValidStateSamplerPtr;
+
+  SamplerPtr allocStateSampler(const SpaceInformation *si)
+  {
+    return si->allocValidStateSampler();
+  }
+};
+/** \endcond */
+
+/** \brief Class to ease the creation of a set of samplers. This is especially useful for multi-threaded planners. */
+template <typename T>
+class StateSamplerArray
+{
+public:
+  /** \brief Pointer to the type of sampler allocated */
+  using SamplerPtr = typename SamplerSelector<T>::SamplerPtr;
+
+  /** \brief The type of sampler allocated */
+  using Sampler = typename SamplerSelector<T>::Sampler;
+
+  /** \brief Constructor */
+  StateSamplerArray(const SpaceInformationPtr &si) : si_(si.get())
+  {
+  }
+
+  /** \brief Constructor */
+  StateSamplerArray(const SpaceInformation *si) : si_(si)
+  {
+  }
+
+  ~StateSamplerArray() = default;
+
+  /** \brief Access operator for a specific sampler. For
+      performance reasons, the bounds are not checked. */
+  Sampler *operator[](std::size_t index) const
+  {
+    return samplers_[index].get();
+  }
+
+  /** \brief Create or release some state samplers */
+  void resize(std::size_t count)
+  {
+    if (samplers_.size() > count)
+      samplers_.resize(count);
+    else if (samplers_.size() < count)
     {
-
-        /** \brief Depending on the type of state sampler, we have different allocation routines
-
-            This struct will provide that allocation routine,
-            depending on the template argument of ompl::base::SamplerType.*/
-        template<typename T>
-        struct SamplerSelector
-        {
-        };
-
-        /** \cond IGNORE */
-        template<>
-        struct SamplerSelector<StateSampler>
-        {
-            using Sampler = StateSampler;
-            using SamplerPtr = StateSamplerPtr;
-
-            SamplerPtr allocStateSampler(const SpaceInformation *si)
-            {
-                return si->allocStateSampler();
-            }
-
-        };
-
-        template<>
-        struct SamplerSelector<ValidStateSampler>
-        {
-            using Sampler = ValidStateSampler;
-            using SamplerPtr = ValidStateSamplerPtr;
-
-            SamplerPtr allocStateSampler(const SpaceInformation *si)
-            {
-                return si->allocValidStateSampler();
-            }
-        };
-        /** \endcond */
-
-        /** \brief Class to ease the creation of a set of samplers. This is especially useful for multi-threaded planners. */
-        template<typename T>
-        class StateSamplerArray
-        {
-        public:
-
-            /** \brief Pointer to the type of sampler allocated */
-            using SamplerPtr = typename SamplerSelector<T>::SamplerPtr;
-
-            /** \brief The type of sampler allocated */
-            using Sampler = typename SamplerSelector<T>::Sampler;
-
-            /** \brief Constructor */
-            StateSamplerArray(const SpaceInformationPtr &si) : si_(si.get())
-            {
-            }
-
-            /** \brief Constructor */
-            StateSamplerArray(const SpaceInformation *si) : si_(si)
-            {
-            }
-
-            ~StateSamplerArray() = default;
-
-            /** \brief Access operator for a specific sampler. For
-                performance reasons, the bounds are not checked. */
-            Sampler* operator[](std::size_t index) const
-            {
-                return samplers_[index].get();
-            }
-
-            /** \brief Create or release some state samplers */
-            void resize(std::size_t count)
-            {
-                if (samplers_.size() > count)
-                    samplers_.resize(count);
-                else
-                    if (samplers_.size() < count)
-                    {
-                        std::size_t c = samplers_.size();
-                        samplers_.resize(count);
-                        for (std::size_t i = c ; i < count ; ++i)
-                            samplers_[i] = ss_.allocStateSampler(si_);
-                    }
-            }
-
-            /** \brief Get the count of samplers currently available */
-            std::size_t size() const
-            {
-                return samplers_.size();
-            }
-
-            /** \brief Clear all allocated samplers */
-            void clear()
-            {
-                resize(0);
-            }
-
-        private:
-
-            const SpaceInformation  *si_;
-            SamplerSelector<T>       ss_;
-            std::vector<SamplerPtr>  samplers_;
-
-        };
+      std::size_t c = samplers_.size();
+      samplers_.resize(count);
+      for (std::size_t i = c; i < count; ++i)
+        samplers_[i] = ss_.allocStateSampler(si_);
     }
+  }
+
+  /** \brief Get the count of samplers currently available */
+  std::size_t size() const
+  {
+    return samplers_.size();
+  }
+
+  /** \brief Clear all allocated samplers */
+  void clear()
+  {
+    resize(0);
+  }
+
+private:
+  const SpaceInformation *si_;
+  SamplerSelector<T> ss_;
+  std::vector<SamplerPtr> samplers_;
+};
+}
 }
 
 #endif

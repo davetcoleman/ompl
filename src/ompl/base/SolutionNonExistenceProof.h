@@ -44,30 +44,30 @@
 
 namespace ompl
 {
-    namespace base
-    {
-        /// @cond IGNORE
-        /// \brief Forward declaration of ompl::base::SolutionNonExistenceProof
-        OMPL_CLASS_FORWARD(SolutionNonExistenceProof);
-        /// @endcond
+namespace base
+{
+/// @cond IGNORE
+/// \brief Forward declaration of ompl::base::SolutionNonExistenceProof
+OMPL_CLASS_FORWARD(SolutionNonExistenceProof);
+/// @endcond
 
-        /// \class ompl::base::SolutionNonExistenceProofPtr
-        /// \brief A shared pointer wrapper for ompl::base::SolutionNonExistenceProof
+/// \class ompl::base::SolutionNonExistenceProofPtr
+/// \brief A shared pointer wrapper for ompl::base::SolutionNonExistenceProof
 
-        /// \brief Abstract definition of a proof for the non-existence of a solution to a problem
-        class SolutionNonExistenceProof
-        {
-            public:
-                SolutionNonExistenceProof(SpaceInformationPtr si) : si_(std::move(si))
-                {
-                }
+/// \brief Abstract definition of a proof for the non-existence of a solution to a problem
+class SolutionNonExistenceProof
+{
+public:
+  SolutionNonExistenceProof(SpaceInformationPtr si) : si_(std::move(si))
+  {
+  }
 
-                virtual ~SolutionNonExistenceProof() = default;
+  virtual ~SolutionNonExistenceProof() = default;
 
-            protected:
-                SpaceInformationPtr si_;
-        };
-    }
+protected:
+  SpaceInformationPtr si_;
+};
+}
 }
 
 #endif

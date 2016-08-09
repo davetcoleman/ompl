@@ -38,6 +38,6 @@
 
 std::ostream& ompl::base::operator<<(std::ostream& stream, Cost c)
 {
-    stream << c.value();
-    return stream;
+  stream << c.value();
+  return stream;
 }

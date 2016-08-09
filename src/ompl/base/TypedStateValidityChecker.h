@@ -43,47 +43,43 @@
 
 namespace ompl
 {
-    namespace base
-    {
+namespace base
+{
+template <typename SpaceType_>
+class TypedStateValidityChecker : public StateValidityChecker
+{
+public:
+  using SpaceType = SpaceType_;
+  using SpaceInformationType = TypedSpaceInformation<SpaceType>;
 
-        template <typename SpaceType_>
-        class TypedStateValidityChecker : public StateValidityChecker
-        {
-        public:
+  TypedStateValidityChecker(SpaceInformationType *si) : StateValidityChecker(si)
+  {
+  }
 
-            using SpaceType = SpaceType_;
-            using SpaceInformationType = TypedSpaceInformation<SpaceType>;
+  TypedStateValidityChecker(const typename SpaceInformationType::Ptr &si) : StateValidityChecker(si)
+  {
+  }
 
-            TypedStateValidityChecker(SpaceInformationType *si) : StateValidityChecker(si)
-            {
-            }
+  SpaceInformationType *getTypedSpaceInformation() const
+  {
+    return static_cast<SpaceInformationType *>(si_);
+  }
 
-            TypedStateValidityChecker(const typename SpaceInformationType::Ptr &si) : StateValidityChecker(si)
-            {
-            }
+  SpaceType *getTypedStateSpace() const
+  {
+    return getTypedSpaceInformation()->getTypedStateSpace();
+  }
 
-            SpaceInformationType* getTypedSpaceInformation() const
-            {
-                return static_cast<SpaceInformationType*>(si_);
-            }
+  static typename SpaceType::StateType *state_as(State *s)
+  {
+    return SpaceInformationType::state_as(s);
+  }
 
-            SpaceType* getTypedStateSpace() const
-            {
-                return getTypedSpaceInformation()->getTypedStateSpace();
-            }
-
-            static typename SpaceType::StateType* state_as(State *s)
-            {
-                return SpaceInformationType::state_as(s);
-            }
-
-            static const typename SpaceType::StateType* state_as(const State *s)
-            {
-                return SpaceInformationType::state_as(s);
-            }
-        };
-
-    }
-
+  static const typename SpaceType::StateType *state_as(const State *s)
+  {
+    return SpaceInformationType::state_as(s);
+  }
+};
+}
 }
 #endif

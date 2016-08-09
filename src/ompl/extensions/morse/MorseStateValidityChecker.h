@@ -42,26 +42,23 @@
 
 namespace ompl
 {
-    namespace base
-    {
+namespace base
+{
+/** \brief The simplest state validity checker: all states are valid if
+    they are within bounds */
+class MorseStateValidityChecker : public StateValidityChecker
+{
+public:
+  /** \brief Constructor */
+  MorseStateValidityChecker(const SpaceInformationPtr &si);
 
-        /** \brief The simplest state validity checker: all states are valid if
-            they are within bounds */
-        class MorseStateValidityChecker : public StateValidityChecker
-        {
-        public:
+  /** \brief A state is always considered valid if it satisfies the bounds */
+  virtual bool isValid(const State *state) const;
 
-            /** \brief Constructor */
-            MorseStateValidityChecker(const SpaceInformationPtr &si);
-
-            /** \brief A state is always considered valid if it satisfies the bounds */
-            virtual bool isValid(const State *state) const;
-
-        protected:
-
-            /** \brief The corresponding MORSE state space */
-            MorseStateSpace *mss_;
-        };
-    }
+protected:
+  /** \brief The corresponding MORSE state space */
+  MorseStateSpace *mss_;
+};
+}
 }
 #endif

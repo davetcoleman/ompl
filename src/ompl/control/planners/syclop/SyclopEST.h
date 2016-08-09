@@ -43,42 +43,42 @@
 
 namespace ompl
 {
-    namespace control
-    {
-        /** \brief SyclopEST is Syclop with EST as its low-level tree planner.
-            \anchor cSyclopEST
-        */
-        class SyclopEST : public Syclop
-        {
-        public:
-            /** \brief Constructor. Requires a Decomposition, which Syclop uses to create high-level leads. */
-            SyclopEST(const SpaceInformationPtr& si, const DecompositionPtr &d) : Syclop(si,d,"SyclopEST")
-            {
-            }
+namespace control
+{
+/** \brief SyclopEST is Syclop with EST as its low-level tree planner.
+    \anchor cSyclopEST
+*/
+class SyclopEST : public Syclop
+{
+public:
+  /** \brief Constructor. Requires a Decomposition, which Syclop uses to create high-level leads. */
+  SyclopEST(const SpaceInformationPtr &si, const DecompositionPtr &d) : Syclop(si, d, "SyclopEST")
+  {
+  }
 
-            ~SyclopEST() override
-            {
-                freeMemory();
-            }
+  ~SyclopEST() override
+  {
+    freeMemory();
+  }
 
-            void setup() override;
-            void clear() override;
-            void getPlannerData(base::PlannerData &data) const override;
+  void setup() override;
+  void clear() override;
+  void getPlannerData(base::PlannerData &data) const override;
 
-        protected:
-            Syclop::Motion* addRoot(const base::State *s) override;
-            void selectAndExtend(Region &region, std::vector<Motion*> &newMotions) override;
+protected:
+  Syclop::Motion *addRoot(const base::State *s) override;
+  void selectAndExtend(Region &region, std::vector<Motion *> &newMotions) override;
 
-            /** \brief Free the memory allocated by this planner. */
-            void freeMemory();
+  /** \brief Free the memory allocated by this planner. */
+  void freeMemory();
 
-            base::StateSamplerPtr sampler_;
-            ControlSamplerPtr controlSampler_;
-            std::vector<Motion*> motions_;
+  base::StateSamplerPtr sampler_;
+  ControlSamplerPtr controlSampler_;
+  std::vector<Motion *> motions_;
 
-            /** \brief The most recent goal motion.  Used for PlannerData computation */
-            Motion *lastGoalMotion_;
-        };
-    }
+  /** \brief The most recent goal motion.  Used for PlannerData computation */
+  Motion *lastGoalMotion_;
+};
+}
 }
 #endif

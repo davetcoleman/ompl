@@ -46,140 +46,139 @@
 
 namespace ompl
 {
-    namespace control
-    {
-        /// @cond IGNORE
-        /** \brief Forward declaration of ompl::control::Automaton */
-        OMPL_CLASS_FORWARD(Automaton);
-        /// @endcond
+namespace control
+{
+/// @cond IGNORE
+/** \brief Forward declaration of ompl::control::Automaton */
+OMPL_CLASS_FORWARD(Automaton);
+/// @endcond
 
-        /** \class ompl::control::AutomatonPtr
-            \brief A shared pointer wrapper for ompl::control::Automaton */
+/** \class ompl::control::AutomatonPtr
+    \brief A shared pointer wrapper for ompl::control::Automaton */
 
-        /** \brief A class to represent a deterministic finite automaton,
-            each edge of which corresponds to a World.
-            A system trajectory, by way of project() and worldAtRegion()
-            in PropositionalDecomposition, determines a sequence of Worlds,
-            which are read by an Automaton to determine whether a trajectory
-            satisfies a given specification.
+/** \brief A class to represent a deterministic finite automaton,
+    each edge of which corresponds to a World.
+    A system trajectory, by way of project() and worldAtRegion()
+    in PropositionalDecomposition, determines a sequence of Worlds,
+    which are read by an Automaton to determine whether a trajectory
+    satisfies a given specification.
 
-            An automaton is meant to be run in a read-only fashion, i.e.,
-            it does not keep track of an internal state and can be thought of
-            as a lookup table. */
-        class Automaton
-        {
-        public:
-            /** \brief Each automaton state has a transition map, which maps from a
-                World to another automaton state.
-                A set \f$P\f$ of true propositions correponds to the formula
-                \f$\bigwedge_{p\in P} p\f$. */
-            struct TransitionMap
-            {
-                /** \brief Returns the automaton state corresponding to a given
-                    World in this transition map.
-                    Returns -1 if no such transition exists. */
-                int eval(const World& w) const;
+    An automaton is meant to be run in a read-only fashion, i.e.,
+    it does not keep track of an internal state and can be thought of
+    as a lookup table. */
+class Automaton
+{
+public:
+  /** \brief Each automaton state has a transition map, which maps from a
+      World to another automaton state.
+      A set \f$P\f$ of true propositions correponds to the formula
+      \f$\bigwedge_{p\in P} p\f$. */
+  struct TransitionMap
+  {
+    /** \brief Returns the automaton state corresponding to a given
+        World in this transition map.
+        Returns -1 if no such transition exists. */
+    int eval(const World& w) const;
 
-                TransitionMap& operator=(const TransitionMap& tm) = default;
+    TransitionMap& operator=(const TransitionMap& tm) = default;
 
-                mutable std::unordered_map<World, unsigned int> entries;
-            };
+    mutable std::unordered_map<World, unsigned int> entries;
+  };
 
-            /** \brief Creates an automaton with a given number of propositions and states. */
-            Automaton(unsigned int numProps, unsigned int numStates = 0);
+  /** \brief Creates an automaton with a given number of propositions and states. */
+  Automaton(unsigned int numProps, unsigned int numStates = 0);
 
-            /** \brief Adds a new state to the automaton and returns an ID for it. */
-            unsigned int addState(bool accepting = false);
+  /** \brief Adds a new state to the automaton and returns an ID for it. */
+  unsigned int addState(bool accepting = false);
 
-            /** \brief Sets the accepting status of a given state. */
-            void setAccepting(unsigned int s, bool a);
+  /** \brief Sets the accepting status of a given state. */
+  void setAccepting(unsigned int s, bool a);
 
-            /** \brief Returns whether a given state of the automaton is accepting. */
-            bool isAccepting(unsigned int s) const;
+  /** \brief Returns whether a given state of the automaton is accepting. */
+  bool isAccepting(unsigned int s) const;
 
-            /** \brief Sets the start state of the automaton. */
-            void setStartState(unsigned int s);
+  /** \brief Sets the start state of the automaton. */
+  void setStartState(unsigned int s);
 
-            /** \brief Returns the start state of the automaton.
-                Returns -1 if no start state has been set. */
-            int getStartState() const;
+  /** \brief Returns the start state of the automaton.
+      Returns -1 if no start state has been set. */
+  int getStartState() const;
 
-            /** \brief Adds a given transition to the automaton. */
-            void addTransition(unsigned int src, const World& w,
-                unsigned int dest);
+  /** \brief Adds a given transition to the automaton. */
+  void addTransition(unsigned int src, const World& w, unsigned int dest);
 
-            /** \brief Runs the automaton from its start state, using
-                the values of propositions from a given sequence of Worlds.
-                Returns false if and only if the result is a nonexistent state
-                (i.e., if and only if there does not exist an extension to trace
-                that will lead it to an accepting state). */
-            bool run(const std::vector<World>& trace) const;
+  /** \brief Runs the automaton from its start state, using
+      the values of propositions from a given sequence of Worlds.
+      Returns false if and only if the result is a nonexistent state
+      (i.e., if and only if there does not exist an extension to trace
+      that will lead it to an accepting state). */
+  bool run(const std::vector<World>& trace) const;
 
-            /** \brief Runs the automaton for one step from the given state,
-                using the values of propositions from a given World.
-                Returns the resulting state, or -1 if the result is a nonexistent state. */
-            int step(int state, const World& w) const;
+  /** \brief Runs the automaton for one step from the given state,
+      using the values of propositions from a given World.
+      Returns the resulting state, or -1 if the result is a nonexistent state. */
+  int step(int state, const World& w) const;
 
-            /** \brief Returns the outgoing transition map for a given automaton state. */
-            TransitionMap& getTransitions(unsigned int src);
+  /** \brief Returns the outgoing transition map for a given automaton state. */
+  TransitionMap& getTransitions(unsigned int src);
 
-            /** \brief Returns the number of states in this automaton. */
-            unsigned int numStates() const;
+  /** \brief Returns the number of states in this automaton. */
+  unsigned int numStates() const;
 
-            /** \brief Returns the number of transitions in this automaton. */
-            unsigned int numTransitions() const;
+  /** \brief Returns the number of transitions in this automaton. */
+  unsigned int numTransitions() const;
 
-            /** \brief Returns the number of propositions used by this automaton. */
-            unsigned int numProps() const;
+  /** \brief Returns the number of propositions used by this automaton. */
+  unsigned int numProps() const;
 
-            /** \brief Prints the automaton to a given output stream, in Graphviz dot format. */
-            void print(std::ostream& out) const;
+  /** \brief Prints the automaton to a given output stream, in Graphviz dot format. */
+  void print(std::ostream& out) const;
 
-            /** \brief Returns the shortest number of transitions from a given state to
-                an accepting state. */
-            unsigned int distFromAccepting(unsigned int s, unsigned int maxDist = std::numeric_limits<unsigned int>::max()) const;
+  /** \brief Returns the shortest number of transitions from a given state to
+      an accepting state. */
+  unsigned int distFromAccepting(unsigned int s, unsigned int maxDist = std::numeric_limits<unsigned int>::max()) const;
 
-            /** \brief Returns a single-state automaton that accepts on all inputs. */
-            static AutomatonPtr AcceptingAutomaton(unsigned int numProps);
+  /** \brief Returns a single-state automaton that accepts on all inputs. */
+  static AutomatonPtr AcceptingAutomaton(unsigned int numProps);
 
-            /** \brief Helper function to return a coverage automaton.
-                Assumes all propositions are mutually exclusive. */
-            static AutomatonPtr CoverageAutomaton(unsigned int numProps, const std::vector<unsigned int>& covProps);
+  /** \brief Helper function to return a coverage automaton.
+      Assumes all propositions are mutually exclusive. */
+  static AutomatonPtr CoverageAutomaton(unsigned int numProps, const std::vector<unsigned int>& covProps);
 
-            /** \brief Helper function to return a sequence automaton.
-                Assumes all propositions are mutually exclusive. */
-            static AutomatonPtr SequenceAutomaton(unsigned int numProps, const std::vector<unsigned int>& seqProps);
+  /** \brief Helper function to return a sequence automaton.
+      Assumes all propositions are mutually exclusive. */
+  static AutomatonPtr SequenceAutomaton(unsigned int numProps, const std::vector<unsigned int>& seqProps);
 
-            /** \brief Helper function to return a disjunction automaton,
-                which accepts when one of the given propositions becomes true. */
-            static AutomatonPtr DisjunctionAutomaton(unsigned int numProps, const std::vector<unsigned int>& disjProps);
+  /** \brief Helper function to return a disjunction automaton,
+      which accepts when one of the given propositions becomes true. */
+  static AutomatonPtr DisjunctionAutomaton(unsigned int numProps, const std::vector<unsigned int>& disjProps);
 
-            /** \brief Returns an avoidance automaton, which rejects when any one of the
-                given list of propositions becomes true. Accepts otherwise. */
-            static AutomatonPtr AvoidanceAutomaton(unsigned int numProps, const std::vector<unsigned int>& avoidProps);
+  /** \brief Returns an avoidance automaton, which rejects when any one of the
+      given list of propositions becomes true. Accepts otherwise. */
+  static AutomatonPtr AvoidanceAutomaton(unsigned int numProps, const std::vector<unsigned int>& avoidProps);
 
-            /** \brief Helper function to return a coverage automaton
-                over propositions from 0 to numProps-1.
-                Assumes all propositions are mutually exclusive. */
-            static AutomatonPtr CoverageAutomaton(unsigned int numProps);
+  /** \brief Helper function to return a coverage automaton
+      over propositions from 0 to numProps-1.
+      Assumes all propositions are mutually exclusive. */
+  static AutomatonPtr CoverageAutomaton(unsigned int numProps);
 
-            /** \brief Helper function to return a sequence automaton
-                over propositions from 0 to numProps-1, in that order.
-                Assumes all propositions are mutually exclusive. */
-            static AutomatonPtr SequenceAutomaton(unsigned int numProps);
+  /** \brief Helper function to return a sequence automaton
+      over propositions from 0 to numProps-1, in that order.
+      Assumes all propositions are mutually exclusive. */
+  static AutomatonPtr SequenceAutomaton(unsigned int numProps);
 
-            /** \brief Helper function to return a disjunction automaton,
-                which accepts when one of the given propositions in [0,numProps-1] becomes true. */
-            static AutomatonPtr DisjunctionAutomaton(unsigned int numProps);
+  /** \brief Helper function to return a disjunction automaton,
+      which accepts when one of the given propositions in [0,numProps-1] becomes true. */
+  static AutomatonPtr DisjunctionAutomaton(unsigned int numProps);
 
-        protected:
-            unsigned int numProps_;
-            unsigned int numStates_;
-            int startState_;
-            std::vector<bool> accepting_;
-            std::vector<TransitionMap> transitions_;
-            mutable std::vector<unsigned int> distances_;
-        };
-    }
+protected:
+  unsigned int numProps_;
+  unsigned int numStates_;
+  int startState_;
+  std::vector<bool> accepting_;
+  std::vector<TransitionMap> transitions_;
+  mutable std::vector<unsigned int> distances_;
+};
+}
 }
 #endif

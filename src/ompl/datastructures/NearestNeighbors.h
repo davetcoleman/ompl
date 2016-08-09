@@ -43,81 +43,77 @@
 
 namespace ompl
 {
+/** \brief Abstract representation of a container that can perform nearest neighbors queries */
+template <typename _T>
+class NearestNeighbors
+{
+public:
+  /** \brief The definition of a distance function */
+  using DistanceFunction = std::function<double(const _T &, const _T &)>;
 
-    /** \brief Abstract representation of a container that can perform nearest neighbors queries */
-    template<typename _T>
-    class NearestNeighbors
-    {
-    public:
+  NearestNeighbors() = default;
 
-        /** \brief The definition of a distance function */
-        using DistanceFunction = std::function<double(const _T&, const _T&)>;
+  virtual ~NearestNeighbors() = default;
 
-        NearestNeighbors() = default;
+  /** \brief Set the distance function to use */
+  virtual void setDistanceFunction(const DistanceFunction &distFun)
+  {
+    distFun_ = distFun;
+  }
 
-        virtual ~NearestNeighbors() = default;
+  /** \brief Get the distance function used */
+  const DistanceFunction &getDistanceFunction() const
+  {
+    return distFun_;
+  }
 
-        /** \brief Set the distance function to use */
-        virtual void setDistanceFunction(const DistanceFunction &distFun)
-        {
-            distFun_ = distFun;
-        }
+  /** \brief Return true if the solutions reported by this data structure
+      are sorted, when calling nearestK / nearestR. */
+  virtual bool reportsSortedResults() const = 0;
 
-        /** \brief Get the distance function used */
-        const DistanceFunction& getDistanceFunction() const
-        {
-            return distFun_;
-        }
+  /** \brief Clear the datastructure */
+  virtual void clear() = 0;
 
-        /** \brief Return true if the solutions reported by this data structure
-            are sorted, when calling nearestK / nearestR. */
-        virtual bool reportsSortedResults() const = 0;
+  /** \brief Add an element to the datastructure */
+  virtual void add(const _T &data) = 0;
 
-        /** \brief Clear the datastructure */
-        virtual void clear() = 0;
+  /** \brief Add a vector of points */
+  virtual void add(const std::vector<_T> &data)
+  {
+    for (auto elt = data.begin(); elt != data.end(); ++elt)
+      add(*elt);
+  }
 
-        /** \brief Add an element to the datastructure */
-        virtual void add(const _T &data) = 0;
+  /** \brief Remove an element from the datastructure */
+  virtual bool remove(const _T &data) = 0;
 
-        /** \brief Add a vector of points */
-        virtual void add(const std::vector<_T> &data)
-        {
-            for (auto elt = data.begin() ; elt != data.end() ; ++elt)
-                add(*elt);
-        }
+  /** \brief Get the nearest neighbor of a point */
+  virtual _T nearest(const _T &data) const = 0;
 
-        /** \brief Remove an element from the datastructure */
-        virtual bool remove(const _T &data) = 0;
+  /** \brief Get the k-nearest neighbors of a point
+   *
+   * All the nearest neighbor structures currently return the neighbors in
+   * sorted order, but this is not required.
+   */
+  virtual void nearestK(const _T &data, std::size_t k, std::vector<_T> &nbh) const = 0;
 
-        /** \brief Get the nearest neighbor of a point */
-        virtual _T nearest(const _T &data) const = 0;
+  /** \brief Get the nearest neighbors of a point, within a specified radius
+   *
+   * All the nearest neighbor structures currently return the neighbors in
+   * sorted order, but this is not required.
+   */
+  virtual void nearestR(const _T &data, double radius, std::vector<_T> &nbh) const = 0;
 
-        /** \brief Get the k-nearest neighbors of a point
-         *
-         * All the nearest neighbor structures currently return the neighbors in
-         * sorted order, but this is not required.
-         */
-        virtual void nearestK(const _T &data, std::size_t k, std::vector<_T> &nbh) const = 0;
+  /** \brief Get the number of elements in the datastructure */
+  virtual std::size_t size() const = 0;
 
-        /** \brief Get the nearest neighbors of a point, within a specified radius
-         *
-         * All the nearest neighbor structures currently return the neighbors in
-         * sorted order, but this is not required.
-         */
-        virtual void nearestR(const _T &data, double radius, std::vector<_T> &nbh) const = 0;
+  /** \brief Get all the elements in the datastructure */
+  virtual void list(std::vector<_T> &data) const = 0;
 
-        /** \brief Get the number of elements in the datastructure */
-        virtual std::size_t size() const = 0;
-
-        /** \brief Get all the elements in the datastructure */
-        virtual void list(std::vector<_T> &data) const = 0;
-
-    protected:
-
-        /** \brief The used distance function */
-        DistanceFunction distFun_;
-
-    };
+protected:
+  /** \brief The used distance function */
+  DistanceFunction distFun_;
+};
 }
 
 #endif

@@ -41,52 +41,50 @@
 
 namespace ompl
 {
-    namespace base
-    {
+namespace base
+{
+/** \brief The lower and upper bounds for an R<sup>n</sup> space */
+class RealVectorBounds
+{
+public:
+  /** \brief Constructor; \e dim represents the dimension of the space these bounds are for. */
+  RealVectorBounds(unsigned int dim)
+  {
+    resize(dim);
+  }
 
-        /** \brief The lower and upper bounds for an R<sup>n</sup> space */
-        class RealVectorBounds
-        {
-        public:
+  /** \brief Set the lower bound in each dimension to a specific value */
+  void setLow(double value);
 
-            /** \brief Constructor; \e dim represents the dimension of the space these bounds are for. */
-            RealVectorBounds(unsigned int dim)
-            {
-                resize(dim);
-            }
+  /** \brief Set the upper bound in each dimension to a specific value */
+  void setHigh(double value);
 
-            /** \brief Set the lower bound in each dimension to a specific value */
-            void setLow(double value);
+  /** \brief Set the lower bound of a dimension to a specific value */
+  void setLow(unsigned int index, double value);
 
-            /** \brief Set the upper bound in each dimension to a specific value */
-            void setHigh(double value);
+  /** \brief Set the upper bound of a dimension to a specific value */
+  void setHigh(unsigned int index, double value);
 
-            /** \brief Set the lower bound of a dimension to a specific value */
-            void setLow(unsigned int index, double value);
+  /** \brief Change the number of dimensions for the bounds */
+  void resize(std::size_t size);
 
-            /** \brief Set the upper bound of a dimension to a specific value */
-            void setHigh(unsigned int index, double value);
+  /** \brief Compute the volume of the space enclosed by the bounds */
+  double getVolume() const;
 
-            /** \brief Change the number of dimensions for the bounds */
-            void resize(std::size_t size);
+  /** \brief Get the difference between the high and low bounds for each dimension: result[i] = high[i] - low[i] */
+  std::vector<double> getDifference() const;
 
-            /** \brief Compute the volume of the space enclosed by the bounds */
-            double getVolume() const;
+  /** \brief Check if the bounds are valid (same length for
+      low and high, high[i] > low[i]). Throw an exception if
+      this is not the case. */
+  void check() const;
 
-            /** \brief Get the difference between the high and low bounds for each dimension: result[i] = high[i] - low[i] */
-            std::vector<double> getDifference() const;
+  /** \brief Lower bound */
+  std::vector<double> low;
 
-            /** \brief Check if the bounds are valid (same length for
-                low and high, high[i] > low[i]). Throw an exception if
-                this is not the case. */
-            void check() const;
-
-            /** \brief Lower bound */
-            std::vector<double> low;
-
-            /** \brief Upper bound */
-            std::vector<double> high;
-        };
-    }
+  /** \brief Upper bound */
+  std::vector<double> high;
+};
+}
 }
 #endif

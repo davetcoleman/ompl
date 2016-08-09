@@ -45,50 +45,46 @@
 
 namespace ompl
 {
-    namespace base
-    {
+namespace base
+{
+/// @cond IGNORE
+OMPL_CLASS_FORWARD(MinimumClearanceValidStateSampler);
+/// @endcond
 
-        /// @cond IGNORE
-        OMPL_CLASS_FORWARD(MinimumClearanceValidStateSampler);
-        /// @endcond
+/** \brief Generate valid samples randomly with extra requirement of min for clearance to nearest obstacle */
+class MinimumClearanceValidStateSampler : public ValidStateSampler
+{
+public:
+  /** \brief Constructor */
+  MinimumClearanceValidStateSampler(const SpaceInformation *si);
 
-        /** \brief Generate valid samples randomly with extra requirement of min for clearance to nearest obstacle */
-        class MinimumClearanceValidStateSampler : public ValidStateSampler
-        {
-        public:
+  ~MinimumClearanceValidStateSampler() override = default;
+  ;
 
-            /** \brief Constructor */
-            MinimumClearanceValidStateSampler(const SpaceInformation *si);
+  bool sample(State *state) override;
 
-            ~MinimumClearanceValidStateSampler() override = default;;
+  bool sampleNear(State *state, const State *near, const double distance) override;
 
-            bool sample(State *state) override;
+  /** \brief Set the minimum required distance of sample from nearest obstacle to be considered valid */
+  void setMinimumObstacleClearance(double clearance)
+  {
+    clearance_ = clearance;
+  }
 
-            bool sampleNear(State *state, const State *near, const double distance) override;
+  /** \brief Get the minimum required distance of sample from nearest obstacle to be considered valid */
+  unsigned int getMinimumObstacleClearance() const
+  {
+    return clearance_;
+  }
 
-            /** \brief Set the minimum required distance of sample from nearest obstacle to be considered valid */
-            void setMinimumObstacleClearance(double clearance)
-            {
-                clearance_ = clearance;
-            }
+protected:
+  /** \brief The sampler to build upon */
+  StateSamplerPtr sampler_;
 
-            /** \brief Get the minimum required distance of sample from nearest obstacle to be considered valid */
-            unsigned int getMinimumObstacleClearance() const
-            {
-                return clearance_;
-            }
-
-        protected:
-
-            /** \brief The sampler to build upon */
-            StateSamplerPtr sampler_;
-
-            /** \brief Minimum required distance of sample from nearest obstacle to be considered valid */
-            double          clearance_;
-        };
-
-    }
+  /** \brief Minimum required distance of sample from nearest obstacle to be considered valid */
+  double clearance_;
+};
 }
-
+}
 
 #endif

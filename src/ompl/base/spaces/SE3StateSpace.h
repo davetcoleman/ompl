@@ -43,109 +43,106 @@
 
 namespace ompl
 {
-    namespace base
+namespace base
+{
+/** \brief A state space representing SE(3) */
+class SE3StateSpace : public CompoundStateSpace
+{
+public:
+  /** \brief A state in SE(3): position = (x, y, z), quaternion = (x, y, z, w) */
+  class StateType : public CompoundStateSpace::StateType
+  {
+  public:
+    StateType() : CompoundStateSpace::StateType()
     {
-
-        /** \brief A state space representing SE(3) */
-        class SE3StateSpace : public CompoundStateSpace
-        {
-        public:
-
-            /** \brief A state in SE(3): position = (x, y, z), quaternion = (x, y, z, w) */
-            class StateType : public CompoundStateSpace::StateType
-            {
-            public:
-                StateType() : CompoundStateSpace::StateType()
-                {
-                }
-
-                /** \brief Get the X component of the state */
-                double getX() const
-                {
-                    return as<RealVectorStateSpace::StateType>(0)->values[0];
-                }
-
-                /** \brief Get the Y component of the state */
-                double getY() const
-                {
-                    return as<RealVectorStateSpace::StateType>(0)->values[1];
-                }
-
-                /** \brief Get the Z component of the state */
-                double getZ() const
-                {
-                    return as<RealVectorStateSpace::StateType>(0)->values[2];
-                }
-
-                /** \brief Get the rotation component of the state */
-                const SO3StateSpace::StateType& rotation() const
-                {
-                    return *as<SO3StateSpace::StateType>(1);
-                }
-
-                /** \brief Get the rotation component of the state and allow changing it as well */
-                SO3StateSpace::StateType& rotation()
-                {
-                    return *as<SO3StateSpace::StateType>(1);
-                }
-
-                /** \brief Set the X component of the state */
-                void setX(double x)
-                {
-                    as<RealVectorStateSpace::StateType>(0)->values[0] = x;
-                }
-
-                /** \brief Set the Y component of the state */
-                void setY(double y)
-                {
-                    as<RealVectorStateSpace::StateType>(0)->values[1] = y;
-                }
-
-                /** \brief Set the Z component of the state */
-                void setZ(double z)
-                {
-                    as<RealVectorStateSpace::StateType>(0)->values[2] = z;
-                }
-
-                /** \brief Set the X, Y and Z components of the state */
-                void setXYZ(double x, double y, double z)
-                {
-                    setX(x);
-                    setY(y);
-                    setZ(z);
-                }
-
-            };
-
-            SE3StateSpace() : CompoundStateSpace()
-            {
-                setName("SE3" + getName());
-                type_ = STATE_SPACE_SE3;
-                addSubspace(StateSpacePtr(new RealVectorStateSpace(3)), 1.0);
-                addSubspace(StateSpacePtr(new SO3StateSpace()), 1.0);
-                lock();
-            }
-
-            ~SE3StateSpace() override = default;
-
-            /** \copydoc RealVectorStateSpace::setBounds() */
-            void setBounds(const RealVectorBounds &bounds)
-            {
-                as<RealVectorStateSpace>(0)->setBounds(bounds);
-            }
-
-            /** \copydoc RealVectorStateSpace::getBounds() */
-            const RealVectorBounds& getBounds() const
-            {
-                return as<RealVectorStateSpace>(0)->getBounds();
-            }
-
-            State* allocState() const override;
-            void freeState(State *state) const override;
-
-            void registerProjections() override;
-        };
     }
+
+    /** \brief Get the X component of the state */
+    double getX() const
+    {
+      return as<RealVectorStateSpace::StateType>(0)->values[0];
+    }
+
+    /** \brief Get the Y component of the state */
+    double getY() const
+    {
+      return as<RealVectorStateSpace::StateType>(0)->values[1];
+    }
+
+    /** \brief Get the Z component of the state */
+    double getZ() const
+    {
+      return as<RealVectorStateSpace::StateType>(0)->values[2];
+    }
+
+    /** \brief Get the rotation component of the state */
+    const SO3StateSpace::StateType& rotation() const
+    {
+      return *as<SO3StateSpace::StateType>(1);
+    }
+
+    /** \brief Get the rotation component of the state and allow changing it as well */
+    SO3StateSpace::StateType& rotation()
+    {
+      return *as<SO3StateSpace::StateType>(1);
+    }
+
+    /** \brief Set the X component of the state */
+    void setX(double x)
+    {
+      as<RealVectorStateSpace::StateType>(0)->values[0] = x;
+    }
+
+    /** \brief Set the Y component of the state */
+    void setY(double y)
+    {
+      as<RealVectorStateSpace::StateType>(0)->values[1] = y;
+    }
+
+    /** \brief Set the Z component of the state */
+    void setZ(double z)
+    {
+      as<RealVectorStateSpace::StateType>(0)->values[2] = z;
+    }
+
+    /** \brief Set the X, Y and Z components of the state */
+    void setXYZ(double x, double y, double z)
+    {
+      setX(x);
+      setY(y);
+      setZ(z);
+    }
+  };
+
+  SE3StateSpace() : CompoundStateSpace()
+  {
+    setName("SE3" + getName());
+    type_ = STATE_SPACE_SE3;
+    addSubspace(StateSpacePtr(new RealVectorStateSpace(3)), 1.0);
+    addSubspace(StateSpacePtr(new SO3StateSpace()), 1.0);
+    lock();
+  }
+
+  ~SE3StateSpace() override = default;
+
+  /** \copydoc RealVectorStateSpace::setBounds() */
+  void setBounds(const RealVectorBounds& bounds)
+  {
+    as<RealVectorStateSpace>(0)->setBounds(bounds);
+  }
+
+  /** \copydoc RealVectorStateSpace::getBounds() */
+  const RealVectorBounds& getBounds() const
+  {
+    return as<RealVectorStateSpace>(0)->getBounds();
+  }
+
+  State* allocState() const override;
+  void freeState(State* state) const override;
+
+  void registerProjections() override;
+};
+}
 }
 
 #endif

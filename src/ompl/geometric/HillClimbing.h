@@ -44,75 +44,70 @@
 
 namespace ompl
 {
+namespace geometric
+{
+/**
+   @anchor HillClimbing
 
-    namespace geometric
-    {
+   @par Short description
 
-        /**
-           @anchor HillClimbing
+   HillClimbing searches for a state using hill climbing, starting from a given seed state.
 
-           @par Short description
+   @par External documentation
+*/
 
-           HillClimbing searches for a state using hill climbing, starting from a given seed state.
+/** \brief Hill Climbing search */
+class HillClimbing
+{
+public:
+  /** \brief Constructor */
+  HillClimbing(base::SpaceInformationPtr si) : si_(std::move(si)), maxImproveSteps_(2), checkValidity_(true)
+  {
+  }
 
-           @par External documentation
-        */
+  ~HillClimbing() = default;
 
-        /** \brief Hill Climbing search */
-        class HillClimbing
-        {
-        public:
+  /** \brief Try to improve a state (reduce distance to goal). The updates are performed by sampling near the
+      state, within the specified distance. If improvements were found, the function returns true and the better
+      goal distance is optionally returned */
+  bool tryToImprove(const base::GoalRegion &goal, base::State *state, double nearDistance,
+                    double *betterGoalDistance = nullptr) const;
 
-            /** \brief Constructor */
-            HillClimbing(base::SpaceInformationPtr si) : si_(std::move(si)), maxImproveSteps_(2), checkValidity_(true)
-            {
-            }
+  /** \brief Set the number of steps to perform */
+  void setMaxImproveSteps(unsigned int steps)
+  {
+    maxImproveSteps_ = steps;
+  }
 
-            ~HillClimbing() = default;
+  /** \brief Get the number of steps to perform */
+  unsigned int getMaxImproveSteps() const
+  {
+    return maxImproveSteps_;
+  }
 
-            /** \brief Try to improve a state (reduce distance to goal). The updates are performed by sampling near the
-                state, within the specified distance. If improvements were found, the function returns true and the better
-                goal distance is optionally returned */
-            bool tryToImprove(const base::GoalRegion &goal, base::State *state, double nearDistance, double *betterGoalDistance = nullptr) const;
+  /** \brief Set the state validity flag; if this is false, states are not checked for validity */
+  void setValidityCheck(bool valid)
+  {
+    checkValidity_ = valid;
+  }
 
-            /** \brief Set the number of steps to perform */
-            void setMaxImproveSteps(unsigned int steps)
-            {
-                maxImproveSteps_ = steps;
-            }
+  /** \brief Get the state validity flag; if this is false, states are not checked for validity */
+  bool getValidityCheck() const
+  {
+    return checkValidity_;
+  }
 
-            /** \brief Get the number of steps to perform */
-            unsigned int getMaxImproveSteps() const
-            {
-                return maxImproveSteps_;
-            }
+private:
+  bool valid(const base::State *state) const
+  {
+    return checkValidity_ ? si_->isValid(state) : true;
+  }
 
-            /** \brief Set the state validity flag; if this is false, states are not checked for validity */
-            void setValidityCheck(bool valid)
-            {
-                checkValidity_ = valid;
-            }
-
-            /** \brief Get the state validity flag; if this is false, states are not checked for validity */
-            bool getValidityCheck() const
-            {
-                return checkValidity_;
-            }
-
-        private:
-
-            bool valid(const base::State *state) const
-            {
-                return checkValidity_ ? si_->isValid(state) : true;
-            }
-
-            base::SpaceInformationPtr si_;
-            unsigned int              maxImproveSteps_;
-            bool                      checkValidity_;
-        };
-
-    }
-
+  base::SpaceInformationPtr si_;
+  unsigned int maxImproveSteps_;
+  bool checkValidity_;
+};
+}
 }
 
 #endif

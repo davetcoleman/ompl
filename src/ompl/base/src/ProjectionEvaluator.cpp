@@ -49,162 +49,164 @@
 #include <limits>
 #include <utility>
 
-ompl::base::ProjectionMatrix::Matrix ompl::base::ProjectionMatrix::ComputeRandom(const unsigned int from, const unsigned int to, const std::vector<double> &scale)
+ompl::base::ProjectionMatrix::Matrix ompl::base::ProjectionMatrix::ComputeRandom(const unsigned int from,
+                                                                                 const unsigned int to,
+                                                                                 const std::vector<double> &scale)
 {
-    namespace nu = boost::numeric::ublas;
+  namespace nu = boost::numeric::ublas;
 
-    RNG rng;
-    Matrix projection(to, from);
+  RNG rng;
+  Matrix projection(to, from);
 
-    for (unsigned int j = 0 ; j < from ; ++j)
+  for (unsigned int j = 0; j < from; ++j)
+  {
+    if (scale.size() == from && fabs(scale[j]) < std::numeric_limits<double>::epsilon())
+      nu::column(projection, j) = nu::zero_vector<double>(to);
+    else
+      for (unsigned int i = 0; i < to; ++i)
+        projection(i, j) = rng.gaussian01();
+  }
+
+  for (unsigned int i = 0; i < to; ++i)
+  {
+    nu::matrix_row<Matrix> row(projection, i);
+    for (unsigned int j = 0; j < i; ++j)
     {
-        if (scale.size() == from && fabs(scale[j]) < std::numeric_limits<double>::epsilon())
-            nu::column(projection, j) = nu::zero_vector<double>(to);
-        else
-            for (unsigned int i = 0 ; i < to ; ++i)
-                projection(i, j) = rng.gaussian01();
+      nu::matrix_row<Matrix> prevRow(projection, j);
+      // subtract projection
+      row -= inner_prod(row, prevRow) * prevRow;
     }
+    // normalize
+    row /= norm_2(row);
+  }
 
-    for (unsigned int i = 0 ; i < to ; ++i)
+  assert(scale.size() == from || scale.size() == 0);
+  if (scale.size() == from)
+  {
+    unsigned int z = 0;
+    for (unsigned int i = 0; i < from; ++i)
     {
-        nu::matrix_row<Matrix> row(projection, i);
-        for (unsigned int j = 0 ; j < i ; ++j)
-        {
-            nu::matrix_row<Matrix> prevRow(projection, j);
-            // subtract projection
-            row -= inner_prod(row, prevRow) * prevRow;
-        }
-        // normalize
-        row /= norm_2(row);
+      if (fabs(scale[i]) < std::numeric_limits<double>::epsilon())
+        z++;
+      else
+        nu::column(projection, i) /= scale[i];
     }
-
-    assert(scale.size() == from || scale.size() == 0);
-    if (scale.size() == from)
-    {
-        unsigned int z = 0;
-        for (unsigned int i = 0 ; i < from ; ++i)
-        {
-            if (fabs(scale[i]) < std::numeric_limits<double>::epsilon())
-                z++;
-            else
-                nu::column(projection, i) /= scale[i];
-        }
-        if (z == from)
-            OMPL_WARN("Computed projection matrix is all 0s");
-    }
-    return projection;
+    if (z == from)
+      OMPL_WARN("Computed projection matrix is all 0s");
+  }
+  return projection;
 }
 
-ompl::base::ProjectionMatrix::Matrix ompl::base::ProjectionMatrix::ComputeRandom(const unsigned int from, const unsigned int to)
+ompl::base::ProjectionMatrix::Matrix ompl::base::ProjectionMatrix::ComputeRandom(const unsigned int from,
+                                                                                 const unsigned int to)
 {
-    return ComputeRandom(from, to, std::vector<double>());
+  return ComputeRandom(from, to, std::vector<double>());
 }
 
-void ompl::base::ProjectionMatrix::computeRandom(const unsigned int from, const unsigned int to, const std::vector<double> &scale)
+void ompl::base::ProjectionMatrix::computeRandom(const unsigned int from, const unsigned int to,
+                                                 const std::vector<double> &scale)
 {
-    mat = ComputeRandom(from, to, scale);
+  mat = ComputeRandom(from, to, scale);
 }
 
 void ompl::base::ProjectionMatrix::computeRandom(const unsigned int from, const unsigned int to)
 {
-    mat = ComputeRandom(from, to);
+  mat = ComputeRandom(from, to);
 }
 
-void ompl::base::ProjectionMatrix::project(const double *from, EuclideanProjection& to) const
+void ompl::base::ProjectionMatrix::project(const double *from, EuclideanProjection &to) const
 {
-    namespace nu = boost::numeric::ublas;
-    // create a temporary uBLAS vector from a C-style array without copying data
-    nu::shallow_array_adaptor<const double> tmp1(mat.size2(), from);
-    nu::vector<double, nu::shallow_array_adaptor<const double> > tmp2(mat.size2(), tmp1);
-    to = prod(mat, tmp2);
+  namespace nu = boost::numeric::ublas;
+  // create a temporary uBLAS vector from a C-style array without copying data
+  nu::shallow_array_adaptor<const double> tmp1(mat.size2(), from);
+  nu::vector<double, nu::shallow_array_adaptor<const double> > tmp2(mat.size2(), tmp1);
+  to = prod(mat, tmp2);
 }
 
 void ompl::base::ProjectionMatrix::print(std::ostream &out) const
 {
-    out << mat << std::endl;
+  out << mat << std::endl;
 }
 
-ompl::base::ProjectionEvaluator::ProjectionEvaluator(const StateSpace *space) :
-    space_(space),
-    bounds_(0), estimatedBounds_(0),
-    defaultCellSizes_(true), cellSizesWereInferred_(false)
+ompl::base::ProjectionEvaluator::ProjectionEvaluator(const StateSpace *space)
+  : space_(space), bounds_(0), estimatedBounds_(0), defaultCellSizes_(true), cellSizesWereInferred_(false)
 {
-    params_.declareParam<double>("cellsize_factor", std::bind(&ProjectionEvaluator::mulCellSizes, this, std::placeholders::_1));
+  params_.declareParam<double>("cellsize_factor",
+                               std::bind(&ProjectionEvaluator::mulCellSizes, this, std::placeholders::_1));
 }
 
-ompl::base::ProjectionEvaluator::ProjectionEvaluator(const StateSpacePtr &space) :
-    space_(space.get()),
-    bounds_(0), estimatedBounds_(0),
-    defaultCellSizes_(true), cellSizesWereInferred_(false)
+ompl::base::ProjectionEvaluator::ProjectionEvaluator(const StateSpacePtr &space)
+  : space_(space.get()), bounds_(0), estimatedBounds_(0), defaultCellSizes_(true), cellSizesWereInferred_(false)
 {
-    params_.declareParam<double>("cellsize_factor", std::bind(&ProjectionEvaluator::mulCellSizes, this, std::placeholders::_1));
+  params_.declareParam<double>("cellsize_factor",
+                               std::bind(&ProjectionEvaluator::mulCellSizes, this, std::placeholders::_1));
 }
 
 ompl::base::ProjectionEvaluator::~ProjectionEvaluator() = default;
 
 bool ompl::base::ProjectionEvaluator::userConfigured() const
 {
-    return !defaultCellSizes_ && !cellSizesWereInferred_;
+  return !defaultCellSizes_ && !cellSizesWereInferred_;
 }
 
 void ompl::base::ProjectionEvaluator::setCellSizes(const std::vector<double> &cellSizes)
 {
-    defaultCellSizes_ = false;
-    cellSizesWereInferred_ = false;
-    cellSizes_ = cellSizes;
-    checkCellSizes();
+  defaultCellSizes_ = false;
+  cellSizesWereInferred_ = false;
+  cellSizes_ = cellSizes;
+  checkCellSizes();
 }
 
 void ompl::base::ProjectionEvaluator::setBounds(const RealVectorBounds &bounds)
 {
-    bounds_ = bounds;
-    checkBounds();
+  bounds_ = bounds;
+  checkBounds();
 }
 
 void ompl::base::ProjectionEvaluator::setCellSizes(unsigned int dim, double cellSize)
 {
-    if (cellSizes_.size() >= dim)
-        OMPL_ERROR("Dimension %u is not defined for projection evaluator", dim);
-    else
-    {
-        std::vector<double> c = cellSizes_;
-        c[dim] = cellSize;
-        setCellSizes(c);
-    }
+  if (cellSizes_.size() >= dim)
+    OMPL_ERROR("Dimension %u is not defined for projection evaluator", dim);
+  else
+  {
+    std::vector<double> c = cellSizes_;
+    c[dim] = cellSize;
+    setCellSizes(c);
+  }
 }
 
 double ompl::base::ProjectionEvaluator::getCellSizes(unsigned int dim) const
 {
-    if (cellSizes_.size() > dim)
-        return cellSizes_[dim];
-    OMPL_ERROR("Dimension %u is not defined for projection evaluator", dim);
-    return 0.0;
+  if (cellSizes_.size() > dim)
+    return cellSizes_[dim];
+  OMPL_ERROR("Dimension %u is not defined for projection evaluator", dim);
+  return 0.0;
 }
 
 void ompl::base::ProjectionEvaluator::mulCellSizes(double factor)
 {
-    if (cellSizes_.size() == getDimension())
-    {
-        std::vector<double> c(cellSizes_.size());
-        for (std::size_t i = 0 ; i < cellSizes_.size() ; ++i)
-            c[i] = cellSizes_[i] * factor;
-        setCellSizes(c);
-    }
+  if (cellSizes_.size() == getDimension())
+  {
+    std::vector<double> c(cellSizes_.size());
+    for (std::size_t i = 0; i < cellSizes_.size(); ++i)
+      c[i] = cellSizes_[i] * factor;
+    setCellSizes(c);
+  }
 }
 
 void ompl::base::ProjectionEvaluator::checkCellSizes() const
 {
-    if (getDimension() <= 0)
-        throw Exception("Dimension of projection needs to be larger than 0");
-    if (cellSizes_.size() != getDimension())
-        throw Exception("Number of dimensions in projection space does not match number of cell sizes");
+  if (getDimension() <= 0)
+    throw Exception("Dimension of projection needs to be larger than 0");
+  if (cellSizes_.size() != getDimension())
+    throw Exception("Number of dimensions in projection space does not match number of cell sizes");
 }
 
 void ompl::base::ProjectionEvaluator::checkBounds() const
 {
-    bounds_.check();
-    if (hasBounds() && bounds_.low.size() != getDimension())
-        throw Exception("Number of dimensions in projection space does not match dimension of bounds");
+  bounds_.check();
+  if (hasBounds() && bounds_.low.size() != getDimension())
+    throw Exception("Number of dimensions in projection space does not match dimension of bounds");
 }
 
 void ompl::base::ProjectionEvaluator::defaultCellSizes()
@@ -214,165 +216,170 @@ void ompl::base::ProjectionEvaluator::defaultCellSizes()
 /// @cond IGNORE
 namespace ompl
 {
-    namespace base
-    {
-
-        static inline void computeCoordinatesHelper(const std::vector<double> &cellSizes, const EuclideanProjection &projection, ProjectionCoordinates &coord)
-        {
-            const std::size_t dim = cellSizes.size();
-            coord.resize(dim);
-            for (unsigned int i = 0 ; i < dim ; ++i)
-                coord[i] = (int)floor(projection(i)/cellSizes[i]);
-        }
-    }
+namespace base
+{
+static inline void computeCoordinatesHelper(const std::vector<double> &cellSizes, const EuclideanProjection &projection,
+                                            ProjectionCoordinates &coord)
+{
+  const std::size_t dim = cellSizes.size();
+  coord.resize(dim);
+  for (unsigned int i = 0; i < dim; ++i)
+    coord[i] = (int)floor(projection(i) / cellSizes[i]);
+}
+}
 }
 /// @endcond
 
 void ompl::base::ProjectionEvaluator::inferBounds()
 {
-    if (estimatedBounds_.low.empty())
-        estimateBounds();
-    bounds_ = estimatedBounds_;
+  if (estimatedBounds_.low.empty())
+    estimateBounds();
+  bounds_ = estimatedBounds_;
 }
 
 void ompl::base::ProjectionEvaluator::estimateBounds()
 {
-    unsigned int dim = getDimension();
-    estimatedBounds_.resize(dim);
-    if (dim > 0)
+  unsigned int dim = getDimension();
+  estimatedBounds_.resize(dim);
+  if (dim > 0)
+  {
+    StateSamplerPtr sampler = space_->allocStateSampler();
+    State *s = space_->allocState();
+    EuclideanProjection proj(dim);
+
+    estimatedBounds_.setLow(std::numeric_limits<double>::infinity());
+    estimatedBounds_.setHigh(-std::numeric_limits<double>::infinity());
+
+    for (unsigned int i = 0; i < magic::PROJECTION_EXTENTS_SAMPLES; ++i)
     {
-        StateSamplerPtr sampler = space_->allocStateSampler();
-        State *s = space_->allocState();
-        EuclideanProjection proj(dim);
-
-        estimatedBounds_.setLow(std::numeric_limits<double>::infinity());
-        estimatedBounds_.setHigh(-std::numeric_limits<double>::infinity());
-
-        for (unsigned int i = 0 ; i < magic::PROJECTION_EXTENTS_SAMPLES ; ++i)
-        {
-            sampler->sampleUniform(s);
-            project(s, proj);
-            for (unsigned int j = 0 ; j < dim ; ++j)
-            {
-                if (estimatedBounds_.low[j] > proj[j])
-                    estimatedBounds_.low[j] = proj[j];
-                if (estimatedBounds_.high[j] < proj[j])
-                    estimatedBounds_.high[j] = proj[j];
-            }
-        }
-        // make bounding box 10% larger (5% padding on each side)
-        std::vector<double> diff(estimatedBounds_.getDifference());
-        for (unsigned int j = 0; j < dim; ++j)
-        {
-            estimatedBounds_.low[j] -= magic::PROJECTION_EXPAND_FACTOR * diff[j];
-            estimatedBounds_.high[j] += magic::PROJECTION_EXPAND_FACTOR * diff[j];
-        }
-
-        space_->freeState(s);
+      sampler->sampleUniform(s);
+      project(s, proj);
+      for (unsigned int j = 0; j < dim; ++j)
+      {
+        if (estimatedBounds_.low[j] > proj[j])
+          estimatedBounds_.low[j] = proj[j];
+        if (estimatedBounds_.high[j] < proj[j])
+          estimatedBounds_.high[j] = proj[j];
+      }
     }
+    // make bounding box 10% larger (5% padding on each side)
+    std::vector<double> diff(estimatedBounds_.getDifference());
+    for (unsigned int j = 0; j < dim; ++j)
+    {
+      estimatedBounds_.low[j] -= magic::PROJECTION_EXPAND_FACTOR * diff[j];
+      estimatedBounds_.high[j] += magic::PROJECTION_EXPAND_FACTOR * diff[j];
+    }
+
+    space_->freeState(s);
+  }
 }
 
 void ompl::base::ProjectionEvaluator::inferCellSizes()
 {
-    cellSizesWereInferred_ = true;
-    if (!hasBounds())
-        inferBounds();
-    unsigned int dim = getDimension();
-    cellSizes_.resize(dim);
-    for (unsigned int j = 0 ; j < dim ; ++j)
+  cellSizesWereInferred_ = true;
+  if (!hasBounds())
+    inferBounds();
+  unsigned int dim = getDimension();
+  cellSizes_.resize(dim);
+  for (unsigned int j = 0; j < dim; ++j)
+  {
+    cellSizes_[j] = (bounds_.high[j] - bounds_.low[j]) / magic::PROJECTION_DIMENSION_SPLITS;
+    if (cellSizes_[j] < std::numeric_limits<double>::epsilon())
     {
-        cellSizes_[j] = (bounds_.high[j] - bounds_.low[j]) / magic::PROJECTION_DIMENSION_SPLITS;
-        if (cellSizes_[j] < std::numeric_limits<double>::epsilon())
-        {
-            cellSizes_[j] = 1.0;
-            OMPL_WARN("Inferred cell size for dimension %u of a projection for state space %s is 0. Setting arbitrary value of 1 instead.",
-                      j, space_->getName().c_str());
-        }
+      cellSizes_[j] = 1.0;
+      OMPL_WARN("Inferred cell size for dimension %u of a projection for state space %s is 0. Setting arbitrary value "
+                "of 1 instead.",
+                j, space_->getName().c_str());
     }
+  }
 }
 
 void ompl::base::ProjectionEvaluator::setup()
 {
-    using setCellSizesFunctionType = void (ompl::base::ProjectionEvaluator::*)(unsigned int, double);
-    using getCellSizesFunctionType = double (ompl::base::ProjectionEvaluator::*)(unsigned int) const;
+  using setCellSizesFunctionType = void (ompl::base::ProjectionEvaluator::*)(unsigned int, double);
+  using getCellSizesFunctionType = double (ompl::base::ProjectionEvaluator::*)(unsigned int) const;
 
-    if (defaultCellSizes_)
-        defaultCellSizes();
+  if (defaultCellSizes_)
+    defaultCellSizes();
 
-    if ((cellSizes_.size() == 0 && getDimension() > 0) || cellSizesWereInferred_)
-        inferCellSizes();
+  if ((cellSizes_.size() == 0 && getDimension() > 0) || cellSizesWereInferred_)
+    inferCellSizes();
 
-    checkCellSizes();
-    checkBounds();
+  checkCellSizes();
+  checkBounds();
 
-    unsigned int dim = getDimension();
-    for (unsigned int i = 0 ; i < dim ; ++i)
-        params_.declareParam<double>("cellsize." + std::to_string(i),
-                                     std::bind((setCellSizesFunctionType)&ProjectionEvaluator::setCellSizes, this, i, std::placeholders::_1),
-                                     std::bind((getCellSizesFunctionType)&ProjectionEvaluator::getCellSizes, this, i));
+  unsigned int dim = getDimension();
+  for (unsigned int i = 0; i < dim; ++i)
+    params_.declareParam<double>(
+        "cellsize." + std::to_string(i),
+        std::bind((setCellSizesFunctionType)&ProjectionEvaluator::setCellSizes, this, i, std::placeholders::_1),
+        std::bind((getCellSizesFunctionType)&ProjectionEvaluator::getCellSizes, this, i));
 }
 
-void ompl::base::ProjectionEvaluator::computeCoordinates(const EuclideanProjection &projection, ProjectionCoordinates &coord) const
+void ompl::base::ProjectionEvaluator::computeCoordinates(const EuclideanProjection &projection,
+                                                         ProjectionCoordinates &coord) const
 {
-    computeCoordinatesHelper(cellSizes_, projection, coord);
+  computeCoordinatesHelper(cellSizes_, projection, coord);
 }
 
 void ompl::base::ProjectionEvaluator::printSettings(std::ostream &out) const
 {
-    out << "Projection of dimension " << getDimension() << std::endl;
-    out << "Cell sizes";
-    if (cellSizesWereInferred_)
-        out << " (inferred by sampling)";
+  out << "Projection of dimension " << getDimension() << std::endl;
+  out << "Cell sizes";
+  if (cellSizesWereInferred_)
+    out << " (inferred by sampling)";
+  else
+  {
+    if (defaultCellSizes_)
+      out << " (computed defaults)";
     else
-    {
-        if (defaultCellSizes_)
-            out << " (computed defaults)";
-        else
-            out << " (set by user)";
-    }
-    out << ": [";
-    for (unsigned int i = 0 ; i < cellSizes_.size() ; ++i)
-    {
-        out << cellSizes_[i];
-        if (i + 1 < cellSizes_.size())
-            out << ' ';
-    }
-    out << ']' << std::endl;
+      out << " (set by user)";
+  }
+  out << ": [";
+  for (unsigned int i = 0; i < cellSizes_.size(); ++i)
+  {
+    out << cellSizes_[i];
+    if (i + 1 < cellSizes_.size())
+      out << ' ';
+  }
+  out << ']' << std::endl;
 }
 
 void ompl::base::ProjectionEvaluator::printProjection(const EuclideanProjection &projection, std::ostream &out) const
 {
-    out << projection << std::endl;
+  out << projection << std::endl;
 }
 
-ompl::base::SubspaceProjectionEvaluator::SubspaceProjectionEvaluator(const StateSpace *space, unsigned int index, ProjectionEvaluatorPtr projToUse) :
-    ProjectionEvaluator(space), index_(index), specifiedProj_(std::move(projToUse))
+ompl::base::SubspaceProjectionEvaluator::SubspaceProjectionEvaluator(const StateSpace *space, unsigned int index,
+                                                                     ProjectionEvaluatorPtr projToUse)
+  : ProjectionEvaluator(space), index_(index), specifiedProj_(std::move(projToUse))
 {
-    if (!space_->isCompound())
-        throw Exception("Cannot construct a subspace projection evaluator for a space that is not compound");
-    if (space_->as<CompoundStateSpace>()->getSubspaceCount() <= index_)
-        throw Exception("State space " + space_->getName() + " does not have a subspace at index " + std::to_string(index_));
+  if (!space_->isCompound())
+    throw Exception("Cannot construct a subspace projection evaluator for a space that is not compound");
+  if (space_->as<CompoundStateSpace>()->getSubspaceCount() <= index_)
+    throw Exception("State space " + space_->getName() + " does not have a subspace at index " +
+                    std::to_string(index_));
 }
 
 void ompl::base::SubspaceProjectionEvaluator::setup()
 {
-    if (specifiedProj_)
-        proj_ = specifiedProj_;
-    else
-        proj_ = space_->as<CompoundStateSpace>()->getSubspace(index_)->getDefaultProjection();
-    if (!proj_)
-        throw Exception("No projection specified for subspace at index " + std::to_string(index_));
+  if (specifiedProj_)
+    proj_ = specifiedProj_;
+  else
+    proj_ = space_->as<CompoundStateSpace>()->getSubspace(index_)->getDefaultProjection();
+  if (!proj_)
+    throw Exception("No projection specified for subspace at index " + std::to_string(index_));
 
-    cellSizes_ = proj_->getCellSizes();
-    ProjectionEvaluator::setup();
+  cellSizes_ = proj_->getCellSizes();
+  ProjectionEvaluator::setup();
 }
 
 unsigned int ompl::base::SubspaceProjectionEvaluator::getDimension() const
 {
-    return proj_->getDimension();
+  return proj_->getDimension();
 }
 
 void ompl::base::SubspaceProjectionEvaluator::project(const State *state, EuclideanProjection &projection) const
 {
-    proj_->project(state->as<CompoundState>()->components[index_], projection);
+  proj_->project(state->as<CompoundState>()->components[index_], projection);
 }

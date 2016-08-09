@@ -38,57 +38,59 @@
 #include "ompl/base/SpaceInformation.h"
 #include "ompl/tools/config/MagicConstants.h"
 
-ompl::base::GaussianValidStateSampler::GaussianValidStateSampler(const SpaceInformation *si) :
-    ValidStateSampler(si), sampler_(si->allocStateSampler()), stddev_(si->getMaximumExtent() * magic::STD_DEV_AS_SPACE_EXTENT_FRACTION)
+ompl::base::GaussianValidStateSampler::GaussianValidStateSampler(const SpaceInformation *si)
+  : ValidStateSampler(si)
+  , sampler_(si->allocStateSampler())
+  , stddev_(si->getMaximumExtent() * magic::STD_DEV_AS_SPACE_EXTENT_FRACTION)
 {
-    name_ = "gaussian";
-    params_.declareParam<double>("standard_deviation",
-                                 std::bind(&GaussianValidStateSampler::setStdDev, this, std::placeholders::_1),
-                                 std::bind(&GaussianValidStateSampler::getStdDev, this));
+  name_ = "gaussian";
+  params_.declareParam<double>("standard_deviation",
+                               std::bind(&GaussianValidStateSampler::setStdDev, this, std::placeholders::_1),
+                               std::bind(&GaussianValidStateSampler::getStdDev, this));
 }
 
 bool ompl::base::GaussianValidStateSampler::sample(State *state)
 {
-    bool result = false;
-    unsigned int attempts = 0;
-    State *temp = si_->allocState();
-    do
+  bool result = false;
+  unsigned int attempts = 0;
+  State *temp = si_->allocState();
+  do
+  {
+    sampler_->sampleUniform(state);
+    bool v1 = si_->isValid(state);
+    sampler_->sampleGaussian(temp, state, stddev_);
+    bool v2 = si_->isValid(temp);
+    if (v1 != v2)
     {
-        sampler_->sampleUniform(state);
-        bool v1 = si_->isValid(state);
-        sampler_->sampleGaussian(temp, state, stddev_);
-        bool v2 = si_->isValid(temp);
-        if (v1 != v2)
-        {
-            if (v2)
-                si_->copyState(state, temp);
-            result = true;
-        }
-        ++attempts;
-    } while (!result && attempts < attempts_);
-    si_->freeState(temp);
-    return result;
+      if (v2)
+        si_->copyState(state, temp);
+      result = true;
+    }
+    ++attempts;
+  } while (!result && attempts < attempts_);
+  si_->freeState(temp);
+  return result;
 }
 
 bool ompl::base::GaussianValidStateSampler::sampleNear(State *state, const State *near, const double distance)
 {
-    bool result = false;
-    unsigned int attempts = 0;
-    State *temp = si_->allocState();
-    do
+  bool result = false;
+  unsigned int attempts = 0;
+  State *temp = si_->allocState();
+  do
+  {
+    sampler_->sampleUniformNear(state, near, distance);
+    bool v1 = si_->isValid(state);
+    sampler_->sampleGaussian(temp, state, distance);
+    bool v2 = si_->isValid(temp);
+    if (v1 != v2)
     {
-        sampler_->sampleUniformNear(state, near, distance);
-        bool v1 = si_->isValid(state);
-        sampler_->sampleGaussian(temp, state, distance);
-        bool v2 = si_->isValid(temp);
-        if (v1 != v2)
-        {
-            if (v2)
-                si_->copyState(state, temp);
-            result = true;
-        }
-        ++attempts;
-    } while (!result && attempts < attempts_);
-    si_->freeState(temp);
-    return result;
+      if (v2)
+        si_->copyState(state, temp);
+      result = true;
+    }
+    ++attempts;
+  } while (!result && attempts < attempts_);
+  si_->freeState(temp);
+  return result;
 }

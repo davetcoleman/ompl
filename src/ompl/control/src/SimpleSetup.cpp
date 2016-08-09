@@ -39,119 +39,121 @@
 
 ompl::base::PlannerPtr ompl::control::getDefaultPlanner(const base::GoalPtr &goal)
 {
-    return tools::SelfConfig::getDefaultPlanner(goal);
+  return tools::SelfConfig::getDefaultPlanner(goal);
 }
 
-ompl::control::SimpleSetup::SimpleSetup(const SpaceInformationPtr &si) :
-    configured_(false), planTime_(0.0), last_status_(base::PlannerStatus::UNKNOWN)
+ompl::control::SimpleSetup::SimpleSetup(const SpaceInformationPtr &si)
+  : configured_(false), planTime_(0.0), last_status_(base::PlannerStatus::UNKNOWN)
 {
-    si_ = si;
-    pdef_.reset(new base::ProblemDefinition(si_));
+  si_ = si;
+  pdef_.reset(new base::ProblemDefinition(si_));
 }
 
-ompl::control::SimpleSetup::SimpleSetup(const ControlSpacePtr &space) :
-    configured_(false), planTime_(0.0), last_status_(base::PlannerStatus::UNKNOWN)
+ompl::control::SimpleSetup::SimpleSetup(const ControlSpacePtr &space)
+  : configured_(false), planTime_(0.0), last_status_(base::PlannerStatus::UNKNOWN)
 {
-    si_.reset(new SpaceInformation(space->getStateSpace(), space));
-    pdef_.reset(new base::ProblemDefinition(si_));
+  si_.reset(new SpaceInformation(space->getStateSpace(), space));
+  pdef_.reset(new base::ProblemDefinition(si_));
 }
 
 void ompl::control::SimpleSetup::setup()
 {
-    if (!configured_ || !si_->isSetup() || !planner_->isSetup())
+  if (!configured_ || !si_->isSetup() || !planner_->isSetup())
+  {
+    if (!si_->isSetup())
+      si_->setup();
+    if (!planner_)
     {
-        if (!si_->isSetup())
-            si_->setup();
-        if (!planner_)
-        {
-            if (pa_)
-                planner_ = pa_(si_);
-            if (!planner_)
-            {
-                OMPL_INFORM("No planner specified. Using default.");
-                planner_ = tools::SelfConfig::getDefaultPlanner(getGoal());
-            }
-        }
-        planner_->setProblemDefinition(pdef_);
-        if (!planner_->isSetup())
-            planner_->setup();
-
-        configured_ = true;
+      if (pa_)
+        planner_ = pa_(si_);
+      if (!planner_)
+      {
+        OMPL_INFORM("No planner specified. Using default.");
+        planner_ = tools::SelfConfig::getDefaultPlanner(getGoal());
+      }
     }
+    planner_->setProblemDefinition(pdef_);
+    if (!planner_->isSetup())
+      planner_->setup();
+
+    configured_ = true;
+  }
 }
 
 void ompl::control::SimpleSetup::clear()
 {
-    if (planner_)
-        planner_->clear();
-    if (pdef_)
-        pdef_->clearSolutionPaths();
+  if (planner_)
+    planner_->clear();
+  if (pdef_)
+    pdef_->clearSolutionPaths();
 }
 
-// we provide a duplicate implementation here to allow the planner to choose how the time is turned into a planner termination condition
+// we provide a duplicate implementation here to allow the planner to choose how the time is turned into a planner
+// termination condition
 ompl::base::PlannerStatus ompl::control::SimpleSetup::solve(double time)
 {
-    setup();
-    last_status_ = base::PlannerStatus::UNKNOWN;
-    time::point start = time::now();
-    last_status_ = planner_->solve(time);
-    planTime_ = time::seconds(time::now() - start);
-    if (last_status_)
-        OMPL_INFORM("Solution found in %f seconds", planTime_);
-    else
-        OMPL_INFORM("No solution found after %f seconds", planTime_);
-    return last_status_;
+  setup();
+  last_status_ = base::PlannerStatus::UNKNOWN;
+  time::point start = time::now();
+  last_status_ = planner_->solve(time);
+  planTime_ = time::seconds(time::now() - start);
+  if (last_status_)
+    OMPL_INFORM("Solution found in %f seconds", planTime_);
+  else
+    OMPL_INFORM("No solution found after %f seconds", planTime_);
+  return last_status_;
 }
 
 ompl::base::PlannerStatus ompl::control::SimpleSetup::solve(const base::PlannerTerminationCondition &ptc)
 {
-    setup();
-    last_status_ = base::PlannerStatus::UNKNOWN;
-    time::point start = time::now();
-    last_status_ = planner_->solve(ptc);
-    planTime_ = time::seconds(time::now() - start);
-    if (last_status_)
-        OMPL_INFORM("Solution found in %f seconds", planTime_);
-    else
-        OMPL_INFORM("No solution found after %f seconds", planTime_);
-    return last_status_;
+  setup();
+  last_status_ = base::PlannerStatus::UNKNOWN;
+  time::point start = time::now();
+  last_status_ = planner_->solve(ptc);
+  planTime_ = time::seconds(time::now() - start);
+  if (last_status_)
+    OMPL_INFORM("Solution found in %f seconds", planTime_);
+  else
+    OMPL_INFORM("No solution found after %f seconds", planTime_);
+  return last_status_;
 }
 
-ompl::control::PathControl& ompl::control::SimpleSetup::getSolutionPath() const
+ompl::control::PathControl &ompl::control::SimpleSetup::getSolutionPath() const
 {
-    if (pdef_)
-    {
-        const base::PathPtr &p = pdef_->getSolutionPath();
-        if (p)
-            return static_cast<PathControl&>(*p);
-    }
-    throw Exception("No solution path");
+  if (pdef_)
+  {
+    const base::PathPtr &p = pdef_->getSolutionPath();
+    if (p)
+      return static_cast<PathControl &>(*p);
+  }
+  throw Exception("No solution path");
 }
 
 bool ompl::control::SimpleSetup::haveExactSolutionPath() const
 {
-    return haveSolutionPath() && (!pdef_->hasApproximateSolution() || pdef_->getSolutionDifference() < std::numeric_limits<double>::epsilon());
+  return haveSolutionPath() &&
+         (!pdef_->hasApproximateSolution() || pdef_->getSolutionDifference() < std::numeric_limits<double>::epsilon());
 }
 
 void ompl::control::SimpleSetup::getPlannerData(base::PlannerData &pd) const
 {
-    pd.clear();
-    if (planner_)
-        planner_->getPlannerData(pd);
+  pd.clear();
+  if (planner_)
+    planner_->getPlannerData(pd);
 }
 
 void ompl::control::SimpleSetup::print(std::ostream &out) const
 {
-    if (si_)
-    {
-        si_->printProperties(out);
-        si_->printSettings(out);
-    }
-    if (planner_)
-    {
-        planner_->printProperties(out);
-        planner_->printSettings(out);
-    }
-    if (pdef_)
-        pdef_->print(out);
+  if (si_)
+  {
+    si_->printProperties(out);
+    si_->printSettings(out);
+  }
+  if (planner_)
+  {
+    planner_->printProperties(out);
+    planner_->printSettings(out);
+  }
+  if (pdef_)
+    pdef_->print(out);
 }

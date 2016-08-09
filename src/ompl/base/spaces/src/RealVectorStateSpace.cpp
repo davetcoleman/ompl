@@ -44,261 +44,257 @@
 
 void ompl::base::RealVectorStateSampler::sampleUniform(State *state)
 {
-    const unsigned int dim = space_->getDimension();
-    const RealVectorBounds &bounds = static_cast<const RealVectorStateSpace*>(space_)->getBounds();
+  const unsigned int dim = space_->getDimension();
+  const RealVectorBounds &bounds = static_cast<const RealVectorStateSpace *>(space_)->getBounds();
 
-    RealVectorStateSpace::StateType *rstate = static_cast<RealVectorStateSpace::StateType*>(state);
-    for (unsigned int i = 0 ; i < dim ; ++i)
-        rstate->values[i] = rng_.uniformReal(bounds.low[i], bounds.high[i]);
+  RealVectorStateSpace::StateType *rstate = static_cast<RealVectorStateSpace::StateType *>(state);
+  for (unsigned int i = 0; i < dim; ++i)
+    rstate->values[i] = rng_.uniformReal(bounds.low[i], bounds.high[i]);
 }
 
 void ompl::base::RealVectorStateSampler::sampleUniformNear(State *state, const State *near, const double distance)
 {
-    const unsigned int dim = space_->getDimension();
-    const RealVectorBounds &bounds = static_cast<const RealVectorStateSpace*>(space_)->getBounds();
+  const unsigned int dim = space_->getDimension();
+  const RealVectorBounds &bounds = static_cast<const RealVectorStateSpace *>(space_)->getBounds();
 
-    RealVectorStateSpace::StateType *rstate = static_cast<RealVectorStateSpace::StateType*>(state);
-    const RealVectorStateSpace::StateType *rnear = static_cast<const RealVectorStateSpace::StateType*>(near);
-    for (unsigned int i = 0 ; i < dim ; ++i)
-        rstate->values[i] =
-            rng_.uniformReal(std::max(bounds.low[i], rnear->values[i] - distance),
-                             std::min(bounds.high[i], rnear->values[i] + distance));
+  RealVectorStateSpace::StateType *rstate = static_cast<RealVectorStateSpace::StateType *>(state);
+  const RealVectorStateSpace::StateType *rnear = static_cast<const RealVectorStateSpace::StateType *>(near);
+  for (unsigned int i = 0; i < dim; ++i)
+    rstate->values[i] = rng_.uniformReal(std::max(bounds.low[i], rnear->values[i] - distance),
+                                         std::min(bounds.high[i], rnear->values[i] + distance));
 }
 
 void ompl::base::RealVectorStateSampler::sampleGaussian(State *state, const State *mean, const double stdDev)
 {
-    const unsigned int dim = space_->getDimension();
-    const RealVectorBounds &bounds = static_cast<const RealVectorStateSpace*>(space_)->getBounds();
+  const unsigned int dim = space_->getDimension();
+  const RealVectorBounds &bounds = static_cast<const RealVectorStateSpace *>(space_)->getBounds();
 
-    RealVectorStateSpace::StateType *rstate = static_cast<RealVectorStateSpace::StateType*>(state);
-    const RealVectorStateSpace::StateType *rmean = static_cast<const RealVectorStateSpace::StateType*>(mean);
-    for (unsigned int i = 0 ; i < dim ; ++i)
-    {
-        double v = rng_.gaussian(rmean->values[i], stdDev);
-        if (v < bounds.low[i])
-            v = bounds.low[i];
-        else
-            if (v > bounds.high[i])
-                v = bounds.high[i];
-        rstate->values[i] = v;
-    }
+  RealVectorStateSpace::StateType *rstate = static_cast<RealVectorStateSpace::StateType *>(state);
+  const RealVectorStateSpace::StateType *rmean = static_cast<const RealVectorStateSpace::StateType *>(mean);
+  for (unsigned int i = 0; i < dim; ++i)
+  {
+    double v = rng_.gaussian(rmean->values[i], stdDev);
+    if (v < bounds.low[i])
+      v = bounds.low[i];
+    else if (v > bounds.high[i])
+      v = bounds.high[i];
+    rstate->values[i] = v;
+  }
 }
 
 void ompl::base::RealVectorStateSpace::registerProjections()
 {
-    // compute a default random projection
-    if (dimension_ > 0)
+  // compute a default random projection
+  if (dimension_ > 0)
+  {
+    if (dimension_ > 2)
     {
-        if (dimension_ > 2)
-        {
-            int p = std::max(2, (int)ceil(log((double)dimension_)));
-            registerDefaultProjection(ProjectionEvaluatorPtr(new RealVectorRandomLinearProjectionEvaluator(this, p)));
-        }
-        else
-            registerDefaultProjection(ProjectionEvaluatorPtr(new RealVectorIdentityProjectionEvaluator(this)));
+      int p = std::max(2, (int)ceil(log((double)dimension_)));
+      registerDefaultProjection(ProjectionEvaluatorPtr(new RealVectorRandomLinearProjectionEvaluator(this, p)));
     }
+    else
+      registerDefaultProjection(ProjectionEvaluatorPtr(new RealVectorIdentityProjectionEvaluator(this)));
+  }
 }
 
 void ompl::base::RealVectorStateSpace::setup()
 {
-    bounds_.check();
-    StateSpace::setup();
+  bounds_.check();
+  StateSpace::setup();
 }
 
 void ompl::base::RealVectorStateSpace::addDimension(const std::string &name, double minBound, double maxBound)
 {
-    addDimension(minBound, maxBound);
-    setDimensionName(dimension_ - 1, name);
+  addDimension(minBound, maxBound);
+  setDimensionName(dimension_ - 1, name);
 }
 
 void ompl::base::RealVectorStateSpace::addDimension(double minBound, double maxBound)
 {
-    dimension_++;
-    stateBytes_ = dimension_ * sizeof(double);
-    bounds_.low.push_back(minBound);
-    bounds_.high.push_back(maxBound);
-    dimensionNames_.resize(dimension_, "");
+  dimension_++;
+  stateBytes_ = dimension_ * sizeof(double);
+  bounds_.low.push_back(minBound);
+  bounds_.high.push_back(maxBound);
+  dimensionNames_.resize(dimension_, "");
 }
 
 void ompl::base::RealVectorStateSpace::setBounds(const RealVectorBounds &bounds)
 {
-    bounds.check();
-    if (bounds.low.size() != dimension_)
-        throw Exception("Bounds do not match dimension of state space: expected dimension " +
-                        std::to_string(dimension_) + " but got dimension " +
-                        std::to_string(bounds.low.size()));
-    bounds_ = bounds;
+  bounds.check();
+  if (bounds.low.size() != dimension_)
+    throw Exception("Bounds do not match dimension of state space: expected dimension " + std::to_string(dimension_) +
+                    " but got dimension " + std::to_string(bounds.low.size()));
+  bounds_ = bounds;
 }
 
 void ompl::base::RealVectorStateSpace::setBounds(double low, double high)
 {
-    RealVectorBounds bounds(dimension_);
-    bounds.setLow(low);
-    bounds.setHigh(high);
-    setBounds(bounds);
+  RealVectorBounds bounds(dimension_);
+  bounds.setLow(low);
+  bounds.setHigh(high);
+  setBounds(bounds);
 }
 
 unsigned int ompl::base::RealVectorStateSpace::getDimension() const
 {
-    return dimension_;
+  return dimension_;
 }
 
-const std::string& ompl::base::RealVectorStateSpace::getDimensionName(unsigned int index) const
+const std::string &ompl::base::RealVectorStateSpace::getDimensionName(unsigned int index) const
 {
-    if (index < dimensionNames_.size())
-        return dimensionNames_[index];
-    throw Exception("Index out of bounds");
+  if (index < dimensionNames_.size())
+    return dimensionNames_[index];
+  throw Exception("Index out of bounds");
 }
 
 int ompl::base::RealVectorStateSpace::getDimensionIndex(const std::string &name) const
 {
-    auto it = dimensionIndex_.find(name);
-    return it != dimensionIndex_.end() ? (int)it->second : -1;
+  auto it = dimensionIndex_.find(name);
+  return it != dimensionIndex_.end() ? (int)it->second : -1;
 }
 
 void ompl::base::RealVectorStateSpace::setDimensionName(unsigned int index, const std::string &name)
 {
-    if (index < dimensionNames_.size())
-    {
-        dimensionNames_[index] = name;
-        dimensionIndex_[name] = index;
-    }
-    else
-        throw Exception("Cannot set dimension name. Index out of bounds");
+  if (index < dimensionNames_.size())
+  {
+    dimensionNames_[index] = name;
+    dimensionIndex_[name] = index;
+  }
+  else
+    throw Exception("Cannot set dimension name. Index out of bounds");
 }
 
 double ompl::base::RealVectorStateSpace::getMaximumExtent() const
 {
-    double e = 0.0;
-    for (unsigned int i = 0 ; i < dimension_ ; ++i)
-    {
-        double d = bounds_.high[i] - bounds_.low[i];
-        e += d*d;
-    }
-    return sqrt(e);
+  double e = 0.0;
+  for (unsigned int i = 0; i < dimension_; ++i)
+  {
+    double d = bounds_.high[i] - bounds_.low[i];
+    e += d * d;
+  }
+  return sqrt(e);
 }
 
 double ompl::base::RealVectorStateSpace::getMeasure() const
 {
-    double m = 1.0;
-    for (unsigned int i = 0 ; i < dimension_ ; ++i)
-    {
-        m *= bounds_.high[i] - bounds_.low[i];
-    }
-    return m;
+  double m = 1.0;
+  for (unsigned int i = 0; i < dimension_; ++i)
+  {
+    m *= bounds_.high[i] - bounds_.low[i];
+  }
+  return m;
 }
 
 void ompl::base::RealVectorStateSpace::enforceBounds(State *state) const
 {
-    StateType *rstate = static_cast<StateType*>(state);
-    for (unsigned int i = 0 ; i < dimension_ ; ++i)
-    {
-        if (rstate->values[i] > bounds_.high[i])
-            rstate->values[i] = bounds_.high[i];
-        else
-            if (rstate->values[i] < bounds_.low[i])
-                rstate->values[i] = bounds_.low[i];
-    }
+  StateType *rstate = static_cast<StateType *>(state);
+  for (unsigned int i = 0; i < dimension_; ++i)
+  {
+    if (rstate->values[i] > bounds_.high[i])
+      rstate->values[i] = bounds_.high[i];
+    else if (rstate->values[i] < bounds_.low[i])
+      rstate->values[i] = bounds_.low[i];
+  }
 }
 
 bool ompl::base::RealVectorStateSpace::satisfiesBounds(const State *state) const
 {
-    const StateType *rstate = static_cast<const StateType*>(state);
-    for (unsigned int i = 0 ; i < dimension_ ; ++i)
-        if (rstate->values[i] - std::numeric_limits<double>::epsilon() > bounds_.high[i] ||
-            rstate->values[i] + std::numeric_limits<double>::epsilon() < bounds_.low[i])
-            return false;
-    return true;
+  const StateType *rstate = static_cast<const StateType *>(state);
+  for (unsigned int i = 0; i < dimension_; ++i)
+    if (rstate->values[i] - std::numeric_limits<double>::epsilon() > bounds_.high[i] ||
+        rstate->values[i] + std::numeric_limits<double>::epsilon() < bounds_.low[i])
+      return false;
+  return true;
 }
 
 void ompl::base::RealVectorStateSpace::copyState(State *destination, const State *source) const
 {
-    memcpy(static_cast<StateType*>(destination)->values,
-           static_cast<const StateType*>(source)->values, stateBytes_);
-    static_cast<StateType*>(destination)->level_ = static_cast<const StateType*>(source)->level_;
+  memcpy(static_cast<StateType *>(destination)->values, static_cast<const StateType *>(source)->values, stateBytes_);
+  static_cast<StateType *>(destination)->level_ = static_cast<const StateType *>(source)->level_;
 }
 
 unsigned int ompl::base::RealVectorStateSpace::getSerializationLength() const
 {
-    return stateBytes_;
+  return stateBytes_;
 }
 
 void ompl::base::RealVectorStateSpace::serialize(void *serialization, const State *state) const
 {
-    memcpy(serialization, state->as<StateType>()->values, stateBytes_);
+  memcpy(serialization, state->as<StateType>()->values, stateBytes_);
 }
 
 void ompl::base::RealVectorStateSpace::deserialize(State *state, const void *serialization) const
 {
-    memcpy(state->as<StateType>()->values, serialization, stateBytes_);
+  memcpy(state->as<StateType>()->values, serialization, stateBytes_);
 }
 
 double ompl::base::RealVectorStateSpace::distance(const State *state1, const State *state2) const
 {
-    double dist = 0.0;
-    const double *s1 = static_cast<const StateType*>(state1)->values;
-    const double *s2 = static_cast<const StateType*>(state2)->values;
+  double dist = 0.0;
+  const double *s1 = static_cast<const StateType *>(state1)->values;
+  const double *s2 = static_cast<const StateType *>(state2)->values;
 
-    // L2
-    // for (unsigned int i = 0 ; i < dimension_ ; ++i)
-    // {
-    //     double diff = (*s1++) - (*s2++);
-    //     dist += diff * diff;
-    // }
-    // return sqrt(dist);
+  // L2
+  // for (unsigned int i = 0 ; i < dimension_ ; ++i)
+  // {
+  //     double diff = (*s1++) - (*s2++);
+  //     dist += diff * diff;
+  // }
+  // return sqrt(dist);
 
-    // L1
-    for (unsigned int i = 0 ; i < dimension_ ; ++i)
-    {
-        double diff = (*s1++) - (*s2++);
-        dist += fabs(diff);
-    }
-    return dist;
+  // L1
+  for (unsigned int i = 0; i < dimension_; ++i)
+  {
+    double diff = (*s1++) - (*s2++);
+    dist += fabs(diff);
+  }
+  return dist;
 }
 
 bool ompl::base::RealVectorStateSpace::equalStates(const State *state1, const State *state2) const
 {
-    const double *s1 = static_cast<const StateType*>(state1)->values;
-    const double *s2 = static_cast<const StateType*>(state2)->values;
-    for (unsigned int i = 0 ; i < dimension_ ; ++i)
-    {
-        double diff = (*s1++) - (*s2++);
-        if (fabs(diff) > std::numeric_limits<double>::epsilon() * 2.0)
-            return false;
-    }
+  const double *s1 = static_cast<const StateType *>(state1)->values;
+  const double *s2 = static_cast<const StateType *>(state2)->values;
+  for (unsigned int i = 0; i < dimension_; ++i)
+  {
+    double diff = (*s1++) - (*s2++);
+    if (fabs(diff) > std::numeric_limits<double>::epsilon() * 2.0)
+      return false;
+  }
 
-    if (static_cast<const StateType*>(state1)->level_ != static_cast<const StateType*>(state2)->level_)
-        return false;
+  if (static_cast<const StateType *>(state1)->level_ != static_cast<const StateType *>(state2)->level_)
+    return false;
 
-    return true;
+  return true;
 }
 
-void ompl::base::RealVectorStateSpace::interpolate(const State *from, const State *to, const double t, State *state) const
+void ompl::base::RealVectorStateSpace::interpolate(const State *from, const State *to, const double t,
+                                                   State *state) const
 {
-    const StateType *rfrom = static_cast<const StateType*>(from);
-    const StateType *rto = static_cast<const StateType*>(to);
-    const StateType *rstate = static_cast<StateType*>(state);
-    for (unsigned int i = 0 ; i < dimension_ ; ++i)
-        rstate->values[i] = rfrom->values[i] + (rto->values[i] - rfrom->values[i]) * t;
+  const StateType *rfrom = static_cast<const StateType *>(from);
+  const StateType *rto = static_cast<const StateType *>(to);
+  const StateType *rstate = static_cast<StateType *>(state);
+  for (unsigned int i = 0; i < dimension_; ++i)
+    rstate->values[i] = rfrom->values[i] + (rto->values[i] - rfrom->values[i]) * t;
 }
 
 ompl::base::StateSamplerPtr ompl::base::RealVectorStateSpace::allocDefaultStateSampler() const
 {
-    return StateSamplerPtr(new RealVectorStateSampler(this));
+  return StateSamplerPtr(new RealVectorStateSampler(this));
 }
 
-ompl::base::State* ompl::base::RealVectorStateSpace::allocState() const
+ompl::base::State *ompl::base::RealVectorStateSpace::allocState() const
 {
-    auto *rstate = new StateType();
-    rstate->values = new double[dimension_];
-    return rstate;
+  auto *rstate = new StateType();
+  rstate->values = new double[dimension_];
+  return rstate;
 }
 
 void ompl::base::RealVectorStateSpace::freeState(State *state) const
 {
-    StateType *rstate = static_cast<StateType*>(state);
-    delete[] rstate->values;
-    delete rstate;
+  StateType *rstate = static_cast<StateType *>(state);
+  delete[] rstate->values;
+  delete rstate;
 }
 
 bool ompl::base::RealVectorStateSpace::populateState(State *state, const std::vector<double> &values)
@@ -308,68 +304,67 @@ bool ompl::base::RealVectorStateSpace::populateState(State *state, const std::ve
   {
     state->as<StateType>()->values[i] = values[i];
   }
-  //memcpy((void *) &values[0], state->as<ModelBasedStateSpace::StateType>()->values,
-  //values.size() * sizeof(double));
+  // memcpy((void *) &values[0], state->as<ModelBasedStateSpace::StateType>()->values,
+  // values.size() * sizeof(double));
   return true;
 }
 
-double* ompl::base::RealVectorStateSpace::getValueAddressAtIndex(State *state, const unsigned int index) const
+double *ompl::base::RealVectorStateSpace::getValueAddressAtIndex(State *state, const unsigned int index) const
 {
-    return index < dimension_ ? static_cast<StateType*>(state)->values + index : nullptr;
+  return index < dimension_ ? static_cast<StateType *>(state)->values + index : nullptr;
 }
 
 void ompl::base::RealVectorStateSpace::printState(const State *state, std::ostream &out) const
 {
-    out << "RealVectorState [";
-    if (state)
+  out << "RealVectorState [";
+  if (state)
+  {
+    const StateType *rstate = static_cast<const StateType *>(state);
+    for (unsigned int i = 0; i < dimension_; ++i)
     {
-        const StateType *rstate = static_cast<const StateType*>(state);
-        for (unsigned int i = 0 ; i < dimension_ ; ++i)
-        {
-            out << rstate->values[i];
-            if (i + 1 < dimension_)
-                out << ' ';
-        }
-        // Add the level
-        out << ' ' << rstate->level_;
+      out << rstate->values[i];
+      if (i + 1 < dimension_)
+        out << ' ';
     }
-    else
-        out << "nullptr" << std::endl;
-    out << ']' << std::endl;
+    // Add the level
+    out << ' ' << rstate->level_;
+  }
+  else
+    out << "nullptr" << std::endl;
+  out << ']' << std::endl;
 }
 
 void ompl::base::RealVectorStateSpace::printSettings(std::ostream &out) const
 {
-    out << "Real vector state space '" << getName() << "' of dimension " << dimension_ << " with bounds: " << std::endl;
-    out << "  - min: ";
-    for (unsigned int i = 0 ; i < dimension_ ; ++i)
-        out << bounds_.low[i] << " ";
-    out << std::endl;
-    out << "  - max: ";
-    for (unsigned int i = 0 ; i < dimension_ ; ++i)
-        out << bounds_.high[i] << " ";
-    out << std::endl;
+  out << "Real vector state space '" << getName() << "' of dimension " << dimension_ << " with bounds: " << std::endl;
+  out << "  - min: ";
+  for (unsigned int i = 0; i < dimension_; ++i)
+    out << bounds_.low[i] << " ";
+  out << std::endl;
+  out << "  - max: ";
+  for (unsigned int i = 0; i < dimension_; ++i)
+    out << bounds_.high[i] << " ";
+  out << std::endl;
 
-    bool printNames = false;
-    for (unsigned int i = 0 ; i < dimension_ ; ++i)
-        if (!dimensionNames_[i].empty())
-            printNames = true;
-    if (printNames)
-    {
-        out << "  and dimension names: ";
-        for (unsigned int i = 0 ; i < dimension_ ; ++i)
-            out << "'" << dimensionNames_[i] << "' ";
-        out << std::endl;
-    }
+  bool printNames = false;
+  for (unsigned int i = 0; i < dimension_; ++i)
+    if (!dimensionNames_[i].empty())
+      printNames = true;
+  if (printNames)
+  {
+    out << "  and dimension names: ";
+    for (unsigned int i = 0; i < dimension_; ++i)
+      out << "'" << dimensionNames_[i] << "' ";
+    out << std::endl;
+  }
 }
 
 int ompl::base::RealVectorStateSpace::getLevel(const ompl::base::State *state) const
 {
-    return state->as<StateType>()->level_;
-
+  return state->as<StateType>()->level_;
 }
 
 void ompl::base::RealVectorStateSpace::setLevel(ompl::base::State *state, int level)
 {
-    state->as<StateType>()->level_ = level;
+  state->as<StateType>()->level_ = level;
 }

@@ -38,7 +38,7 @@
 #include <boost/archive/archive_exception.hpp>
 
 /// \cond IGNORE
-static const boost::uint32_t OMPL_PLANNER_DATA_CONTROL_ARCHIVE_MARKER = 0x5044434D; // this spells PDCM
+static const boost::uint32_t OMPL_PLANNER_DATA_CONTROL_ARCHIVE_MARKER = 0x5044434D;  // this spells PDCM
 /// \endcond
 
 ompl::control::PlannerDataStorage::PlannerDataStorage() : base::PlannerDataStorage()
@@ -49,120 +49,120 @@ ompl::control::PlannerDataStorage::~PlannerDataStorage() = default;
 
 void ompl::control::PlannerDataStorage::load(const char *filename, base::PlannerData &pd)
 {
-    base::PlannerDataStorage::load(filename, pd);
+  base::PlannerDataStorage::load(filename, pd);
 }
 
 void ompl::control::PlannerDataStorage::load(std::istream &in, base::PlannerData &pd)
 {
-    if (!pd.hasControls())
+  if (!pd.hasControls())
+  {
+    OMPL_WARN("PlannerData does not have controls.  Invoking base::PlannerDataStorage::load");
+    base::PlannerDataStorage::load(in, pd);
+    return;
+  }
+
+  control::PlannerData *pdc = static_cast<control::PlannerData *>(&pd);
+  pdc->clear();
+
+  const SpaceInformationPtr &si = pdc->getSpaceInformation();
+  if (!in.good())
+  {
+    OMPL_ERROR("Failed to load PlannerData: input stream is invalid");
+    return;
+  }
+  if (!si)
+  {
+    OMPL_ERROR("Failed to load PlannerData: SpaceInformation is invalid");
+    return;
+  }
+  // Loading the planner data:
+  try
+  {
+    boost::archive::binary_iarchive ia(in);
+
+    // Read the header
+    Header h;
+    ia >> h;
+
+    // Checking the archive marker
+    if (h.marker != OMPL_PLANNER_DATA_CONTROL_ARCHIVE_MARKER)
     {
-        OMPL_WARN("PlannerData does not have controls.  Invoking base::PlannerDataStorage::load");
-        base::PlannerDataStorage::load(in, pd);
-        return;
+      OMPL_ERROR("Failed to load PlannerData: PlannerData control archive marker not found");
+      return;
     }
 
-    control::PlannerData *pdc = static_cast<control::PlannerData*>(&pd);
-    pdc->clear();
-
-    const SpaceInformationPtr &si = pdc->getSpaceInformation();
-    if (!in.good())
+    // Verify that the state space is the same
+    std::vector<int> sig;
+    si->getStateSpace()->computeSignature(sig);
+    if (h.signature != sig)
     {
-        OMPL_ERROR("Failed to load PlannerData: input stream is invalid");
-        return;
+      OMPL_ERROR("Failed to load PlannerData: StateSpace signature mismatch");
+      return;
     }
-    if (!si)
+
+    // Verify that the control space is the same
+    sig.clear();
+    si->getControlSpace()->computeSignature(sig);
+    if (h.control_signature != sig)
     {
-        OMPL_ERROR("Failed to load PlannerData: SpaceInformation is invalid");
-        return;
+      OMPL_ERROR("Failed to load PlannerData: ControlSpace signature mismatch");
+      return;
     }
-    // Loading the planner data:
-    try
-    {
-        boost::archive::binary_iarchive ia(in);
 
-        // Read the header
-        Header h;
-        ia >> h;
-
-        // Checking the archive marker
-        if (h.marker != OMPL_PLANNER_DATA_CONTROL_ARCHIVE_MARKER)
-        {
-            OMPL_ERROR("Failed to load PlannerData: PlannerData control archive marker not found");
-            return;
-        }
-
-        // Verify that the state space is the same
-        std::vector<int> sig;
-        si->getStateSpace()->computeSignature(sig);
-        if (h.signature != sig)
-        {
-            OMPL_ERROR("Failed to load PlannerData: StateSpace signature mismatch");
-            return;
-        }
-
-        // Verify that the control space is the same
-        sig.clear();
-        si->getControlSpace()->computeSignature(sig);
-        if (h.control_signature != sig)
-        {
-            OMPL_ERROR("Failed to load PlannerData: ControlSpace signature mismatch");
-            return;
-        }
-
-        // File seems ok... loading vertices and edges
-        loadVertices(pd, h.vertex_count, ia);
-        loadEdges(pd, h.edge_count, ia);
-    }
-    catch (boost::archive::archive_exception &ae)
-    {
-        OMPL_ERROR("Failed to load PlannerData: %s", ae.what());
-    }
+    // File seems ok... loading vertices and edges
+    loadVertices(pd, h.vertex_count, ia);
+    loadEdges(pd, h.edge_count, ia);
+  }
+  catch (boost::archive::archive_exception &ae)
+  {
+    OMPL_ERROR("Failed to load PlannerData: %s", ae.what());
+  }
 }
 
 void ompl::control::PlannerDataStorage::store(const base::PlannerData &pd, const char *filename)
 {
-    base::PlannerDataStorage::store(pd, filename);
+  base::PlannerDataStorage::store(pd, filename);
 }
 
 void ompl::control::PlannerDataStorage::store(const base::PlannerData &pd, std::ostream &out)
 {
-    const control::PlannerData *pdc = static_cast<const control::PlannerData*>(&pd);
-    if (!pdc)
-    {
-        OMPL_WARN("Failed to cast PlannerData to control::PlannerData.  Invoking base::PlannerDataStorage::store");
-        base::PlannerDataStorage::store(pd, out);
-        return;
-    }
+  const control::PlannerData *pdc = static_cast<const control::PlannerData *>(&pd);
+  if (!pdc)
+  {
+    OMPL_WARN("Failed to cast PlannerData to control::PlannerData.  Invoking base::PlannerDataStorage::store");
+    base::PlannerDataStorage::store(pd, out);
+    return;
+  }
 
-    const SpaceInformationPtr &si = pdc->getSpaceInformation();
-    if (!out.good())
-    {
-        OMPL_ERROR("Failed to store PlannerData: output stream is invalid");
-        return;
-    }
-    if (!si)
-    {
-        OMPL_ERROR("Failed to store PlannerData: SpaceInformation is invalid");
-        return;
-    }
-    try
-    {
-        boost::archive::binary_oarchive oa(out);
+  const SpaceInformationPtr &si = pdc->getSpaceInformation();
+  if (!out.good())
+  {
+    OMPL_ERROR("Failed to store PlannerData: output stream is invalid");
+    return;
+  }
+  if (!si)
+  {
+    OMPL_ERROR("Failed to store PlannerData: SpaceInformation is invalid");
+    return;
+  }
+  try
+  {
+    boost::archive::binary_oarchive oa(out);
 
-        // Writing the header
-        Header h;
-        h.marker = OMPL_PLANNER_DATA_CONTROL_ARCHIVE_MARKER;
-        h.vertex_count = pdc->numVertices();
-        h.edge_count = pdc->numEdges();
-        si->getStateSpace()->computeSignature(h.signature);
-        si->getControlSpace()->computeSignature(h.control_signature);
-        oa << h;
+    // Writing the header
+    Header h;
+    h.marker = OMPL_PLANNER_DATA_CONTROL_ARCHIVE_MARKER;
+    h.vertex_count = pdc->numVertices();
+    h.edge_count = pdc->numEdges();
+    si->getStateSpace()->computeSignature(h.signature);
+    si->getControlSpace()->computeSignature(h.control_signature);
+    oa << h;
 
-        storeVertices(pd, oa);
-        storeEdges(pd, oa);
-    }
-    catch (boost::archive::archive_exception &ae)
-    {
-        OMPL_ERROR("Failed to store PlannerData: %s", ae.what());
-    }
+    storeVertices(pd, oa);
+    storeEdges(pd, oa);
+  }
+  catch (boost::archive::archive_exception &ae)
+  {
+    OMPL_ERROR("Failed to store PlannerData: %s", ae.what());
+  }
 }

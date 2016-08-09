@@ -41,319 +41,314 @@
 #include <thread>
 #include <utility>
 
-ompl::base::Planner::Planner(SpaceInformationPtr si, std::string name) :
-    si_(std::move(si)), pis_(this), name_(std::move(name)), setup_(false)
+ompl::base::Planner::Planner(SpaceInformationPtr si, std::string name)
+  : si_(std::move(si)), pis_(this), name_(std::move(name)), setup_(false)
 {
-    if (!si_)
-        throw Exception(name_, "Invalid space information instance for planner");
+  if (!si_)
+    throw Exception(name_, "Invalid space information instance for planner");
 }
 
-const ompl::base::PlannerSpecs& ompl::base::Planner::getSpecs() const
+const ompl::base::PlannerSpecs &ompl::base::Planner::getSpecs() const
 {
-    return specs_;
+  return specs_;
 }
 
-const std::string& ompl::base::Planner::getName() const
+const std::string &ompl::base::Planner::getName() const
 {
-    return name_;
+  return name_;
 }
 
 void ompl::base::Planner::setName(const std::string &name)
 {
-    name_ = name;
+  name_ = name;
 }
 
-const ompl::base::SpaceInformationPtr&  ompl::base::Planner::getSpaceInformation() const
+const ompl::base::SpaceInformationPtr &ompl::base::Planner::getSpaceInformation() const
 {
-    return si_;
+  return si_;
 }
 
-const ompl::base::ProblemDefinitionPtr& ompl::base::Planner::getProblemDefinition() const
+const ompl::base::ProblemDefinitionPtr &ompl::base::Planner::getProblemDefinition() const
 {
-    return pdef_;
+  return pdef_;
 }
 
 void ompl::base::Planner::setProblemDefinition(const ProblemDefinitionPtr &pdef)
 {
-    pdef_ = pdef;
-    pis_.update();
+  pdef_ = pdef;
+  pis_.update();
 }
 
-const ompl::base::PlannerInputStates& ompl::base::Planner::getPlannerInputStates() const
+const ompl::base::PlannerInputStates &ompl::base::Planner::getPlannerInputStates() const
 {
-    return pis_;
+  return pis_;
 }
 
 void ompl::base::Planner::setup()
 {
-    if (!si_->isSetup())
-    {
-        OMPL_INFORM("%s: Space information setup was not yet called. Calling now.", getName().c_str());
-        si_->setup();
-    }
+  if (!si_->isSetup())
+  {
+    OMPL_INFORM("%s: Space information setup was not yet called. Calling now.", getName().c_str());
+    si_->setup();
+  }
 
-    if (setup_)
-        OMPL_WARN("%s: Planner setup called multiple times", getName().c_str());
-    else
-        setup_ = true;
+  if (setup_)
+    OMPL_WARN("%s: Planner setup called multiple times", getName().c_str());
+  else
+    setup_ = true;
 }
 
 void ompl::base::Planner::checkValidity()
 {
-    if (!isSetup())
-        setup();
-    pis_.checkValidity();
+  if (!isSetup())
+    setup();
+  pis_.checkValidity();
 }
 
 bool ompl::base::Planner::isSetup() const
 {
-    return setup_;
+  return setup_;
 }
 
 void ompl::base::Planner::clear()
 {
-    pis_.clear();
-    pis_.update();
+  pis_.clear();
+  pis_.update();
 }
 
 void ompl::base::Planner::getPlannerData(PlannerData &data) const
 {
-    for (const auto & plannerProgressProperty : plannerProgressProperties_)
-        data.properties[plannerProgressProperty.first] = plannerProgressProperty.second();
+  for (const auto &plannerProgressProperty : plannerProgressProperties_)
+    data.properties[plannerProgressProperty.first] = plannerProgressProperty.second();
 }
 
 ompl::base::PlannerStatus ompl::base::Planner::solve(const PlannerTerminationConditionFn &ptc, double checkInterval)
 {
-    return solve(PlannerTerminationCondition(ptc, checkInterval));
+  return solve(PlannerTerminationCondition(ptc, checkInterval));
 }
 
 ompl::base::PlannerStatus ompl::base::Planner::solve(double solveTime)
 {
-    if (solveTime < 1.0)
-        return solve(timedPlannerTerminationCondition(solveTime));
-    else
-        return solve(timedPlannerTerminationCondition(solveTime, std::min(solveTime / 100.0, 0.1)));
+  if (solveTime < 1.0)
+    return solve(timedPlannerTerminationCondition(solveTime));
+  else
+    return solve(timedPlannerTerminationCondition(solveTime, std::min(solveTime / 100.0, 0.1)));
 }
 
 void ompl::base::Planner::printProperties(std::ostream &out) const
 {
-    out << "Planner " + getName() + " specs:" << std::endl;
-    out << "Multithreaded:                 " << (getSpecs().multithreaded ? "Yes" : "No") << std::endl;
-    out << "Reports approximate solutions: " << (getSpecs().approximateSolutions ? "Yes" : "No") << std::endl;
-    out << "Can optimize solutions:        " << (getSpecs().optimizingPaths ? "Yes" : "No") << std::endl;
-    out << "Aware of the following parameters:";
-    std::vector<std::string> params;
-    params_.getParamNames(params);
-    for (auto & param : params)
-        out << " " << param;
-    out << std::endl;
+  out << "Planner " + getName() + " specs:" << std::endl;
+  out << "Multithreaded:                 " << (getSpecs().multithreaded ? "Yes" : "No") << std::endl;
+  out << "Reports approximate solutions: " << (getSpecs().approximateSolutions ? "Yes" : "No") << std::endl;
+  out << "Can optimize solutions:        " << (getSpecs().optimizingPaths ? "Yes" : "No") << std::endl;
+  out << "Aware of the following parameters:";
+  std::vector<std::string> params;
+  params_.getParamNames(params);
+  for (auto &param : params)
+    out << " " << param;
+  out << std::endl;
 }
 
 void ompl::base::Planner::printSettings(std::ostream &out) const
 {
-    out << "Declared parameters for planner " << getName() << ":" << std::endl;
-    params_.print(out);
+  out << "Declared parameters for planner " << getName() << ":" << std::endl;
+  params_.print(out);
 }
 
 void ompl::base::PlannerInputStates::clear()
 {
-    if (tempState_)
-    {
-        si_->freeState(tempState_);
-        tempState_ = nullptr;
-    }
-    addedStartStates_ = 0;
-    sampledGoalsCount_ = 0;
-    pdef_ = nullptr;
-    si_ = nullptr;
+  if (tempState_)
+  {
+    si_->freeState(tempState_);
+    tempState_ = nullptr;
+  }
+  addedStartStates_ = 0;
+  sampledGoalsCount_ = 0;
+  pdef_ = nullptr;
+  si_ = nullptr;
 }
 
 void ompl::base::PlannerInputStates::restart()
 {
-    addedStartStates_ = 0;
-    sampledGoalsCount_ = 0;
+  addedStartStates_ = 0;
+  sampledGoalsCount_ = 0;
 }
 
 bool ompl::base::PlannerInputStates::update()
 {
-    if (!planner_)
-        throw Exception("No planner set for PlannerInputStates");
-    return use(planner_->getProblemDefinition());
+  if (!planner_)
+    throw Exception("No planner set for PlannerInputStates");
+  return use(planner_->getProblemDefinition());
 }
 
 void ompl::base::PlannerInputStates::checkValidity() const
 {
-    std::string error;
+  std::string error;
 
-    if (!pdef_)
-        error = "Problem definition not specified";
+  if (!pdef_)
+    error = "Problem definition not specified";
+  else
+  {
+    if (pdef_->getStartStateCount() <= 0)
+      error = "No start states specified";
+    else if (!pdef_->getGoal())
+      error = "No goal specified";
+  }
+
+  if (!error.empty())
+  {
+    if (planner_)
+      throw Exception(planner_->getName(), error);
     else
-    {
-        if (pdef_->getStartStateCount() <= 0)
-            error = "No start states specified";
-        else
-            if (!pdef_->getGoal())
-                error = "No goal specified";
-    }
-
-    if (!error.empty())
-    {
-        if (planner_)
-            throw Exception(planner_->getName(), error);
-        else
-            throw Exception(error);
-    }
+      throw Exception(error);
+  }
 }
 
 bool ompl::base::PlannerInputStates::use(const ProblemDefinitionPtr &pdef)
 {
-    if (pdef)
-        return use(pdef.get());
-    else
-    {
-        clear();
-        return true;
-    }
+  if (pdef)
+    return use(pdef.get());
+  else
+  {
+    clear();
+    return true;
+  }
 }
 
 bool ompl::base::PlannerInputStates::use(const ProblemDefinition *pdef)
 {
-    if (pdef_ != pdef)
-    {
-        clear();
-        pdef_ = pdef;
-        si_ = pdef->getSpaceInformation().get();
-        return true;
-    }
-    return false;
+  if (pdef_ != pdef)
+  {
+    clear();
+    pdef_ = pdef;
+    si_ = pdef->getSpaceInformation().get();
+    return true;
+  }
+  return false;
 }
 
-const ompl::base::State* ompl::base::PlannerInputStates::nextStart()
+const ompl::base::State *ompl::base::PlannerInputStates::nextStart()
 {
-    if (pdef_ == nullptr || si_ == nullptr)
-    {
-        std::string error = "Missing space information or problem definition";
-        if (planner_)
-            throw Exception(planner_->getName(), error);
-        else
-            throw Exception(error);
-    }
+  if (pdef_ == nullptr || si_ == nullptr)
+  {
+    std::string error = "Missing space information or problem definition";
+    if (planner_)
+      throw Exception(planner_->getName(), error);
+    else
+      throw Exception(error);
+  }
 
-    while (addedStartStates_ < pdef_->getStartStateCount())
+  while (addedStartStates_ < pdef_->getStartStateCount())
+  {
+    const base::State *st = pdef_->getStartState(addedStartStates_);
+    addedStartStates_++;
+    bool bounds = si_->satisfiesBounds(st);
+    bool valid = bounds ? si_->isValid(st) : false;
+    if (bounds && valid)
+      return st;
+    else
     {
-        const base::State *st = pdef_->getStartState(addedStartStates_);
-        addedStartStates_++;
-        bool bounds = si_->satisfiesBounds(st);
-        bool valid = bounds ? si_->isValid(st) : false;
-        if (bounds && valid)
-            return st;
-        else
+      OMPL_WARN("%s: Skipping invalid start state (invalid %s)",
+                planner_ ? planner_->getName().c_str() : "PlannerInputStates", bounds ? "state" : "bounds");
+      std::stringstream ss;
+      si_->printState(st, ss);
+      OMPL_DEBUG("%s: Discarded start state %s", planner_ ? planner_->getName().c_str() : "PlannerInputStates",
+                 ss.str().c_str());
+    }
+  }
+  return nullptr;
+}
+
+const ompl::base::State *ompl::base::PlannerInputStates::nextGoal()
+{
+  // This initialization is safe since we are in a non-const function anyway.
+  static PlannerTerminationCondition ptc = plannerAlwaysTerminatingCondition();
+  return nextGoal(ptc);
+}
+
+const ompl::base::State *ompl::base::PlannerInputStates::nextGoal(const PlannerTerminationCondition &ptc)
+{
+  if (pdef_ == nullptr || si_ == nullptr)
+  {
+    std::string error = "Missing space information or problem definition";
+    if (planner_)
+      throw Exception(planner_->getName(), error);
+    else
+      throw Exception(error);
+  }
+
+  const GoalSampleableRegion *goal =
+      pdef_->getGoal()->hasType(GOAL_SAMPLEABLE_REGION) ? pdef_->getGoal()->as<GoalSampleableRegion>() : nullptr;
+
+  if (goal)
+  {
+    time::point start_wait;
+    bool first = true;
+    bool attempt = true;
+    while (attempt)
+    {
+      attempt = false;
+
+      if (sampledGoalsCount_ < goal->maxSampleCount() && goal->canSample())
+      {
+        if (tempState_ == nullptr)
+          tempState_ = si_->allocState();
+        do
         {
-            OMPL_WARN("%s: Skipping invalid start state (invalid %s)",
-                      planner_ ? planner_->getName().c_str() : "PlannerInputStates",
-                      bounds ? "state": "bounds");
+          goal->sampleGoal(tempState_);
+          sampledGoalsCount_++;
+          bool bounds = si_->satisfiesBounds(tempState_);
+          bool valid = bounds ? si_->isValid(tempState_) : false;
+          if (bounds && valid)
+          {
+            if (!first)  // if we waited, show how long
+            {
+              OMPL_DEBUG("%s: Waited %lf seconds for the first goal sample.",
+                         planner_ ? planner_->getName().c_str() : "PlannerInputStates",
+                         time::seconds(time::now() - start_wait));
+            }
+            return tempState_;
+          }
+          else
+          {
+            OMPL_WARN("%s: Skipping invalid goal state (invalid %s)",
+                      planner_ ? planner_->getName().c_str() : "PlannerInputStates", bounds ? "state" : "bounds");
             std::stringstream ss;
-            si_->printState(st, ss);
-            OMPL_DEBUG("%s: Discarded start state %s",
-                       planner_ ? planner_->getName().c_str() : "PlannerInputStates",
+            si_->printState(tempState_, ss);
+            OMPL_DEBUG("%s: Discarded goal state %s", planner_ ? planner_->getName().c_str() : "PlannerInputStates",
                        ss.str().c_str());
-        }
-    }
-    return nullptr;
-}
-
-const ompl::base::State* ompl::base::PlannerInputStates::nextGoal()
-{
-    // This initialization is safe since we are in a non-const function anyway.
-    static PlannerTerminationCondition ptc = plannerAlwaysTerminatingCondition();
-    return nextGoal(ptc);
-}
-
-const ompl::base::State* ompl::base::PlannerInputStates::nextGoal(const PlannerTerminationCondition &ptc)
-{
-    if (pdef_ == nullptr || si_ == nullptr)
-    {
-        std::string error = "Missing space information or problem definition";
-        if (planner_)
-            throw Exception(planner_->getName(), error);
-        else
-            throw Exception(error);
-    }
-
-    const GoalSampleableRegion *goal = pdef_->getGoal()->hasType(GOAL_SAMPLEABLE_REGION) ? pdef_->getGoal()->as<GoalSampleableRegion>() : nullptr;
-
-    if (goal)
-    {
-        time::point start_wait;
-        bool first = true;
-        bool attempt = true;
-        while (attempt)
+          }
+        } while (!ptc && sampledGoalsCount_ < goal->maxSampleCount() && goal->canSample());
+      }
+      if (goal->couldSample() && !ptc)
+      {
+        if (first)
         {
-            attempt = false;
-
-            if (sampledGoalsCount_ < goal->maxSampleCount() && goal->canSample())
-            {
-                if (tempState_ == nullptr)
-                    tempState_ = si_->allocState();
-                do
-                {
-                    goal->sampleGoal(tempState_);
-                    sampledGoalsCount_++;
-                    bool bounds = si_->satisfiesBounds(tempState_);
-                    bool valid = bounds ? si_->isValid(tempState_) : false;
-                    if (bounds && valid)
-                    {
-                        if (!first) // if we waited, show how long
-                        {
-                            OMPL_DEBUG("%s: Waited %lf seconds for the first goal sample.",
-                                       planner_ ? planner_->getName().c_str() : "PlannerInputStates",
-                                       time::seconds(time::now() - start_wait));
-                        }
-                        return tempState_;
-                    }
-                    else
-                    {
-                        OMPL_WARN("%s: Skipping invalid goal state (invalid %s)",
-                                  planner_ ? planner_->getName().c_str() : "PlannerInputStates",
-                                  bounds ? "state": "bounds");
-                        std::stringstream ss;
-                        si_->printState(tempState_, ss);
-                        OMPL_DEBUG("%s: Discarded goal state %s",
-                                   planner_ ? planner_->getName().c_str() : "PlannerInputStates",
-                                   ss.str().c_str());
-                    }
-                }
-                while (!ptc && sampledGoalsCount_ < goal->maxSampleCount() && goal->canSample());
-            }
-            if (goal->couldSample() && !ptc)
-            {
-                if (first)
-                {
-                    first = false;
-                    start_wait = time::now();
-                    OMPL_DEBUG("%s: Waiting for goal region samples ...",
-                               planner_ ? planner_->getName().c_str() : "PlannerInputStates");
-                }
-                std::this_thread::sleep_for(time::seconds(0.01));
-                attempt = !ptc;
-            }
+          first = false;
+          start_wait = time::now();
+          OMPL_DEBUG("%s: Waiting for goal region samples ...", planner_ ? planner_->getName().c_str() : "PlannerInputS"
+                                                                                                         "tates");
         }
+        std::this_thread::sleep_for(time::seconds(0.01));
+        attempt = !ptc;
+      }
     }
+  }
 
-    return nullptr;
+  return nullptr;
 }
 
 bool ompl::base::PlannerInputStates::haveMoreStartStates() const
 {
-    if (pdef_)
-        return addedStartStates_ < pdef_->getStartStateCount();
-    return false;
+  if (pdef_)
+    return addedStartStates_ < pdef_->getStartStateCount();
+  return false;
 }
 
 bool ompl::base::PlannerInputStates::haveMoreGoalStates() const
 {
-    if (pdef_ && pdef_->getGoal())
-        if (pdef_->getGoal()->hasType(GOAL_SAMPLEABLE_REGION))
-            return sampledGoalsCount_ < pdef_->getGoal()->as<GoalSampleableRegion>()->maxSampleCount();
-    return false;
+  if (pdef_ && pdef_->getGoal())
+    if (pdef_->getGoal()->hasType(GOAL_SAMPLEABLE_REGION))
+      return sampledGoalsCount_ < pdef_->getGoal()->as<GoalSampleableRegion>()->maxSampleCount();
+  return false;
 }

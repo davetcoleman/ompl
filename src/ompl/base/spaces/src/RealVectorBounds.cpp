@@ -41,56 +41,57 @@
 
 void ompl::base::RealVectorBounds::setLow(double value)
 {
-    std::fill(low.begin(), low.end(), value);
+  std::fill(low.begin(), low.end(), value);
 }
 
 void ompl::base::RealVectorBounds::setHigh(double value)
 {
-    std::fill(high.begin(), high.end(), value);
+  std::fill(high.begin(), high.end(), value);
 }
 
 void ompl::base::RealVectorBounds::setLow(unsigned int index, double value)
 {
-    low[index] = value;
+  low[index] = value;
 }
 
 void ompl::base::RealVectorBounds::setHigh(unsigned int index, double value)
 {
-    high[index] = value;
+  high[index] = value;
 }
 
 std::vector<double> ompl::base::RealVectorBounds::getDifference() const
 {
-    unsigned int n = std::min(low.size(), high.size());
-    std::vector<double> result(n);
-    for (unsigned int i = 0 ; i < n ; ++i)
-        result[i] = high[i] - low[i];
-    return result;
+  unsigned int n = std::min(low.size(), high.size());
+  std::vector<double> result(n);
+  for (unsigned int i = 0; i < n; ++i)
+    result[i] = high[i] - low[i];
+  return result;
 }
 
 double ompl::base::RealVectorBounds::getVolume() const
 {
-    double v = 1.0;
-    unsigned int n = std::min(low.size(), high.size());
-    for (unsigned int i = 0 ; i < n ; ++i)
-    {
-        double d = high[i] - low[i];
-        v *= d;
-    }
-    return v;
+  double v = 1.0;
+  unsigned int n = std::min(low.size(), high.size());
+  for (unsigned int i = 0; i < n; ++i)
+  {
+    double d = high[i] - low[i];
+    v *= d;
+  }
+  return v;
 }
 
 void ompl::base::RealVectorBounds::resize(std::size_t size)
 {
-    low.resize(size, 0.0);
-    high.resize(size, 0.0);
+  low.resize(size, 0.0);
+  high.resize(size, 0.0);
 }
 
 void ompl::base::RealVectorBounds::check() const
 {
-    if (low.size() != high.size())
-        throw Exception("Lower and upper bounds are not of same dimension");
-    for (unsigned int i = 0 ; i < low.size() ; ++i)
-        if (low[i] > high[i])
-            throw Exception("Bounds for real vector space seem to be incorrect (lower bound must be stricly less than upper bound). Sampling will not be possible");
+  if (low.size() != high.size())
+    throw Exception("Lower and upper bounds are not of same dimension");
+  for (unsigned int i = 0; i < low.size(); ++i)
+    if (low[i] > high[i])
+      throw Exception("Bounds for real vector space seem to be incorrect (lower bound must be stricly less than upper "
+                      "bound). Sampling will not be possible");
 }

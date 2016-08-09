@@ -41,33 +41,33 @@
 
 namespace ompl
 {
-    namespace base
-    {
-        /** \brief An optimization objective which corresponds to optimizing path length. */
-        class PathLengthOptimizationObjective : public OptimizationObjective
-        {
-        public:
-            PathLengthOptimizationObjective(const SpaceInformationPtr &si);
+namespace base
+{
+/** \brief An optimization objective which corresponds to optimizing path length. */
+class PathLengthOptimizationObjective : public OptimizationObjective
+{
+public:
+  PathLengthOptimizationObjective(const SpaceInformationPtr &si);
 
-            /** \brief Returns identity cost. */
-            Cost stateCost(const State *s) const override;
+  /** \brief Returns identity cost. */
+  Cost stateCost(const State *s) const override;
 
-            /** \brief Motion cost for this objective is defined as
-                the configuration space distance between \e s1 and \e
-                s2, using the method SpaceInformation::distance(). */
-            Cost motionCost(const State *s1, const State *s2) const override;
+  /** \brief Motion cost for this objective is defined as
+      the configuration space distance between \e s1 and \e
+      s2, using the method SpaceInformation::distance(). */
+  Cost motionCost(const State *s1, const State *s2) const override;
 
-            /** \brief the motion cost heuristic for this objective is
-                simply the configuration space distance between \e s1
-                and \e s2, since this is the optimal cost between any
-                two states assuming no obstacles. */
-            Cost motionCostHeuristic(const State *s1, const State *s2) const override;
+  /** \brief the motion cost heuristic for this objective is
+      simply the configuration space distance between \e s1
+      and \e s2, since this is the optimal cost between any
+      two states assuming no obstacles. */
+  Cost motionCostHeuristic(const State *s1, const State *s2) const override;
 
-            /** \brief Allocate a state sampler for the path-length objective (i.e., direct ellipsoidal sampling). */
-            InformedSamplerPtr allocInformedStateSampler(const ProblemDefinitionPtr &probDefn, unsigned int maxNumberCalls) const override;
-
-        };
-    }
+  /** \brief Allocate a state sampler for the path-length objective (i.e., direct ellipsoidal sampling). */
+  InformedSamplerPtr allocInformedStateSampler(const ProblemDefinitionPtr &probDefn,
+                                               unsigned int maxNumberCalls) const override;
+};
+}
 }
 
 #endif

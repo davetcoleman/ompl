@@ -44,97 +44,88 @@
 
 namespace ompl
 {
+namespace control
+{
+/** \brief Create the set of classes typically needed to solve a
+    control problem when forward propagation is computed with OpenDE. */
+class OpenDESimpleSetup : public SimpleSetup
+{
+public:
+  /** \brief Constructor needs the control space needed for planning. */
+  explicit OpenDESimpleSetup(const ControlSpacePtr &space);
 
-    namespace control
-    {
+  /** \brief The control space is assumed to be OpenDEControlSpace. Constructor only needs the state space. */
+  explicit OpenDESimpleSetup(const base::StateSpacePtr &space);
 
-        /** \brief Create the set of classes typically needed to solve a
-            control problem when forward propagation is computed with OpenDE. */
-        class OpenDESimpleSetup : public SimpleSetup
-        {
-        public:
+  /** \brief The control space is assumed to be
+      OpenDEControlSpace. The state space is assumed to
+      be OpenDEStateSpace. Constructor only needs the OpenDE
+      environment. */
+  explicit OpenDESimpleSetup(const OpenDEEnvironmentPtr &env);
 
-            /** \brief Constructor needs the control space needed for planning. */
-            explicit
-            OpenDESimpleSetup(const ControlSpacePtr &space);
+  ~OpenDESimpleSetup() override = default;
 
-            /** \brief The control space is assumed to be OpenDEControlSpace. Constructor only needs the state space. */
-            explicit
-            OpenDESimpleSetup(const base::StateSpacePtr &space);
+  /** \brief Get the OpenDE environment associated to the state and control spaces */
+  const OpenDEEnvironmentPtr &getEnvironment() const
+  {
+    return getStateSpace()->as<OpenDEStateSpace>()->getEnvironment();
+  }
 
-            /** \brief The control space is assumed to be
-                OpenDEControlSpace. The state space is assumed to
-                be OpenDEStateSpace. Constructor only needs the OpenDE
-                environment. */
-            explicit
-            OpenDESimpleSetup(const OpenDEEnvironmentPtr &env);
+  /** \brief Get the current OpenDE state (read parameters from OpenDE bodies) */
+  base::ScopedState<OpenDEStateSpace> getCurrentState() const;
 
-            ~OpenDESimpleSetup() override = default;
+  /** \brief Set the current OpenDE state (set parameters for OpenDE bodies) */
+  void setCurrentState(const base::ScopedState<> &state);
 
-            /** \brief Get the OpenDE environment associated to the state and control spaces */
-            const OpenDEEnvironmentPtr& getEnvironment() const
-            {
-                return getStateSpace()->as<OpenDEStateSpace>()->getEnvironment();
-            }
+  /** \brief Set the current OpenDE state (set parameters for OpenDE bodies) */
+  void setCurrentState(const base::State *state);
 
-            /** \brief Get the current OpenDE state (read parameters from OpenDE bodies) */
-            base::ScopedState<OpenDEStateSpace> getCurrentState() const;
+  /** \brief Set the bounds for the planning volume */
+  void setVolumeBounds(const base::RealVectorBounds &bounds)
+  {
+    getStateSpace()->as<OpenDEStateSpace>()->setVolumeBounds(bounds);
+  }
 
-            /** \brief Set the current OpenDE state (set parameters for OpenDE bodies) */
-            void setCurrentState(const base::ScopedState<> &state);
+  /** \brief Set the bounds for the linear velocity */
+  void setLinearVelocityBounds(const base::RealVectorBounds &bounds)
+  {
+    getStateSpace()->as<OpenDEStateSpace>()->setLinearVelocityBounds(bounds);
+  }
 
-            /** \brief Set the current OpenDE state (set parameters for OpenDE bodies) */
-            void setCurrentState(const base::State *state);
+  /** \brief Set the bounds for the angular velocity */
+  void setAngularVelocityBounds(const base::RealVectorBounds &bounds)
+  {
+    getStateSpace()->as<OpenDEStateSpace>()->setAngularVelocityBounds(bounds);
+  }
 
-            /** \brief Set the bounds for the planning volume */
-            void setVolumeBounds(const base::RealVectorBounds &bounds)
-            {
-                getStateSpace()->as<OpenDEStateSpace>()->setVolumeBounds(bounds);
-            }
+  /** \brief Set the OpenDE world to the states that are
+      contained in a given path, sequentially. Using \e
+      timeFactor, the speed at which this sequence is
+      iterated through is altered. */
+  void playPath(const base::PathPtr &path, double timeFactor = 1.0) const;
 
-            /** \brief Set the bounds for the linear velocity */
-            void setLinearVelocityBounds(const base::RealVectorBounds &bounds)
-            {
-                getStateSpace()->as<OpenDEStateSpace>()->setLinearVelocityBounds(bounds);
-            }
+  /** \brief Call playPath() on the solution path, if one is available */
+  void playSolutionPath(double timeFactor = 1.0) const;
 
-            /** \brief Set the bounds for the angular velocity */
-            void setAngularVelocityBounds(const base::RealVectorBounds &bounds)
-            {
-                getStateSpace()->as<OpenDEStateSpace>()->setAngularVelocityBounds(bounds);
-            }
+  /** \brief Simulate the OpenDE environment forward for \e steps simulation steps, using the control \e control.
+      Construct a path representing this action. */
+  base::PathPtr simulateControl(const double *control, unsigned int steps) const;
 
-            /** \brief Set the OpenDE world to the states that are
-                contained in a given path, sequentially. Using \e
-                timeFactor, the speed at which this sequence is
-                iterated through is altered. */
-            void playPath(const base::PathPtr &path, double timeFactor = 1.0) const;
+  /** \brief Simulate the OpenDE environment forward for \e steps simulation steps, using the control \e control.
+      Construct a path representing this action. */
+  base::PathPtr simulateControl(const Control *control, unsigned int steps) const;
 
-            /** \brief Call playPath() on the solution path, if one is available */
-            void playSolutionPath(double timeFactor = 1.0) const;
+  /** \brief Simulate the OpenDE environment forward for \e
+      steps simulation steps, using the null control
+      (ompl::control::ControlSpace::nullControl()).
+      Construct a path representing this action. */
+  base::PathPtr simulate(unsigned int steps) const;
 
-            /** \brief Simulate the OpenDE environment forward for \e steps simulation steps, using the control \e control.
-                Construct a path representing this action. */
-            base::PathPtr simulateControl(const double *control, unsigned int steps) const;
+  void setup() override;
 
-            /** \brief Simulate the OpenDE environment forward for \e steps simulation steps, using the control \e control.
-                Construct a path representing this action. */
-            base::PathPtr simulateControl(const Control *control, unsigned int steps) const;
-
-            /** \brief Simulate the OpenDE environment forward for \e
-                steps simulation steps, using the null control
-                (ompl::control::ControlSpace::nullControl()).
-                Construct a path representing this action. */
-            base::PathPtr simulate(unsigned int steps) const;
-
-            void setup() override;
-
-        private:
-
-            void useEnvParams();
-
-        };
-    }
-
+private:
+  void useEnvParams();
+};
+}
 }
 #endif

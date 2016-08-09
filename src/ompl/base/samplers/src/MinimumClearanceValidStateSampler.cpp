@@ -40,55 +40,56 @@
 #include "ompl/base/samplers/MinimumClearanceValidStateSampler.h"
 #include "ompl/base/SpaceInformation.h"
 
-ompl::base::MinimumClearanceValidStateSampler::MinimumClearanceValidStateSampler(const SpaceInformation *si) :
-    ValidStateSampler(si), sampler_(si->allocStateSampler()), clearance_(1)
+ompl::base::MinimumClearanceValidStateSampler::MinimumClearanceValidStateSampler(const SpaceInformation *si)
+  : ValidStateSampler(si), sampler_(si->allocStateSampler()), clearance_(1)
 {
-    name_ = "min_clearance";
-    params_.declareParam<unsigned int>("min_obstacle_clearance",
-                                       std::bind(&MinimumClearanceValidStateSampler::setMinimumObstacleClearance, this, std::placeholders::_1),
-                                       std::bind(&MinimumClearanceValidStateSampler::getMinimumObstacleClearance, this));
+  name_ = "min_clearance";
+  params_.declareParam<unsigned int>(
+      "min_obstacle_clearance",
+      std::bind(&MinimumClearanceValidStateSampler::setMinimumObstacleClearance, this, std::placeholders::_1),
+      std::bind(&MinimumClearanceValidStateSampler::getMinimumObstacleClearance, this));
 }
 
 bool ompl::base::MinimumClearanceValidStateSampler::sample(State *state)
 {
-    unsigned int attempts = 0;
-    bool valid = false;
-    double dist = 0.0;
-    do
+  unsigned int attempts = 0;
+  bool valid = false;
+  double dist = 0.0;
+  do
+  {
+    sampler_->sampleUniform(state);
+    valid = si_->getStateValidityChecker()->isValid(state, dist);
+
+    // Also check for distance to nearest obstacle and invalidate if too close
+    if (dist < clearance_)
     {
-        sampler_->sampleUniform(state);
-        valid = si_->getStateValidityChecker()->isValid(state, dist);
+      valid = false;
+    }
 
-        // Also check for distance to nearest obstacle and invalidate if too close
-        if (dist < clearance_)
-        {
-            valid = false;
-        }
+    ++attempts;
+  } while (!valid && attempts < attempts_);
 
-        ++attempts;
-    } while (!valid && attempts < attempts_);
-
-    return valid;
+  return valid;
 }
 
 bool ompl::base::MinimumClearanceValidStateSampler::sampleNear(State *state, const State *near, const double distance)
 {
-    unsigned int attempts = 0;
-    bool valid = false;
-    double dist = 0.0;
-    do
+  unsigned int attempts = 0;
+  bool valid = false;
+  double dist = 0.0;
+  do
+  {
+    sampler_->sampleUniformNear(state, near, distance);
+    valid = si_->getStateValidityChecker()->isValid(state, dist);
+
+    // Also check for distance to nearest obstacle and invalidate if too close
+    if (dist < clearance_)
     {
-        sampler_->sampleUniformNear(state, near, distance);
-        valid = si_->getStateValidityChecker()->isValid(state, dist);
+      valid = false;
+    }
 
-        // Also check for distance to nearest obstacle and invalidate if too close
-        if (dist < clearance_)
-        {
-            valid = false;
-        }
+    ++attempts;
+  } while (!valid && attempts < attempts_);
 
-        ++attempts;
-    } while (!valid && attempts < attempts_);
-
-    return valid;
+  return valid;
 }

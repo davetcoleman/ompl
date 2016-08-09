@@ -39,71 +39,68 @@
 
 #include <utility>
 
-namespace // anonymous
+namespace  // anonymous
 {
-    /**
-     * \brief Calculate min for 3 numbers
-     */
-    inline double min3(double n1, double n2, double n3)
-    {
-        return std::min(n1, std::min(n2, n3));
-    }
+/**
+ * \brief Calculate min for 3 numbers
+ */
+inline double min3(double n1, double n2, double n3)
+{
+  return std::min(n1, std::min(n2, n3));
+}
 }
 
-ompl::tools::DynamicTimeWarp::DynamicTimeWarp(base::SpaceInformationPtr si)
-    : si_(std::move(si)), table_(1, 1)
+ompl::tools::DynamicTimeWarp::DynamicTimeWarp(base::SpaceInformationPtr si) : si_(std::move(si)), table_(1, 1)
 {
-    table_(0, 0) = 0.;
+  table_(0, 0) = 0.;
 }
 
-double ompl::tools::DynamicTimeWarp::calcDTWDistance(const og::PathGeometric &path1, const og::PathGeometric &path2 ) const
+double ompl::tools::DynamicTimeWarp::calcDTWDistance(const og::PathGeometric &path1,
+                                                     const og::PathGeometric &path2) const
 {
-    // Get lengths
-    std::size_t n = path1.getStateCount();
-    std::size_t m = path2.getStateCount();
-    std::size_t nrows = table_.size1(), ncols = table_.size2();
+  // Get lengths
+  std::size_t n = path1.getStateCount();
+  std::size_t m = path2.getStateCount();
+  std::size_t nrows = table_.size1(), ncols = table_.size2();
 
-    // Intialize table
-    if (nrows <= n || ncols <= m)
+  // Intialize table
+  if (nrows <= n || ncols <= m)
+  {
+    table_.resize(n + 1, m + 1, false);
+    for (std::size_t i = nrows; i <= n; ++i)
+      table_(i, 0) = std::numeric_limits<double>::infinity();
+    for (std::size_t i = ncols; i <= m; ++i)
+      table_(0, i) = std::numeric_limits<double>::infinity();
+  }
+
+  // Do calculations
+  double cost;
+  for (std::size_t i = 1; i <= n; ++i)
+    for (std::size_t j = 1; j <= m; ++j)
     {
-        table_.resize(n + 1, m + 1, false);
-        for (std::size_t i = nrows; i <= n; ++i)
-            table_(i, 0) = std::numeric_limits<double>::infinity();
-        for (std::size_t i = ncols; i <= m; ++i)
-            table_(0, i) = std::numeric_limits<double>::infinity();
+      cost = si_->distance(path1.getState(i - 1), path2.getState(j - 1));
+      table_(i, j) = cost + min3(table_(i - 1, j), table_(i, j - 1), table_(i - 1, j - 1));
     }
 
-    // Do calculations
-    double cost;
-    for (std::size_t i = 1; i <= n; ++i)
-        for (std::size_t j = 1; j <= m; ++j)
-        {
-            cost = si_->distance(path1.getState(i - 1), path2.getState(j - 1));
-            table_(i, j) = cost + min3(table_(i - 1, j),
-                                       table_(i, j - 1),
-                                       table_(i - 1, j - 1));
-        }
-
-    return table_(n, m);
+  return table_(n, m);
 }
 
 double ompl::tools::DynamicTimeWarp::getPathsScore(const og::PathGeometric &path1, const og::PathGeometric &path2) const
 {
-    // Copy the path but not the states
-    og::PathGeometric newPath1 = path1;
-    og::PathGeometric newPath2 = path2;
+  // Copy the path but not the states
+  og::PathGeometric newPath1 = path1;
+  og::PathGeometric newPath2 = path2;
 
-    // Interpolate both paths so that we have an even discretization of samples
-    newPath1.interpolate();
-    newPath2.interpolate();
+  // Interpolate both paths so that we have an even discretization of samples
+  newPath1.interpolate();
+  newPath2.interpolate();
 
-    // compute the DTW between two vectors and divide by total path length of the longer path
-    double max_states = std::max(newPath1.getStateCount(),newPath2.getStateCount());
+  // compute the DTW between two vectors and divide by total path length of the longer path
+  double max_states = std::max(newPath1.getStateCount(), newPath2.getStateCount());
 
-    // Prevent division by zero
-    if (max_states == 0)
-        return std::numeric_limits<double>::max(); // the worse score possible
+  // Prevent division by zero
+  if (max_states == 0)
+    return std::numeric_limits<double>::max();  // the worse score possible
 
-    return calcDTWDistance(newPath1, newPath2) / max_states;
+  return calcDTWDistance(newPath1, newPath2) / max_states;
 }
-

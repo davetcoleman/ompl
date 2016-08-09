@@ -38,47 +38,48 @@
 #include "ompl/tools/config/MagicConstants.h"
 #include <cstring>
 
-ompl::base::State* ompl::base::SE3StateSpace::allocState() const
+ompl::base::State *ompl::base::SE3StateSpace::allocState() const
 {
-    auto *state = new StateType();
-    allocStateComponents(state);
-    return state;
+  auto *state = new StateType();
+  allocStateComponents(state);
+  return state;
 }
 
 void ompl::base::SE3StateSpace::freeState(State *state) const
 {
-    CompoundStateSpace::freeState(state);
+  CompoundStateSpace::freeState(state);
 }
 
 void ompl::base::SE3StateSpace::registerProjections()
 {
-    class SE3DefaultProjection : public ProjectionEvaluator
+  class SE3DefaultProjection : public ProjectionEvaluator
+  {
+  public:
+    SE3DefaultProjection(const StateSpace *space) : ProjectionEvaluator(space)
     {
-    public:
+    }
 
-        SE3DefaultProjection(const StateSpace *space) : ProjectionEvaluator(space)
-        {
-        }
+    unsigned int getDimension() const override
+    {
+      return 3;
+    }
 
-        unsigned int getDimension() const override
-        {
-            return 3;
-        }
+    void defaultCellSizes() override
+    {
+      cellSizes_.resize(3);
+      bounds_ = space_->as<SE3StateSpace>()->getBounds();
+      cellSizes_[0] = (bounds_.high[0] - bounds_.low[0]) / magic::PROJECTION_DIMENSION_SPLITS;
+      cellSizes_[1] = (bounds_.high[1] - bounds_.low[1]) / magic::PROJECTION_DIMENSION_SPLITS;
+      cellSizes_[2] = (bounds_.high[2] - bounds_.low[2]) / magic::PROJECTION_DIMENSION_SPLITS;
+    }
 
-        void defaultCellSizes() override
-        {
-            cellSizes_.resize(3);
-            bounds_ = space_->as<SE3StateSpace>()->getBounds();
-            cellSizes_[0] = (bounds_.high[0] - bounds_.low[0]) / magic::PROJECTION_DIMENSION_SPLITS;
-            cellSizes_[1] = (bounds_.high[1] - bounds_.low[1]) / magic::PROJECTION_DIMENSION_SPLITS;
-            cellSizes_[2] = (bounds_.high[2] - bounds_.low[2]) / magic::PROJECTION_DIMENSION_SPLITS;
-        }
+    void project(const State *state, EuclideanProjection &projection) const override
+    {
+      memcpy(&projection(0), state->as<SE3StateSpace::StateType>()->as<RealVectorStateSpace::StateType>(0)->values,
+             3 * sizeof(double));
+    }
+  };
 
-        void project(const State *state, EuclideanProjection &projection) const override
-        {
-            memcpy(&projection(0), state->as<SE3StateSpace::StateType>()->as<RealVectorStateSpace::StateType>(0)->values, 3 * sizeof(double));
-        }
-    };
-
-    registerDefaultProjection(ProjectionEvaluatorPtr(dynamic_cast<ProjectionEvaluator*>(new SE3DefaultProjection(this))));
+  registerDefaultProjection(
+      ProjectionEvaluatorPtr(dynamic_cast<ProjectionEvaluator *>(new SE3DefaultProjection(this))));
 }

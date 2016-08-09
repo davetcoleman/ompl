@@ -71,125 +71,117 @@
     \}
 */
 
-#define ANSI_COLOR_RED     "\x1b[31m"
-#define ANSI_COLOR_GREEN   "\x1b[32m"
-#define ANSI_COLOR_YELLOW  "\x1b[33m"
-#define ANSI_COLOR_BLUE    "\x1b[34m"
+#define ANSI_COLOR_RED "\x1b[31m"
+#define ANSI_COLOR_GREEN "\x1b[32m"
+#define ANSI_COLOR_YELLOW "\x1b[33m"
+#define ANSI_COLOR_BLUE "\x1b[34m"
 #define ANSI_COLOR_MAGENTA "\x1b[35m"
-#define ANSI_COLOR_CYAN    "\x1b[36m"
-#define ANSI_COLOR_RESET   "\x1b[0m"
+#define ANSI_COLOR_CYAN "\x1b[36m"
+#define ANSI_COLOR_RESET "\x1b[0m"
 
-#define OMPL_ERROR(fmt, ...)  ompl::msg::log(__FILE__, __LINE__, ompl::msg::LOG_ERROR, fmt, ##__VA_ARGS__)
+#define OMPL_ERROR(fmt, ...) ompl::msg::log(__FILE__, __LINE__, ompl::msg::LOG_ERROR, fmt, ##__VA_ARGS__)
 
-#define OMPL_WARN(fmt, ...)   ompl::msg::log(__FILE__, __LINE__, ompl::msg::LOG_WARN,  fmt, ##__VA_ARGS__)
+#define OMPL_WARN(fmt, ...) ompl::msg::log(__FILE__, __LINE__, ompl::msg::LOG_WARN, fmt, ##__VA_ARGS__)
 
-#define OMPL_INFORM(fmt, ...) ompl::msg::log(__FILE__, __LINE__, ompl::msg::LOG_INFO,  fmt, ##__VA_ARGS__)
+#define OMPL_INFORM(fmt, ...) ompl::msg::log(__FILE__, __LINE__, ompl::msg::LOG_INFO, fmt, ##__VA_ARGS__)
 
-#define OMPL_DEBUG(fmt, ...)  ompl::msg::log(__FILE__, __LINE__, ompl::msg::LOG_DEBUG, fmt, ##__VA_ARGS__)
+#define OMPL_DEBUG(fmt, ...) ompl::msg::log(__FILE__, __LINE__, ompl::msg::LOG_DEBUG, fmt, ##__VA_ARGS__)
 
-#define OMPL_DEVMSG1(fmt, ...)  ompl::msg::log(__FILE__, __LINE__, ompl::msg::LOG_DEV1, fmt, ##__VA_ARGS__)
+#define OMPL_DEVMSG1(fmt, ...) ompl::msg::log(__FILE__, __LINE__, ompl::msg::LOG_DEV1, fmt, ##__VA_ARGS__)
 
-#define OMPL_DEVMSG2(fmt, ...)  ompl::msg::log(__FILE__, __LINE__, ompl::msg::LOG_DEV2, fmt, ##__VA_ARGS__)
+#define OMPL_DEVMSG2(fmt, ...) ompl::msg::log(__FILE__, __LINE__, ompl::msg::LOG_DEV2, fmt, ##__VA_ARGS__)
 
 namespace ompl
 {
+/** \brief Message namespace. This contains classes needed to
+    output error messages (or logging) from within the library.
+    Message logging can be performed with \ref logging "logging macros" */
+namespace msg
+{
+/** \brief The set of priorities for message logging */
+enum LogLevel
+{
+  LOG_DEV2 = -2,  // message type for developers
+  LOG_DEV1 = -1,  // message type for developers
+  LOG_DEBUG = 0,
+  LOG_INFO,
+  LOG_WARN,
+  LOG_ERROR,
+  LOG_NONE
+};
 
-    /** \brief Message namespace. This contains classes needed to
-        output error messages (or logging) from within the library.
-        Message logging can be performed with \ref logging "logging macros" */
-    namespace msg
-    {
-        /** \brief The set of priorities for message logging */
-        enum LogLevel
-        {
-            LOG_DEV2 = -2, // message type for developers
-            LOG_DEV1 = -1, // message type for developers
-            LOG_DEBUG = 0,
-            LOG_INFO,
-            LOG_WARN,
-            LOG_ERROR,
-            LOG_NONE
-        };
+/** \brief Generic class to handle output from a piece of
+    code.
 
-        /** \brief Generic class to handle output from a piece of
-            code.
+    In order to handle output from the library in different
+    ways, an implementation of this class needs to be
+    provided. This instance can be set with the useOutputHandler
+    function. */
+class OutputHandler
+{
+public:
+  OutputHandler() = default;
 
-            In order to handle output from the library in different
-            ways, an implementation of this class needs to be
-            provided. This instance can be set with the useOutputHandler
-            function. */
-        class OutputHandler
-        {
-        public:
+  virtual ~OutputHandler() = default;
 
-            OutputHandler() = default;
+  /** \brief log a message to the output handler with the given text
+      and logging level from a specific file and line number */
+  virtual void log(const std::string &text, LogLevel level, const char *filename, int line) = 0;
+};
 
-            virtual ~OutputHandler() = default;
+/** \brief Default implementation of OutputHandler. This sends
+    the information to the console. */
+class OutputHandlerSTD : public OutputHandler
+{
+public:
+  OutputHandlerSTD() : OutputHandler()
+  {
+  }
 
-            /** \brief log a message to the output handler with the given text
-                and logging level from a specific file and line number */
-            virtual void log(const std::string &text, LogLevel level, const char *filename, int line) = 0;
-        };
+  void log(const std::string &text, LogLevel level, const char *filename, int line) override;
+};
 
-        /** \brief Default implementation of OutputHandler. This sends
-            the information to the console. */
-        class OutputHandlerSTD : public OutputHandler
-        {
-        public:
+/** \brief Implementation of OutputHandler that saves messages in a file. */
+class OutputHandlerFile : public OutputHandler
+{
+public:
+  /** \brief The name of the file in which to save the message data */
+  OutputHandlerFile(const char *filename);
 
-            OutputHandlerSTD() : OutputHandler()
-            {
-            }
+  ~OutputHandlerFile() override;
 
-            void log(const std::string &text, LogLevel level, const char *filename, int line) override;
+  void log(const std::string &text, LogLevel level, const char *filename, int line) override;
 
-        };
+private:
+  /** \brief The file to save to */
+  FILE *file_;
+};
 
-        /** \brief Implementation of OutputHandler that saves messages in a file. */
-        class OutputHandlerFile : public OutputHandler
-        {
-        public:
+/** \brief This function instructs ompl that no messages should be outputted. Equivalent to useOutputHandler(nullptr) */
+void noOutputHandler();
 
-            /** \brief The name of the file in which to save the message data */
-            OutputHandlerFile(const char *filename);
+/** \brief Restore the output handler that was previously in use (if any) */
+void restorePreviousOutputHandler();
 
-            ~OutputHandlerFile() override;
+/** \brief Specify the instance of the OutputHandler to use. By default, this is OutputHandlerSTD */
+void useOutputHandler(OutputHandler *oh);
 
-            void log(const std::string &text, LogLevel level, const char *filename, int line) override;
+/** \brief Get the instance of the OutputHandler currently used. This is nullptr in case there is no output handler. */
+OutputHandler *getOutputHandler();
 
-        private:
+/** \brief Set the minimum level of logging data to output.  Messages
+    with lower logging levels will not be recorded. */
+void setLogLevel(LogLevel level);
 
-            /** \brief The file to save to */
-            FILE *file_;
+/** \brief Retrieve the current level of logging data.  Messages
+    with lower logging levels will not be recorded. */
+LogLevel getLogLevel();
 
-        };
-
-        /** \brief This function instructs ompl that no messages should be outputted. Equivalent to useOutputHandler(nullptr) */
-        void noOutputHandler();
-
-        /** \brief Restore the output handler that was previously in use (if any) */
-        void restorePreviousOutputHandler();
-
-        /** \brief Specify the instance of the OutputHandler to use. By default, this is OutputHandlerSTD */
-        void useOutputHandler(OutputHandler *oh);
-
-        /** \brief Get the instance of the OutputHandler currently used. This is nullptr in case there is no output handler. */
-        OutputHandler* getOutputHandler();
-
-        /** \brief Set the minimum level of logging data to output.  Messages
-            with lower logging levels will not be recorded. */
-        void setLogLevel(LogLevel level);
-
-        /** \brief Retrieve the current level of logging data.  Messages
-            with lower logging levels will not be recorded. */
-        LogLevel getLogLevel();
-
-        /** \brief Root level logging function.  This should not be invoked directly,
-            but rather used via a \ref logging "logging macro".  Formats the message
-            string given the arguments and forwards the string to the output handler */
-        void log(const char *file, int line, LogLevel level, const char *m, ...);
-    }
-
+/** \brief Root level logging function.  This should not be invoked directly,
+    but rather used via a \ref logging "logging macro".  Formats the message
+    string given the arguments and forwards the string to the output handler */
+void log(const char *file, int line, LogLevel level, const char *m, ...);
+}
 }
 
 #endif

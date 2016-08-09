@@ -42,48 +42,44 @@
 
 namespace ompl
 {
+namespace control
+{
+/** \brief State propagation with MORSE. Only forward
+    propagation is possible.
 
-    namespace control
-    {
+    At every propagation step, controls are applied using
+    MorseEnvironment::applyControl(), and then \b worldStep()
+    is called.*/
+class MorseStatePropagator : public StatePropagator
+{
+public:
+  /** \brief Construct representation of a MORSE state propagator.
+      If \e si->getStateSpace() does not cast to a
+      MorseStateSpace, an exception is thrown. */
+  MorseStatePropagator(const SpaceInformationPtr &si);
 
-        /** \brief State propagation with MORSE. Only forward
-            propagation is possible.
+  virtual ~MorseStatePropagator()
+  {
+  }
 
-            At every propagation step, controls are applied using
-            MorseEnvironment::applyControl(), and then \b worldStep()
-            is called.*/
-        class MorseStatePropagator : public StatePropagator
-        {
-        public:
+  /** \brief Get the MORSE environment this state propagator operates on */
+  const base::MorseEnvironmentPtr &getEnvironment() const
+  {
+    return env_;
+  }
 
-            /** \brief Construct representation of a MORSE state propagator.
-                If \e si->getStateSpace() does not cast to a
-                MorseStateSpace, an exception is thrown. */
-            MorseStatePropagator(const SpaceInformationPtr &si);
+  /** \brief Will always return false, as the simulation can only proceed forward in time */
+  virtual bool canPropagateBackward() const;
 
-            virtual ~MorseStatePropagator()
-            {
-            }
+  /** \brief Propagate from a state, under a given control, for some specified amount of time */
+  virtual void propagate(const base::State *state, const Control *control, const double duration,
+                         base::State *result) const;
 
-            /** \brief Get the MORSE environment this state propagator operates on */
-            const base::MorseEnvironmentPtr& getEnvironment() const
-            {
-                return env_;
-            }
-
-            /** \brief Will always return false, as the simulation can only proceed forward in time */
-            virtual bool canPropagateBackward() const;
-
-            /** \brief Propagate from a state, under a given control, for some specified amount of time */
-            virtual void propagate(const base::State *state, const Control *control, const double duration, base::State *result) const;
-
-        protected:
-
-            /** \brief The MORSE environment this state propagator operates on */
-            base::MorseEnvironmentPtr env_;
-
-        };
-    }
+protected:
+  /** \brief The MORSE environment this state propagator operates on */
+  base::MorseEnvironmentPtr env_;
+};
+}
 }
 
 #endif

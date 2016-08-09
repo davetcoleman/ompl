@@ -44,74 +44,68 @@
 
 namespace ompl
 {
-    namespace base
+namespace base
+{
+/**
+ * Optimization objective that computes the upstream criterion between two states.
+ */
+class VFUpstreamCriterionOptimizationObjective : public ompl::base::OptimizationObjective
+{
+public:
+  /** Constructor. */
+  VFUpstreamCriterionOptimizationObjective(const ompl::base::SpaceInformationPtr &si, geometric::VFRRT::VectorField vf)
+    : ompl::base::OptimizationObjective(si), vf_(std::move(vf))
+  {
+    description_ = "Upstream Criterion";
+  }
+
+  /** Assume we can always do better. */
+  bool isSatisfied(ompl::base::Cost c) const override
+  {
+    return false;
+  }
+
+  /** \brief Returns a cost with a value of 0. */
+  Cost stateCost(const State *s) const override
+  {
+    return Cost(0.);
+  }
+
+  /** Compute upstream criterion between two states. */
+  ompl::base::Cost motionCost(const State *s1, const State *s2) const override
+  {
+    const base::StateSpacePtr &space = si_->getStateSpace();
+    // Per equation 1 in the paper, Riemann approximation on the left
+    unsigned int vfdim = space->getValueLocations().size();
+    Eigen::VectorXd qprime(vfdim);
+    unsigned int numSegments = space->validSegmentCount(s1, s2);
+    std::vector<ompl::base::State *> interp;
+
+    for (unsigned int i = 0; i < vfdim; i++)
+      qprime[i] = *space->getValueAddressAtIndex(s2, i) - *space->getValueAddressAtIndex(s1, i);
+    qprime.normalize();
+    si_->getMotionStates(s1, s2, interp, numSegments - 1, true, true);
+    double cost = 0;
+    for (unsigned int i = 0; i < interp.size() - 1; i++)
     {
-
-        /**
-         * Optimization objective that computes the upstream criterion between two states.
-         */
-        class VFUpstreamCriterionOptimizationObjective : public ompl::base::OptimizationObjective
-        {
-
-        public:
-
-            /** Constructor. */
-            VFUpstreamCriterionOptimizationObjective(const ompl::base::SpaceInformationPtr &si,
-                geometric::VFRRT::VectorField vf)
-                : ompl::base::OptimizationObjective(si), vf_(std::move(vf))
-            {
-                description_ = "Upstream Criterion";
-            }
-
-            /** Assume we can always do better. */
-            bool isSatisfied(ompl::base::Cost c) const override
-            {
-                return false;
-            }
-
-            /** \brief Returns a cost with a value of 0. */
-            Cost stateCost(const State *s) const override
-            {
-                return Cost(0.);
-            }
-
-            /** Compute upstream criterion between two states. */
-            ompl::base::Cost motionCost(const State *s1, const State *s2) const override
-            {
-                const base::StateSpacePtr &space = si_->getStateSpace();
-                // Per equation 1 in the paper, Riemann approximation on the left
-                unsigned int vfdim = space->getValueLocations().size();
-                Eigen::VectorXd qprime(vfdim);
-                unsigned int numSegments = space->validSegmentCount(s1, s2);
-                std::vector<ompl::base::State*> interp;
-
-                for (unsigned int i = 0; i < vfdim; i++)
-                    qprime[i] = *space->getValueAddressAtIndex(s2, i)
-                        - *space->getValueAddressAtIndex(s1, i);
-                qprime.normalize();
-                si_->getMotionStates(s1, s2, interp, numSegments - 1, true, true);
-                double cost = 0;
-                for (unsigned int i = 0; i < interp.size() - 1; i++)
-                {
-                    Eigen::VectorXd f = vf_(interp[i]);
-                    cost += si_->distance(interp[i], interp[i + 1]) * (f.norm() - f.dot(qprime));
-                    si_->freeState(interp[i]);
-                }
-                si_->freeState(interp[interp.size()-1]);
-                return ompl::base::Cost(cost);
-            }
-
-            bool isSymmetric() const override
-            {
-                return false;
-            }
-
-        protected:
-            /** VectorField associated with the space. */
-            geometric::VFRRT::VectorField vf_;
-        };
-
+      Eigen::VectorXd f = vf_(interp[i]);
+      cost += si_->distance(interp[i], interp[i + 1]) * (f.norm() - f.dot(qprime));
+      si_->freeState(interp[i]);
     }
+    si_->freeState(interp[interp.size() - 1]);
+    return ompl::base::Cost(cost);
+  }
+
+  bool isSymmetric() const override
+  {
+    return false;
+  }
+
+protected:
+  /** VectorField associated with the space. */
+  geometric::VFRRT::VectorField vf_;
+};
+}
 }
 
 #endif

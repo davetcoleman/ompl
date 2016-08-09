@@ -41,129 +41,124 @@
 
 namespace ompl
 {
-    namespace base
-    {
+namespace base
+{
+/** \brief State space sampler for SO(3), using quaternion representation  */
+class SO3StateSampler : public StateSampler
+{
+public:
+  /** \brief Constructor */
+  SO3StateSampler(const StateSpace *space) : StateSampler(space)
+  {
+  }
 
-        /** \brief State space sampler for SO(3), using quaternion representation  */
-        class SO3StateSampler : public StateSampler
-        {
-        public:
+  void sampleUniform(State *state) override;
+  /** \brief To sample unit quaternions uniformly within some given
+      distance, we sample a 3-vector from the R^3 tangent space.
+      This vector is drawn uniformly random from a 3D ball centered at
+      the origin with radius distance. The vector is then "wrapped"
+      around S^3 to obtain a unit quaternion uniformly distributed
+      around the identity quaternion within given distance. We
+      pre-multiply this quaternion with the quaternion near
+      to center the distribution around near. */
+  void sampleUniformNear(State *state, const State *near, const double distance) override;
+  /** \brief Sample a state such that the expected distance between
+      mean and state is stdDev.
 
-            /** \brief Constructor */
-            SO3StateSampler(const StateSpace *space) : StateSampler(space)
-            {
-            }
+      To sample a unit quaternion from a Gaussian
+      distribution, we sample a 3-vector from the R^3 tangent space
+      using a 3D Gaussian with zero mean and covariance matrix equal
+      to diag(stdDev^2, stdDev^2, stdDev^2). This vector is "wrapped"
+      around S^3 to obtain a Gaussian quaternion with zero mean.
+      We pre-multiply this quaternion with the quaternion mean
+      to get the desired mean. */
+  void sampleGaussian(State *state, const State *mean, const double stdDev) override;
+};
 
-            void sampleUniform(State *state) override;
-            /** \brief To sample unit quaternions uniformly within some given
-                distance, we sample a 3-vector from the R^3 tangent space.
-                This vector is drawn uniformly random from a 3D ball centered at
-                the origin with radius distance. The vector is then "wrapped"
-                around S^3 to obtain a unit quaternion uniformly distributed
-                around the identity quaternion within given distance. We
-                pre-multiply this quaternion with the quaternion near
-                to center the distribution around near. */
-            void sampleUniformNear(State *state, const State *near, const double distance) override;
-            /** \brief Sample a state such that the expected distance between
-                mean and state is stdDev.
+/** \brief A state space representing SO(3). The internal
+    representation is done with quaternions. The distance
+    between states is the angle between quaternions and
+    interpolation is done with slerp. */
+class SO3StateSpace : public StateSpace
+{
+public:
+  /** \brief The definition of a state in SO(3) represented as a unit quaternion
 
-                To sample a unit quaternion from a Gaussian
-                distribution, we sample a 3-vector from the R^3 tangent space
-                using a 3D Gaussian with zero mean and covariance matrix equal
-                to diag(stdDev^2, stdDev^2, stdDev^2). This vector is "wrapped"
-                around S^3 to obtain a Gaussian quaternion with zero mean.
-                We pre-multiply this quaternion with the quaternion mean
-                to get the desired mean. */
-            void sampleGaussian(State *state, const State *mean, const double stdDev) override;
-        };
+      \note The order of the elements matters in this
+      definition for the SO3StateUniformSampler::sample()
+      function. */
+  class StateType : public State
+  {
+  public:
+    /** \brief Set the quaternion from axis-angle representation.  The angle is given in radians. */
+    void setAxisAngle(double ax, double ay, double az, double angle);
 
-        /** \brief A state space representing SO(3). The internal
-            representation is done with quaternions. The distance
-            between states is the angle between quaternions and
-            interpolation is done with slerp. */
-        class SO3StateSpace : public StateSpace
-        {
-        public:
+    /** \brief Set the state to identity -- no rotation */
+    void setIdentity();
 
+    /** \brief X component of quaternion vector */
+    double x;
 
-            /** \brief The definition of a state in SO(3) represented as a unit quaternion
+    /** \brief Y component of quaternion vector */
+    double y;
 
-                \note The order of the elements matters in this
-                definition for the SO3StateUniformSampler::sample()
-                function. */
-            class StateType : public State
-            {
-            public:
+    /** \brief Z component of quaternion vector */
+    double z;
 
-                /** \brief Set the quaternion from axis-angle representation.  The angle is given in radians. */
-                void setAxisAngle(double ax, double ay, double az, double angle);
+    /** \brief scalar component of quaternion */
+    double w;
+  };
 
-                /** \brief Set the state to identity -- no rotation */
-                void setIdentity();
+  SO3StateSpace() : StateSpace()
+  {
+    setName("SO3" + getName());
+    type_ = STATE_SPACE_SO3;
+  }
 
-                /** \brief X component of quaternion vector */
-                double x;
+  ~SO3StateSpace() override = default;
 
-                /** \brief Y component of quaternion vector */
-                double y;
+  /** \brief Compute the norm of a state */
+  double norm(const StateType *state) const;
 
-                /** \brief Z component of quaternion vector */
-                double z;
+  unsigned int getDimension() const override;
 
-                /** \brief scalar component of quaternion */
-                double w;
-            };
+  double getMaximumExtent() const override;
 
-            SO3StateSpace() : StateSpace()
-            {
-                setName("SO3" + getName());
-                type_ = STATE_SPACE_SO3;
-            }
+  double getMeasure() const override;
 
-            ~SO3StateSpace() override = default;
+  void enforceBounds(State *state) const override;
 
-            /** \brief Compute the norm of a state */
-            double norm(const StateType *state) const;
+  bool satisfiesBounds(const State *state) const override;
 
-            unsigned int getDimension() const override;
+  void copyState(State *destination, const State *source) const override;
 
-            double getMaximumExtent() const override;
+  unsigned int getSerializationLength() const override;
 
-            double getMeasure() const override;
+  void serialize(void *serialization, const State *state) const override;
 
-            void enforceBounds(State *state) const override;
+  void deserialize(State *state, const void *serialization) const override;
 
-            bool satisfiesBounds(const State *state) const override;
+  double distance(const State *state1, const State *state2) const override;
 
-            void copyState(State *destination, const State *source) const override;
+  bool equalStates(const State *state1, const State *state2) const override;
 
-            unsigned int getSerializationLength() const override;
+  void interpolate(const State *from, const State *to, const double t, State *state) const override;
 
-            void serialize(void *serialization, const State *state) const override;
+  StateSamplerPtr allocDefaultStateSampler() const override;
 
-            void deserialize(State *state, const void *serialization) const override;
+  State *allocState() const override;
 
-            double distance(const State *state1, const State *state2) const override;
+  void freeState(State *state) const override;
 
-            bool equalStates(const State *state1, const State *state2) const override;
+  double *getValueAddressAtIndex(State *state, const unsigned int index) const override;
 
-            void interpolate(const State *from, const State *to, const double t, State *state) const override;
+  void printState(const State *state, std::ostream &out) const override;
 
-            StateSamplerPtr allocDefaultStateSampler() const override;
+  void printSettings(std::ostream &out) const override;
 
-            State* allocState() const override;
-
-            void freeState(State *state) const override;
-
-            double* getValueAddressAtIndex(State *state, const unsigned int index) const override;
-
-            void printState(const State *state, std::ostream &out) const override;
-
-            void printSettings(std::ostream &out) const override;
-
-            void registerProjections() override;
-        };
-    }
+  void registerProjections() override;
+};
+}
 }
 
 #endif

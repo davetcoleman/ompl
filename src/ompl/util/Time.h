@@ -43,61 +43,58 @@
 #include <sstream>
 
 // std::put_time is not implemented in GCC 4.x
-#if defined (__GNUC__) && (__GNUC__ < 5)
+#if defined(__GNUC__) && (__GNUC__ < 5)
 namespace std
 {
-    inline std::string put_time(const std::tm* tmb, const char* fmt)
-    {
-        char mbstr[100];
-        std::strftime(mbstr, sizeof(mbstr), fmt, tmb);
-        return string(mbstr);
-    }
+inline std::string put_time(const std::tm* tmb, const char* fmt)
+{
+  char mbstr[100];
+  std::strftime(mbstr, sizeof(mbstr), fmt, tmb);
+  return string(mbstr);
+}
 }
 #endif
 
 namespace ompl
 {
+/** \brief Namespace containing time datatypes and time operations */
+namespace time
+{
+/** \brief Representation of a point in time */
+using point = std::chrono::system_clock::time_point;
 
-    /** \brief Namespace containing time datatypes and time operations */
-    namespace time
-    {
+/** \brief Representation of a time duration */
+using duration = std::chrono::system_clock::duration;
 
-        /** \brief Representation of a point in time */
-        using point = std::chrono::system_clock::time_point;
+/** \brief Get the current time point */
+inline point now()
+{
+  return std::chrono::system_clock::now();
+}
 
-        /** \brief Representation of a time duration */
-        using duration = std::chrono::system_clock::duration;
+/** \brief Return the time duration representing a given number of seconds */
+inline duration seconds(double sec)
+{
+  long s = (long)sec;
+  long us = (long)((sec - (double)s) * 1000000);
+  return std::chrono::seconds(s) + std::chrono::microseconds(us);
+}
 
-        /** \brief Get the current time point */
-        inline point now()
-        {
-            return std::chrono::system_clock::now();
-        }
+/** \brief Return the number of seconds that a time duration represents */
+inline double seconds(const duration& d)
+{
+  return std::chrono::duration<double>(d).count();
+}
 
-        /** \brief Return the time duration representing a given number of seconds */
-        inline duration seconds(double sec)
-        {
-            long s  = (long)sec;
-            long us = (long)((sec - (double)s) * 1000000);
-            return std::chrono::seconds(s) + std::chrono::microseconds(us);
-        }
-
-        /** \brief Return the number of seconds that a time duration represents */
-        inline double seconds(const duration &d)
-        {
-            return std::chrono::duration<double>(d).count();
-        }
-
-        /** \brief Return string representation of point in time */
-        inline std::string as_string(const point& p)
-        {
-            std::time_t pt = std::chrono::system_clock::to_time_t(p);
-            std::stringstream ss;
-            ss << std::put_time(std::localtime(&pt), "%F %T");
-            return ss.str();
-        }
-
-    }
+/** \brief Return string representation of point in time */
+inline std::string as_string(const point& p)
+{
+  std::time_t pt = std::chrono::system_clock::to_time_t(p);
+  std::stringstream ss;
+  ss << std::put_time(std::localtime(&pt), "%F %T");
+  return ss.str();
+}
+}
 }
 
 #endif

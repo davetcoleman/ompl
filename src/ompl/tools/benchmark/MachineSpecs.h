@@ -41,23 +41,22 @@
 
 namespace ompl
 {
+/** \brief This namespace contains routines that read specifications of the machine in use */
+namespace machine
+{
+/** \brief Amount of memory used, in bytes */
+using MemUsage_t = unsigned long long;
 
-    /** \brief This namespace contains routines that read specifications of the machine in use */
-    namespace machine
-    {
+/** \brief Get the amount of memory the current process is using. This should work on major platforms (Windows, Mac OS,
+ * Linux) */
+MemUsage_t getProcessMemoryUsage();
 
-        /** \brief Amount of memory used, in bytes */
-        using MemUsage_t = unsigned long long;
+/** \brief Get the hostname of the machine in use */
+std::string getHostname();
 
-        /** \brief Get the amount of memory the current process is using. This should work on major platforms (Windows, Mac OS, Linux) */
-        MemUsage_t getProcessMemoryUsage();
-
-        /** \brief Get the hostname of the machine in use */
-        std::string getHostname();
-
-        /** \brief Get information about the CPU of the machine in use */
-        std::string getCPUInfo();
-    }
+/** \brief Get information about the CPU of the machine in use */
+std::string getCPUInfo();
+}
 }
 
 #endif

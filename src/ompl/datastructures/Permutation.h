@@ -41,33 +41,33 @@
 
 namespace ompl
 {
+/// \brief A permutation of indices into an array
+///
+/// This class tends to be faster than the two-argument version of
+/// std::random_shuffle when permute is called several times, since
+/// the random number generator doesn't need to be allocated each time.
+class Permutation : public std::vector<int>
+{
+public:
+  /// \brief Create a permutation of the numbers 0, ... , n - 1
+  Permutation(std::size_t n) : std::vector<int>(n)
+  {
+    permute(n);
+  }
+  /// \brief Create a permutation of the numbers 0, ..., n - 1
+  void permute(unsigned int n)
+  {
+    if (size() < n)
+      resize(n);
+    for (unsigned int i = 0; i < n; ++i)
+      operator[](i) = i;
+    std::shuffle(begin(), begin() + n, generator_);
+  }
 
-    /// \brief A permutation of indices into an array
-    ///
-    /// This class tends to be faster than the two-argument version of
-    /// std::random_shuffle when permute is called several times, since
-    /// the random number generator doesn't need to be allocated each time.
-    class Permutation : public std::vector<int>
-    {
-    public:
-        /// \brief Create a permutation of the numbers 0, ... , n - 1
-        Permutation(std::size_t n) : std::vector<int>(n)
-        {
-            permute(n);
-        }
-        /// \brief Create a permutation of the numbers 0, ..., n - 1
-        void permute(unsigned int n)
-        {
-            if (size() < n)
-                resize(n);
-            for (unsigned int i = 0; i < n; ++i)
-                operator[](i) = i;
-            std::shuffle(begin(), begin() + n, generator_);
-        }
-    private:
-        /// Mersenne twister random number generator
-        std::mt19937 generator_;
-    };
+private:
+  /// Mersenne twister random number generator
+  std::mt19937 generator_;
+};
 }
 
 #endif

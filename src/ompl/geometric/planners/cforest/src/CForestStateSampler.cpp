@@ -38,58 +38,58 @@
 
 void ompl::base::CForestStateSampler::sampleUniform(State *state)
 {
-    if (!statesToSample_.empty())
-        getNextSample(state);
-    else
-        sampler_->sampleUniform(state);
+  if (!statesToSample_.empty())
+    getNextSample(state);
+  else
+    sampler_->sampleUniform(state);
 }
 
 void ompl::base::CForestStateSampler::sampleUniformNear(State *state, const State *near, const double distance)
 {
-    if (!statesToSample_.empty())
-        getNextSample(state);
-    else
-        sampler_->sampleUniformNear(state, near, distance);
+  if (!statesToSample_.empty())
+    getNextSample(state);
+  else
+    sampler_->sampleUniformNear(state, near, distance);
 }
 
 void ompl::base::CForestStateSampler::sampleGaussian(State *state, const State *mean, const double stdDev)
 {
-    if (!statesToSample_.empty())
-        getNextSample(state);
-    else
-        sampler_->sampleGaussian(state, mean, stdDev);
+  if (!statesToSample_.empty())
+    getNextSample(state);
+  else
+    sampler_->sampleGaussian(state, mean, stdDev);
 }
 
 void ompl::base::CForestStateSampler::setStatesToSample(const std::vector<const State *> &states)
 {
-    std::lock_guard<std::mutex> slock(statesLock_);
-    for (auto & i : statesToSample_)
-        space_->freeState(i);
-    statesToSample_.clear();
+  std::lock_guard<std::mutex> slock(statesLock_);
+  for (auto &i : statesToSample_)
+    space_->freeState(i);
+  statesToSample_.clear();
 
-    statesToSample_.reserve(states.size());
-    // push in reverse order, so that the states are popped in order in getNextSample()
-    for (auto state : states)
-    {
-        State *s = space_->allocState();
-        space_->copyState(s, state);
-        statesToSample_.push_back(s);
-    }
+  statesToSample_.reserve(states.size());
+  // push in reverse order, so that the states are popped in order in getNextSample()
+  for (auto state : states)
+  {
+    State *s = space_->allocState();
+    space_->copyState(s, state);
+    statesToSample_.push_back(s);
+  }
 }
 
 void ompl::base::CForestStateSampler::getNextSample(State *state)
 {
-    std::lock_guard<std::mutex> slock(statesLock_);
-    space_->copyState(state, statesToSample_.back());
-    space_->freeState(statesToSample_.back());
-    statesToSample_.pop_back();
+  std::lock_guard<std::mutex> slock(statesLock_);
+  space_->copyState(state, statesToSample_.back());
+  space_->freeState(statesToSample_.back());
+  statesToSample_.pop_back();
 }
 
 void ompl::base::CForestStateSampler::clear()
 {
-    std::lock_guard<std::mutex> slock(statesLock_);
-    for (auto & i : statesToSample_)
-        space_->freeState(i);
-    statesToSample_.clear();
-    sampler_.reset();
+  std::lock_guard<std::mutex> slock(statesLock_);
+  for (auto &i : statesToSample_)
+    space_->freeState(i);
+  statesToSample_.clear();
+  sampler_.reset();
 }

@@ -50,137 +50,134 @@
 
 namespace ompl
 {
+namespace tools
+{
+/**
+   @anchor ThunderDB
+   @par Short description
+   Database for storing and retrieving past plans
+*/
 
-    namespace tools
-    {
-        /**
-           @anchor ThunderDB
-           @par Short description
-           Database for storing and retrieving past plans
-        */
+/// @cond IGNORE
+OMPL_CLASS_FORWARD(ThunderDB);
+/// @endcond
 
-        /// @cond IGNORE
-        OMPL_CLASS_FORWARD(ThunderDB);
-        /// @endcond
+using SPARSdbPtr = std::shared_ptr<ompl::geometric::SPARSdb>;
 
-        using SPARSdbPtr = std::shared_ptr<ompl::geometric::SPARSdb>;
+/** \class ompl::geometric::ThunderDBPtr
+    \brief A shared pointer wrapper for ompl::tools::ThunderDB */
 
-        /** \class ompl::geometric::ThunderDBPtr
-            \brief A shared pointer wrapper for ompl::tools::ThunderDB */
+/** \brief Save and load entire paths from file */
+class ThunderDB
+{
+public:
+  /** \brief Constructor needs the state space used for planning.
+   *  \param space - state space
+   */
+  ThunderDB(const base::StateSpacePtr& space, VisualizerPtr visual);
 
-        /** \brief Save and load entire paths from file */
-        class ThunderDB
-        {
-        public:
+  /** \brief Deconstructor */
+  virtual ~ThunderDB();
 
-            /** \brief Constructor needs the state space used for planning.
-             *  \param space - state space
-             */
-            ThunderDB(const base::StateSpacePtr &space, VisualizerPtr visual);
+  /**
+   * \brief Load database from file
+   * \param fileName - name of database file
+   * \return true if file loaded successfully
+   */
+  bool load(const std::string& fileName);
 
-            /** \brief Deconstructor */
-            virtual ~ThunderDB();
+  /**
+   * \brief Add a new solution path to our database. Des not actually save to file so
+   *        experience will be lost if save() is not called
+   * \param new path - must be non-const because will be interpolated
+   * \param returned insertion time to add to db
+   * \return true on success
+   */
+  bool addPath(ompl::geometric::PathGeometric& solutionPath, double& insertionTime);
 
-            /**
-             * \brief Load database from file
-             * \param fileName - name of database file
-             * \return true if file loaded successfully
-             */
-            bool load(const std::string& fileName);
+  /**
+   * \brief Save loaded database to file, except skips saving if no paths have been added
+   * \param fileName - name of database file
+   * \return true if file saved successfully
+   */
+  bool saveIfChanged(const std::string& fileName);
 
-            /**
-             * \brief Add a new solution path to our database. Des not actually save to file so
-             *        experience will be lost if save() is not called
-             * \param new path - must be non-const because will be interpolated
-             * \param returned insertion time to add to db
-             * \return true on success
-             */
-            bool addPath(ompl::geometric::PathGeometric& solutionPath, double& insertionTime);
+  /**
+   * \brief Save loaded database to file
+   * \param fileName - name of database file
+   * \return true if file saved successfully
+   */
+  bool save(const std::string& fileName);
 
-            /**
-             * \brief Save loaded database to file, except skips saving if no paths have been added
-             * \param fileName - name of database file
-             * \return true if file saved successfully
-             */
-            bool saveIfChanged(const std::string& fileName);
+  /**
+   * \brief Get a vector of all the planner datas in the database
+   */
+  void getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr>& plannerDatas) const;
 
-            /**
-             * \brief Save loaded database to file
-             * \param fileName - name of database file
-             * \return true if file saved successfully
-             */
-            bool save(const std::string& fileName);
+  /** \brief Create the database structure for saving experiences */
+  void setSPARSdb(ompl::tools::SPARSdbPtr& prm);
 
-            /**
-             * \brief Get a vector of all the planner datas in the database
-             */
-            void getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const;
+  /** \brief Hook for debugging */
+  ompl::tools::SPARSdbPtr& getSPARSdb();
 
-            /** \brief Create the database structure for saving experiences */
-            void setSPARSdb(ompl::tools::SPARSdbPtr &prm);
+  /** \brief Find the k nearest paths to our queries one */
+  bool findNearestStartGoal(int nearestK, const base::State* start, const base::State* goal,
+                            ompl::geometric::SPARSdb::CandidateSolution& candidateSolution,
+                            const base::PlannerTerminationCondition& ptc);
 
-            /** \brief Hook for debugging */
-            ompl::tools::SPARSdbPtr& getSPARSdb();
+  /** \brief Print info to screen */
+  void debugVertex(const ompl::base::PlannerDataVertex& vertex);
+  void debugState(const ompl::base::State* state);
 
-            /** \brief Find the k nearest paths to our queries one */
-            bool findNearestStartGoal(int nearestK, const base::State* start, const base::State* goal,
-                                      ompl::geometric::SPARSdb::CandidateSolution &candidateSolution,
-                                      const base::PlannerTerminationCondition& ptc);
+  /** \brief Get number of unsaved paths */
+  int getNumPathsInserted() const
+  {
+    return numPathsInserted_;
+  }
 
-            /** \brief Print info to screen */
-            void debugVertex(const ompl::base::PlannerDataVertex& vertex);
-            void debugState(const ompl::base::State* state);
+  /** \brief Getter for enabling experience database saving */
+  bool getSavingEnabled()
+  {
+    return saving_enabled_;
+  }
 
-            /** \brief Get number of unsaved paths */
-            int getNumPathsInserted() const
-            {
-                return numPathsInserted_;
-            }
+  /** \brief Setter for enabling experience database saving */
+  void setSavingEnabled(bool saving_enabled)
+  {
+    saving_enabled_ = saving_enabled;
+  }
 
-            /** \brief Getter for enabling experience database saving */
-            bool getSavingEnabled()
-            {
-                return saving_enabled_;
-            }
+  /**
+   * \brief Check if anything has been loaded into DB
+   * \return true if has no nodes
+   */
+  bool isEmpty()
+  {
+    return !spars_->getNumVertices();
+  }
 
-            /** \brief Setter for enabling experience database saving */
-            void setSavingEnabled(bool saving_enabled)
-            {
-                saving_enabled_ = saving_enabled;
-            }
+protected:
+  /// The created space information
+  base::SpaceInformationPtr si_;  // TODO: is this even necessary?
 
-            /**
-             * \brief Check if anything has been loaded into DB
-             * \return true if has no nodes
-             */
-            bool isEmpty()
-            {
-                return !spars_->getNumVertices();
-            }
+  /** \brief Class for managing various visualization features */
+  VisualizerPtr visual_;
 
-        protected:
+  /// Helper class for storing each plannerData instance
+  ompl::base::PlannerDataStorage plannerDataStorage_;
 
-            /// The created space information
-            base::SpaceInformationPtr     si_; // TODO: is this even necessary?
+  // Track unsaved paths to determine if a save is required
+  int numPathsInserted_;
 
-            /** \brief Class for managing various visualization features */
-            VisualizerPtr visual_;
+  // Use SPARSdb's graph datastructure to store experience
+  ompl::tools::SPARSdbPtr spars_;
 
-            /// Helper class for storing each plannerData instance
-            ompl::base::PlannerDataStorage plannerDataStorage_;
+  // Allow the database to save to file (new experiences)
+  bool saving_enabled_;
 
-            // Track unsaved paths to determine if a save is required
-            int numPathsInserted_;
+};  // end of class ThunderDB
 
-            // Use SPARSdb's graph datastructure to store experience
-            ompl::tools::SPARSdbPtr spars_;
+}  // end of namespace
 
-            // Allow the database to save to file (new experiences)
-            bool saving_enabled_;
-
-        }; // end of class ThunderDB
-
-    } // end of namespace
-
-} // end of namespace
+}  // end of namespace
 #endif

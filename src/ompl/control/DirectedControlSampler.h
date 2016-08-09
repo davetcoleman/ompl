@@ -44,66 +44,64 @@
 
 namespace ompl
 {
-    namespace control
-    {
+namespace control
+{
+/// @cond IGNORE
+OMPL_CLASS_FORWARD(SpaceInformation);
+OMPL_CLASS_FORWARD(DirectedControlSampler);
+/// @endcond
 
-        /// @cond IGNORE
-        OMPL_CLASS_FORWARD(SpaceInformation);
-        OMPL_CLASS_FORWARD(DirectedControlSampler);
-        /// @endcond
+/** \class ompl::control::DirectedControlSamplerPtr
+    \brief A shared pointer wrapper for ompl::control::DirectedControlSampler */
 
-        /** \class ompl::control::DirectedControlSamplerPtr
-            \brief A shared pointer wrapper for ompl::control::DirectedControlSampler */
+/** \brief Abstract definition of a directed control sampler. Motion
+    planners that need to sample controls that take the system to a desired direction will call functions
+    from this class. Planners should call the versions of sampleTo() with most arguments, whenever this information is
+   available.
+    If no direction information is available, the use of a ControlSampler is perhaps more appropriate. */
+class DirectedControlSampler
+{
+public:
+  // non-copyable
+  DirectedControlSampler(const DirectedControlSampler &) = delete;
+  DirectedControlSampler &operator=(const DirectedControlSampler &) = delete;
 
-        /** \brief Abstract definition of a directed control sampler. Motion
-            planners that need to sample controls that take the system to a desired direction will call functions
-            from this class. Planners should call the versions of sampleTo() with most arguments, whenever this information is available.
-            If no direction information is available, the use of a ControlSampler is perhaps more appropriate. */
-        class DirectedControlSampler
-        {
-        public:
-            // non-copyable
-            DirectedControlSampler(const DirectedControlSampler&) = delete;
-            DirectedControlSampler& operator=(const DirectedControlSampler&) = delete;
+  /** \brief Constructor takes the state space to construct samples for as argument */
+  DirectedControlSampler(const SpaceInformation *si) : si_(si)
+  {
+  }
 
-            /** \brief Constructor takes the state space to construct samples for as argument */
-            DirectedControlSampler(const SpaceInformation *si) : si_(si)
-            {
-            }
+  virtual ~DirectedControlSampler() = default;
 
-            virtual ~DirectedControlSampler() = default;
+  /** \brief Sample a control given that it will be applied to state
+      \e state and the intention is to reach state \e target. This is
+      useful for some algorithms that have a notion of direction in
+      their exploration (e.g., \ref cRRT). Furthermore, return the
+      duration for which this control should be applied. The state
+      \e dest is modified to match the state reached with the computed
+      control and duration. The motion is checked for validity. */
+  virtual unsigned int sampleTo(Control *control, const base::State *source, base::State *dest) = 0;
 
-            /** \brief Sample a control given that it will be applied to state
-                \e state and the intention is to reach state \e target. This is
-                useful for some algorithms that have a notion of direction in
-                their exploration (e.g., \ref cRRT). Furthermore, return the
-                duration for which this control should be applied. The state
-                \e dest is modified to match the state reached with the computed
-                control and duration. The motion is checked for validity. */
-            virtual unsigned int sampleTo(Control *control, const base::State *source, base::State *dest) = 0;
+  /** \brief Sample a control given that it will be applied to state
+      \e state and the intention is to reach state \e dest. Also take
+      into account the fact that the previously applied control is \e
+      previous. This is useful for some algorithms that have a notion
+      of direction in their exploration (e.g., \ref cRRT).
+      Furthermore, return the duration for which this control should
+      be applied. The state \e dest is modified to match the state
+      reached with the computed control and duration. The motion is
+      checked for validity. */
+  virtual unsigned int sampleTo(Control *control, const Control *previous, const base::State *source,
+                                base::State *dest) = 0;
 
-            /** \brief Sample a control given that it will be applied to state
-                \e state and the intention is to reach state \e dest. Also take
-                into account the fact that the previously applied control is \e
-                previous. This is useful for some algorithms that have a notion
-                of direction in their exploration (e.g., \ref cRRT).
-                Furthermore, return the duration for which this control should
-                be applied. The state \e dest is modified to match the state
-                reached with the computed control and duration. The motion is
-                checked for validity. */
-            virtual unsigned int sampleTo(Control *control, const Control *previous, const base::State *source, base::State *dest) = 0;
+protected:
+  /** \brief The space information this sampler operates on */
+  const SpaceInformation *si_;
+};
 
-        protected:
-
-            /** \brief The space information this sampler operates on */
-            const SpaceInformation *si_;
-
-        };
-
-        /** \brief Definition of a function that can allocate a directed control sampler */
-        using DirectedControlSamplerAllocator = std::function<DirectedControlSamplerPtr (const SpaceInformation *)>;
-    }
+/** \brief Definition of a function that can allocate a directed control sampler */
+using DirectedControlSamplerAllocator = std::function<DirectedControlSamplerPtr(const SpaceInformation *)>;
 }
-
+}
 
 #endif

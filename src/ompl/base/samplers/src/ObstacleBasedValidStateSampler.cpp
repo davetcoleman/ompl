@@ -37,82 +37,80 @@
 #include "ompl/base/samplers/ObstacleBasedValidStateSampler.h"
 #include "ompl/base/SpaceInformation.h"
 
-ompl::base::ObstacleBasedValidStateSampler::ObstacleBasedValidStateSampler(const SpaceInformation *si) :
-    ValidStateSampler(si), sampler_(si->allocStateSampler())
+ompl::base::ObstacleBasedValidStateSampler::ObstacleBasedValidStateSampler(const SpaceInformation *si)
+  : ValidStateSampler(si), sampler_(si->allocStateSampler())
 {
-    name_ = "obstacle_based";
+  name_ = "obstacle_based";
 }
 
 bool ompl::base::ObstacleBasedValidStateSampler::sample(State *state)
 {
-    // find invalid state
-    unsigned int attempts = 0;
-    bool valid = true;
-    do
-    {
-        sampler_->sampleUniform(state);
-        valid = si_->isValid(state);
-        ++attempts;
-    } while (valid && attempts < attempts_);
-    if (valid)
-        return false;
+  // find invalid state
+  unsigned int attempts = 0;
+  bool valid = true;
+  do
+  {
+    sampler_->sampleUniform(state);
+    valid = si_->isValid(state);
+    ++attempts;
+  } while (valid && attempts < attempts_);
+  if (valid)
+    return false;
 
-    // find a valid state
-    State *temp = si_->allocState();
-    attempts = 0;
-    do
-    {
-        sampler_->sampleUniform(temp);
-        valid = si_->isValid(temp);
-        ++attempts;
-    } while (!valid && attempts < attempts_);
+  // find a valid state
+  State *temp = si_->allocState();
+  attempts = 0;
+  do
+  {
+    sampler_->sampleUniform(temp);
+    valid = si_->isValid(temp);
+    ++attempts;
+  } while (!valid && attempts < attempts_);
 
+  // keep the last valid state, before collision
+  if (valid)
+  {
+    std::pair<State *, double> fail(state, 0.0);
+    si_->checkMotion(temp, state, fail);
+  }
 
-    // keep the last valid state, before collision
-    if (valid)
-    {
-        std::pair<State*, double> fail(state, 0.0);
-        si_->checkMotion(temp, state, fail);
-    }
+  si_->freeState(temp);
 
-    si_->freeState(temp);
-
-    return valid;
+  return valid;
 }
 
 bool ompl::base::ObstacleBasedValidStateSampler::sampleNear(State *state, const State *near, const double distance)
 {
-    // find invalid state nearby
-    unsigned int attempts = 0;
-    bool valid = true;
-    do
-    {
-        sampler_->sampleUniformNear(state, near, distance);
-        valid = si_->isValid(state);
-        ++attempts;
-    } while (valid && attempts < attempts_);
-    if (valid)
-        return false;
+  // find invalid state nearby
+  unsigned int attempts = 0;
+  bool valid = true;
+  do
+  {
+    sampler_->sampleUniformNear(state, near, distance);
+    valid = si_->isValid(state);
+    ++attempts;
+  } while (valid && attempts < attempts_);
+  if (valid)
+    return false;
 
-    // find a valid state
-    State *temp = si_->allocState();
-    attempts = 0;
-    do
-    {
-        sampler_->sampleUniform(temp);
-        valid = si_->isValid(temp);
-        ++attempts;
-    } while (!valid && attempts < attempts_);
+  // find a valid state
+  State *temp = si_->allocState();
+  attempts = 0;
+  do
+  {
+    sampler_->sampleUniform(temp);
+    valid = si_->isValid(temp);
+    ++attempts;
+  } while (!valid && attempts < attempts_);
 
+  // keep the last valid state, before collision
+  if (valid)
+  {
+    std::pair<State *, double> fail(state, 0.0);
+    si_->checkMotion(temp, state, fail);
+  }
 
-    // keep the last valid state, before collision
-    if (valid)
-    {
-        std::pair<State*, double> fail(state, 0.0);
-        si_->checkMotion(temp, state, fail);
-    }
+  si_->freeState(temp);
 
-    si_->freeState(temp);
-
-    return valid;
+  return valid;
 }

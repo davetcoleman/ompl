@@ -44,78 +44,78 @@
 
 #include <memory>
 
-//For ease-of-use shared_ptr definition
+// For ease-of-use shared_ptr definition
 #include <ompl/util/ClassForward.h>
 
 namespace ompl
 {
-    /// @cond IGNORE
-    // A forward declaration of the prolate hyperspheroid class
-    OMPL_CLASS_FORWARD(ProlateHyperspheroid);
-    /// @endcond
+/// @cond IGNORE
+// A forward declaration of the prolate hyperspheroid class
+OMPL_CLASS_FORWARD(ProlateHyperspheroid);
+/// @endcond
 
-    /** \brief A class describing a prolate hyperspheroid, a special symmetric type of n-dimensional ellipse,
-    for use in direct informed sampling for problems seeking to minimize path length.
-    @par J D. Gammell, S. S. Srinivasa, T. D. Barfoot, "Informed RRT*: Optimal Sampling-based
-    Path Planning Focused via Direct Sampling of an Admissible Ellipsoidal Heuristic." In Proceedings
-    of the IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). Chicago, IL, USA,
-    14-18 Sept. 2014.
-    DOI: <a href="http://dx.doi.org/10.1109/IROS.2014.6942976">10.1109/IROS.2014.6942976</a>.
-    <a href="http://www.youtube.com/watch?v=d7dX5MvDYTc">Illustration video</a>.
-    <a href="http://www.youtube.com/watch?v=nsl-5MZfwu4">Short description video</a>. */
-    class ProlateHyperspheroid
-    {
-    public:
-        /** \brief The description of an n-dimensional prolate hyperspheroid */
-        ProlateHyperspheroid(unsigned int n, const double focus1[], const double focus2[]);
+/** \brief A class describing a prolate hyperspheroid, a special symmetric type of n-dimensional ellipse,
+for use in direct informed sampling for problems seeking to minimize path length.
+@par J D. Gammell, S. S. Srinivasa, T. D. Barfoot, "Informed RRT*: Optimal Sampling-based
+Path Planning Focused via Direct Sampling of an Admissible Ellipsoidal Heuristic." In Proceedings
+of the IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). Chicago, IL, USA,
+14-18 Sept. 2014.
+DOI: <a href="http://dx.doi.org/10.1109/IROS.2014.6942976">10.1109/IROS.2014.6942976</a>.
+<a href="http://www.youtube.com/watch?v=d7dX5MvDYTc">Illustration video</a>.
+<a href="http://www.youtube.com/watch?v=nsl-5MZfwu4">Short description video</a>. */
+class ProlateHyperspheroid
+{
+public:
+  /** \brief The description of an n-dimensional prolate hyperspheroid */
+  ProlateHyperspheroid(unsigned int n, const double focus1[], const double focus2[]);
 
-        /** \brief Set the transverse diameter of the PHS */
-        void setTransverseDiameter(double transverseDiameter);
+  /** \brief Set the transverse diameter of the PHS */
+  void setTransverseDiameter(double transverseDiameter);
 
-        /** \brief Transform a point from a sphere to PHS. The return variable \e phs is expected to already exist.  */
-        void transform(const double sphere[], double phs[]) const;
+  /** \brief Transform a point from a sphere to PHS. The return variable \e phs is expected to already exist.  */
+  void transform(const double sphere[], double phs[]) const;
 
-        /** \brief Check if the given point lies \e in the PHS. */
-        bool isInPhs(const double point[]) const;
+  /** \brief Check if the given point lies \e in the PHS. */
+  bool isInPhs(const double point[]) const;
 
-        /** \brief Check if the given point lies \e on the PHS. */
-        bool isOnPhs(const double point[]) const;
+  /** \brief Check if the given point lies \e on the PHS. */
+  bool isOnPhs(const double point[]) const;
 
-        /** \brief The dimension of the PHS */
-        unsigned int getPhsDimension() const;
+  /** \brief The dimension of the PHS */
+  unsigned int getPhsDimension() const;
 
-        /** \brief The measure of the PHS */
-        double getPhsMeasure() const;
+  /** \brief The measure of the PHS */
+  double getPhsMeasure() const;
 
-        /** \brief The measure of the PHS for a given transverse diameter */
-        double getPhsMeasure(double tranDiam) const;
+  /** \brief The measure of the PHS for a given transverse diameter */
+  double getPhsMeasure(double tranDiam) const;
 
-        /** \brief The minimum transverse diameter of the PHS, i.e., the distance between the foci */
-        double getMinTransverseDiameter() const;
+  /** \brief The minimum transverse diameter of the PHS, i.e., the distance between the foci */
+  double getMinTransverseDiameter() const;
 
-        /** \brief Calculate length of a line that originates from one focus, passes through the given point, and terminates at the other focus, i.e., the transverse diameter of the ellipse on which the given sample lies*/
-        double getPathLength(const double point[]) const;
+  /** \brief Calculate length of a line that originates from one focus, passes through the given point, and terminates
+   * at the other focus, i.e., the transverse diameter of the ellipse on which the given sample lies*/
+  double getPathLength(const double point[]) const;
 
-        /** \brief The state dimension of the PHS */
-        unsigned int getDimension() const;
+  /** \brief The state dimension of the PHS */
+  unsigned int getDimension() const;
 
-    protected:
+protected:
+private:
+  /** \brief A forward declaration to the data structure class for the PIMPL idiom. */
+  struct PhsData;
 
-    private:
-        /** \brief A forward declaration to the data structure class for the PIMPL idiom. */
-        struct PhsData;
+  /** \brief A shared pointer to the actual data of a ProlateHyperspheroid. Used to hide Eigen from the header. */
+  std::shared_ptr<PhsData> dataPtr_;
 
-        /** \brief A shared pointer to the actual data of a ProlateHyperspheroid. Used to hide Eigen from the header. */
-        std::shared_ptr<PhsData> dataPtr_;
+  // Functions
+  /** \brief Calculate the rotation from the PHS frame to the world frame via singular-value decomposition using the
+   * transverse symmetry of the PHS. */
+  void updateRotation();
 
-        // Functions
-        /** \brief Calculate the rotation from the PHS frame to the world frame via singular-value decomposition using the transverse symmetry of the PHS. */
-        void updateRotation();
-
-        /** \brief Calculate the hyperspheroid to PHS transformation matrix */
-        void updateTransformation();
-    };
+  /** \brief Calculate the hyperspheroid to PHS transformation matrix */
+  void updateTransformation();
+};
 }
 
 #endif
-

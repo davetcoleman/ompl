@@ -42,71 +42,72 @@
 
 namespace ompl
 {
-    namespace base
-    {
-        /// A class to store the exit status of Planner::solve()
-        struct PlannerStatus
-        {
-            /// The possible values of the status returned by a planner
-            enum StatusType
-            {
-                /// Uninitialized status
-                UNKNOWN = 0,
-                /// Invalid start state or no start state specified
-                INVALID_START,
-                /// Invalid goal state
-                INVALID_GOAL,
-                /// The goal is of a type that a planner does not recognize
-                UNRECOGNIZED_GOAL_TYPE,
-                /// The planner failed to find a solution
-                TIMEOUT,
-                /// The planner found an approximate solution
-                APPROXIMATE_SOLUTION,
-                /// The planner found an exact solution
-                EXACT_SOLUTION,
-                /// The planner crashed
-                CRASH,
-                /// The planner did not find a solution for some other reason
-                ABORT,
-                /// The number of possible status values
-                TYPE_COUNT
-            };
+namespace base
+{
+/// A class to store the exit status of Planner::solve()
+struct PlannerStatus
+{
+  /// The possible values of the status returned by a planner
+  enum StatusType
+  {
+    /// Uninitialized status
+    UNKNOWN = 0,
+    /// Invalid start state or no start state specified
+    INVALID_START,
+    /// Invalid goal state
+    INVALID_GOAL,
+    /// The goal is of a type that a planner does not recognize
+    UNRECOGNIZED_GOAL_TYPE,
+    /// The planner failed to find a solution
+    TIMEOUT,
+    /// The planner found an approximate solution
+    APPROXIMATE_SOLUTION,
+    /// The planner found an exact solution
+    EXACT_SOLUTION,
+    /// The planner crashed
+    CRASH,
+    /// The planner did not find a solution for some other reason
+    ABORT,
+    /// The number of possible status values
+    TYPE_COUNT
+  };
 
-            /// Default constructor
-            PlannerStatus(StatusType status = UNKNOWN) : status_(status)
-            {
-            }
+  /// Default constructor
+  PlannerStatus(StatusType status = UNKNOWN) : status_(status)
+  {
+  }
 
-            /// Convenience constructor that sets status_ based on whether some solution was found (\e hasSolution) and whether that solution was approximate or not (\e isApproximate)
-            PlannerStatus(bool hasSolution, bool isApproximate)
-                : status_ (hasSolution ? (isApproximate ? APPROXIMATE_SOLUTION : EXACT_SOLUTION) : TIMEOUT)
-            {
-            }
+  /// Convenience constructor that sets status_ based on whether some solution was found (\e hasSolution) and whether
+  /// that solution was approximate or not (\e isApproximate)
+  PlannerStatus(bool hasSolution, bool isApproximate)
+    : status_(hasSolution ? (isApproximate ? APPROXIMATE_SOLUTION : EXACT_SOLUTION) : TIMEOUT)
+  {
+  }
 
-            /// Return a string representation
-            std::string asString() const;
-            /// Allow casting to true. The value is true iff an approximate or exact solution was found
-            operator bool() const
-            {
-                return status_ == APPROXIMATE_SOLUTION || status_ == EXACT_SOLUTION;
-            }
-            /// Allow casting to the enum type StatusType
-            operator StatusType() const
-            {
-                return status_;
-            }
+  /// Return a string representation
+  std::string asString() const;
+  /// Allow casting to true. The value is true iff an approximate or exact solution was found
+  operator bool() const
+  {
+    return status_ == APPROXIMATE_SOLUTION || status_ == EXACT_SOLUTION;
+  }
+  /// Allow casting to the enum type StatusType
+  operator StatusType() const
+  {
+    return status_;
+  }
 
-        private:
-            /// Exit status of calling Planner::solve()
-            StatusType status_;
-        };
+private:
+  /// Exit status of calling Planner::solve()
+  StatusType status_;
+};
 
-        /// Print a PlannerStatus object
-        inline std::ostream& operator<<(std::ostream& out, const PlannerStatus& status)
-        {
-            return out << status.asString();
-        }
-    }
+/// Print a PlannerStatus object
+inline std::ostream& operator<<(std::ostream& out, const PlannerStatus& status)
+{
+  return out << status.asString();
+}
+}
 }
 
 #endif

@@ -42,40 +42,40 @@
 /// @cond IGNORE
 namespace ompl
 {
-    namespace control
-    {
-        static void computeControlSpaceSignatureHelper(const ControlSpace *space, std::vector<int> &signature)
-        {
-            signature.push_back(space->getType());
-            signature.push_back(space->getDimension());
+namespace control
+{
+static void computeControlSpaceSignatureHelper(const ControlSpace *space, std::vector<int> &signature)
+{
+  signature.push_back(space->getType());
+  signature.push_back(space->getDimension());
 
-            if (space->isCompound())
-            {
-                unsigned int c = space->as<CompoundControlSpace>()->getSubspaceCount();
-                for (unsigned int i = 0 ; i < c ; ++i)
-                    computeControlSpaceSignatureHelper(space->as<CompoundControlSpace>()->getSubspace(i).get(), signature);
-            }
-        }
-    }
+  if (space->isCompound())
+  {
+    unsigned int c = space->as<CompoundControlSpace>()->getSubspaceCount();
+    for (unsigned int i = 0; i < c; ++i)
+      computeControlSpaceSignatureHelper(space->as<CompoundControlSpace>()->getSubspace(i).get(), signature);
+  }
+}
+}
 }
 /// @endcond
 
 ompl::control::ControlSpace::ControlSpace(base::StateSpacePtr stateSpace) : stateSpace_(std::move(stateSpace))
 {
-    name_ = "Control[" + stateSpace_->getName() + "]";
-    type_ = CONTROL_SPACE_UNKNOWN;
+  name_ = "Control[" + stateSpace_->getName() + "]";
+  type_ = CONTROL_SPACE_UNKNOWN;
 }
 
 ompl::control::ControlSpace::~ControlSpace() = default;
 
-const std::string& ompl::control::ControlSpace::getName() const
+const std::string &ompl::control::ControlSpace::getName() const
 {
-    return name_;
+  return name_;
 }
 
 void ompl::control::ControlSpace::setName(const std::string &name)
 {
-    name_ = name;
+  name_ = name;
 }
 
 void ompl::control::ControlSpace::setup()
@@ -84,233 +84,233 @@ void ompl::control::ControlSpace::setup()
 
 ompl::control::ControlSamplerPtr ompl::control::ControlSpace::allocControlSampler() const
 {
-    if (csa_)
-        return csa_(this);
-    else
-        return allocDefaultControlSampler();
+  if (csa_)
+    return csa_(this);
+  else
+    return allocDefaultControlSampler();
 }
 
 void ompl::control::ControlSpace::setControlSamplerAllocator(const ControlSamplerAllocator &csa)
 {
-    csa_ = csa;
+  csa_ = csa;
 }
 
 void ompl::control::ControlSpace::clearControlSamplerAllocator()
 {
-    csa_ = ControlSamplerAllocator();
+  csa_ = ControlSamplerAllocator();
 }
 
-double* ompl::control::ControlSpace::getValueAddressAtIndex(Control* /*control*/, const unsigned int /*index*/) const
+double *ompl::control::ControlSpace::getValueAddressAtIndex(Control * /*control*/, const unsigned int /*index*/) const
 {
-    return nullptr;
+  return nullptr;
 }
 
 void ompl::control::ControlSpace::printControl(const Control *control, std::ostream &out) const
 {
-    out << "Control instance: " << control << std::endl;
+  out << "Control instance: " << control << std::endl;
 }
 
 void ompl::control::ControlSpace::printSettings(std::ostream &out) const
 {
-    out << "ControlSpace '" << getName() << "' instance: " << this << std::endl;
+  out << "ControlSpace '" << getName() << "' instance: " << this << std::endl;
 }
 
 unsigned int ompl::control::ControlSpace::getSerializationLength() const
 {
-    return 0;
+  return 0;
 }
 
-void ompl::control::ControlSpace::serialize(void* /*serialization*/, const Control* /*ctrl*/) const
+void ompl::control::ControlSpace::serialize(void * /*serialization*/, const Control * /*ctrl*/) const
 {
 }
 
-void ompl::control::ControlSpace::deserialize(Control* /*ctrl*/, const void* /*serialization*/) const
+void ompl::control::ControlSpace::deserialize(Control * /*ctrl*/, const void * /*serialization*/) const
 {
 }
 
 void ompl::control::ControlSpace::computeSignature(std::vector<int> &signature) const
 {
-    signature.clear();
-    computeControlSpaceSignatureHelper(this, signature);
-    signature.insert(signature.begin(), signature.size());
+  signature.clear();
+  computeControlSpaceSignatureHelper(this, signature);
+  signature.insert(signature.begin(), signature.size());
 }
 
 bool ompl::control::ControlSpace::isCompound() const
 {
-    return false;
+  return false;
 }
 
 void ompl::control::CompoundControlSpace::addSubspace(const ControlSpacePtr &component)
 {
-    if (locked_)
-        throw Exception("This control space is locked. No further components can be added");
+  if (locked_)
+    throw Exception("This control space is locked. No further components can be added");
 
-    components_.push_back(component);
-    componentCount_ = components_.size();
+  components_.push_back(component);
+  componentCount_ = components_.size();
 }
 
 unsigned int ompl::control::CompoundControlSpace::getSubspaceCount() const
 {
-    return componentCount_;
+  return componentCount_;
 }
 
-const ompl::control::ControlSpacePtr& ompl::control::CompoundControlSpace::getSubspace(const unsigned int index) const
+const ompl::control::ControlSpacePtr &ompl::control::CompoundControlSpace::getSubspace(const unsigned int index) const
 {
-    if (componentCount_ > index)
-        return components_[index];
-    else
-        throw Exception("Subspace index does not exist");
+  if (componentCount_ > index)
+    return components_[index];
+  else
+    throw Exception("Subspace index does not exist");
 }
 
-const ompl::control::ControlSpacePtr& ompl::control::CompoundControlSpace::getSubspace(const std::string &name) const
+const ompl::control::ControlSpacePtr &ompl::control::CompoundControlSpace::getSubspace(const std::string &name) const
 {
-    for (unsigned int i = 0 ; i < componentCount_ ; ++i)
-        if (components_[i]->getName() == name)
-            return components_[i];
-    throw Exception("Subspace " + name + " does not exist");
+  for (unsigned int i = 0; i < componentCount_; ++i)
+    if (components_[i]->getName() == name)
+      return components_[i];
+  throw Exception("Subspace " + name + " does not exist");
 }
 
 unsigned int ompl::control::CompoundControlSpace::getDimension() const
 {
-    unsigned int dim = 0;
-    for (unsigned int i = 0 ; i < componentCount_ ; ++i)
-        dim += components_[i]->getDimension();
-    return dim;
+  unsigned int dim = 0;
+  for (unsigned int i = 0; i < componentCount_; ++i)
+    dim += components_[i]->getDimension();
+  return dim;
 }
 
-ompl::control::Control* ompl::control::CompoundControlSpace::allocControl() const
+ompl::control::Control *ompl::control::CompoundControlSpace::allocControl() const
 {
-    auto *control = new CompoundControl();
-    control->components = new Control*[componentCount_];
-    for (unsigned int i = 0 ; i < componentCount_ ; ++i)
-        control->components[i] = components_[i]->allocControl();
-    return static_cast<Control*>(control);
+  auto *control = new CompoundControl();
+  control->components = new Control *[componentCount_];
+  for (unsigned int i = 0; i < componentCount_; ++i)
+    control->components[i] = components_[i]->allocControl();
+  return static_cast<Control *>(control);
 }
 
 void ompl::control::CompoundControlSpace::freeControl(Control *control) const
 {
-    CompoundControl *ccontrol = static_cast<CompoundControl*>(control);
-    for (unsigned int i = 0 ; i < componentCount_ ; ++i)
-        components_[i]->freeControl(ccontrol->components[i]);
-    delete[] ccontrol->components;
-    delete ccontrol;
+  CompoundControl *ccontrol = static_cast<CompoundControl *>(control);
+  for (unsigned int i = 0; i < componentCount_; ++i)
+    components_[i]->freeControl(ccontrol->components[i]);
+  delete[] ccontrol->components;
+  delete ccontrol;
 }
 
 void ompl::control::CompoundControlSpace::copyControl(Control *destination, const Control *source) const
 {
-    CompoundControl      *cdest = static_cast<CompoundControl*>(destination);
-    const CompoundControl *csrc = static_cast<const CompoundControl*>(source);
-    for (unsigned int i = 0 ; i < componentCount_ ; ++i)
-        components_[i]->copyControl(cdest->components[i], csrc->components[i]);
+  CompoundControl *cdest = static_cast<CompoundControl *>(destination);
+  const CompoundControl *csrc = static_cast<const CompoundControl *>(source);
+  for (unsigned int i = 0; i < componentCount_; ++i)
+    components_[i]->copyControl(cdest->components[i], csrc->components[i]);
 }
 
 bool ompl::control::CompoundControlSpace::equalControls(const Control *control1, const Control *control2) const
 {
-    const CompoundControl *ccontrol1 = static_cast<const CompoundControl*>(control1);
-    const CompoundControl *ccontrol2 = static_cast<const CompoundControl*>(control2);
-    for (unsigned int i = 0 ; i < componentCount_ ; ++i)
-        if (!components_[i]->equalControls(ccontrol1->components[i], ccontrol2->components[i]))
-            return false;
-    return true;
+  const CompoundControl *ccontrol1 = static_cast<const CompoundControl *>(control1);
+  const CompoundControl *ccontrol2 = static_cast<const CompoundControl *>(control2);
+  for (unsigned int i = 0; i < componentCount_; ++i)
+    if (!components_[i]->equalControls(ccontrol1->components[i], ccontrol2->components[i]))
+      return false;
+  return true;
 }
 
 void ompl::control::CompoundControlSpace::nullControl(Control *control) const
 {
-    CompoundControl *ccontrol = static_cast<CompoundControl*>(control);
-    for (unsigned int i = 0 ; i < componentCount_ ; ++i)
-        components_[i]->nullControl(ccontrol->components[i]);
+  CompoundControl *ccontrol = static_cast<CompoundControl *>(control);
+  for (unsigned int i = 0; i < componentCount_; ++i)
+    components_[i]->nullControl(ccontrol->components[i]);
 }
 
 ompl::control::ControlSamplerPtr ompl::control::CompoundControlSpace::allocDefaultControlSampler() const
 {
-    auto *ss = new CompoundControlSampler(this);
-    for (unsigned int i = 0 ; i < componentCount_ ; ++i)
-        ss->addSampler(components_[i]->allocControlSampler());
-    return ControlSamplerPtr(ss);
+  auto *ss = new CompoundControlSampler(this);
+  for (unsigned int i = 0; i < componentCount_; ++i)
+    ss->addSampler(components_[i]->allocControlSampler());
+  return ControlSamplerPtr(ss);
 }
 
 void ompl::control::CompoundControlSpace::lock()
 {
-    locked_ = true;
+  locked_ = true;
 }
 
-double* ompl::control::CompoundControlSpace::getValueAddressAtIndex(Control *control, const unsigned int index) const
+double *ompl::control::CompoundControlSpace::getValueAddressAtIndex(Control *control, const unsigned int index) const
 {
-    CompoundControl *ccontrol = static_cast<CompoundControl*>(control);
-    unsigned int idx = 0;
+  CompoundControl *ccontrol = static_cast<CompoundControl *>(control);
+  unsigned int idx = 0;
 
-    for (unsigned int i = 0 ; i < componentCount_ ; ++i)
-        for (unsigned int j = 0 ; j <= index ; ++j)
-        {
-            double *va = components_[i]->getValueAddressAtIndex(ccontrol->components[i], j);
-            if (va)
-            {
-                if (idx == index)
-                    return va;
-                else
-                    idx++;
-            }
-            else
-                break;
-        }
-    return nullptr;
+  for (unsigned int i = 0; i < componentCount_; ++i)
+    for (unsigned int j = 0; j <= index; ++j)
+    {
+      double *va = components_[i]->getValueAddressAtIndex(ccontrol->components[i], j);
+      if (va)
+      {
+        if (idx == index)
+          return va;
+        else
+          idx++;
+      }
+      else
+        break;
+    }
+  return nullptr;
 }
 
 void ompl::control::CompoundControlSpace::printControl(const Control *control, std::ostream &out) const
 {
-    out << "Compound control [" << std::endl;
-    const CompoundControl *ccontrol = static_cast<const CompoundControl*>(control);
-    for (unsigned int i = 0 ; i < componentCount_ ; ++i)
-        components_[i]->printControl(ccontrol->components[i], out);
-    out << "]" << std::endl;
+  out << "Compound control [" << std::endl;
+  const CompoundControl *ccontrol = static_cast<const CompoundControl *>(control);
+  for (unsigned int i = 0; i < componentCount_; ++i)
+    components_[i]->printControl(ccontrol->components[i], out);
+  out << "]" << std::endl;
 }
 
 void ompl::control::CompoundControlSpace::printSettings(std::ostream &out) const
 {
-    out << "Compound control space '" << getName() << "' [" << std::endl;
-    for (unsigned int i = 0 ; i < componentCount_ ; ++i)
-        components_[i]->printSettings(out);
-    out << "]" << std::endl;
+  out << "Compound control space '" << getName() << "' [" << std::endl;
+  for (unsigned int i = 0; i < componentCount_; ++i)
+    components_[i]->printSettings(out);
+  out << "]" << std::endl;
 }
 
 void ompl::control::CompoundControlSpace::setup()
 {
-    for (unsigned int i = 0 ; i < componentCount_ ; ++i)
-        components_[i]->setup();
-    ControlSpace::setup();
+  for (unsigned int i = 0; i < componentCount_; ++i)
+    components_[i]->setup();
+  ControlSpace::setup();
 }
 
 unsigned int ompl::control::CompoundControlSpace::getSerializationLength() const
 {
-    unsigned int l = 0;
-    for (unsigned int i = 0 ; i < componentCount_ ; ++i)
-        l += components_[i]->getSerializationLength();
-    return l;
+  unsigned int l = 0;
+  for (unsigned int i = 0; i < componentCount_; ++i)
+    l += components_[i]->getSerializationLength();
+  return l;
 }
 
 void ompl::control::CompoundControlSpace::serialize(void *serialization, const Control *ctrl) const
 {
-    const CompoundControl *compctrl = static_cast<const CompoundControl*>(ctrl);
-    unsigned int l = 0;
-    for (unsigned int i = 0 ; i < componentCount_ ; ++i)
-    {
-        components_[i]->serialize(reinterpret_cast<char*>(serialization) + l, compctrl->components[i]);
-        l += components_[i]->getSerializationLength();
-    }
+  const CompoundControl *compctrl = static_cast<const CompoundControl *>(ctrl);
+  unsigned int l = 0;
+  for (unsigned int i = 0; i < componentCount_; ++i)
+  {
+    components_[i]->serialize(reinterpret_cast<char *>(serialization) + l, compctrl->components[i]);
+    l += components_[i]->getSerializationLength();
+  }
 }
 
 void ompl::control::CompoundControlSpace::deserialize(Control *ctrl, const void *serialization) const
 {
-    CompoundControl *compctrl = static_cast<CompoundControl*>(ctrl);
-    unsigned int l = 0;
-    for (unsigned int i = 0 ; i < componentCount_ ; ++i)
-    {
-        components_[i]->deserialize(compctrl->components[i], reinterpret_cast<const char*>(serialization) + l);
-        l += components_[i]->getSerializationLength();
-    }
+  CompoundControl *compctrl = static_cast<CompoundControl *>(ctrl);
+  unsigned int l = 0;
+  for (unsigned int i = 0; i < componentCount_; ++i)
+  {
+    components_[i]->deserialize(compctrl->components[i], reinterpret_cast<const char *>(serialization) + l);
+    l += components_[i]->getSerializationLength();
+  }
 }
 
 bool ompl::control::CompoundControlSpace::isCompound() const
 {
-    return true;
+  return true;
 }

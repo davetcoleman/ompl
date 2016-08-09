@@ -47,163 +47,150 @@
 
 namespace ompl
 {
+namespace geometric
+{
+/**
+ * Attempt to connect to the k nearest neighbors.
+ */
+template <class Milestone>
+class KStrategy
+{
+public:
+  /** \brief Constructor takes the maximum number of nearest neighbors to return (\e k) and the
+      nearest neighbors datastruture to use (\e nn) */
+  KStrategy(const unsigned int k, std::shared_ptr<NearestNeighbors<Milestone> > nn) : k_(k), nn_(std::move(nn))
+  {
+    neighbors_.reserve(k_);
+  }
 
-    namespace geometric
-    {
+  virtual ~KStrategy() = default;
 
-        /**
-         * Attempt to connect to the k nearest neighbors.
-         */
-        template <class Milestone>
-        class KStrategy
-        {
-        public:
+  /** \brief Set the nearest neighbors datastructure to use */
+  void setNearestNeighbors(const std::shared_ptr<NearestNeighbors<Milestone> > &nn)
+  {
+    nn_ = nn;
+  }
 
-            /** \brief Constructor takes the maximum number of nearest neighbors to return (\e k) and the
-                nearest neighbors datastruture to use (\e nn) */
-            KStrategy(const unsigned int k,
-                      std::shared_ptr< NearestNeighbors<Milestone> > nn) :
-                k_(k), nn_(std::move(nn))
-            {
-                neighbors_.reserve(k_);
-            }
+  /** \brief Given a milestone \e m, find the number of nearest
+      neighbors connection attempts that should be made from it,
+      according to the connection strategy */
+  const std::vector<Milestone> &operator()(const Milestone &m)
+  {
+    nn_->nearestK(m, k_, neighbors_);
+    return neighbors_;
+  }
 
-            virtual ~KStrategy() = default;
+protected:
+  /** \brief Maximum number of nearest neighbors to attempt to connect new milestones to */
+  unsigned int k_;
 
-            /** \brief Set the nearest neighbors datastructure to use */
-            void setNearestNeighbors(const std::shared_ptr< NearestNeighbors<Milestone> > &nn)
-            {
-                nn_ = nn;
-            }
+  /** \brief Nearest neighbors data structure */
+  std::shared_ptr<NearestNeighbors<Milestone> > nn_;
 
-            /** \brief Given a milestone \e m, find the number of nearest
-                neighbors connection attempts that should be made from it,
-                according to the connection strategy */
-            const std::vector<Milestone>& operator()(const Milestone &m)
-            {
-                nn_->nearestK(m, k_, neighbors_);
-                return neighbors_;
-            }
+  /** \brief Scratch space for storing k-nearest neighbors */
+  std::vector<Milestone> neighbors_;
+};
 
-        protected:
+/**
+ * \brief Make the minimal number of connections required to ensure
+ * asymptotic optimality.
+ *
+ * This connection strategy attempts to connect a milestone to its
+ * k-nearest neighbors where k is a function of the number of milestones
+ * that have already been added to the roadmap (n).
+ *
+ * k(n) = kPRMConstant * log(n)
+ *
+ * where
+ *
+ * kPRMConstant > kStarPRMConstant = e(1 + 1/d)
+ *
+ * and d is the number of dimensions in the state space. Note that
+ * kPRMConstant = 2e is a valid choice for any problem instance and so,
+ * if d is not provided, this value is used.
+ *
+ * The user must provide a function that returns the value of n.
+ *
+ * @par External documentation
+ * S. Karaman and E. Frazzoli
+ * Sampling-based algorithms for optimal motion planning,
+ * <em>Int. Journal of Robotics Research</em> Volume 30, Number 7, June 2010
+ */
+template <class Milestone>
+class KStarStrategy : public KStrategy<Milestone>
+{
+public:
+  using NumNeighborsFn = std::function<unsigned int()>;
+  /**
+   * \brief Constructor
+   *
+   * \param n a function that returns the number of milestones that have already been added to the roadmap
+   * \param nn the nearest neighbors datastruture to use
+   * \param d the dimensionality of the state space.
+   * The default is 1, which will make kPRMConstant=2e which
+   * is valid for all problem instances.
+   */
+  KStarStrategy(const NumNeighborsFn &n, const std::shared_ptr<NearestNeighbors<Milestone> > &nn,
+                const unsigned int d = 1)
+    : KStrategy<Milestone>(n(), nn)
+    , n_(n)
+    , kPRMConstant_(boost::math::constants::e<double>() + (boost::math::constants::e<double>() / (double)d))
+  {
+  }
 
-            /** \brief Maximum number of nearest neighbors to attempt to connect new milestones to */
-            unsigned int                                     k_;
+  const std::vector<Milestone> &operator()(const Milestone &m)
+  {
+    KStrategy<Milestone>::k_ = static_cast<unsigned int>(ceil(kPRMConstant_ * log((double)n_())));
+    return static_cast<KStrategy<Milestone> &>(*this)(m);
+  }
 
-            /** \brief Nearest neighbors data structure */
-            std::shared_ptr< NearestNeighbors<Milestone> > nn_;
+protected:
+  /** \brief Function returning the number of milestones added to the roadmap so far */
+  const NumNeighborsFn n_;
+  const double kPRMConstant_;
+};
 
-            /** \brief Scratch space for storing k-nearest neighbors */
-            std::vector<Milestone>                           neighbors_;
-        };
+/**
+ * \brief Return at most k neighbors, as long as they are also within a specified bound.
+ */
+template <class Milestone>
+class KBoundedStrategy : public KStrategy<Milestone>
+{
+public:
+  /**
+   * \brief Constructor
+   *
+   * \param k the maximum number of nearest neighbors to return
+   * \param bound the maximum distance for any nearest neighbor to be returned
+   * \param nn the nearest neighbors datastruture to use
+   */
+  KBoundedStrategy(const unsigned int k, const double bound, const std::shared_ptr<NearestNeighbors<Milestone> > &nn)
+    : KStrategy<Milestone>(k, nn), bound_(bound)
+  {
+  }
 
-        /**
-         * \brief Make the minimal number of connections required to ensure
-         * asymptotic optimality.
-         *
-         * This connection strategy attempts to connect a milestone to its
-         * k-nearest neighbors where k is a function of the number of milestones
-         * that have already been added to the roadmap (n).
-         *
-         * k(n) = kPRMConstant * log(n)
-         *
-         * where
-         *
-         * kPRMConstant > kStarPRMConstant = e(1 + 1/d)
-         *
-         * and d is the number of dimensions in the state space. Note that
-         * kPRMConstant = 2e is a valid choice for any problem instance and so,
-         * if d is not provided, this value is used.
-         *
-         * The user must provide a function that returns the value of n.
-         *
-         * @par External documentation
-         * S. Karaman and E. Frazzoli
-         * Sampling-based algorithms for optimal motion planning,
-         * <em>Int. Journal of Robotics Research</em> Volume 30, Number 7, June 2010
-         */
-        template <class Milestone>
-        class KStarStrategy : public KStrategy<Milestone>
-        {
-        public:
-            using NumNeighborsFn = std::function<unsigned int ()>;
-            /**
-             * \brief Constructor
-             *
-             * \param n a function that returns the number of milestones that have already been added to the roadmap
-             * \param nn the nearest neighbors datastruture to use
-             * \param d the dimensionality of the state space.
-             * The default is 1, which will make kPRMConstant=2e which
-             * is valid for all problem instances.
-             */
-            KStarStrategy(const NumNeighborsFn& n,
-                          const std::shared_ptr< NearestNeighbors<Milestone> > &nn,
-                          const unsigned int d = 1) :
-                KStrategy<Milestone>(n(), nn), n_(n),
-                kPRMConstant_(boost::math::constants::e<double>() + (boost::math::constants::e<double>() / (double)d))
-            {
-            }
+  const std::vector<Milestone> &operator()(const Milestone &m)
+  {
+    std::vector<Milestone> &result = KStrategy<Milestone>::neighbors_;
+    KStrategy<Milestone>::nn_->nearestK(m, KStrategy<Milestone>::k_, result);
+    if (result.empty())
+      return result;
+    const typename NearestNeighbors<Milestone>::DistanceFunction &dist =
+        KStrategy<Milestone>::nn_->getDistanceFunction();
+    if (!KStrategy<Milestone>::nn_->reportsSortedResults())
+      std::sort(result.begin(), result.end(), dist);
+    std::size_t newCount = result.size();
+    while (newCount > 0 && dist(result[newCount - 1], m) > bound_)
+      --newCount;
+    result.resize(newCount);
+    return result;
+  }
 
-            const std::vector<Milestone>& operator()(const Milestone &m)
-            {
-                KStrategy<Milestone>::k_ = static_cast<unsigned int>(ceil(kPRMConstant_ * log((double)n_())));
-                return static_cast<KStrategy<Milestone>&>(*this)(m);
-            }
-
-        protected:
-
-            /** \brief Function returning the number of milestones added to the roadmap so far */
-            const NumNeighborsFn  n_;
-            const double          kPRMConstant_;
-
-        };
-
-
-        /**
-         * \brief Return at most k neighbors, as long as they are also within a specified bound.
-         */
-        template <class Milestone>
-        class KBoundedStrategy : public KStrategy<Milestone>
-        {
-        public:
-
-            /**
-             * \brief Constructor
-             *
-             * \param k the maximum number of nearest neighbors to return
-             * \param bound the maximum distance for any nearest neighbor to be returned
-             * \param nn the nearest neighbors datastruture to use
-             */
-            KBoundedStrategy(const unsigned int k,
-                             const double bound,
-                             const std::shared_ptr< NearestNeighbors<Milestone> > &nn) :
-                KStrategy<Milestone>(k, nn), bound_(bound)
-            {
-            }
-
-            const std::vector<Milestone>& operator()(const Milestone &m)
-            {
-                std::vector<Milestone> &result = KStrategy<Milestone>::neighbors_;
-                KStrategy<Milestone>::nn_->nearestK(m, KStrategy<Milestone>::k_, result);
-                if (result.empty()) return result;
-                const typename NearestNeighbors<Milestone>::DistanceFunction &dist =
-                    KStrategy<Milestone>::nn_->getDistanceFunction();
-                if (!KStrategy<Milestone>::nn_->reportsSortedResults())
-                    std::sort(result.begin(), result.end(), dist);
-                std::size_t newCount = result.size();
-                while (newCount > 0 && dist(result[newCount - 1], m) > bound_) --newCount;
-                result.resize(newCount);
-                return result;
-            }
-
-        protected:
-
-            /** \brief The maximum distance at which nearby milestones are reported */
-            const double bound_;
-
-        };
-
-    }
+protected:
+  /** \brief The maximum distance at which nearby milestones are reported */
+  const double bound_;
+};
+}
 }
 
 #endif

@@ -41,176 +41,176 @@
 
 void ompl::base::TimeStateSampler::sampleUniform(State *state)
 {
-    if (space_->as<TimeStateSpace>()->isBounded())
-        state->as<TimeStateSpace::StateType>()->position = rng_.uniformReal(space_->as<TimeStateSpace>()->getMinTimeBound(),
-                                                                               space_->as<TimeStateSpace>()->getMaxTimeBound());
-    else
-        state->as<TimeStateSpace::StateType>()->position = 0.0;
+  if (space_->as<TimeStateSpace>()->isBounded())
+    state->as<TimeStateSpace::StateType>()->position = rng_.uniformReal(
+        space_->as<TimeStateSpace>()->getMinTimeBound(), space_->as<TimeStateSpace>()->getMaxTimeBound());
+  else
+    state->as<TimeStateSpace::StateType>()->position = 0.0;
 }
 
 void ompl::base::TimeStateSampler::sampleUniformNear(State *state, const State *near, const double distance)
 {
-    state->as<TimeStateSpace::StateType>()->position =
-        rng_.uniformReal(near->as<TimeStateSpace::StateType>()->position - distance,
-                         near->as<TimeStateSpace::StateType>()->position + distance);
-    space_->enforceBounds(state);
+  state->as<TimeStateSpace::StateType>()->position =
+      rng_.uniformReal(near->as<TimeStateSpace::StateType>()->position - distance,
+                       near->as<TimeStateSpace::StateType>()->position + distance);
+  space_->enforceBounds(state);
 }
 
 void ompl::base::TimeStateSampler::sampleGaussian(State *state, const State *mean, const double stdDev)
 {
-    state->as<TimeStateSpace::StateType>()->position =
-        rng_.gaussian(mean->as<TimeStateSpace::StateType>()->position, stdDev);
-    space_->enforceBounds(state);
+  state->as<TimeStateSpace::StateType>()->position =
+      rng_.gaussian(mean->as<TimeStateSpace::StateType>()->position, stdDev);
+  space_->enforceBounds(state);
 }
 
 unsigned int ompl::base::TimeStateSpace::getDimension() const
 {
-    return 1;
+  return 1;
 }
 
 void ompl::base::TimeStateSpace::setBounds(double minTime, double maxTime)
 {
-    if (minTime > maxTime)
-        throw Exception("The maximum position in time cannot be before the minimum position in time");
+  if (minTime > maxTime)
+    throw Exception("The maximum position in time cannot be before the minimum position in time");
 
-    minTime_ = minTime;
-    maxTime_ = maxTime;
-    bounded_ = true;
+  minTime_ = minTime;
+  maxTime_ = maxTime;
+  bounded_ = true;
 }
 
 double ompl::base::TimeStateSpace::getMaximumExtent() const
 {
-    return bounded_ ? maxTime_ - minTime_ : 1.0;
+  return bounded_ ? maxTime_ - minTime_ : 1.0;
 }
 
 double ompl::base::TimeStateSpace::getMeasure() const
 {
-    return getMaximumExtent();
+  return getMaximumExtent();
 }
 
 void ompl::base::TimeStateSpace::enforceBounds(State *state) const
 {
-    if (bounded_)
-    {
-        if (state->as<StateType>()->position > maxTime_)
-            state->as<StateType>()->position = maxTime_;
-        else
-            if (state->as<StateType>()->position < minTime_)
-                state->as<StateType>()->position = minTime_;
-    }
+  if (bounded_)
+  {
+    if (state->as<StateType>()->position > maxTime_)
+      state->as<StateType>()->position = maxTime_;
+    else if (state->as<StateType>()->position < minTime_)
+      state->as<StateType>()->position = minTime_;
+  }
 }
 
 bool ompl::base::TimeStateSpace::satisfiesBounds(const State *state) const
 {
-    return !bounded_ || (state->as<StateType>()->position >= minTime_ - std::numeric_limits<double>::epsilon() &&
-                         state->as<StateType>()->position <= maxTime_ + std::numeric_limits<double>::epsilon());
+  return !bounded_ || (state->as<StateType>()->position >= minTime_ - std::numeric_limits<double>::epsilon() &&
+                       state->as<StateType>()->position <= maxTime_ + std::numeric_limits<double>::epsilon());
 }
 
 void ompl::base::TimeStateSpace::copyState(State *destination, const State *source) const
 {
-    destination->as<StateType>()->position = source->as<StateType>()->position;
+  destination->as<StateType>()->position = source->as<StateType>()->position;
 }
 
 unsigned int ompl::base::TimeStateSpace::getSerializationLength() const
 {
-    return sizeof(double);
+  return sizeof(double);
 }
 
 void ompl::base::TimeStateSpace::serialize(void *serialization, const State *state) const
 {
-    memcpy(serialization, &state->as<StateType>()->position, sizeof(double));
+  memcpy(serialization, &state->as<StateType>()->position, sizeof(double));
 }
 
 void ompl::base::TimeStateSpace::deserialize(State *state, const void *serialization) const
 {
-    memcpy(&state->as<StateType>()->position, serialization, sizeof(double));
+  memcpy(&state->as<StateType>()->position, serialization, sizeof(double));
 }
 
 double ompl::base::TimeStateSpace::distance(const State *state1, const State *state2) const
 {
-    return fabs(state1->as<StateType>()->position - state2->as<StateType>()->position);
+  return fabs(state1->as<StateType>()->position - state2->as<StateType>()->position);
 }
 
 bool ompl::base::TimeStateSpace::equalStates(const State *state1, const State *state2) const
 {
-    return fabs(state1->as<StateType>()->position - state2->as<StateType>()->position) < std::numeric_limits<double>::epsilon() * 2.0;
+  return fabs(state1->as<StateType>()->position - state2->as<StateType>()->position) <
+         std::numeric_limits<double>::epsilon() * 2.0;
 }
 
 void ompl::base::TimeStateSpace::interpolate(const State *from, const State *to, const double t, State *state) const
 {
-    state->as<StateType>()->position = from->as<StateType>()->position +
-        (to->as<StateType>()->position - from->as<StateType>()->position) * t;
+  state->as<StateType>()->position =
+      from->as<StateType>()->position + (to->as<StateType>()->position - from->as<StateType>()->position) * t;
 }
 
 ompl::base::StateSamplerPtr ompl::base::TimeStateSpace::allocDefaultStateSampler() const
 {
-    return StateSamplerPtr(new TimeStateSampler(this));
+  return StateSamplerPtr(new TimeStateSampler(this));
 }
 
-ompl::base::State* ompl::base::TimeStateSpace::allocState() const
+ompl::base::State *ompl::base::TimeStateSpace::allocState() const
 {
-    return new StateType();
+  return new StateType();
 }
 
 void ompl::base::TimeStateSpace::freeState(State *state) const
 {
-    delete static_cast<StateType*>(state);
+  delete static_cast<StateType *>(state);
 }
 
 void ompl::base::TimeStateSpace::registerProjections()
 {
-    class TimeDefaultProjection : public ProjectionEvaluator
+  class TimeDefaultProjection : public ProjectionEvaluator
+  {
+  public:
+    TimeDefaultProjection(const StateSpace *space) : ProjectionEvaluator(space)
     {
-    public:
+    }
 
-        TimeDefaultProjection(const StateSpace *space) : ProjectionEvaluator(space)
-        {
-        }
+    unsigned int getDimension() const override
+    {
+      return 1;
+    }
 
-        unsigned int getDimension() const override
-        {
-            return 1;
-        }
+    void defaultCellSizes() override
+    {
+      cellSizes_.resize(1);
+      if (space_->as<TimeStateSpace>()->isBounded())
+      {
+        bounds_.resize(1);
+        bounds_.low[0] = space_->as<TimeStateSpace>()->getMinTimeBound();
+        bounds_.high[0] = space_->as<TimeStateSpace>()->getMaxTimeBound();
+        cellSizes_[0] = bounds_.getDifference()[0] / magic::PROJECTION_DIMENSION_SPLITS;
+      }
+      else
+        cellSizes_[0] = 1.0;
+    }
 
-        void defaultCellSizes() override
-        {
-            cellSizes_.resize(1);
-            if (space_->as<TimeStateSpace>()->isBounded())
-            {
-                bounds_.resize(1);
-                bounds_.low[0] = space_->as<TimeStateSpace>()->getMinTimeBound();
-                bounds_.high[0] = space_->as<TimeStateSpace>()->getMaxTimeBound();
-                cellSizes_[0] = bounds_.getDifference()[0] / magic::PROJECTION_DIMENSION_SPLITS;
-            }
-            else
-                cellSizes_[0] = 1.0;
-        }
+    void project(const State *state, EuclideanProjection &projection) const override
+    {
+      projection(0) = state->as<TimeStateSpace::StateType>()->position;
+    }
+  };
 
-        void project(const State *state, EuclideanProjection &projection) const override
-        {
-            projection(0) = state->as<TimeStateSpace::StateType>()->position;
-        }
-    };
-
-    registerDefaultProjection(ProjectionEvaluatorPtr(dynamic_cast<ProjectionEvaluator*>(new TimeDefaultProjection(this))));
+  registerDefaultProjection(
+      ProjectionEvaluatorPtr(dynamic_cast<ProjectionEvaluator *>(new TimeDefaultProjection(this))));
 }
 
-double* ompl::base::TimeStateSpace::getValueAddressAtIndex(State *state, const unsigned int index) const
+double *ompl::base::TimeStateSpace::getValueAddressAtIndex(State *state, const unsigned int index) const
 {
-    return index == 0 ? &(state->as<StateType>()->position) : nullptr;
+  return index == 0 ? &(state->as<StateType>()->position) : nullptr;
 }
 
 void ompl::base::TimeStateSpace::printState(const State *state, std::ostream &out) const
 {
-    out << "TimeState [";
-    if (state)
-        out << state->as<StateType>()->position;
-    else
-        out << "nullptr";
-    out << ']' << std::endl;
+  out << "TimeState [";
+  if (state)
+    out << state->as<StateType>()->position;
+  else
+    out << "nullptr";
+  out << ']' << std::endl;
 }
 
 void ompl::base::TimeStateSpace::printSettings(std::ostream &out) const
 {
-    out << "Time state space '" << getName() << "'" << std::endl;
+  out << "Time state space '" << getName() << "'" << std::endl;
 }

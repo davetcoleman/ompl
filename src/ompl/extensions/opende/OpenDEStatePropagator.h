@@ -42,52 +42,47 @@
 
 namespace ompl
 {
+namespace control
+{
+/** \brief State propagation with OpenDE. Only forward
+    propagation is possible.
 
-    namespace control
-    {
+    At every propagation step, controls are applied using
+    OpenDEEnvironment::applyControl(), contacts are computed by
+    calling \b dSpaceCollide() on the spaces in
+    OpenDEEnvironment::collisionSpaces_ and then \b
+    dWorldQuickStep() is called. If the \e state argument of
+    propagate() does not have its
+    OpenDEStateSpace::StateType::collision field set, it is
+    set based on the information returned by contact
+    computation. Certain collisions (contacts) are allowed, as
+    indicated by OpenDEEnvironment::isValidCollision(). */
+class OpenDEStatePropagator : public StatePropagator
+{
+public:
+  /** \brief Construct a representation of OpenDE state propagator.
+      If \e si->getStateSpace() does not cast to an
+      OpenDEStateSpace, an exception is thrown. */
+  OpenDEStatePropagator(const SpaceInformationPtr &si);
 
-        /** \brief State propagation with OpenDE. Only forward
-            propagation is possible.
+  ~OpenDEStatePropagator() override = default;
 
-            At every propagation step, controls are applied using
-            OpenDEEnvironment::applyControl(), contacts are computed by
-            calling \b dSpaceCollide() on the spaces in
-            OpenDEEnvironment::collisionSpaces_ and then \b
-            dWorldQuickStep() is called. If the \e state argument of
-            propagate() does not have its
-            OpenDEStateSpace::StateType::collision field set, it is
-            set based on the information returned by contact
-            computation. Certain collisions (contacts) are allowed, as
-            indicated by OpenDEEnvironment::isValidCollision(). */
-        class OpenDEStatePropagator : public StatePropagator
-        {
-        public:
+  /** \brief Get the OpenDE environment this state propagator operates on */
+  const OpenDEEnvironmentPtr &getEnvironment() const
+  {
+    return env_;
+  }
 
-            /** \brief Construct a representation of OpenDE state propagator.
-                If \e si->getStateSpace() does not cast to an
-                OpenDEStateSpace, an exception is thrown. */
-            OpenDEStatePropagator(const SpaceInformationPtr &si);
+  bool canPropagateBackward() const override;
 
-            ~OpenDEStatePropagator() override = default;
+  void propagate(const base::State *state, const Control *control, const double duration,
+                 base::State *result) const override;
 
-            /** \brief Get the OpenDE environment this state propagator operates on */
-            const OpenDEEnvironmentPtr& getEnvironment() const
-            {
-                return env_;
-            }
-
-            bool canPropagateBackward() const override;
-
-            void propagate(const base::State *state, const Control *control, const double duration, base::State *result) const override;
-
-        protected:
-
-            /** \brief The OpenDE environment this state propagator operates on */
-            OpenDEEnvironmentPtr env_;
-
-        };
-    }
-
+protected:
+  /** \brief The OpenDE environment this state propagator operates on */
+  OpenDEEnvironmentPtr env_;
+};
+}
 }
 
 #endif

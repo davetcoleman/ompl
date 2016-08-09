@@ -40,15 +40,12 @@
 #include "ompl/tools/multiplan/ParallelPlan.h"
 
 ompl::tools::ExperienceSetup::ExperienceSetup(const base::SpaceInformationPtr &si)
-    : ompl::geometric::SimpleSetup(si)
-    , recallEnabled_(true)
-    , scratchEnabled_(true)
+  : ompl::geometric::SimpleSetup(si), recallEnabled_(true), scratchEnabled_(true)
 {
   logInitialize();
 };
 
-ompl::tools::ExperienceSetup::ExperienceSetup(const base::StateSpacePtr &space)
-  : ompl::geometric::SimpleSetup(space)
+ompl::tools::ExperienceSetup::ExperienceSetup(const base::StateSpacePtr &space) : ompl::geometric::SimpleSetup(space)
 {
   logInitialize();
 };
@@ -57,73 +54,62 @@ void ompl::tools::ExperienceSetup::logInitialize()
 {
   // Header of CSV file
   csvDataLogStream_
-    // Times
-    << "planningTime,insertion_time,"
-    // Solution properties
-    << "planner,result,is_saved,"
-    // Failure booleans
-    << "approximate,too_short,insertionFailed,"
-    // Lightning properties
-    << "score,"
-    // Thunder (SPARS) properties
-    << "numVertices,numEdges,numConnectedComponents,"
-    // Hack for using python cause im lazy right now
-    << "total_experiences,total_scratch,total_recall,total_failed,total_approximate,"
-    << "total_too_short,total_insertionFailed,"
-    << "avg_planningTime,avg_insertion_time"
-    << std::endl;
+      // Times
+      << "planningTime,insertion_time,"
+      // Solution properties
+      << "planner,result,is_saved,"
+      // Failure booleans
+      << "approximate,too_short,insertionFailed,"
+      // Lightning properties
+      << "score,"
+      // Thunder (SPARS) properties
+      << "numVertices,numEdges,numConnectedComponents,"
+      // Hack for using python cause im lazy right now
+      << "total_experiences,total_scratch,total_recall,total_failed,total_approximate,"
+      << "total_too_short,total_insertionFailed,"
+      << "avg_planningTime,avg_insertion_time" << std::endl;
 }
 
 void ompl::tools::ExperienceSetup::convertLogToString(const ExperienceLog &log)
 {
-  csvDataLogStream_
-    << log.planningTime << ","
-    << log.insertionTime << ","
-    << log.planner << ","
-    << log.result << ","
-    << log.isSaved << ","
-    << log.approximate << ","
-    << log.tooShort << ","
-    << log.insertionFailed << ","
-    << log.score << ","
-    << log.numVertices << ","
-    << log.numEdges << ","
-    << log.numConnectedComponents
-    << std::endl;
+  csvDataLogStream_ << log.planningTime << "," << log.insertionTime << "," << log.planner << "," << log.result << ","
+                    << log.isSaved << "," << log.approximate << "," << log.tooShort << "," << log.insertionFailed << ","
+                    << log.score << "," << log.numVertices << "," << log.numEdges << "," << log.numConnectedComponents
+                    << std::endl;
 }
 
 void ompl::tools::ExperienceSetup::saveDataLog(std::ostream &out)
 {
-    // Export to file and clear the stream
-    out << csvDataLogStream_.str();
-    csvDataLogStream_.str("");
+  // Export to file and clear the stream
+  out << csvDataLogStream_.str();
+  csvDataLogStream_.str("");
 }
 
-const std::string& ompl::tools::ExperienceSetup::getFilePath() const
+const std::string &ompl::tools::ExperienceSetup::getFilePath() const
 {
-    return filePath_;
+  return filePath_;
 }
 
 bool ompl::tools::ExperienceSetup::setFilePath(const std::string &filePath)
 {
-    filePath_ = filePath;
-    return true;
+  filePath_ = filePath;
+  return true;
 }
 
 void ompl::tools::ExperienceSetup::enablePlanningFromRecall(bool enable)
 {
-    // Remember state
-    recallEnabled_ = enable;
+  // Remember state
+  recallEnabled_ = enable;
 
-    // Flag the planners as possibly misconfigured
-    configured_ = false;
+  // Flag the planners as possibly misconfigured
+  configured_ = false;
 }
 
 void ompl::tools::ExperienceSetup::enablePlanningFromScratch(bool enable)
 {
-    // Remember state
-    scratchEnabled_ = enable;
+  // Remember state
+  scratchEnabled_ = enable;
 
-    // Flag the planners as possibly misconfigured
-    configured_ = false;
+  // Flag the planners as possibly misconfigured
+  configured_ = false;
 }

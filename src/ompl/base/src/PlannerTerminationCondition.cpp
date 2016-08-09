@@ -42,230 +42,240 @@
 
 namespace ompl
 {
-    namespace base
+namespace base
+{
+/// @cond IGNORE
+class PlannerTerminationCondition::PlannerTerminationConditionImpl
+{
+public:
+  PlannerTerminationConditionImpl(PlannerTerminationConditionFn fn, double period)
+    : fn_(std::move(fn))
+    , period_(period)
+    , terminate_(false)
+    , thread_(nullptr)
+    , evalValue_(false)
+    , signalThreadStop_(false)
+  {
+    if (period_ > 0.0)
+      startEvalThread();
+  }
+
+  ~PlannerTerminationConditionImpl()
+  {
+    stopEvalThread();
+  }
+
+  bool eval() const
+  {
+    if (terminate_)
+      return true;
+    if (period_ > 0.0)
+      return evalValue_;
+    return fn_();
+  }
+
+  void terminate() const
+  {
+    // it is ok to have unprotected write here
+    terminate_ = true;
+  }
+
+private:
+  /** \brief Start the thread evaluating termination conditions if not already started */
+  void startEvalThread()
+  {
+    if (!thread_)
     {
-
-        /// @cond IGNORE
-        class PlannerTerminationCondition::PlannerTerminationConditionImpl
-        {
-        public:
-            PlannerTerminationConditionImpl(PlannerTerminationConditionFn fn, double period) :
-            fn_(std::move(fn)),
-            period_(period),
-            terminate_(false),
-            thread_(nullptr),
-            evalValue_(false),
-            signalThreadStop_(false)
-            {
-                if (period_ > 0.0)
-                    startEvalThread();
-            }
-
-            ~PlannerTerminationConditionImpl()
-            {
-                stopEvalThread();
-            }
-
-            bool eval() const
-            {
-                if (terminate_)
-                    return true;
-                if (period_ > 0.0)
-                    return evalValue_;
-                return fn_();
-            }
-
-            void terminate() const
-            {
-                // it is ok to have unprotected write here
-                terminate_ = true;
-            }
-
-        private:
-
-            /** \brief Start the thread evaluating termination conditions if not already started */
-            void startEvalThread()
-            {
-                if (!thread_)
-                {
-                    signalThreadStop_ = false;
-                    evalValue_ = false;
-                    thread_ = new std::thread(std::bind(&PlannerTerminationConditionImpl::periodicEval, this));
-                }
-            }
-
-            /** \brief Stop the thread evaluating termination conditions if not already stopped */
-            void stopEvalThread()
-            {
-                signalThreadStop_ = true;
-                if (thread_)
-                {
-                    thread_->join();
-                    delete thread_;
-                    thread_ = nullptr;
-                }
-            }
-
-            /** \brief Worker function that runs in a separate thread (calls computeEval())*/
-            void periodicEval()
-            {
-                // we want to check for termination at least once every ms;
-                // even though we may evaluate the condition itself more rarely
-
-                unsigned int count = 1;
-                time::duration s = time::seconds(period_);
-                if (period_ > 0.001)
-                {
-                    count = 0.5 + period_ / 0.001;
-                    s = time::seconds(period_ / (double) count);
-                }
-
-                while (!terminate_ && !signalThreadStop_)
-                {
-                    evalValue_ = fn_();
-                    for (unsigned int i = 0 ; i < count ; ++i)
-                    {
-                        if (terminate_ || signalThreadStop_)
-                            break;
-                        std::this_thread::sleep_for(s);
-                    }
-                }
-            }
-
-            /** \brief Function pointer to the piece of code that decides whether a termination condition has been met */
-            PlannerTerminationConditionFn fn_;
-
-            /** \brief Interval of time (seconds) to wait between calls to computeEval() */
-            double                        period_;
-
-            /** \brief Flag indicating whether the user has externally requested that the condition for termination should become true */
-            mutable bool                  terminate_;
-
-            /** \brief Thread for periodicEval() */
-            std::thread                  *thread_;
-
-            /** \brief Cached value returned by fn_() */
-            bool                          evalValue_;
-
-            /** \brief Flag used to signal the condition evaluation thread to stop. */
-            bool                          signalThreadStop_;
-        };
-
-        /// @endcond
+      signalThreadStop_ = false;
+      evalValue_ = false;
+      thread_ = new std::thread(std::bind(&PlannerTerminationConditionImpl::periodicEval, this));
     }
+  }
+
+  /** \brief Stop the thread evaluating termination conditions if not already stopped */
+  void stopEvalThread()
+  {
+    signalThreadStop_ = true;
+    if (thread_)
+    {
+      thread_->join();
+      delete thread_;
+      thread_ = nullptr;
+    }
+  }
+
+  /** \brief Worker function that runs in a separate thread (calls computeEval())*/
+  void periodicEval()
+  {
+    // we want to check for termination at least once every ms;
+    // even though we may evaluate the condition itself more rarely
+
+    unsigned int count = 1;
+    time::duration s = time::seconds(period_);
+    if (period_ > 0.001)
+    {
+      count = 0.5 + period_ / 0.001;
+      s = time::seconds(period_ / (double)count);
+    }
+
+    while (!terminate_ && !signalThreadStop_)
+    {
+      evalValue_ = fn_();
+      for (unsigned int i = 0; i < count; ++i)
+      {
+        if (terminate_ || signalThreadStop_)
+          break;
+        std::this_thread::sleep_for(s);
+      }
+    }
+  }
+
+  /** \brief Function pointer to the piece of code that decides whether a termination condition has been met */
+  PlannerTerminationConditionFn fn_;
+
+  /** \brief Interval of time (seconds) to wait between calls to computeEval() */
+  double period_;
+
+  /** \brief Flag indicating whether the user has externally requested that the condition for termination should become
+   * true */
+  mutable bool terminate_;
+
+  /** \brief Thread for periodicEval() */
+  std::thread *thread_;
+
+  /** \brief Cached value returned by fn_() */
+  bool evalValue_;
+
+  /** \brief Flag used to signal the condition evaluation thread to stop. */
+  bool signalThreadStop_;
+};
+
+/// @endcond
+}
 }
 
-ompl::base::PlannerTerminationCondition::PlannerTerminationCondition(const PlannerTerminationConditionFn &fn) :
-impl_(new PlannerTerminationConditionImpl(fn, -1.0))
+ompl::base::PlannerTerminationCondition::PlannerTerminationCondition(const PlannerTerminationConditionFn &fn)
+  : impl_(new PlannerTerminationConditionImpl(fn, -1.0))
 {
 }
 
-ompl::base::PlannerTerminationCondition::PlannerTerminationCondition(const PlannerTerminationConditionFn &fn, double period) :
-impl_(new PlannerTerminationConditionImpl(fn, period))
+ompl::base::PlannerTerminationCondition::PlannerTerminationCondition(const PlannerTerminationConditionFn &fn,
+                                                                     double period)
+  : impl_(new PlannerTerminationConditionImpl(fn, period))
 {
 }
 
 void ompl::base::PlannerTerminationCondition::terminate() const
 {
-    impl_->terminate();
+  impl_->terminate();
 }
 
 bool ompl::base::PlannerTerminationCondition::eval() const
 {
-    return impl_->eval();
+  return impl_->eval();
 }
 
 ompl::base::PlannerTerminationCondition ompl::base::plannerNonTerminatingCondition()
 {
-    return PlannerTerminationCondition([] { return false; });
+  return PlannerTerminationCondition([]
+                                     {
+                                       return false;
+                                     });
 }
 
 ompl::base::PlannerTerminationCondition ompl::base::plannerAlwaysTerminatingCondition()
 {
-    return PlannerTerminationCondition([] { return true; });
+  return PlannerTerminationCondition([]
+                                     {
+                                       return true;
+                                     });
 }
 
 /// @cond IGNORE
 namespace ompl
 {
-    namespace base
-    {
-        static bool plannerOrTerminationConditionAux(const PlannerTerminationCondition &c1, const PlannerTerminationCondition &c2)
-        {
-            return c1() || c2();
-        }
+namespace base
+{
+static bool plannerOrTerminationConditionAux(const PlannerTerminationCondition &c1,
+                                             const PlannerTerminationCondition &c2)
+{
+  return c1() || c2();
+}
 
-        static bool plannerAndTerminationConditionAux(const PlannerTerminationCondition &c1, const PlannerTerminationCondition &c2)
-        {
-            return c1() && c2();
-        }
+static bool plannerAndTerminationConditionAux(const PlannerTerminationCondition &c1,
+                                              const PlannerTerminationCondition &c2)
+{
+  return c1() && c2();
+}
 
-        // return true if a certain point in time has passed
-        static bool timePassed(const time::point &endTime)
-        {
-            return time::now() > endTime;
-        }
-    }
+// return true if a certain point in time has passed
+static bool timePassed(const time::point &endTime)
+{
+  return time::now() > endTime;
+}
+}
 }
 /// @endcond
 
-ompl::base::PlannerTerminationCondition ompl::base::plannerOrTerminationCondition(const PlannerTerminationCondition &c1, const PlannerTerminationCondition &c2)
+ompl::base::PlannerTerminationCondition ompl::base::plannerOrTerminationCondition(const PlannerTerminationCondition &c1,
+                                                                                  const PlannerTerminationCondition &c2)
 {
-    return PlannerTerminationCondition(std::bind(&plannerOrTerminationConditionAux, c1, c2));
+  return PlannerTerminationCondition(std::bind(&plannerOrTerminationConditionAux, c1, c2));
 }
 
-ompl::base::PlannerTerminationCondition ompl::base::plannerAndTerminationCondition(const PlannerTerminationCondition &c1, const PlannerTerminationCondition &c2)
+ompl::base::PlannerTerminationCondition
+ompl::base::plannerAndTerminationCondition(const PlannerTerminationCondition &c1, const PlannerTerminationCondition &c2)
 {
-    return PlannerTerminationCondition(std::bind(&plannerAndTerminationConditionAux, c1, c2));
+  return PlannerTerminationCondition(std::bind(&plannerAndTerminationConditionAux, c1, c2));
 }
 
 ompl::base::PlannerTerminationCondition ompl::base::timedPlannerTerminationCondition(double duration)
 {
-    return timedPlannerTerminationCondition(time::seconds(duration));
+  return timedPlannerTerminationCondition(time::seconds(duration));
 }
 
 ompl::base::PlannerTerminationCondition ompl::base::timedPlannerTerminationCondition(time::duration duration)
 {
-    return PlannerTerminationCondition(std::bind(&timePassed, time::now() + duration));
+  return PlannerTerminationCondition(std::bind(&timePassed, time::now() + duration));
 }
 
 ompl::base::PlannerTerminationCondition ompl::base::timedPlannerTerminationCondition(double duration, double interval)
 {
-    if (interval > duration)
-        interval = duration;
-    return PlannerTerminationCondition(std::bind(&timePassed, time::now() + time::seconds(duration)), interval);
+  if (interval > duration)
+    interval = duration;
+  return PlannerTerminationCondition(std::bind(&timePassed, time::now() + time::seconds(duration)), interval);
 }
 
-ompl::base::PlannerTerminationCondition ompl::base::exactSolnPlannerTerminationCondition(ompl::base::ProblemDefinitionPtr pdef)
+ompl::base::PlannerTerminationCondition
+ompl::base::exactSolnPlannerTerminationCondition(ompl::base::ProblemDefinitionPtr pdef)
 {
-    return PlannerTerminationCondition(std::bind(&ProblemDefinition::hasExactSolution, pdef));
+  return PlannerTerminationCondition(std::bind(&ProblemDefinition::hasExactSolution, pdef));
 }
 
 namespace ompl
 {
-    namespace base
-    {
-        IterationTerminationCondition::IterationTerminationCondition(unsigned int numIterations)
-          : maxCalls_(numIterations),
-            timesCalled_(0u)
-        {
-        }
+namespace base
+{
+IterationTerminationCondition::IterationTerminationCondition(unsigned int numIterations)
+  : maxCalls_(numIterations), timesCalled_(0u)
+{
+}
 
-        bool IterationTerminationCondition::eval()
-        {
-            ++timesCalled_;
+bool IterationTerminationCondition::eval()
+{
+  ++timesCalled_;
 
-            return (timesCalled_ > maxCalls_);
-        }
+  return (timesCalled_ > maxCalls_);
+}
 
-        void IterationTerminationCondition::reset()
-        {
-            timesCalled_ = 0u;
-        }
+void IterationTerminationCondition::reset()
+{
+  timesCalled_ = 0u;
+}
 
-        IterationTerminationCondition::operator PlannerTerminationCondition()
-        {
-            return PlannerTerminationCondition( std::bind(&IterationTerminationCondition::eval, this) );
-        }
-    }
+IterationTerminationCondition::operator PlannerTerminationCondition()
+{
+  return PlannerTerminationCondition(std::bind(&IterationTerminationCondition::eval, this));
+}
+}
 }

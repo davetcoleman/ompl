@@ -42,164 +42,157 @@
 
 namespace ompl
 {
-    namespace base
-    {
+namespace base
+{
+/** \brief Definition for a class computing linear projections
+    (multiplication of a k-by-n matrix to the the
+    R<sup>n</sup> vector state to produce an R<sup>k</sup>
+    projection. The multiplication matrix needs to be supplied
+    as input. */
+class RealVectorLinearProjectionEvaluator : public ProjectionEvaluator
+{
+public:
+  /** \brief Initialize a linear projection evaluator for state space \e space. The used projection matrix is
+      \e projection and the cell sizes are \e cellSizes. */
+  RealVectorLinearProjectionEvaluator(const StateSpace *space, const std::vector<double> &cellSizes,
+                                      const ProjectionMatrix::Matrix &projection);
 
-        /** \brief Definition for a class computing linear projections
-            (multiplication of a k-by-n matrix to the the
-            R<sup>n</sup> vector state to produce an R<sup>k</sup>
-            projection. The multiplication matrix needs to be supplied
-            as input. */
-        class RealVectorLinearProjectionEvaluator : public ProjectionEvaluator
-        {
-        public:
+  /** \brief Initialize a linear projection evaluator for state space \e space. The used projection matrix is
+      \e projection and the cell sizes are \e cellSizes. */
+  RealVectorLinearProjectionEvaluator(const StateSpacePtr &space, const std::vector<double> &cellSizes,
+                                      const ProjectionMatrix::Matrix &projection);
 
-            /** \brief Initialize a linear projection evaluator for state space \e space. The used projection matrix is
-                \e projection and the cell sizes are \e cellSizes. */
-            RealVectorLinearProjectionEvaluator(const StateSpace *space, const std::vector<double> &cellSizes,
-                                                const ProjectionMatrix::Matrix &projection);
+  /** \brief Initialize a linear projection evaluator for state space \e space. The used projection matrix is
+      \e projection and the cell sizes are automatically inferred through sampling. */
+  RealVectorLinearProjectionEvaluator(const StateSpace *space, const ProjectionMatrix::Matrix &projection);
 
-            /** \brief Initialize a linear projection evaluator for state space \e space. The used projection matrix is
-                \e projection and the cell sizes are \e cellSizes. */
-            RealVectorLinearProjectionEvaluator(const StateSpacePtr &space, const std::vector<double> &cellSizes,
-                                                const ProjectionMatrix::Matrix &projection);
+  /** \brief Initialize a linear projection evaluator for state space \e space. The used projection matrix is
+      \e projection and the cell sizes are automatically inferred through sampling. */
+  RealVectorLinearProjectionEvaluator(const StateSpacePtr &space, const ProjectionMatrix::Matrix &projection);
 
-            /** \brief Initialize a linear projection evaluator for state space \e space. The used projection matrix is
-                \e projection and the cell sizes are automatically inferred through sampling. */
-            RealVectorLinearProjectionEvaluator(const StateSpace *space,
-                                                const ProjectionMatrix::Matrix &projection);
+  unsigned int getDimension() const override;
 
-            /** \brief Initialize a linear projection evaluator for state space \e space. The used projection matrix is
-                \e projection and the cell sizes are automatically inferred through sampling. */
-            RealVectorLinearProjectionEvaluator(const StateSpacePtr &space,
-                                                const ProjectionMatrix::Matrix &projection);
+  void project(const State *state, EuclideanProjection &projection) const override;
 
-            unsigned int getDimension() const override;
+protected:
+  /** \brief The projection matrix */
+  ProjectionMatrix projection_;
+};
 
-            void project(const State *state, EuclideanProjection &projection) const override;
+/** \brief Definition for a class computing a random linear projections */
+class RealVectorRandomLinearProjectionEvaluator : public RealVectorLinearProjectionEvaluator
+{
+public:
+  /** \brief Initialize a linear projection evaluator for state space \e space. The used projection matrix is
+      sampled at random and the cell sizes are automatically inferred through sampling. */
+  RealVectorRandomLinearProjectionEvaluator(const StateSpace *space, const std::vector<double> &cellSizes)
+    : RealVectorLinearProjectionEvaluator(space, cellSizes,
+                                          ProjectionMatrix::ComputeRandom(space->getDimension(), cellSizes.size()))
+  {
+  }
 
-        protected:
+  /** \brief Initialize a linear projection evaluator for state space \e space. The used projection matrix is
+      sampled at random and the cell sizes are automatically inferred through sampling. */
+  RealVectorRandomLinearProjectionEvaluator(const StateSpacePtr &space, const std::vector<double> &cellSizes)
+    : RealVectorLinearProjectionEvaluator(space, cellSizes,
+                                          ProjectionMatrix::ComputeRandom(space->getDimension(), cellSizes.size()))
+  {
+  }
 
-            /** \brief The projection matrix */
-            ProjectionMatrix projection_;
+  /** \brief Initialize a linear projection evaluator for state space \e space. The used projection matrix is
+      sampled at random to produce a space of dimension \e dim and the cell sizes are automatically inferred through
+     sampling. */
+  RealVectorRandomLinearProjectionEvaluator(const StateSpace *space, unsigned int dim)
+    : RealVectorLinearProjectionEvaluator(
+          space, ProjectionMatrix::ComputeRandom(space->getDimension(), dim,
+                                                 space->as<RealVectorStateSpace>()->getBounds().getDifference()))
+  {
+  }
 
-        };
+  /** \brief Initialize a linear projection evaluator for state space \e space. The used projection matrix is
+      sampled at random to produce a space of dimension \e dim and the cell sizes are automatically inferred through
+     sampling. */
+  RealVectorRandomLinearProjectionEvaluator(const StateSpacePtr &space, unsigned int dim)
+    : RealVectorLinearProjectionEvaluator(
+          space, ProjectionMatrix::ComputeRandom(space->getDimension(), dim,
+                                                 space->as<RealVectorStateSpace>()->getBounds().getDifference()))
+  {
+  }
+};
 
-        /** \brief Definition for a class computing a random linear projections */
-        class RealVectorRandomLinearProjectionEvaluator : public RealVectorLinearProjectionEvaluator
-        {
-        public:
+/** \brief Definition for a class computing orthogonal projections */
+class RealVectorOrthogonalProjectionEvaluator : public ProjectionEvaluator
+{
+public:
+  /** \brief Initialize an orthogonal projection evaluator for state space \e space. The indices of the
+      kept components are in \e components and the cell sizes are in \e cellSizes */
+  RealVectorOrthogonalProjectionEvaluator(const StateSpace *space, const std::vector<double> &cellSizes,
+                                          std::vector<unsigned int> components);
 
-            /** \brief Initialize a linear projection evaluator for state space \e space. The used projection matrix is
-                sampled at random and the cell sizes are automatically inferred through sampling. */
-            RealVectorRandomLinearProjectionEvaluator(const StateSpace *space, const std::vector<double> &cellSizes) :
-                RealVectorLinearProjectionEvaluator(space, cellSizes, ProjectionMatrix::ComputeRandom(space->getDimension(), cellSizes.size()))
-            {
-            }
+  /** \brief Initialize an orthogonal projection evaluator for state space \e space. The indices of the
+      kept components are in \e components and the cell sizes are in \e cellSizes */
+  RealVectorOrthogonalProjectionEvaluator(const StateSpacePtr &space, const std::vector<double> &cellSizes,
+                                          std::vector<unsigned int> components);
 
-            /** \brief Initialize a linear projection evaluator for state space \e space. The used projection matrix is
-                sampled at random and the cell sizes are automatically inferred through sampling. */
-            RealVectorRandomLinearProjectionEvaluator(const StateSpacePtr &space, const std::vector<double> &cellSizes) :
-                RealVectorLinearProjectionEvaluator(space, cellSizes, ProjectionMatrix::ComputeRandom(space->getDimension(), cellSizes.size()))
-            {
-            }
+  /** \brief Initialize an orthogonal projection evaluator for state space \e space. The indices of the
+      kept components are in \e components and the cell sizes are a tenth of the corresponding bounds from the state
+     space. */
+  RealVectorOrthogonalProjectionEvaluator(const StateSpace *space, std::vector<unsigned int> components);
 
-            /** \brief Initialize a linear projection evaluator for state space \e space. The used projection matrix is
-                sampled at random to produce a space of dimension \e dim and the cell sizes are automatically inferred through sampling. */
-            RealVectorRandomLinearProjectionEvaluator(const StateSpace *space, unsigned int dim) :
-                RealVectorLinearProjectionEvaluator(space, ProjectionMatrix::ComputeRandom(space->getDimension(), dim,
-                                                                                           space->as<RealVectorStateSpace>()->getBounds().getDifference()))
-            {
-            }
+  /** \brief Initialize an orthogonal projection evaluator for state space \e space. The indices of the
+      kept components are in \e components and the cell sizes are a tenth of the corresponding bounds from the state
+     space.  */
+  RealVectorOrthogonalProjectionEvaluator(const StateSpacePtr &space, std::vector<unsigned int> components);
 
-            /** \brief Initialize a linear projection evaluator for state space \e space. The used projection matrix is
-                sampled at random to produce a space of dimension \e dim and the cell sizes are automatically inferred through sampling. */
-            RealVectorRandomLinearProjectionEvaluator(const StateSpacePtr &space, unsigned int dim) :
-                RealVectorLinearProjectionEvaluator(space, ProjectionMatrix::ComputeRandom(space->getDimension(), dim,
-                                                                                           space->as<RealVectorStateSpace>()->getBounds().getDifference()))
-            {
-            }
+  unsigned int getDimension() const override;
 
-        };
+  void defaultCellSizes() override;
 
-        /** \brief Definition for a class computing orthogonal projections */
-        class RealVectorOrthogonalProjectionEvaluator : public ProjectionEvaluator
-        {
-        public:
+  void project(const State *state, EuclideanProjection &projection) const override;
 
-            /** \brief Initialize an orthogonal projection evaluator for state space \e space. The indices of the
-                kept components are in \e components and the cell sizes are in \e cellSizes */
-            RealVectorOrthogonalProjectionEvaluator(const StateSpace *space, const std::vector<double> &cellSizes,
-                                                    std::vector<unsigned int> components);
+protected:
+  /** \brief Fill bounds_ with bounds from the state space */
+  void copyBounds();
 
-            /** \brief Initialize an orthogonal projection evaluator for state space \e space. The indices of the
-                kept components are in \e components and the cell sizes are in \e cellSizes */
-            RealVectorOrthogonalProjectionEvaluator(const StateSpacePtr &space, const std::vector<double> &cellSizes,
-                                                    std::vector<unsigned int> components);
+  /** \brief The set of components selected by the projection */
+  std::vector<unsigned int> components_;
+};
 
-            /** \brief Initialize an orthogonal projection evaluator for state space \e space. The indices of the
-                kept components are in \e components and the cell sizes are a tenth of the corresponding bounds from the state space. */
-            RealVectorOrthogonalProjectionEvaluator(const StateSpace *space, std::vector<unsigned int> components);
+/** \brief Define the identity projection */
+class RealVectorIdentityProjectionEvaluator : public ProjectionEvaluator
+{
+public:
+  /** \brief Initialize the identity projection evaluator for state space \e space. The indices of the
+      kept components are in \e components and the cell sizes are in \e cellSizes */
+  RealVectorIdentityProjectionEvaluator(const StateSpace *space, const std::vector<double> &cellSizes);
 
-            /** \brief Initialize an orthogonal projection evaluator for state space \e space. The indices of the
-                kept components are in \e components and the cell sizes are a tenth of the corresponding bounds from the state space.  */
-            RealVectorOrthogonalProjectionEvaluator(const StateSpacePtr &space, std::vector<unsigned int> components);
+  /** \brief Initialize the identity projection evaluator for state space \e space. The indices of the
+      kept components are in \e components and the cell sizes are in \e cellSizes */
+  RealVectorIdentityProjectionEvaluator(const StateSpacePtr &space, const std::vector<double> &cellSizes);
 
-            unsigned int getDimension() const override;
+  /** \brief Initialize the identity projection evaluator for state space \e space. The indices of the
+      kept components are in \e components and the cell sizes are a tenth of the bounds from the state space.  */
+  RealVectorIdentityProjectionEvaluator(const StateSpace *space);
 
-            void defaultCellSizes() override;
+  /** \brief Initialize the identity projection evaluator for state space \e space. The indices of the
+      kept components are in \e components and the cell sizes are a tenth of the bounds from the state space.  */
+  RealVectorIdentityProjectionEvaluator(const StateSpacePtr &space);
 
-            void project(const State *state, EuclideanProjection &projection) const override;
+  unsigned int getDimension() const override;
 
-        protected:
+  void defaultCellSizes() override;
 
-            /** \brief Fill bounds_ with bounds from the state space */
-            void copyBounds();
+  void setup() override;
 
-            /** \brief The set of components selected by the projection */
-            std::vector<unsigned int> components_;
+  void project(const State *state, EuclideanProjection &projection) const override;
 
-        };
+private:
+  /** \brief Fill bounds_ with bounds from the state space */
+  void copyBounds();
 
-        /** \brief Define the identity projection */
-        class RealVectorIdentityProjectionEvaluator : public ProjectionEvaluator
-        {
-        public:
-
-            /** \brief Initialize the identity projection evaluator for state space \e space. The indices of the
-                kept components are in \e components and the cell sizes are in \e cellSizes */
-            RealVectorIdentityProjectionEvaluator(const StateSpace *space, const std::vector<double> &cellSizes);
-
-            /** \brief Initialize the identity projection evaluator for state space \e space. The indices of the
-                kept components are in \e components and the cell sizes are in \e cellSizes */
-            RealVectorIdentityProjectionEvaluator(const StateSpacePtr &space, const std::vector<double> &cellSizes);
-
-            /** \brief Initialize the identity projection evaluator for state space \e space. The indices of the
-                kept components are in \e components and the cell sizes are a tenth of the bounds from the state space.  */
-            RealVectorIdentityProjectionEvaluator(const StateSpace *space);
-
-            /** \brief Initialize the identity projection evaluator for state space \e space. The indices of the
-                kept components are in \e components and the cell sizes are a tenth of the bounds from the state space.  */
-            RealVectorIdentityProjectionEvaluator(const StateSpacePtr &space);
-
-            unsigned int getDimension() const override;
-
-            void defaultCellSizes() override;
-
-            void setup() override;
-
-            void project(const State *state, EuclideanProjection &projection) const override;
-
-        private:
-
-            /** \brief Fill bounds_ with bounds from the state space */
-            void copyBounds();
-
-            /** \brief The amount of data to copy from projection to state */
-            std::size_t copySize_;
-
-        };
-
-    }
+  /** \brief The amount of data to copy from projection to state */
+  std::size_t copySize_;
+};
+}
 }
 #endif

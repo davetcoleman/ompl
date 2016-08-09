@@ -41,131 +41,125 @@
 
 namespace ompl
 {
-    namespace base
-    {
+namespace base
+{
+/** \brief State space sampler for time */
+class TimeStateSampler : public StateSampler
+{
+public:
+  /** \brief Constructor */
+  TimeStateSampler(const StateSpace *space) : StateSampler(space)
+  {
+  }
 
-        /** \brief State space sampler for time */
-        class TimeStateSampler : public StateSampler
-        {
-        public:
+  void sampleUniform(State *state) override;
+  void sampleUniformNear(State *state, const State *near, const double distance) override;
+  void sampleGaussian(State *state, const State *mean, const double stdDev) override;
+};
 
-            /** \brief Constructor */
-            TimeStateSampler(const StateSpace *space) : StateSampler(space)
-            {
-            }
+/** \brief A state space representing time. The time can be
+    unbounded, in which case enforceBounds() is a no-op,
+    satisfiesBounds() always returns true, sampling uniform
+    time states always produces time 0 and getMaximumExtent()
+    returns 1. If time is bounded (setBounds() has been
+    previously called), the state space behaves as
+    expected. After construction, the state space is
+    unbounded. isBounded() can be used to check if the state space
+    is bounded or not. */
+class TimeStateSpace : public StateSpace
+{
+public:
+  /** \brief The definition of a time state */
+  class StateType : public State
+  {
+  public:
+    /** \brief The position in time */
+    double position;
+  };
 
-            void sampleUniform(State *state) override;
-            void sampleUniformNear(State *state, const State *near, const double distance) override;
-            void sampleGaussian(State *state, const State *mean, const double stdDev) override;
-        };
+  TimeStateSpace() : StateSpace(), bounded_(false), minTime_(0.0), maxTime_(0.0)
+  {
+    setName("Time" + getName());
+    type_ = STATE_SPACE_TIME;
+  }
 
-        /** \brief A state space representing time. The time can be
-            unbounded, in which case enforceBounds() is a no-op,
-            satisfiesBounds() always returns true, sampling uniform
-            time states always produces time 0 and getMaximumExtent()
-            returns 1. If time is bounded (setBounds() has been
-            previously called), the state space behaves as
-            expected. After construction, the state space is
-            unbounded. isBounded() can be used to check if the state space
-            is bounded or not. */
-        class TimeStateSpace : public StateSpace
-        {
-        public:
+  ~TimeStateSpace() override = default;
 
-            /** \brief The definition of a time state */
-            class StateType : public State
-            {
-            public:
+  unsigned int getDimension() const override;
 
-                /** \brief The position in time */
-                double position;
-            };
+  double getMaximumExtent() const override;
 
-            TimeStateSpace() : StateSpace(), bounded_(false), minTime_(0.0), maxTime_(0.0)
-            {
-                setName("Time" + getName());
-                type_ = STATE_SPACE_TIME;
-            }
+  double getMeasure() const override;
 
-            ~TimeStateSpace() override = default;
+  /** \brief Set the minimum and maximum time bounds. This
+      will make the state space switch into bounded time
+      mode. If this function is not called, sampling time
+      will always produce position = 0, enforceBounds() is a no-op,
+      satisfiesBounds() always returns true and
+      getMaximumExtent() returns 1. */
+  void setBounds(double minTime, double maxTime);
 
-            unsigned int getDimension() const override;
+  /** \brief Get the minimum allowed value of \e position in a state. The function returns 0 if time is not bounded. */
+  double getMinTimeBound() const
+  {
+    return minTime_;
+  }
 
-            double getMaximumExtent() const override;
+  /** \brief Get the maximum allowed value of \e position in a state. The function returns 0 if time is not bounded. */
+  double getMaxTimeBound() const
+  {
+    return maxTime_;
+  }
 
-            double getMeasure() const override;
+  /** \brief Check if the time is bounded or not */
+  bool isBounded() const
+  {
+    return bounded_;
+  }
 
-            /** \brief Set the minimum and maximum time bounds. This
-                will make the state space switch into bounded time
-                mode. If this function is not called, sampling time
-                will always produce position = 0, enforceBounds() is a no-op,
-                satisfiesBounds() always returns true and
-                getMaximumExtent() returns 1. */
-            void setBounds(double minTime, double maxTime);
+  void enforceBounds(State *state) const override;
 
-            /** \brief Get the minimum allowed value of \e position in a state. The function returns 0 if time is not bounded. */
-            double getMinTimeBound() const
-            {
-                return minTime_;
-            }
+  bool satisfiesBounds(const State *state) const override;
 
-            /** \brief Get the maximum allowed value of \e position in a state. The function returns 0 if time is not bounded. */
-            double getMaxTimeBound() const
-            {
-                return maxTime_;
-            }
+  void copyState(State *destination, const State *source) const override;
 
-            /** \brief Check if the time is bounded or not */
-            bool isBounded() const
-            {
-                return bounded_;
-            }
+  unsigned int getSerializationLength() const override;
 
-            void enforceBounds(State *state) const override;
+  void serialize(void *serialization, const State *state) const override;
 
-            bool satisfiesBounds(const State *state) const override;
+  void deserialize(State *state, const void *serialization) const override;
 
-            void copyState(State *destination, const State *source) const override;
+  double distance(const State *state1, const State *state2) const override;
 
-            unsigned int getSerializationLength() const override;
+  bool equalStates(const State *state1, const State *state2) const override;
 
-            void serialize(void *serialization, const State *state) const override;
+  void interpolate(const State *from, const State *to, const double t, State *state) const override;
 
-            void deserialize(State *state, const void *serialization) const override;
+  StateSamplerPtr allocDefaultStateSampler() const override;
 
-            double distance(const State *state1, const State *state2) const override;
+  State *allocState() const override;
 
-            bool equalStates(const State *state1, const State *state2) const override;
+  void freeState(State *state) const override;
 
-            void interpolate(const State *from, const State *to, const double t, State *state) const override;
+  double *getValueAddressAtIndex(State *state, const unsigned int index) const override;
 
-            StateSamplerPtr allocDefaultStateSampler() const override;
+  void printState(const State *state, std::ostream &out) const override;
 
-            State* allocState() const override;
+  void printSettings(std::ostream &out) const override;
 
-            void freeState(State *state) const override;
+  void registerProjections() override;
 
-            double* getValueAddressAtIndex(State *state, const unsigned int index) const override;
+protected:
+  /** \brief Flag indicating whether the state space is considering bounds or not */
+  bool bounded_;
 
-            void printState(const State *state, std::ostream &out) const override;
+  /** \brief The minimum point in time considered by the state space (if bounds are used) */
+  double minTime_;
 
-            void printSettings(std::ostream &out) const override;
-
-            void registerProjections() override;
-
-        protected:
-
-            /** \brief Flag indicating whether the state space is considering bounds or not */
-            bool   bounded_;
-
-            /** \brief The minimum point in time considered by the state space (if bounds are used) */
-            double minTime_;
-
-            /** \brief The maximum point in time considered by the state space (if bounds are used) */
-            double maxTime_;
-
-        };
-    }
+  /** \brief The maximum point in time considered by the state space (if bounds are used) */
+  double maxTime_;
+};
+}
 }
 
 #endif

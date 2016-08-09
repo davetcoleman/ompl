@@ -36,47 +36,46 @@
 
 #include "ompl/base/objectives/MinimaxObjective.h"
 
-ompl::base::MinimaxObjective::MinimaxObjective(const SpaceInformationPtr &si) :
-    OptimizationObjective(si)
+ompl::base::MinimaxObjective::MinimaxObjective(const SpaceInformationPtr &si) : OptimizationObjective(si)
 {
 }
 
 ompl::base::Cost ompl::base::MinimaxObjective::stateCost(const State *s) const
 {
-    return Cost(1.0);
+  return Cost(1.0);
 }
 
 ompl::base::Cost ompl::base::MinimaxObjective::motionCost(const State *s1, const State *s2) const
 {
-    Cost worstCost = this->identityCost();
+  Cost worstCost = this->identityCost();
 
-    int nd = si_->getStateSpace()->validSegmentCount(s1, s2);
+  int nd = si_->getStateSpace()->validSegmentCount(s1, s2);
 
-    if (nd > 1)
+  if (nd > 1)
+  {
+    State *test = si_->allocState();
+    for (int j = 1; j < nd; ++j)
     {
-        State *test = si_->allocState();
-        for (int j = 1; j < nd; ++j)
-        {
-            si_->getStateSpace()->interpolate(s1, s2, (double) j / (double) nd, test);
-            Cost testStateCost = this->stateCost(test);
-            if (this->isCostBetterThan(worstCost, testStateCost))
-                worstCost = testStateCost;
-        }
-        si_->freeState(test);
+      si_->getStateSpace()->interpolate(s1, s2, (double)j / (double)nd, test);
+      Cost testStateCost = this->stateCost(test);
+      if (this->isCostBetterThan(worstCost, testStateCost))
+        worstCost = testStateCost;
     }
+    si_->freeState(test);
+  }
 
-    // Lastly, check s2
-    Cost lastCost = this->stateCost(s2);
-    if (this->isCostBetterThan(worstCost, lastCost))
-        worstCost = lastCost;
+  // Lastly, check s2
+  Cost lastCost = this->stateCost(s2);
+  if (this->isCostBetterThan(worstCost, lastCost))
+    worstCost = lastCost;
 
-    return worstCost;
+  return worstCost;
 }
 
 ompl::base::Cost ompl::base::MinimaxObjective::combineCosts(Cost c1, Cost c2) const
 {
-    if (this->isCostBetterThan(c1, c2))
-        return c2;
-    else
-        return c1;
+  if (this->isCostBetterThan(c1, c2))
+    return c2;
+  else
+    return c1;
 }

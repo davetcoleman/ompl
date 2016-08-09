@@ -39,99 +39,100 @@
 
 namespace ompl
 {
-    namespace base
+namespace base
+{
+// The default rejection-sampling class:
+RejectionInfSampler::RejectionInfSampler(const ProblemDefinitionPtr &probDefn, unsigned int maxNumberCalls)
+  : InformedSampler(probDefn, maxNumberCalls)
+{
+  // Create the basic sampler
+  baseSampler_ = InformedSampler::space_->allocDefaultStateSampler();
+
+  // Warn if a cost-to-go heuristic is not defined
+  if (InformedSampler::opt_->hasCostToGoHeuristic() == false)
+  {
+    OMPL_WARN("RejectionInfSampler: The optimization objective does not have a cost-to-go heuristic defined. Informed "
+              "sampling will likely have little to no effect.");
+  }
+  // No else
+}
+
+bool RejectionInfSampler::sampleUniform(State *statePtr, const Cost &maxCost)
+{
+  // Variable
+  // The persistent iteration counter:
+  unsigned int iter = 0u;
+
+  // Call the sampleUniform helper function with my iteration counter:
+  return sampleUniform(statePtr, maxCost, &iter);
+}
+
+bool RejectionInfSampler::sampleUniform(State *statePtr, const Cost &minCost, const Cost &maxCost)
+{
+  // Variable
+  // Whether we were successful in creating an informed sample. Initially not:
+  bool foundSample = false;
+
+  // Spend numIters_ iterations trying to find an informed sample:
+  for (unsigned int i = 0u; i < InformedSampler::numIters_ && foundSample == false; ++i)
+  {
+    // Call the helper function for the larger cost. It will move our iteration counter:
+    foundSample = sampleUniform(statePtr, maxCost, &i);
+
+    // Did we find a sample?
+    if (foundSample == true)
     {
-        // The default rejection-sampling class:
-        RejectionInfSampler::RejectionInfSampler(const ProblemDefinitionPtr& probDefn, unsigned int maxNumberCalls)
-          : InformedSampler(probDefn, maxNumberCalls)
-        {
-            // Create the basic sampler
-            baseSampler_ = InformedSampler::space_->allocDefaultStateSampler();
+      // We did, but it only satisfied the upper bound. Check that it meets the lower bound.
 
-            // Warn if a cost-to-go heuristic is not defined
-            if (InformedSampler::opt_->hasCostToGoHeuristic() == false)
-            {
-                OMPL_WARN("RejectionInfSampler: The optimization objective does not have a cost-to-go heuristic defined. Informed sampling will likely have little to no effect.");
-            }
-            // No else
-        }
+      // Variables
+      // The cost of the sample we found:
+      Cost sampledCost = InformedSampler::heuristicSolnCost(statePtr);
 
-        bool RejectionInfSampler::sampleUniform(State *statePtr, const Cost &maxCost)
-        {
-            // Variable
-            // The persistent iteration counter:
-            unsigned int iter = 0u;
+      // Check if the sample's cost is greater than or equal to the lower bound
+      foundSample = InformedSampler::opt_->isCostEquivalentTo(minCost, sampledCost) ||
+                    InformedSampler::opt_->isCostBetterThan(minCost, sampledCost);
+    }
+    // No else, no sample was found.
+  }
 
-            //Call the sampleUniform helper function with my iteration counter:
-            return sampleUniform(statePtr, maxCost, &iter);
-        }
+  // One way or the other, we're done:
+  return foundSample;
+}
 
-        bool RejectionInfSampler::sampleUniform(State *statePtr, const Cost &minCost, const Cost &maxCost)
-        {
-            // Variable
-            // Whether we were successful in creating an informed sample. Initially not:
-            bool foundSample = false;
+bool RejectionInfSampler::hasInformedMeasure() const
+{
+  return false;
+}
 
-            // Spend numIters_ iterations trying to find an informed sample:
-            for (unsigned int i = 0u; i < InformedSampler::numIters_ && foundSample == false; ++i)
-            {
-                // Call the helper function for the larger cost. It will move our iteration counter:
-                foundSample = sampleUniform(statePtr, maxCost, &i);
+double RejectionInfSampler::getInformedMeasure(const Cost & /*currentCost*/) const
+{
+  return InformedSampler::space_->getMeasure();
+}
 
-                // Did we find a sample?
-                if (foundSample == true)
-                {
-                    // We did, but it only satisfied the upper bound. Check that it meets the lower bound.
+double RejectionInfSampler::getInformedMeasure(const Cost & /*minCost*/, const Cost & /*maxCost*/) const
+{
+  return InformedSampler::space_->getMeasure();
+}
 
-                    // Variables
-                    // The cost of the sample we found:
-                    Cost sampledCost = InformedSampler::heuristicSolnCost(statePtr);
+bool RejectionInfSampler::sampleUniform(State *statePtr, const Cost &maxCost, unsigned int *iterPtr)
+{
+  // Variable
+  // Whether we were successful in creating an informed sample. Initially not:
+  bool foundSample = false;
 
-                    // Check if the sample's cost is greater than or equal to the lower bound
-                    foundSample = InformedSampler::opt_->isCostEquivalentTo(minCost, sampledCost) || InformedSampler::opt_->isCostBetterThan(minCost, sampledCost);
-                }
-                // No else, no sample was found.
-            }
+  // Make numIters_ attempts at finding a sample whose heuristic estimate of solution cost through the sample is better
+  // than maxCost by sampling the entire planning domain
+  for (/* Provided iteration counter */; *iterPtr < InformedSampler::numIters_ && foundSample == false; ++(*iterPtr))
+  {
+    // Get a sample:
+    baseSampler_->sampleUniform(statePtr);
 
-            // One way or the other, we're done:
-            return foundSample;
-        }
+    // Check if it's found, i.e., if f(state) <= maxCost
+    foundSample = InformedSampler::opt_->isCostBetterThan(InformedSampler::heuristicSolnCost(statePtr), maxCost);
+  }
 
-        bool RejectionInfSampler::hasInformedMeasure() const
-        {
-            return false;
-        }
-
-        double RejectionInfSampler::getInformedMeasure(const Cost &/*currentCost*/) const
-        {
-            return InformedSampler::space_->getMeasure();
-        }
-
-        double RejectionInfSampler::getInformedMeasure(const Cost &/*minCost*/, const Cost &/*maxCost*/) const
-        {
-            return InformedSampler::space_->getMeasure();
-        }
-
-
-
-        bool RejectionInfSampler::sampleUniform(State *statePtr, const Cost &maxCost, unsigned int *iterPtr)
-        {
-            // Variable
-            // Whether we were successful in creating an informed sample. Initially not:
-            bool foundSample = false;
-
-            // Make numIters_ attempts at finding a sample whose heuristic estimate of solution cost through the sample is better than maxCost by sampling the entire planning domain
-            for (/* Provided iteration counter */; *iterPtr < InformedSampler::numIters_ && foundSample == false; ++(*iterPtr))
-            {
-                // Get a sample:
-                baseSampler_->sampleUniform(statePtr);
-
-                // Check if it's found, i.e., if f(state) <= maxCost
-                foundSample = InformedSampler::opt_->isCostBetterThan(InformedSampler::heuristicSolnCost(statePtr), maxCost);
-            }
-
-            // All done, one way or the other:
-            return foundSample;
-        }
-    }; // base
+  // All done, one way or the other:
+  return foundSample;
+}
+};  // base
 };  // ompl

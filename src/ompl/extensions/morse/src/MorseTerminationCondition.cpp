@@ -38,6 +38,6 @@
 
 bool ompl::base::MorseTerminationCondition::eval() const
 {
-    // the Python object will unset this if we should stop
-    return !env_->simRunning_;
+  // the Python object will unset this if we should stop
+  return !env_->simRunning_;
 }

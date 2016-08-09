@@ -38,75 +38,73 @@
 
 namespace ompl
 {
-    namespace magic
-    {
-
-        /** \brief Maximum number of consecutive failures to allow
-            before giving up on improving a state. A failure consists
-            of being unable to sample a state that is closer to the
-            specified goal region.*/
-        static const unsigned int MAX_CLIMB_NO_UPDATE_STEPS = 10;
-    }
+namespace magic
+{
+/** \brief Maximum number of consecutive failures to allow
+    before giving up on improving a state. A failure consists
+    of being unable to sample a state that is closer to the
+    specified goal region.*/
+static const unsigned int MAX_CLIMB_NO_UPDATE_STEPS = 10;
+}
 }
 
-bool ompl::geometric::HillClimbing::tryToImprove(const base::GoalRegion &goal, base::State *state, double nearDistance, double *betterGoalDistance) const
+bool ompl::geometric::HillClimbing::tryToImprove(const base::GoalRegion &goal, base::State *state, double nearDistance,
+                                                 double *betterGoalDistance) const
 {
-    double tempDistance;
-    double initialDistance;
+  double tempDistance;
+  double initialDistance;
 
-    bool wasValid = valid(state);
-    bool wasValidStart = wasValid;
+  bool wasValid = valid(state);
+  bool wasValidStart = wasValid;
 
-    bool wasSatisfied = goal.isSatisfied(state, &initialDistance);
-    bool wasSatisfiedStart = wasSatisfied;
+  bool wasSatisfied = goal.isSatisfied(state, &initialDistance);
+  bool wasSatisfiedStart = wasSatisfied;
 
-    double bestDist = initialDistance;
+  double bestDist = initialDistance;
 
-    base::StateSamplerPtr ss = si_->allocStateSampler();
-    base::State *test = si_->allocState();
-    unsigned int noUpdateSteps = 0;
+  base::StateSamplerPtr ss = si_->allocStateSampler();
+  base::State *test = si_->allocState();
+  unsigned int noUpdateSteps = 0;
 
-    for (unsigned int i = 0 ; noUpdateSteps < magic::MAX_CLIMB_NO_UPDATE_STEPS && i < maxImproveSteps_ ; ++i)
+  for (unsigned int i = 0; noUpdateSteps < magic::MAX_CLIMB_NO_UPDATE_STEPS && i < maxImproveSteps_; ++i)
+  {
+    bool update = false;
+    ss->sampleUniformNear(test, state, nearDistance);
+    bool isValid = valid(test);
+    bool isSatisfied = goal.isSatisfied(test, &tempDistance);
+    if (!wasValid && isValid)
     {
-        bool update = false;
-        ss->sampleUniformNear(test, state, nearDistance);
-        bool isValid = valid(test);
-        bool isSatisfied = goal.isSatisfied(test, &tempDistance);
-        if (!wasValid && isValid)
-        {
-            si_->copyState(state, test);
-            wasValid = true;
-            wasSatisfied = isSatisfied;
-            update = true;
-        }
-        else
-            if (wasValid == isValid)
-            {
-                if (!wasSatisfied && isSatisfied)
-                {
-                    si_->copyState(state, test);
-                    wasSatisfied = true;
-                    update = true;
-                }
-                else
-                    if (wasSatisfied == isSatisfied)
-                    {
-                        if (tempDistance < bestDist)
-                        {
-                            si_->copyState(state, test);
-                            bestDist = tempDistance;
-                            update = true;
-                        }
-                    }
-            }
-        if (update)
-            noUpdateSteps = 0;
-        else
-            noUpdateSteps++;
+      si_->copyState(state, test);
+      wasValid = true;
+      wasSatisfied = isSatisfied;
+      update = true;
     }
-    si_->freeState(test);
+    else if (wasValid == isValid)
+    {
+      if (!wasSatisfied && isSatisfied)
+      {
+        si_->copyState(state, test);
+        wasSatisfied = true;
+        update = true;
+      }
+      else if (wasSatisfied == isSatisfied)
+      {
+        if (tempDistance < bestDist)
+        {
+          si_->copyState(state, test);
+          bestDist = tempDistance;
+          update = true;
+        }
+      }
+    }
+    if (update)
+      noUpdateSteps = 0;
+    else
+      noUpdateSteps++;
+  }
+  si_->freeState(test);
 
-    if (betterGoalDistance)
-        *betterGoalDistance = bestDist;
-    return (bestDist < initialDistance) || (!wasSatisfiedStart && wasSatisfied) || (!wasValidStart && wasValid);
+  if (betterGoalDistance)
+    *betterGoalDistance = bestDist;
+  return (bestDist < initialDistance) || (!wasSatisfiedStart && wasSatisfied) || (!wasValidStart && wasValid);
 }

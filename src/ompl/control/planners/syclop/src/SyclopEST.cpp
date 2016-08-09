@@ -39,90 +39,89 @@
 
 void ompl::control::SyclopEST::setup()
 {
-    Syclop::setup();
-    sampler_ = si_->allocStateSampler();
-    controlSampler_ = siC_->allocControlSampler();
-    lastGoalMotion_ = nullptr;
+  Syclop::setup();
+  sampler_ = si_->allocStateSampler();
+  controlSampler_ = siC_->allocControlSampler();
+  lastGoalMotion_ = nullptr;
 }
 
 void ompl::control::SyclopEST::clear()
 {
-    Syclop::clear();
-    freeMemory();
-    motions_.clear();
-    lastGoalMotion_ = nullptr;
+  Syclop::clear();
+  freeMemory();
+  motions_.clear();
+  lastGoalMotion_ = nullptr;
 }
 
 void ompl::control::SyclopEST::getPlannerData(base::PlannerData &data) const
 {
-    Planner::getPlannerData(data);
+  Planner::getPlannerData(data);
 
-    double delta = siC_->getPropagationStepSize();
+  double delta = siC_->getPropagationStepSize();
 
-    if (lastGoalMotion_)
-        data.addGoalVertex(lastGoalMotion_->state);
+  if (lastGoalMotion_)
+    data.addGoalVertex(lastGoalMotion_->state);
 
-    for (auto motion : motions_)
+  for (auto motion : motions_)
+  {
+    if (motion->parent)
     {
-        if (motion->parent)
-        {
-            if (data.hasControls())
-                data.addEdge (base::PlannerDataVertex(motion->parent->state),
-                              base::PlannerDataVertex(motion->state),
-                              control::PlannerDataEdgeControl (motion->control, motion->steps * delta));
-            else
-                data.addEdge (base::PlannerDataVertex(motion->parent->state),
-                              base::PlannerDataVertex(motion->state));
-        }
-        else
-            data.addStartVertex (base::PlannerDataVertex(motion->state));
+      if (data.hasControls())
+        data.addEdge(base::PlannerDataVertex(motion->parent->state), base::PlannerDataVertex(motion->state),
+                     control::PlannerDataEdgeControl(motion->control, motion->steps * delta));
+      else
+        data.addEdge(base::PlannerDataVertex(motion->parent->state), base::PlannerDataVertex(motion->state));
     }
+    else
+      data.addStartVertex(base::PlannerDataVertex(motion->state));
+  }
 }
 
-ompl::control::Syclop::Motion* ompl::control::SyclopEST::addRoot(const base::State *s)
+ompl::control::Syclop::Motion *ompl::control::SyclopEST::addRoot(const base::State *s)
 {
+  auto *motion = new Motion(siC_);
+  si_->copyState(motion->state, s);
+  siC_->nullControl(motion->control);
+  motions_.push_back(motion);
+  return motion;
+}
+
+void ompl::control::SyclopEST::selectAndExtend(Region &region, std::vector<Motion *> &newMotions)
+{
+  Motion *treeMotion = region.motions[rng_.uniformInt(0, region.motions.size() - 1)];
+  Control *rctrl = siC_->allocControl();
+  base::State *newState = si_->allocState();
+
+  controlSampler_->sample(rctrl, treeMotion->state);
+  unsigned int duration =
+      controlSampler_->sampleStepCount(siC_->getMinControlDuration(), siC_->getMaxControlDuration());
+  duration = siC_->propagateWhileValid(treeMotion->state, rctrl, duration, newState);
+
+  if (duration >= siC_->getMinControlDuration())
+  {
     auto *motion = new Motion(siC_);
-    si_->copyState(motion->state, s);
-    siC_->nullControl(motion->control);
+    si_->copyState(motion->state, newState);
+    siC_->copyControl(motion->control, rctrl);
+    motion->steps = duration;
+    motion->parent = treeMotion;
     motions_.push_back(motion);
-    return motion;
-}
+    newMotions.push_back(motion);
 
-void ompl::control::SyclopEST::selectAndExtend(Region &region, std::vector<Motion*>& newMotions)
-{
-    Motion *treeMotion = region.motions[rng_.uniformInt(0, region.motions.size()-1)];
-    Control *rctrl = siC_->allocControl();
-    base::State *newState = si_->allocState();
+    lastGoalMotion_ = motion;
+  }
 
-    controlSampler_->sample(rctrl, treeMotion->state);
-    unsigned int duration = controlSampler_->sampleStepCount(siC_->getMinControlDuration(), siC_->getMaxControlDuration());
-    duration = siC_->propagateWhileValid(treeMotion->state, rctrl, duration, newState);
-
-    if (duration >= siC_->getMinControlDuration())
-    {
-        auto *motion = new Motion(siC_);
-        si_->copyState(motion->state, newState);
-        siC_->copyControl(motion->control, rctrl);
-        motion->steps = duration;
-        motion->parent = treeMotion;
-        motions_.push_back(motion);
-        newMotions.push_back(motion);
-
-        lastGoalMotion_ = motion;
-    }
-
-    siC_->freeControl(rctrl);
-    si_->freeState(newState);
+  siC_->freeControl(rctrl);
+  si_->freeState(newState);
 }
 
 void ompl::control::SyclopEST::freeMemory()
 {
-    for (auto m : motions_)
-    {
-        if (m->state)
-            si_->freeState(m->state);
-        if (m->control)
-            siC_->freeControl(m->control);
-        delete m;
-    }
+  for (auto m : motions_)
+  {
+    if (m->state)
+      si_->freeState(m->state);
+    if (m->control)
+      siC_->freeControl(m->control);
+    delete m;
+  }
 }

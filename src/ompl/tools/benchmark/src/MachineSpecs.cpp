@@ -50,42 +50,38 @@
 
 ompl::machine::MemUsage_t getProcessMemoryUsageAux()
 {
-    HANDLE hProcess;
-    PROCESS_MEMORY_COUNTERS pmc;
+  HANDLE hProcess;
+  PROCESS_MEMORY_COUNTERS pmc;
 
-    hProcess = OpenProcess(  PROCESS_QUERY_INFORMATION |
-                             PROCESS_VM_READ,
-                             false,
-                             GetCurrentProcessId() );
+  hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, GetCurrentProcessId());
 
-    ompl::machine::MemUsage_t result = 0;
+  ompl::machine::MemUsage_t result = 0;
 
-    if (nullptr != hProcess)
-    {
-        if ( GetProcessMemoryInfo( hProcess, &pmc, sizeof(pmc)) )
-            result = pmc.WorkingSetSize;
-        CloseHandle( hProcess );
-    }
+  if (nullptr != hProcess)
+  {
+    if (GetProcessMemoryInfo(hProcess, &pmc, sizeof(pmc)))
+      result = pmc.WorkingSetSize;
+    CloseHandle(hProcess);
+  }
 
-    return result;
+  return result;
 }
 
 std::string getCPUInfoAux()
 {
-    static const int BUF_SIZE = 256;
-    char buffer[BUF_SIZE];
-    std::stringstream result;
-    FILE *cmdPipe = _popen("wmic cpu list full", "rt");
-    if (cmdPipe != nullptr)
-    {
-        while (fgets(buffer, BUF_SIZE, cmdPipe))
-            result << buffer;
-        if (feof(cmdPipe))
-            _pclose(cmdPipe);
-    }
-    return result.str();
+  static const int BUF_SIZE = 256;
+  char buffer[BUF_SIZE];
+  std::stringstream result;
+  FILE *cmdPipe = _popen("wmic cpu list full", "rt");
+  if (cmdPipe != nullptr)
+  {
+    while (fgets(buffer, BUF_SIZE, cmdPipe))
+      result << buffer;
+    if (feof(cmdPipe))
+      _pclose(cmdPipe);
+  }
+  return result.str();
 }
-
 
 #else
 #if defined __APPLE__
@@ -101,34 +97,34 @@ std::string getCPUInfoAux()
 
 ompl::machine::MemUsage_t getProcessMemoryUsageAux()
 {
+  task_basic_info info;
+  kern_return_t rval = 0;
+  mach_port_t task = mach_task_self();
+  mach_msg_type_number_t tcnt = TASK_BASIC_INFO_COUNT;
+  task_info_t tptr = (task_info_t)&info;
 
-    task_basic_info         info;
-    kern_return_t           rval = 0;
-    mach_port_t             task = mach_task_self();
-    mach_msg_type_number_t  tcnt = TASK_BASIC_INFO_COUNT;
-    task_info_t             tptr = (task_info_t) &info;
+  memset(&info, 0, sizeof(info));
 
-    memset(&info, 0, sizeof(info));
-
-    rval = task_info(task, TASK_BASIC_INFO, tptr, &tcnt);
-    if (!(rval == KERN_SUCCESS)) return 0;
-    return info.resident_size;
+  rval = task_info(task, TASK_BASIC_INFO, tptr, &tcnt);
+  if (!(rval == KERN_SUCCESS))
+    return 0;
+  return info.resident_size;
 }
 
 std::string getCPUInfoAux()
 {
-    static const int BUF_SIZE = 256;
-    char buffer[BUF_SIZE];
-    std::stringstream result;
-    FILE *cmdPipe = popen("sysctl hw", "r");
-    if (cmdPipe != nullptr)
-    {
-        while (fgets(buffer, BUF_SIZE, cmdPipe))
-            result << buffer;
-        if (feof(cmdPipe))
-            pclose(cmdPipe);
-    }
-    return result.str();
+  static const int BUF_SIZE = 256;
+  char buffer[BUF_SIZE];
+  std::stringstream result;
+  FILE *cmdPipe = popen("sysctl hw", "r");
+  if (cmdPipe != nullptr)
+  {
+    while (fgets(buffer, BUF_SIZE, cmdPipe))
+      result << buffer;
+    if (feof(cmdPipe))
+      pclose(cmdPipe);
+  }
+  return result.str();
 }
 
 #else
@@ -142,104 +138,102 @@ std::string getCPUInfoAux()
 
 ompl::machine::MemUsage_t getProcessMemoryUsageAux()
 {
-   using std::ios_base;
-   using std::ifstream;
-   using std::string;
+  using std::ios_base;
+  using std::ifstream;
+  using std::string;
 
-   // 'file' stat seems to give the most reliable results
-   //
-   ifstream stat_stream("/proc/self/stat",ios_base::in);
+  // 'file' stat seems to give the most reliable results
+  //
+  ifstream stat_stream("/proc/self/stat", ios_base::in);
 
-   if (stat_stream.good() && !stat_stream.eof())
-   {
-       // dummy vars for leading entries in stat that we don't care about
-       //
-       string pid, comm, state, ppid, pgrp, session, tty_nr;
-       string tpgid, flags, minflt, cminflt, majflt, cmajflt;
-       string utime, stime, cutime, cstime, priority, nice;
-       string O, itrealvalue, starttime;
+  if (stat_stream.good() && !stat_stream.eof())
+  {
+    // dummy vars for leading entries in stat that we don't care about
+    //
+    string pid, comm, state, ppid, pgrp, session, tty_nr;
+    string tpgid, flags, minflt, cminflt, majflt, cmajflt;
+    string utime, stime, cutime, cstime, priority, nice;
+    string O, itrealvalue, starttime;
 
+    // the two fields we want
+    //
+    unsigned long vsize;
+    long rss;
 
-       // the two fields we want
-       //
-       unsigned long vsize;
-       long rss;
+    stat_stream >> pid >> comm >> state >> ppid >> pgrp >> session >> tty_nr >> tpgid >> flags >> minflt >> cminflt >>
+        majflt >> cmajflt >> utime >> stime >> cutime >> cstime >> priority >> nice >> O >> itrealvalue >> starttime >>
+        vsize >> rss;  // don't care about the rest
 
-       stat_stream >> pid >> comm >> state >> ppid >> pgrp >> session >> tty_nr
-                   >> tpgid >> flags >> minflt >> cminflt >> majflt >> cmajflt
-                   >> utime >> stime >> cutime >> cstime >> priority >> nice
-                   >> O >> itrealvalue >> starttime >> vsize >> rss; // don't care about the rest
-
-       ompl::machine::MemUsage_t page_size = sysconf(_SC_PAGE_SIZE);
-       return rss * page_size;
-   }
-   return 0;
+    ompl::machine::MemUsage_t page_size = sysconf(_SC_PAGE_SIZE);
+    return rss * page_size;
+  }
+  return 0;
 }
 
 std::string getCPUInfoAux()
 {
-    static const int BUF_SIZE = 4096;
-    char buffer[BUF_SIZE];
-    std::stringstream result;
-    FILE *cmdPipe = popen("lscpu", "r");
-    if (cmdPipe != nullptr)
-    {
-        while (fgets(buffer, BUF_SIZE, cmdPipe))
-            result << buffer;
-        if (feof(cmdPipe))
-            pclose(cmdPipe);
-    }
-    return result.str();
+  static const int BUF_SIZE = 4096;
+  char buffer[BUF_SIZE];
+  std::stringstream result;
+  FILE *cmdPipe = popen("lscpu", "r");
+  if (cmdPipe != nullptr)
+  {
+    while (fgets(buffer, BUF_SIZE, cmdPipe))
+      result << buffer;
+    if (feof(cmdPipe))
+      pclose(cmdPipe);
+  }
+  return result.str();
 }
 
 #else
 // if we have no idea what to do, we return 0
 ompl::machine::MemUsage_t getProcessMemoryUsageAux()
 {
-    return 0;
+  return 0;
 }
 // if we have no idea what to do, we return an empty string
 std::string getCPUInfoAux()
 {
-    return std::string();
+  return std::string();
 }
 
-#endif // posix
-#endif // apple
-#endif // windows
+#endif  // posix
+#endif  // apple
+#endif  // windows
 
 ompl::machine::MemUsage_t ompl::machine::getProcessMemoryUsage()
 {
-    MemUsage_t result = getProcessMemoryUsageAux();
-    if (result == 0)
-    {
-        OMPL_WARN("Unable to get memory usage");
-    }
-    return result;
+  MemUsage_t result = getProcessMemoryUsageAux();
+  if (result == 0)
+  {
+    OMPL_WARN("Unable to get memory usage");
+  }
+  return result;
 }
 
 std::string ompl::machine::getCPUInfo()
 {
-    std::string result = getCPUInfoAux();
-    if (result.size() == 0)
-    {
-        OMPL_WARN("Unable to get CPU information");
-    }
-    return result;
+  std::string result = getCPUInfoAux();
+  if (result.size() == 0)
+  {
+    OMPL_WARN("Unable to get CPU information");
+  }
+  return result;
 }
 
 std::string ompl::machine::getHostname()
 {
-    static const int BUF_SIZE = 1024;
-    char buffer[BUF_SIZE];
-    int len = gethostname(buffer, sizeof(buffer));
-    if (len != 0)
-        return std::string();
-    else
-    {
-        buffer[BUF_SIZE - 1] = '\0';
-        return std::string(buffer);
-    }
+  static const int BUF_SIZE = 1024;
+  char buffer[BUF_SIZE];
+  int len = gethostname(buffer, sizeof(buffer));
+  if (len != 0)
+    return std::string();
+  else
+  {
+    buffer[BUF_SIZE - 1] = '\0';
+    return std::string(buffer);
+  }
 }
 
 /// @endcond

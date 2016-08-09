@@ -79,104 +79,102 @@ typedef std::function<void(const std::string&)> VizWaitFeedback;
 /** \brief Use an external program to visualize search */
 class Visualizer
 {
-  public:
+public:
+  static const std::size_t NUM_VISUALIZERS = 7;
 
-    static const std::size_t NUM_VISUALIZERS = 7;
+  Visualizer()
+  {
+    OMPL_INFORM("Setting visualizers to count %u", NUM_VISUALIZERS);
+    viz_.resize(NUM_VISUALIZERS);
+  }
 
-    Visualizer()
-    {
-        OMPL_INFORM("Setting visualizers to count %u", NUM_VISUALIZERS);
-        viz_.resize(NUM_VISUALIZERS);
-    }
+  // ------------------------------------------------------------------------------------
 
-    // ------------------------------------------------------------------------------------
+  /** \brief Wait for user feedback i.e. through a button or joystick */
+  void waitForUserFeedback(const std::string& msg)
+  {
+    if (waitForUserFeedback_)
+      waitForUserFeedback_(msg);
+  }
 
-    /** \brief Wait for user feedback i.e. through a button or joystick */
-    void waitForUserFeedback(const std::string& msg)
-    {
-        if (waitForUserFeedback_)
-            waitForUserFeedback_(msg);
-    }
+  /** \brief Set the callback to wait for user feedback */
+  void setWaitForUserFeedback(ompl::tools::VizWaitFeedback waitForUserFeedback)
+  {
+    waitForUserFeedback_ = waitForUserFeedback;
+  }
 
-    /** \brief Set the callback to wait for user feedback */
-    void setWaitForUserFeedback(ompl::tools::VizWaitFeedback waitForUserFeedback)
-    {
-        waitForUserFeedback_ = waitForUserFeedback;
-    }
+  // ------------------------------------------------------------------------------------
 
-    // ------------------------------------------------------------------------------------
+  /** \brief Callback to display the node covereage in 2D */
+  void vizVoronoiDiagram()
+  {
+    if (vizVoronoiDiagram_)
+      vizVoronoiDiagram_();
+  }
 
-    /** \brief Callback to display the node covereage in 2D */
-    void vizVoronoiDiagram()
-    {
-        if (vizVoronoiDiagram_)
-            vizVoronoiDiagram_();
-    }
+  /** \brief Set the callback to wait for user feedback */
+  void setVizVoronoiDiagram(ompl::tools::VizTrigger vizVoronoiDiagram)
+  {
+    vizVoronoiDiagram_ = vizVoronoiDiagram;
+  }
 
-    /** \brief Set the callback to wait for user feedback */
-    void setVizVoronoiDiagram(ompl::tools::VizTrigger vizVoronoiDiagram)
-    {
-        vizVoronoiDiagram_ = vizVoronoiDiagram;
-    }
+  // ------------------------------------------------------------------------------------
 
-    // ------------------------------------------------------------------------------------
+  void setVizWindow(std::size_t id, VizWindowPtr viz)
+  {
+    viz_[id - 1] = viz;
+  }
 
-    void setVizWindow(std::size_t id, VizWindowPtr viz)
-    {
-        viz_[id-1] = viz;
-    }
+  VizWindowPtr viz(std::size_t id)
+  {
+    assert(id > 0 && id <= NUM_VISUALIZERS);
+    return viz_[id - 1];
+  }
 
-    VizWindowPtr viz(std::size_t id)
-    {
-        assert(id > 0 && id <= NUM_VISUALIZERS);
-        return viz_[id-1];
-    }
+  VizWindowPtr viz1()
+  {
+    return viz_[1 - 1];
+  }
 
-    VizWindowPtr viz1()
-    {
-        return viz_[1-1];
-    }
+  VizWindowPtr viz2()
+  {
+    return viz_[2 - 1];
+  }
 
-    VizWindowPtr viz2()
-    {
-        return viz_[2-1];
-    }
+  VizWindowPtr viz3()
+  {
+    return viz_[3 - 1];
+  }
 
-    VizWindowPtr viz3()
-    {
-        return viz_[3-1];
-    }
+  VizWindowPtr viz4()
+  {
+    return viz_[4 - 1];
+  }
 
-    VizWindowPtr viz4()
-    {
-        return viz_[4-1];
-    }
+  VizWindowPtr viz5()
+  {
+    return viz_[5 - 1];
+  }
 
-    VizWindowPtr viz5()
-    {
-        return viz_[5-1];
-    }
+  VizWindowPtr viz6()
+  {
+    return viz_[6 - 1];
+  }
 
-    VizWindowPtr viz6()
-    {
-        return viz_[6-1];
-    }
+  VizWindowPtr viz7()
+  {
+    return viz_[7 - 1];
+  }
 
-    VizWindowPtr viz7()
-    {
-        return viz_[7-1];
-    }
+private:
+  /** \brief Callback to wait for user input before proceeding */
+  VizWaitFeedback waitForUserFeedback_;
 
-  private:
+  /** \brief Callback to display the node covereage in 2D */
+  VizTrigger vizVoronoiDiagram_;
 
-    /** \brief Callback to wait for user input before proceeding */
-    VizWaitFeedback waitForUserFeedback_;
-
-    /** \brief Callback to display the node covereage in 2D */
-    VizTrigger vizVoronoiDiagram_;
-
-    // Pointers to visualization windows in another project
-    std::vector<VizWindowPtr> viz_;
+  // Pointers to visualization windows in another project
+  std::vector<VizWindowPtr> viz_;
 
 };  // end of class Visualizer
 }  // namespace tools

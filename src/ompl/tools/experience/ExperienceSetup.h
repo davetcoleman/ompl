@@ -43,212 +43,207 @@
 
 namespace ompl
 {
+namespace tools
+{
+/// @cond IGNORE
+OMPL_CLASS_FORWARD(ExperienceSetup);
+/// @endcond
 
-    namespace tools
+/** \class ompl::geometric::ExperienceSetupPtr
+    \brief A shared pointer wrapper for ompl::geometric::ExperienceSetup */
+
+/** \brief Create the set of classes typically needed to solve a
+    geometric problem */
+class ExperienceSetup : public geometric::SimpleSetup
+{
+public:
+  /**
+   * \brief Simple logging functionality encapsled in a struct
+   */
+  struct ExperienceStats
+  {
+    ExperienceStats()
+      : numSolutionsFromRecall_(0)
+      , numSolutionsFromRecallSaved_(0)
+      , numSolutionsFromScratch_(0)
+      , numSolutionsFailed_(0)
+      , numSolutionsTimedout_(0)
+      , numSolutionsApproximate_(0)
+      , numSolutionsTooShort_(0)
+      , numProblems_(0)
+      , totalPlanningTime_(0.0)
+      , totalInsertionTime_(0.0)
     {
-
-        /// @cond IGNORE
-        OMPL_CLASS_FORWARD(ExperienceSetup);
-        /// @endcond
-
-        /** \class ompl::geometric::ExperienceSetupPtr
-            \brief A shared pointer wrapper for ompl::geometric::ExperienceSetup */
-
-        /** \brief Create the set of classes typically needed to solve a
-            geometric problem */
-        class ExperienceSetup : public geometric::SimpleSetup
-        {
-        public:
-            /**
-             * \brief Simple logging functionality encapsled in a struct
-             */
-            struct ExperienceStats
-            {
-                ExperienceStats()
-                    : numSolutionsFromRecall_(0)
-                    , numSolutionsFromRecallSaved_(0)
-                    , numSolutionsFromScratch_(0)
-                    , numSolutionsFailed_(0)
-                    , numSolutionsTimedout_(0)
-                    , numSolutionsApproximate_(0)
-                    , numSolutionsTooShort_(0)
-                    , numProblems_(0)
-                    , totalPlanningTime_(0.0)
-                    , totalInsertionTime_(0.0)
-                {
-                }
-
-                double getAveragePlanningTime() const
-                {
-                    if (!numProblems_)
-                        return 0.0;
-
-                    return totalPlanningTime_ / numProblems_;
-                }
-
-                double getAverageInsertionTime() const
-                {
-                    if (!numProblems_)
-                        return 0.0;
-
-                    // Clean up output
-                    double time = totalInsertionTime_ / numProblems_;
-                    if (time < 1e-8)
-                        return 0.0;
-                    else
-                        return totalInsertionTime_ / numProblems_;
-                }
-
-                double numSolutionsFromRecall_;
-                double numSolutionsFromRecallSaved_;
-                double numSolutionsFromScratch_;
-                double numSolutionsFailed_;
-                double numSolutionsTimedout_;
-                double numSolutionsApproximate_;
-                double numSolutionsTooShort_; // less than 3 states
-                double numProblems_; // input requests
-                double totalPlanningTime_; // of all input requests, used for averaging
-                double totalInsertionTime_; // of all input requests, used for averaging
-            };
-
-            /**
-             * \brief Single entry for the csv data logging file
-             */
-            struct ExperienceLog
-            {
-                ExperienceLog()
-                    // Defaults
-                    : planningTime(0.0),
-                      insertionTime(0.0),
-                      planner("NA"),
-                      result("NA"),
-                      isSaved("NA"),
-                      approximate(0.0),
-                      tooShort(0.0),
-                      insertionFailed(0.0),
-                      score(0.0),
-                      numVertices(0.0),
-                      numEdges(0.0),
-                      numConnectedComponents(0.0)
-                {}
-                // Times
-                double planningTime;
-                double insertionTime;
-                // Solution properties
-                std::string planner;
-                std::string result;
-                std::string isSaved;
-                // Failure booleans
-                bool approximate;
-                bool tooShort;
-                bool insertionFailed;
-                // Lightning properties
-                double score;
-                // Thunder (SPARS) properties
-                std::size_t numVertices;
-                std::size_t numEdges;
-                std::size_t numConnectedComponents;
-            };
-
-            /** \brief Constructor needs the state space used for planning. */
-            explicit
-            ExperienceSetup(const base::SpaceInformationPtr &si);
-
-            /** \brief Constructor needs the state space used for planning. */
-            explicit
-            ExperienceSetup(const base::StateSpacePtr &space);
-
-            /** \brief Load the header (first row) of the csv file */
-            void logInitialize();
-
-            /** \brief Move data to string format and put in buffer */
-            void convertLogToString(const ExperienceLog &log);
-
-            /** \brief Display debug data about potential available solutions */
-            virtual void printResultsInfo(std::ostream &out = std::cout) const = 0;
-
-            /** \brief Display debug data about overall results  since being loaded */
-            virtual void printLogs(std::ostream &out = std::cout) const = 0;
-
-            /** \brief Save debug data about overall results since being loaded */
-            virtual void saveDataLog(std::ostream &out = std::cout);
-
-            /** \brief Set the planner to use for repairing experience paths
-                inside the RetrieveRepair planner. If the planner is not
-                set, a default planner is set. */
-            virtual void setRepairPlanner(const base::PlannerPtr &planner) = 0;
-
-            /** \brief Save the experience database to file */
-            virtual bool save() = 0;
-
-            /** \brief Save the experience database to file if there has been a change */
-            virtual bool saveIfChanged() = 0;
-
-            /** \brief Optionally disable the ability to use previous plans in solutions (but will still save them) */
-            void enablePlanningFromRecall(bool enable);
-
-            /** \brief Optionally disable the ability to plan from scratch
-             *         Note: Lightning can still save modified experiences if they are different enough
-             */
-            void enablePlanningFromScratch(bool enable);
-
-            /** \brief Get a vector of all the planning data in the database */
-            virtual void getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const = 0;
-
-            /** \brief Get the total number of paths stored in the database */
-            virtual std::size_t getExperiencesCount() const = 0;
-
-            /** \brief After setFile() is called, access the generated file path for loading and saving the experience database */
-            virtual const std::string& getFilePath() const;
-
-            /** \brief Set the database file to load. Actual loading occurs when setup() is called
-             *  \param filePath - full absolute path to a experience database to load
-             */
-            virtual bool setFilePath(const std::string &filePath);
-
-            /**
-             * \brief Getter for logging data
-             */
-            const ExperienceStats& getStats() const
-            {
-                return stats_;
-            }
-
-            /**
-             * \brief Allow accumlated experiences to be processed
-             */
-            virtual bool doPostProcessing()
-            {
-                return true;
-            }
-
-            /** \brief Get class for managing various visualization features */
-            VisualizerPtr getVisual()
-            {
-                return visual_;
-            }
-
-        protected:
-
-            /** \brief Class for managing various visualization features */
-            VisualizerPtr visual_;
-
-            /// Flag indicating whether recalled plans should be used to find solutions. Enabled by default.
-            bool                              recallEnabled_;
-
-            /// Flag indicating whether planning from scratch should be used to find solutions. Enabled by default.
-            bool                              scratchEnabled_;
-
-            /** \brief File location of database */
-            std::string                       filePath_;
-
-            // output data to file to analyze performance externally
-            std::stringstream                 csvDataLogStream_;
-
-            /** \brief States data for display to console  */
-            ExperienceStats                   stats_;
-        };
     }
 
+    double getAveragePlanningTime() const
+    {
+      if (!numProblems_)
+        return 0.0;
+
+      return totalPlanningTime_ / numProblems_;
+    }
+
+    double getAverageInsertionTime() const
+    {
+      if (!numProblems_)
+        return 0.0;
+
+      // Clean up output
+      double time = totalInsertionTime_ / numProblems_;
+      if (time < 1e-8)
+        return 0.0;
+      else
+        return totalInsertionTime_ / numProblems_;
+    }
+
+    double numSolutionsFromRecall_;
+    double numSolutionsFromRecallSaved_;
+    double numSolutionsFromScratch_;
+    double numSolutionsFailed_;
+    double numSolutionsTimedout_;
+    double numSolutionsApproximate_;
+    double numSolutionsTooShort_;  // less than 3 states
+    double numProblems_;           // input requests
+    double totalPlanningTime_;     // of all input requests, used for averaging
+    double totalInsertionTime_;    // of all input requests, used for averaging
+  };
+
+  /**
+   * \brief Single entry for the csv data logging file
+   */
+  struct ExperienceLog
+  {
+    ExperienceLog()
+        // Defaults
+        : planningTime(0.0),
+          insertionTime(0.0),
+          planner("NA"),
+          result("NA"),
+          isSaved("NA"),
+          approximate(0.0),
+          tooShort(0.0),
+          insertionFailed(0.0),
+          score(0.0),
+          numVertices(0.0),
+          numEdges(0.0),
+          numConnectedComponents(0.0)
+    {
+    }
+    // Times
+    double planningTime;
+    double insertionTime;
+    // Solution properties
+    std::string planner;
+    std::string result;
+    std::string isSaved;
+    // Failure booleans
+    bool approximate;
+    bool tooShort;
+    bool insertionFailed;
+    // Lightning properties
+    double score;
+    // Thunder (SPARS) properties
+    std::size_t numVertices;
+    std::size_t numEdges;
+    std::size_t numConnectedComponents;
+  };
+
+  /** \brief Constructor needs the state space used for planning. */
+  explicit ExperienceSetup(const base::SpaceInformationPtr &si);
+
+  /** \brief Constructor needs the state space used for planning. */
+  explicit ExperienceSetup(const base::StateSpacePtr &space);
+
+  /** \brief Load the header (first row) of the csv file */
+  void logInitialize();
+
+  /** \brief Move data to string format and put in buffer */
+  void convertLogToString(const ExperienceLog &log);
+
+  /** \brief Display debug data about potential available solutions */
+  virtual void printResultsInfo(std::ostream &out = std::cout) const = 0;
+
+  /** \brief Display debug data about overall results  since being loaded */
+  virtual void printLogs(std::ostream &out = std::cout) const = 0;
+
+  /** \brief Save debug data about overall results since being loaded */
+  virtual void saveDataLog(std::ostream &out = std::cout);
+
+  /** \brief Set the planner to use for repairing experience paths
+      inside the RetrieveRepair planner. If the planner is not
+      set, a default planner is set. */
+  virtual void setRepairPlanner(const base::PlannerPtr &planner) = 0;
+
+  /** \brief Save the experience database to file */
+  virtual bool save() = 0;
+
+  /** \brief Save the experience database to file if there has been a change */
+  virtual bool saveIfChanged() = 0;
+
+  /** \brief Optionally disable the ability to use previous plans in solutions (but will still save them) */
+  void enablePlanningFromRecall(bool enable);
+
+  /** \brief Optionally disable the ability to plan from scratch
+   *         Note: Lightning can still save modified experiences if they are different enough
+   */
+  void enablePlanningFromScratch(bool enable);
+
+  /** \brief Get a vector of all the planning data in the database */
+  virtual void getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const = 0;
+
+  /** \brief Get the total number of paths stored in the database */
+  virtual std::size_t getExperiencesCount() const = 0;
+
+  /** \brief After setFile() is called, access the generated file path for loading and saving the experience database */
+  virtual const std::string &getFilePath() const;
+
+  /** \brief Set the database file to load. Actual loading occurs when setup() is called
+   *  \param filePath - full absolute path to a experience database to load
+   */
+  virtual bool setFilePath(const std::string &filePath);
+
+  /**
+   * \brief Getter for logging data
+   */
+  const ExperienceStats &getStats() const
+  {
+    return stats_;
+  }
+
+  /**
+   * \brief Allow accumlated experiences to be processed
+   */
+  virtual bool doPostProcessing()
+  {
+    return true;
+  }
+
+  /** \brief Get class for managing various visualization features */
+  VisualizerPtr getVisual()
+  {
+    return visual_;
+  }
+
+protected:
+  /** \brief Class for managing various visualization features */
+  VisualizerPtr visual_;
+
+  /// Flag indicating whether recalled plans should be used to find solutions. Enabled by default.
+  bool recallEnabled_;
+
+  /// Flag indicating whether planning from scratch should be used to find solutions. Enabled by default.
+  bool scratchEnabled_;
+
+  /** \brief File location of database */
+  std::string filePath_;
+
+  // output data to file to analyze performance externally
+  std::stringstream csvDataLogStream_;
+
+  /** \brief States data for display to console  */
+  ExperienceStats stats_;
+};
+}
 }
 #endif

@@ -45,111 +45,109 @@
 
 namespace ompl
 {
-    namespace geometric
-    {
-        /**
-            \anchor gVFRRT
-            \par Short description
-            Vector Field Rapidly-exploring Random Tree (VFRRT) is a tree-based
-            motion planner that tries to minimize the so-called upstream cost
-            of a path. The upstream cost is defined by an integral over a
-            user-defined vector field.
+namespace geometric
+{
+/**
+    \anchor gVFRRT
+    \par Short description
+    Vector Field Rapidly-exploring Random Tree (VFRRT) is a tree-based
+    motion planner that tries to minimize the so-called upstream cost
+    of a path. The upstream cost is defined by an integral over a
+    user-defined vector field.
 
-            \par External documentation
-            I. Ko, B. Kim, and F. C. Park, Randomized path planning on vector fields, <em>Intl. J. of Robotics Research,</em> 33(13), pp. 1664–1682, 2014. DOI: [10.1177/0278364914545812](http://dx.doi.org/10.1177/0278364914545812)<br>
+    \par External documentation
+    I. Ko, B. Kim, and F. C. Park, Randomized path planning on vector fields, <em>Intl. J. of Robotics Research,</em>
+   33(13), pp. 1664–1682, 2014. DOI: [10.1177/0278364914545812](http://dx.doi.org/10.1177/0278364914545812)<br>
 
-            [[PDF]](http://robotics.snu.ac.kr/fcp/files/_pdf_files_publications/201411_Randomized%20path%20planning.pdf)
+    [[PDF]](http://robotics.snu.ac.kr/fcp/files/_pdf_files_publications/201411_Randomized%20path%20planning.pdf)
 
-        */
-        class VFRRT : public RRT
-        {
-        public:
-            using VectorField = std::function<Eigen::VectorXd (const base::State *)>;
+*/
+class VFRRT : public RRT
+{
+public:
+  using VectorField = std::function<Eigen::VectorXd(const base::State *)>;
 
-            /** Constructor. */
-            VFRRT(const base::SpaceInformationPtr &si, VectorField vf, double exploration,
-                  double initial_lambda, unsigned int update_freq);
+  /** Constructor. */
+  VFRRT(const base::SpaceInformationPtr &si, VectorField vf, double exploration, double initial_lambda,
+        unsigned int update_freq);
 
-            /** Destructor. */
-            ~VFRRT() override;
+  /** Destructor. */
+  ~VFRRT() override;
 
-            /** Reset internal data. */
-            void clear() override;
+  /** Reset internal data. */
+  void clear() override;
 
-            /** Make a Monte Carlo estimate for the mean vector norm in the field. */
-            double determineMeanNorm();
+  /** Make a Monte Carlo estimate for the mean vector norm in the field. */
+  double determineMeanNorm();
 
-            /** Use the vector field to alter the direction of a sample. */
-            Eigen::VectorXd getNewDirection(const base::State *qnear, const base::State *qrand);
+  /** Use the vector field to alter the direction of a sample. */
+  Eigen::VectorXd getNewDirection(const base::State *qnear, const base::State *qrand);
 
-            /** Calculates the weight omega which can be used to compute alpha and beta. */
-            double biasedSampling (const Eigen::VectorXd &vrand, const Eigen::VectorXd &vfield,
-                                   double lambdaScale);
+  /** Calculates the weight omega which can be used to compute alpha and beta. */
+  double biasedSampling(const Eigen::VectorXd &vrand, const Eigen::VectorXd &vfield, double lambdaScale);
 
-            /**
-             * Every nth time this function is called (where the nth step is the update
-             * frequency given in the constructor) the value of lambda is updated and
-             * the counts of efficient and inefficient samples added to the tree are
-             * reset to 0. The measure for exploration inefficiency is also reset to 0.
-             */
-            void updateGain ();
+  /**
+   * Every nth time this function is called (where the nth step is the update
+   * frequency given in the constructor) the value of lambda is updated and
+   * the counts of efficient and inefficient samples added to the tree are
+   * reset to 0. The measure for exploration inefficiency is also reset to 0.
+   */
+  void updateGain();
 
-            /**
-             * Computes alpha and beta, using these values to produce the vector returned by
-             * getNewDirection. This produced vector can be used to determine the direction an
-             * added state should be to maximize the upstream criterion of the produced path.
-             */
-            Eigen::VectorXd computeAlphaBeta (double omega, const Eigen::VectorXd &vrand,
-                                              const Eigen::VectorXd &vfield);
+  /**
+   * Computes alpha and beta, using these values to produce the vector returned by
+   * getNewDirection. This produced vector can be used to determine the direction an
+   * added state should be to maximize the upstream criterion of the produced path.
+   */
+  Eigen::VectorXd computeAlphaBeta(double omega, const Eigen::VectorXd &vrand, const Eigen::VectorXd &vfield);
 
-            /**
-             * This attempts to extend the tree from the motion m to a new motion
-             * in the direction specified by the vector v.
-             */
-            Motion *extendTree (Motion *m, base::State* rstate, const Eigen::VectorXd &v);
-            /**
-             * Updates measures for exploration efficiency if a given motion m is added to the
-             * nearest NearestNeighbors structure.
-             */
-            void updateExplorationEfficiency(Motion *m);
+  /**
+   * This attempts to extend the tree from the motion m to a new motion
+   * in the direction specified by the vector v.
+   */
+  Motion *extendTree(Motion *m, base::State *rstate, const Eigen::VectorXd &v);
+  /**
+   * Updates measures for exploration efficiency if a given motion m is added to the
+   * nearest NearestNeighbors structure.
+   */
+  void updateExplorationEfficiency(Motion *m);
 
-            /** Solve the planning problem. */
-            base::PlannerStatus solve (const base::PlannerTerminationCondition &ptc) override;
+  /** Solve the planning problem. */
+  base::PlannerStatus solve(const base::PlannerTerminationCondition &ptc) override;
 
-            void setup() override;
+  void setup() override;
 
-        private:
+private:
+  /** Vector field for the environemnt. */
+  const VectorField vf_;
 
-            /** Vector field for the environemnt. */
-            const VectorField vf_;
+  /** Number of efficient nodes. */
+  unsigned int efficientCount_;
 
-            /** Number of efficient nodes. */
-            unsigned int efficientCount_;
+  /** Number of inefficient nodes. */
+  unsigned int inefficientCount_;
 
-            /** Number of inefficient nodes. */
-            unsigned int inefficientCount_;
+  /** Current inefficiency. */
+  double explorationInefficiency_;
 
-            /** Current inefficiency. */
-            double explorationInefficiency_;
+  /** User-specified exploration parameter. */
+  double explorationSetting_;
 
-            /** User-specified exploration parameter. */
-            double explorationSetting_;
+  /** Current lambda value. */
+  double lambda_;
 
-            /** Current lambda value. */
-            double lambda_;
+  /** The number of steps until lambda is updated and efficiency metrics are reset. */
+  unsigned int nth_step_;
 
-            /** The number of steps until lambda is updated and efficiency metrics are reset. */
-            unsigned int nth_step_;
+  /** Current number of steps since lambda was updated/initialized. */
+  unsigned int step_;
 
-            /** Current number of steps since lambda was updated/initialized. */
-            unsigned int step_;
+  /** Average norm of vectors in the field. */
+  double meanNorm_;
 
-            /** Average norm of vectors in the field. */
-            double meanNorm_;
-
-            /** Dimensionality of vector field */
-            unsigned int vfdim_;
-        };
-    }
+  /** Dimensionality of vector field */
+  unsigned int vfdim_;
+};
+}
 }
 #endif

@@ -41,30 +41,30 @@
 
 namespace ompl
 {
-    namespace base
-    {
-        /** \brief The cost of a path is defined as the worst state
-            cost over the entire path. This objective attempts to find
-            the path with the "best worst cost" over all paths. */
-        class MinimaxObjective : public OptimizationObjective
-        {
-        public:
-            MinimaxObjective(const SpaceInformationPtr &si);
+namespace base
+{
+/** \brief The cost of a path is defined as the worst state
+    cost over the entire path. This objective attempts to find
+    the path with the "best worst cost" over all paths. */
+class MinimaxObjective : public OptimizationObjective
+{
+public:
+  MinimaxObjective(const SpaceInformationPtr &si);
 
-            /** \brief Returns a cost with a value of 1. */
-            Cost stateCost(const State *s) const override;
+  /** \brief Returns a cost with a value of 1. */
+  Cost stateCost(const State *s) const override;
 
-            /** \brief Interpolates between \e s1 and \e s2 to check for
-                state costs along the motion between the two
-                states. Assumes all costs are worse than identity */
-            Cost motionCost(const State *s1, const State *s2) const override;
+  /** \brief Interpolates between \e s1 and \e s2 to check for
+      state costs along the motion between the two
+      states. Assumes all costs are worse than identity */
+  Cost motionCost(const State *s1, const State *s2) const override;
 
-            /** \brief Since we're only concerned about the "worst"
-                state cost in the path, combining two costs just
-                returns the worse of the two. */
-            Cost combineCosts(Cost c1, Cost c2) const override;
-        };
-    }
+  /** \brief Since we're only concerned about the "worst"
+      state cost in the path, combining two costs just
+      returns the worse of the two. */
+  Cost combineCosts(Cost c1, Cost c2) const override;
+};
+}
 }
 
 #endif

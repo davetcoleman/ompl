@@ -41,85 +41,85 @@
 
 ompl::base::GoalStates::~GoalStates()
 {
-    freeMemory();
+  freeMemory();
 }
 
 void ompl::base::GoalStates::clear()
 {
-    freeMemory();
-    states_.clear();
+  freeMemory();
+  states_.clear();
 }
 
 void ompl::base::GoalStates::freeMemory()
 {
-    for (auto & state : states_)
-        si_->freeState(state);
+  for (auto &state : states_)
+    si_->freeState(state);
 }
 
 double ompl::base::GoalStates::distanceGoal(const State *st) const
 {
-    double dist = std::numeric_limits<double>::infinity();
-    for (auto state : states_)
-    {
-        double d = si_->distance(st, state);
-        if (d < dist)
-            dist = d;
-    }
-    return dist;
+  double dist = std::numeric_limits<double>::infinity();
+  for (auto state : states_)
+  {
+    double d = si_->distance(st, state);
+    if (d < dist)
+      dist = d;
+  }
+  return dist;
 }
 
 void ompl::base::GoalStates::print(std::ostream &out) const
 {
-    out << states_.size() << " goal states, threshold = " << threshold_ << ", memory address = " << this << std::endl;
-    for (auto state : states_)
-    {
-        si_->printState(state, out);
-        out << std::endl;
-    }
+  out << states_.size() << " goal states, threshold = " << threshold_ << ", memory address = " << this << std::endl;
+  for (auto state : states_)
+  {
+    si_->printState(state, out);
+    out << std::endl;
+  }
 }
 
 void ompl::base::GoalStates::sampleGoal(base::State *st) const
 {
-    if (states_.empty())
-        throw Exception("There are no goals to sample");
+  if (states_.empty())
+    throw Exception("There are no goals to sample");
 
-    // Roll over the samplePosition_ if it points past the number of states.
-    samplePosition_ = samplePosition_ % states_.size();
-    // Get the next state.
-    si_->copyState(st, states_[samplePosition_]);
-    // Increment the counter. Do NOT roll over incase a new state is added before sampleGoal is called again.
-    samplePosition_++;
+  // Roll over the samplePosition_ if it points past the number of states.
+  samplePosition_ = samplePosition_ % states_.size();
+  // Get the next state.
+  si_->copyState(st, states_[samplePosition_]);
+  // Increment the counter. Do NOT roll over incase a new state is added before sampleGoal is called again.
+  samplePosition_++;
 }
 
 unsigned int ompl::base::GoalStates::maxSampleCount() const
 {
-    return states_.size();
+  return states_.size();
 }
 
 void ompl::base::GoalStates::addState(const State *st)
 {
-    states_.push_back(si_->cloneState(st));
+  states_.push_back(si_->cloneState(st));
 }
 
 void ompl::base::GoalStates::addState(const ScopedState<> &st)
 {
-    addState(st.get());
+  addState(st.get());
 }
 
-const ompl::base::State* ompl::base::GoalStates::getState(unsigned int index) const
+const ompl::base::State *ompl::base::GoalStates::getState(unsigned int index) const
 {
-    if (index >= states_.size())
-        throw Exception("Index " + std::to_string(index) + " out of range. Only " +
-                        std::to_string(states_.size()) + " states are available");
-    return states_[index];
+  if (index >= states_.size())
+    throw Exception("Index " + std::to_string(index) + " out of range. Only " + std::to_string(states_.size()) +
+                    " states are available");
+  return states_[index];
 }
 
 std::size_t ompl::base::GoalStates::getStateCount() const
 {
-    return states_.size();
+  return states_.size();
 }
 
 bool ompl::base::GoalStates::hasStates() const
 {
-    return !states_.empty();
+  return !states_.empty();
 }

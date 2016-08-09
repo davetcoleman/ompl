@@ -41,24 +41,30 @@
 
 namespace ompl
 {
-    namespace base
-    {
-        /** \brief Definition of a cost value. Can represent the cost of a motion or the cost of a state. */
-        class Cost
-        {
-        public:
-            /** \brief Construct cost with a specified value */
-            explicit Cost(double v = 0.0) : v_(v) {}
+namespace base
+{
+/** \brief Definition of a cost value. Can represent the cost of a motion or the cost of a state. */
+class Cost
+{
+public:
+  /** \brief Construct cost with a specified value */
+  explicit Cost(double v = 0.0) : v_(v)
+  {
+  }
 
-            /** \brief The value of the cost */
-            double value() const { return v_; }
-        private:
-            /** \brief The value of the cost */
-            double v_;
-        };
+  /** \brief The value of the cost */
+  double value() const
+  {
+    return v_;
+  }
 
-        /** \brief Output operator for Cost */
-        std::ostream& operator<<(std::ostream& stream, Cost c);
-    }
+private:
+  /** \brief The value of the cost */
+  double v_;
+};
+
+/** \brief Output operator for Cost */
+std::ostream& operator<<(std::ostream& stream, Cost c);
+}
 }
 #endif

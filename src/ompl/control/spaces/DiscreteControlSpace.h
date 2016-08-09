@@ -41,114 +41,109 @@
 
 namespace ompl
 {
-    namespace control
-    {
+namespace control
+{
+/** \brief Control space sampler for discrete controls */
+class DiscreteControlSampler : public ControlSampler
+{
+public:
+  /** \brief Constructor */
+  DiscreteControlSampler(const ControlSpace *space) : ControlSampler(space)
+  {
+  }
 
-        /** \brief Control space sampler for discrete controls */
-        class DiscreteControlSampler : public ControlSampler
-        {
-        public:
+  void sample(Control *control) override;
+};
 
-            /** \brief Constructor */
-            DiscreteControlSampler(const ControlSpace *space) : ControlSampler(space)
-            {
-            }
+/** \brief A space representing discrete controls; i.e. there
+    are a small number of discrete controls the system can react to.
+    Controls are represented as integers [lowerBound, upperBound],
+    where lowerBound and upperBound are inclusive. */
+class DiscreteControlSpace : public ControlSpace
+{
+public:
+  /** \brief The definition of a discrete control */
+  class ControlType : public Control
+  {
+  public:
+    /** \brief The current control - an int in range [lowerBound, upperBound] */
+    int value;
+  };
 
-            void sample(Control *control) override;
-        };
+  /** \brief Construct a discrete space in wich controls can take values in the set [\e lowerBound, \e upperBound] */
+  DiscreteControlSpace(const base::StateSpacePtr &stateSpace, int lowerBound, int upperBound)
+    : ControlSpace(stateSpace), lowerBound_(lowerBound), upperBound_(upperBound)
+  {
+    setName("Discrete" + getName());
+    type_ = CONTROL_SPACE_DISCRETE;
+  }
 
-        /** \brief A space representing discrete controls; i.e. there
-            are a small number of discrete controls the system can react to.
-            Controls are represented as integers [lowerBound, upperBound],
-            where lowerBound and upperBound are inclusive. */
-        class DiscreteControlSpace : public ControlSpace
-        {
-        public:
+  ~DiscreteControlSpace() override = default;
 
-            /** \brief The definition of a discrete control */
-            class ControlType : public Control
-            {
-            public:
+  unsigned int getDimension() const override;
 
-                /** \brief The current control - an int in range [lowerBound, upperBound] */
-                int value;
-            };
+  void copyControl(Control *destination, const Control *source) const override;
 
-            /** \brief Construct a discrete space in wich controls can take values in the set [\e lowerBound, \e upperBound] */
-            DiscreteControlSpace(const base::StateSpacePtr &stateSpace, int lowerBound, int upperBound) :
-                ControlSpace(stateSpace), lowerBound_(lowerBound), upperBound_(upperBound)
-            {
-                setName("Discrete" + getName());
-                type_ = CONTROL_SPACE_DISCRETE;
-            }
+  bool equalControls(const Control *control1, const Control *control2) const override;
 
-            ~DiscreteControlSpace() override = default;
+  ControlSamplerPtr allocDefaultControlSampler() const override;
 
-            unsigned int getDimension() const override;
+  Control *allocControl() const override;
 
-            void copyControl(Control *destination, const Control *source) const override;
+  void freeControl(Control *control) const override;
 
-            bool equalControls(const Control *control1, const Control *control2) const override;
+  /** \brief This sets the control value to \e lowerBound_ */
+  void nullControl(Control *control) const override;
 
-            ControlSamplerPtr allocDefaultControlSampler() const override;
+  void printControl(const Control *control, std::ostream &out) const override;
 
-            Control* allocControl() const override;
+  void printSettings(std::ostream &out) const override;
 
-            void freeControl(Control *control) const override;
+  /** \brief Returns the number of controls possible */
+  unsigned int getControlCount() const
+  {
+    return upperBound_ - lowerBound_ + 1;
+  }
 
-            /** \brief This sets the control value to \e lowerBound_ */
-            void nullControl(Control *control) const override;
+  /** \brief Returns the lowest possible control value */
+  int getLowerBound() const
+  {
+    return lowerBound_;
+  }
 
-            void printControl(const Control *control, std::ostream &out) const override;
+  /** \brief Returns the highest possible control value */
+  int getUpperBound() const
+  {
+    return upperBound_;
+  }
 
-            void printSettings(std::ostream &out) const override;
+  /** \brief Set the bounds for the states in this space (the states will be in the set [\e lowerBound, \e upperBound]
+   */
+  void setBounds(int lowerBound, int upperBound)
+  {
+    lowerBound_ = lowerBound;
+    upperBound_ = upperBound;
+  }
 
-            /** \brief Returns the number of controls possible */
-            unsigned int getControlCount() const
-            {
-                return upperBound_ - lowerBound_ + 1;
-            }
+  void setup() override;
 
-            /** \brief Returns the lowest possible control value */
-            int getLowerBound() const
-            {
-                return lowerBound_;
-            }
+  /** \brief Returns the serialization size for a single control in this space */
+  unsigned int getSerializationLength() const override;
 
-            /** \brief Returns the highest possible control value */
-            int getUpperBound() const
-            {
-                return upperBound_;
-            }
+  /** \brief Serializes the given control into the serialization buffer. */
+  void serialize(void *serialization, const Control *ctrl) const override;
 
-            /** \brief Set the bounds for the states in this space (the states will be in the set [\e lowerBound, \e upperBound] */
-            void setBounds(int lowerBound, int upperBound)
-            {
-                lowerBound_ = lowerBound;
-                upperBound_ = upperBound;
-            }
+  /** \brief Deserializes a control from the serialization buffer. */
+  void deserialize(Control *ctrl, const void *serialization) const override;
 
-            void setup() override;
+protected:
+  /** \brief The lowest integer state */
+  int lowerBound_;
 
-            /** \brief Returns the serialization size for a single control in this space */
-            unsigned int getSerializationLength() const override;
-
-            /** \brief Serializes the given control into the serialization buffer. */
-            void serialize(void *serialization, const Control *ctrl) const override;
-
-            /** \brief Deserializes a control from the serialization buffer. */
-            void deserialize(Control *ctrl, const void *serialization) const override;
-
-        protected:
-
-            /** \brief The lowest integer state */
-            int lowerBound_;
-
-            /** \brief The highest integer state */
-            int upperBound_;
-        };
-
-    }
+  /** \brief The highest integer state */
+  int upperBound_;
+};
+}
 }
 
 #endif

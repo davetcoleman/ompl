@@ -42,25 +42,22 @@
 
 namespace ompl
 {
-    namespace control
-    {
+namespace control
+{
+/** \brief The simplest state validity checker: all states are valid */
+class OpenDEStateValidityChecker : public base::StateValidityChecker
+{
+public:
+  /** \brief Constructor */
+  OpenDEStateValidityChecker(const SpaceInformationPtr &si);
 
-        /** \brief The simplest state validity checker: all states are valid */
-        class OpenDEStateValidityChecker : public base::StateValidityChecker
-        {
-        public:
+  /** \brief A state is considered valid if it is within bounds and not in collision */
+  bool isValid(const base::State *state) const override;
 
-            /** \brief Constructor */
-            OpenDEStateValidityChecker(const SpaceInformationPtr &si);
-
-            /** \brief A state is considered valid if it is within bounds and not in collision */
-            bool isValid(const base::State *state) const override;
-
-        protected:
-
-            /** \brief The corresponding OpenDE state space */
-            OpenDEStateSpace *osm_;
-        };
-    }
+protected:
+  /** \brief The corresponding OpenDE state space */
+  OpenDEStateSpace *osm_;
+};
+}
 }
 #endif

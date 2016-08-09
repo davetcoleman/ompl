@@ -42,32 +42,25 @@
 
 namespace ompl
 {
-    namespace base
-    {
+namespace base
+{
+/** \brief A state sampler that only samples valid states, uniformly. */
+class UniformValidStateSampler : public ValidStateSampler
+{
+public:
+  /** \brief Constructor */
+  UniformValidStateSampler(const SpaceInformation *si);
 
+  ~UniformValidStateSampler() override = default;
 
-        /** \brief A state sampler that only samples valid states, uniformly. */
-        class UniformValidStateSampler : public ValidStateSampler
-        {
-        public:
+  bool sample(State *state) override;
+  bool sampleNear(State *state, const State *near, const double distance) override;
 
-            /** \brief Constructor */
-            UniformValidStateSampler(const SpaceInformation *si);
-
-            ~UniformValidStateSampler() override = default;
-
-            bool sample(State *state) override;
-            bool sampleNear(State *state, const State *near, const double distance) override;
-
-        protected:
-
-            /** \brief The sampler to build upon */
-            StateSamplerPtr sampler_;
-
-        };
-
-    }
+protected:
+  /** \brief The sampler to build upon */
+  StateSamplerPtr sampler_;
+};
 }
-
+}
 
 #endif

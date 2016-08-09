@@ -41,84 +41,78 @@
 
 namespace ompl
 {
-    namespace control
-    {
+namespace control
+{
+/** \brief Definition of an abstract control */
+class Control
+{
+private:
+  /** \brief Disable copy-constructor */
+  Control(const Control&);
 
-        /** \brief Definition of an abstract control */
-        class Control
-        {
-        private:
+  /** \brief Disable copy operator */
+  const Control& operator=(const Control&);
 
-            /** \brief Disable copy-constructor */
-            Control(const Control&);
+protected:
+  Control() = default;
 
-            /** \brief Disable copy operator */
-            const Control& operator=(const Control&);
+  virtual ~Control() = default;
 
-        protected:
+public:
+  /** \brief Cast this instance to a desired type. */
+  template <class T>
+  const T* as() const
+  {
+    /** \brief Make sure the type we are allocating is indeed a state */
+    BOOST_CONCEPT_ASSERT((boost::Convertible<T*, Control*>));
 
-            Control() = default;
+    return static_cast<const T*>(this);
+  }
 
-            virtual ~Control() = default;
+  /** \brief Cast this instance to a desired type. */
+  template <class T>
+  T* as()
+  {
+    /** \brief Make sure the type we are allocating is indeed a state */
+    BOOST_CONCEPT_ASSERT((boost::Convertible<T*, Control*>));
 
-        public:
+    return static_cast<T*>(this);
+  }
+};
 
-            /** \brief Cast this instance to a desired type. */
-            template<class T>
-            const T* as() const
-            {
-                /** \brief Make sure the type we are allocating is indeed a state */
-                BOOST_CONCEPT_ASSERT((boost::Convertible<T*, Control*>));
+/** \brief Definition of a compound control */
+class CompoundControl : public Control
+{
+public:
+  CompoundControl() : Control()
+  {
+  }
 
-                return static_cast<const T*>(this);
-            }
+  ~CompoundControl() override = default;
 
-            /** \brief Cast this instance to a desired type. */
-            template<class T>
-            T* as()
-            {
-                /** \brief Make sure the type we are allocating is indeed a state */
-                BOOST_CONCEPT_ASSERT((boost::Convertible<T*, Control*>));
+  /** \brief Cast a component of this instance to a desired type. */
+  template <class T>
+  const T* as(const unsigned int index) const
+  {
+    /** \brief Make sure the type we are allocating is indeed a state */
+    BOOST_CONCEPT_ASSERT((boost::Convertible<T*, Control*>));
 
-                return static_cast<T*>(this);
-            }
+    return static_cast<const T*>(components[index]);
+  }
 
-        };
+  /** \brief Cast a component of this instance to a desired type. */
+  template <class T>
+  T* as(const unsigned int index)
+  {
+    /** \brief Make sure the type we are allocating is indeed a state */
+    BOOST_CONCEPT_ASSERT((boost::Convertible<T*, Control*>));
 
-        /** \brief Definition of a compound control */
-        class CompoundControl : public Control
-        {
-        public:
+    return static_cast<T*>(components[index]);
+  }
 
-            CompoundControl() : Control()
-            {
-            }
-
-            ~CompoundControl() override = default;
-
-            /** \brief Cast a component of this instance to a desired type. */
-            template<class T>
-            const T* as(const unsigned int index) const
-            {
-                /** \brief Make sure the type we are allocating is indeed a state */
-                BOOST_CONCEPT_ASSERT((boost::Convertible<T*, Control*>));
-
-                return static_cast<const T*>(components[index]);
-            }
-
-            /** \brief Cast a component of this instance to a desired type. */
-            template<class T>
-            T* as(const unsigned int index)
-            {
-                /** \brief Make sure the type we are allocating is indeed a state */
-                BOOST_CONCEPT_ASSERT((boost::Convertible<T*, Control*>));
-
-                return static_cast<T*>(components[index]);
-            }
-
-            /** \brief The components that make up a compound control */
-            Control **components;
-        };
-    }
+  /** \brief The components that make up a compound control */
+  Control** components;
+};
+}
 }
 #endif

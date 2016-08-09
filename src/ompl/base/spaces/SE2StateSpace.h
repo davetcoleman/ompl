@@ -43,103 +43,97 @@
 
 namespace ompl
 {
-    namespace base
+namespace base
+{
+/** \brief A state space representing SE(2) */
+class SE2StateSpace : public CompoundStateSpace
+{
+public:
+  /** \brief A state in SE(2): (x, y, yaw) */
+  class StateType : public CompoundStateSpace::StateType
+  {
+  public:
+    StateType() : CompoundStateSpace::StateType()
     {
-
-        /** \brief A state space representing SE(2) */
-        class SE2StateSpace : public CompoundStateSpace
-        {
-        public:
-
-            /** \brief A state in SE(2): (x, y, yaw) */
-            class StateType : public CompoundStateSpace::StateType
-            {
-            public:
-                StateType() : CompoundStateSpace::StateType()
-                {
-                }
-
-                /** \brief Get the X component of the state */
-                double getX() const
-                {
-                    return as<RealVectorStateSpace::StateType>(0)->values[0];
-                }
-
-                /** \brief Get the Y component of the state */
-                double getY() const
-                {
-                    return as<RealVectorStateSpace::StateType>(0)->values[1];
-                }
-
-                /** \brief Get the yaw component of the state. This is
-                    the rotation in plane, with respect to the Z
-                    axis. */
-                double getYaw() const
-                {
-                    return as<SO2StateSpace::StateType>(1)->value;
-                }
-
-                /** \brief Set the X component of the state */
-                void setX(double x)
-                {
-                    as<RealVectorStateSpace::StateType>(0)->values[0] = x;
-                }
-
-                /** \brief Set the Y component of the state */
-                void setY(double y)
-                {
-                    as<RealVectorStateSpace::StateType>(0)->values[1] = y;
-                }
-
-                /** \brief Set the X and Y components of the state */
-                void setXY(double x, double y)
-                {
-                    setX(x);
-                    setY(y);
-                }
-
-                /** \brief Set the yaw component of the state. This is
-                    the rotation in plane, with respect to the Z
-                    axis. */
-                void setYaw(double yaw)
-                {
-                    as<SO2StateSpace::StateType>(1)->value = yaw;
-                }
-
-            };
-
-
-            SE2StateSpace() : CompoundStateSpace()
-            {
-                setName("SE2" + getName());
-                type_ = STATE_SPACE_SE2;
-                addSubspace(StateSpacePtr(new RealVectorStateSpace(2)), 1.0);
-                addSubspace(StateSpacePtr(new SO2StateSpace()), 0.5);
-                lock();
-            }
-
-            ~SE2StateSpace() override
-            = default;
-
-            /** \copydoc RealVectorStateSpace::setBounds() */
-            void setBounds(const RealVectorBounds &bounds)
-            {
-                as<RealVectorStateSpace>(0)->setBounds(bounds);
-            }
-
-            /** \copydoc RealVectorStateSpace::getBounds() */
-            const RealVectorBounds& getBounds() const
-            {
-                return as<RealVectorStateSpace>(0)->getBounds();
-            }
-
-            State* allocState() const override;
-            void freeState(State *state) const override;
-
-            void registerProjections() override;
-
-        };
     }
+
+    /** \brief Get the X component of the state */
+    double getX() const
+    {
+      return as<RealVectorStateSpace::StateType>(0)->values[0];
+    }
+
+    /** \brief Get the Y component of the state */
+    double getY() const
+    {
+      return as<RealVectorStateSpace::StateType>(0)->values[1];
+    }
+
+    /** \brief Get the yaw component of the state. This is
+        the rotation in plane, with respect to the Z
+        axis. */
+    double getYaw() const
+    {
+      return as<SO2StateSpace::StateType>(1)->value;
+    }
+
+    /** \brief Set the X component of the state */
+    void setX(double x)
+    {
+      as<RealVectorStateSpace::StateType>(0)->values[0] = x;
+    }
+
+    /** \brief Set the Y component of the state */
+    void setY(double y)
+    {
+      as<RealVectorStateSpace::StateType>(0)->values[1] = y;
+    }
+
+    /** \brief Set the X and Y components of the state */
+    void setXY(double x, double y)
+    {
+      setX(x);
+      setY(y);
+    }
+
+    /** \brief Set the yaw component of the state. This is
+        the rotation in plane, with respect to the Z
+        axis. */
+    void setYaw(double yaw)
+    {
+      as<SO2StateSpace::StateType>(1)->value = yaw;
+    }
+  };
+
+  SE2StateSpace() : CompoundStateSpace()
+  {
+    setName("SE2" + getName());
+    type_ = STATE_SPACE_SE2;
+    addSubspace(StateSpacePtr(new RealVectorStateSpace(2)), 1.0);
+    addSubspace(StateSpacePtr(new SO2StateSpace()), 0.5);
+    lock();
+  }
+
+  ~SE2StateSpace() override = default;
+
+  /** \copydoc RealVectorStateSpace::setBounds() */
+  void setBounds(const RealVectorBounds &bounds)
+  {
+    as<RealVectorStateSpace>(0)->setBounds(bounds);
+  }
+
+  /** \copydoc RealVectorStateSpace::getBounds() */
+  const RealVectorBounds &getBounds() const
+  {
+    return as<RealVectorStateSpace>(0)->getBounds();
+  }
+
+  State *allocState() const override;
+  void freeState(State *state) const override;
+
+  void registerProjections() override;
+};
+}
 }
 
 #endif

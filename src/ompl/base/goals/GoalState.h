@@ -42,55 +42,50 @@
 
 namespace ompl
 {
+namespace base
+{
+/** \brief Definition of a goal state */
+class GoalState : public GoalSampleableRegion
+{
+public:
+  /** \brief Create a goal representation that is in fact a state  */
+  GoalState(const SpaceInformationPtr &si) : GoalSampleableRegion(si), state_(nullptr)
+  {
+    type_ = GOAL_STATE;
+  }
 
-    namespace base
-    {
+  ~GoalState() override;
 
-        /** \brief Definition of a goal state */
-        class GoalState : public GoalSampleableRegion
-        {
-        public:
+  /** \brief Sample a state in the goal region */
+  void sampleGoal(State *st) const override;
 
-            /** \brief Create a goal representation that is in fact a state  */
-            GoalState(const SpaceInformationPtr &si) : GoalSampleableRegion(si), state_(nullptr)
-            {
-                type_ = GOAL_STATE;
-            }
+  /** \brief Return the maximum number of samples that can be asked for before repeating */
+  unsigned int maxSampleCount() const override;
 
-            ~GoalState() override;
+  /** \brief Compute the distance to the goal (heuristic) */
+  double distanceGoal(const State *st) const override;
 
-            /** \brief Sample a state in the goal region */
-            void sampleGoal(State *st) const override;
+  /** \brief Print information about the goal data structure
+      to a stream */
+  void print(std::ostream &out = std::cout) const override;
 
-            /** \brief Return the maximum number of samples that can be asked for before repeating */
-            unsigned int maxSampleCount() const override;
+  /** \brief Set the goal state */
+  void setState(const State *st);
 
-            /** \brief Compute the distance to the goal (heuristic) */
-            double distanceGoal(const State *st) const override;
+  /** \brief Set the goal state */
+  void setState(const ScopedState<> &st);
 
-            /** \brief Print information about the goal data structure
-                to a stream */
-            void print(std::ostream &out = std::cout) const override;
+  /** \brief Get the goal state */
+  const State *getState() const;
 
-            /** \brief Set the goal state */
-            void setState(const State *st);
+  /** \brief Get the goal state */
+  State *getState();
 
-            /** \brief Set the goal state */
-            void setState(const ScopedState<> &st);
-
-            /** \brief Get the goal state */
-            const State* getState() const;
-
-            /** \brief Get the goal state */
-            State* getState();
-
-        protected:
-
-            /** \brief The goal state */
-            State *state_;
-        };
-
-    }
+protected:
+  /** \brief The goal state */
+  State *state_;
+};
+}
 }
 
 #endif

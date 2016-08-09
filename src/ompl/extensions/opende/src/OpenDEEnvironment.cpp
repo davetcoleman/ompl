@@ -38,34 +38,35 @@
 
 unsigned int ompl::control::OpenDEEnvironment::getMaxContacts(dGeomID /*geom1*/, dGeomID /*geom2*/) const
 {
-    return maxContacts_;
+  return maxContacts_;
 }
 
-bool ompl::control::OpenDEEnvironment::isValidCollision(dGeomID /*geom1*/, dGeomID /*geom2*/, const dContact& /*contact*/) const
+bool ompl::control::OpenDEEnvironment::isValidCollision(dGeomID /*geom1*/, dGeomID /*geom2*/,
+                                                        const dContact & /*contact*/) const
 {
-    return false;
+  return false;
 }
 
 void ompl::control::OpenDEEnvironment::setupContact(dGeomID /*geom1*/, dGeomID /*geom2*/, dContact &contact) const
 {
-    contact.surface.mode = dContactBounce | dContactSoftCFM;
-    contact.surface.mu = 0.1;
-    contact.surface.mu2 = 0;
-    contact.surface.bounce = 0.01;
-    contact.surface.bounce_vel = 0.001;
-    contact.surface.soft_cfm = 0.01;
+  contact.surface.mode = dContactBounce | dContactSoftCFM;
+  contact.surface.mu = 0.1;
+  contact.surface.mu2 = 0;
+  contact.surface.bounce = 0.01;
+  contact.surface.bounce_vel = 0.001;
+  contact.surface.soft_cfm = 0.01;
 }
 
 std::string ompl::control::OpenDEEnvironment::getGeomName(dGeomID geom) const
 {
-    auto it = geomNames_.find(geom);
-    if (it == geomNames_.end())
-        return std::to_string(reinterpret_cast<unsigned long>(geom));
-    else
-        return it->second;
+  auto it = geomNames_.find(geom);
+  if (it == geomNames_.end())
+    return std::to_string(reinterpret_cast<unsigned long>(geom));
+  else
+    return it->second;
 }
 
 void ompl::control::OpenDEEnvironment::setGeomName(dGeomID geom, const std::string &name)
 {
-    geomNames_[geom] = name;
+  geomNames_[geom] = name;
 }

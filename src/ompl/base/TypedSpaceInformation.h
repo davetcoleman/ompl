@@ -42,104 +42,99 @@
 
 namespace ompl
 {
-    namespace base
-    {
+namespace base
+{
+template <typename SpaceType_>
+class TypedSpaceInformation : public SpaceInformation
+{
+public:
+  /*--- Type Definitions ---*/
 
-        template<typename SpaceType_>
-        class TypedSpaceInformation : public SpaceInformation
-        {
-        public:
+  /** The actual type of the state space */
+  using SpaceType_ = SpaceType_;
 
-            /*--- Type Definitions ---*/
+  /** The actual type of states in the space. */
+  using StateType = typename SpaceType::StateType;
 
-            /** The actual type of the state space */
-            using SpaceType_ = SpaceType_;
+  /** The actual type for a Scoped State. */
+  using ScopedState = ScopedState<SpaceType>;
 
-            /** The actual type of states in the space. */
-            using StateType = typename SpaceType::StateType;
+  /** Shared Pointer to the actual type of the space. */
+  using SpacePtr = std::shared_ptr<SpaceType>;
 
-            /** The actual type for a Scoped State. */
-            using ScopedState = ScopedState<SpaceType>;
+  /** Shared pointer to the typed space. */
+  using Ptr = std::shared_ptr<TypedSpaceInformation<SpaceType>>;
 
-            /** Shared Pointer to the actual type of the space. */
-            using SpacePtr = std::shared_ptr<SpaceType>;
+  /*--- Constructor ---*/
 
-            /** Shared pointer to the typed space. */
-            using Ptr = std::shared_ptr<TypedSpaceInformation<SpaceType>>;
+  /** Construct from shared pointer to the actual space. */
+  TypedSpaceInformation(const SpacePtr &space) : SpaceInformation(space)
+  {
+  }
 
+  /*--- Space Accessors ---*/
 
-            /*--- Constructor ---*/
+  /** Get space pointer of the proper type, const. */
+  const SpaceType *getTypedStateSpace() const
+  {
+    return getStateSpace()->template as<SpaceType>();
+  }
 
-            /** Construct from shared pointer to the actual space. */
-            TypedSpaceInformation(const SpacePtr &space) : SpaceInformation(space)
-            {
-            }
+  /** Get space pointer of the proper type. */
+  SpaceType *getTypedStateSpace()
+  {
+    return getStateSpace()->template as<SpaceType>();
+  }
 
-            /*--- Space Accessors ---*/
+  /*--- State Memory Management ---*/
 
-            /** Get space pointer of the proper type, const. */
-            const SpaceType* getTypedStateSpace() const
-            {
-                return getStateSpace()->template as<SpaceType>();
-            }
+  /** Allocate a state of the proper type. */
+  StateType *allocTypedState() const
+  {
+    return this->allocState()->template as<StateType>();
+  }
 
-            /** Get space pointer of the proper type. */
-            SpaceType* getTypedStateSpace()
-            {
-                return getStateSpace()->template as<SpaceType>();
-            }
+  /** Allocate memory for typed states in array */
+  void allocTypedStates(std::vector<StateType *> &states) const
+  {
+    allocStates(states);
+  }
 
-            /*--- State Memory Management ---*/
+  /** Free a state of the proper type. */
+  void freeTypedState(StateType *state) const
+  {
+    freeState(state);
+  }
 
-            /** Allocate a state of the proper type. */
-            StateType* allocTypedState() const
-            {
-                return this->allocState()->template as<StateType>();
-            }
+  /** Free typed states in array */
+  void freeTypedStates(std::vector<StateType *> &states) const
+  {
+    freeStates(states);
+  }
 
-            /** Allocate memory for typed states in array */
-            void allocTypedStates(std::vector<StateType *> &states) const
-            {
-                allocStates(states);
-            }
+  /** Copy a state of the proper type. */
+  void copyTypedState(StateType *destination, const StateType *source) const
+  {
+    copyState(destination, source);
+  }
 
-            /** Free a state of the proper type. */
-            void freeTypedState(StateType *state) const
-            {
-                freeState(state);
-            }
+  /** Clone a state of the proper type. */
+  StateType *cloneTypedState(const StateType *source) const
+  {
+    return this->cloneState()->template as<StateType>();
+  }
 
-            /** Free typed states in array */
-            void freeTypedStates(std::vector<StateType*> &states) const
-            {
-                freeStates(states);
-            }
+  static StateType *state_as(ompl::base::State *s)
+  {
+    return s->template as<StateType>();
+  }
 
-            /** Copy a state of the proper type. */
-            void copyTypedState(StateType *destination, const StateType *source) const
-            {
-                copyState(destination, source);
-            }
-
-            /** Clone a state of the proper type. */
-            StateType* cloneTypedState(const StateType *source) const {
-                return this->cloneState()->template as<StateType>();
-            }
-
-            static StateType* state_as(ompl::base::State *s)
-            {
-                return s->template as<StateType>();
-            }
-
-            static const StateType* state_as(const ompl::base::State *s)
-            {
-                return s->template as<StateType>();
-            }
-
-        };
-
-    }
-
+  static const StateType *state_as(const ompl::base::State *s)
+  {
+    return s->template as<StateType>();
+  }
+};
+}
 }
 
 #endif

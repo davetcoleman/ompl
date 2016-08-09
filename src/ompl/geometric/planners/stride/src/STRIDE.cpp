@@ -43,202 +43,212 @@
 #include <limits>
 #include <cassert>
 
-ompl::geometric::STRIDE::STRIDE(const base::SpaceInformationPtr &si,
-    bool useProjectedDistance,
-    unsigned int degree, unsigned int minDegree,
-    unsigned int maxDegree, unsigned int maxNumPtsPerLeaf, double estimatedDimension)
-    : base::Planner(si, "STRIDE"), goalBias_(0.05), maxDistance_(0.),
-    useProjectedDistance_(useProjectedDistance),
-    degree_(degree), minDegree_(minDegree), maxDegree_(maxDegree),
-    maxNumPtsPerLeaf_(maxNumPtsPerLeaf), estimatedDimension_(estimatedDimension),
-    minValidPathFraction_(0.2)
+ompl::geometric::STRIDE::STRIDE(const base::SpaceInformationPtr &si, bool useProjectedDistance, unsigned int degree,
+                                unsigned int minDegree, unsigned int maxDegree, unsigned int maxNumPtsPerLeaf,
+                                double estimatedDimension)
+  : base::Planner(si, "STRIDE")
+  , goalBias_(0.05)
+  , maxDistance_(0.)
+  , useProjectedDistance_(useProjectedDistance)
+  , degree_(degree)
+  , minDegree_(minDegree)
+  , maxDegree_(maxDegree)
+  , maxNumPtsPerLeaf_(maxNumPtsPerLeaf)
+  , estimatedDimension_(estimatedDimension)
+  , minValidPathFraction_(0.2)
 {
-    specs_.approximateSolutions = true;
+  specs_.approximateSolutions = true;
 
-    if (estimatedDimension_ < 1.)
-        estimatedDimension_ = si->getStateDimension();
+  if (estimatedDimension_ < 1.)
+    estimatedDimension_ = si->getStateDimension();
 
-    Planner::declareParam<double>("range", this, &STRIDE::setRange, &STRIDE::getRange, "0.:1.:10000.");
-    Planner::declareParam<double>("goal_bias", this, &STRIDE::setGoalBias, &STRIDE::getGoalBias, "0.:.05:1.");
-    Planner::declareParam<bool>("use_projected_distance", this, &STRIDE::setUseProjectedDistance, &STRIDE::getUseProjectedDistance, "0,1");
-    Planner::declareParam<unsigned int>("degree", this, &STRIDE::setDegree, &STRIDE::getDegree, "2:20");
-    Planner::declareParam<unsigned int>("max_degree", this, &STRIDE::setMaxDegree, &STRIDE::getMaxDegree, "2:20");
-    Planner::declareParam<unsigned int>("min_degree", this, &STRIDE::setMinDegree, &STRIDE::getMinDegree, "2:20");
-    Planner::declareParam<unsigned int>("max_pts_per_leaf", this, &STRIDE::setMaxNumPtsPerLeaf, &STRIDE::getMaxNumPtsPerLeaf, "1:200");
-    Planner::declareParam<double>("estimated_dimension", this, &STRIDE::setEstimatedDimension, &STRIDE::getEstimatedDimension, "1.:30.");
-    Planner::declareParam<double>("min_valid_path_fraction", this, &STRIDE::setMinValidPathFraction, &STRIDE::getMinValidPathFraction, "0.:.05:1.");
+  Planner::declareParam<double>("range", this, &STRIDE::setRange, &STRIDE::getRange, "0.:1.:10000.");
+  Planner::declareParam<double>("goal_bias", this, &STRIDE::setGoalBias, &STRIDE::getGoalBias, "0.:.05:1.");
+  Planner::declareParam<bool>("use_projected_distance", this, &STRIDE::setUseProjectedDistance,
+                              &STRIDE::getUseProjectedDistance, "0,1");
+  Planner::declareParam<unsigned int>("degree", this, &STRIDE::setDegree, &STRIDE::getDegree, "2:20");
+  Planner::declareParam<unsigned int>("max_degree", this, &STRIDE::setMaxDegree, &STRIDE::getMaxDegree, "2:20");
+  Planner::declareParam<unsigned int>("min_degree", this, &STRIDE::setMinDegree, &STRIDE::getMinDegree, "2:20");
+  Planner::declareParam<unsigned int>("max_pts_per_leaf", this, &STRIDE::setMaxNumPtsPerLeaf,
+                                      &STRIDE::getMaxNumPtsPerLeaf, "1:200");
+  Planner::declareParam<double>("estimated_dimension", this, &STRIDE::setEstimatedDimension,
+                                &STRIDE::getEstimatedDimension, "1.:30.");
+  Planner::declareParam<double>("min_valid_path_fraction", this, &STRIDE::setMinValidPathFraction,
+                                &STRIDE::getMinValidPathFraction, "0.:.05:1.");
 }
 
 ompl::geometric::STRIDE::~STRIDE()
 {
-    freeMemory();
+  freeMemory();
 }
 
 void ompl::geometric::STRIDE::setup()
 {
-    Planner::setup();
-    tools::SelfConfig sc(si_, getName());
-    sc.configureProjectionEvaluator(projectionEvaluator_);
-    sc.configurePlannerRange(maxDistance_);
-    setupTree();
+  Planner::setup();
+  tools::SelfConfig sc(si_, getName());
+  sc.configureProjectionEvaluator(projectionEvaluator_);
+  sc.configurePlannerRange(maxDistance_);
+  setupTree();
 }
 
 void ompl::geometric::STRIDE::setupTree()
 {
-    tree_.reset(new NearestNeighborsGNAT<Motion*>(degree_, minDegree_, maxDegree_, maxNumPtsPerLeaf_, estimatedDimension_));
-    if (useProjectedDistance_)
-        tree_->setDistanceFunction(std::bind(&STRIDE::projectedDistanceFunction, this, std::placeholders::_1, std::placeholders::_2));
-    else
-        tree_->setDistanceFunction(std::bind(&STRIDE::distanceFunction, this, std::placeholders::_1, std::placeholders::_2));
+  tree_.reset(
+      new NearestNeighborsGNAT<Motion *>(degree_, minDegree_, maxDegree_, maxNumPtsPerLeaf_, estimatedDimension_));
+  if (useProjectedDistance_)
+    tree_->setDistanceFunction(
+        std::bind(&STRIDE::projectedDistanceFunction, this, std::placeholders::_1, std::placeholders::_2));
+  else
+    tree_->setDistanceFunction(
+        std::bind(&STRIDE::distanceFunction, this, std::placeholders::_1, std::placeholders::_2));
 }
 
 void ompl::geometric::STRIDE::clear()
 {
-    Planner::clear();
-    sampler_.reset();
-    freeMemory();
-    setupTree();
+  Planner::clear();
+  sampler_.reset();
+  freeMemory();
+  setupTree();
 }
 
 void ompl::geometric::STRIDE::freeMemory()
 {
-    if (tree_)
+  if (tree_)
+  {
+    std::vector<Motion *> motions;
+    tree_->list(motions);
+    for (auto &motion : motions)
     {
-        std::vector<Motion*> motions;
-        tree_->list(motions);
-        for (auto & motion : motions)
-        {
-            if (motion->state)
-                si_->freeState(motion->state);
-            delete motion;
-        }
-        tree_.reset();
+      if (motion->state)
+        si_->freeState(motion->state);
+      delete motion;
     }
+    tree_.reset();
+  }
 }
 
 ompl::base::PlannerStatus ompl::geometric::STRIDE::solve(const base::PlannerTerminationCondition &ptc)
 {
-    checkValidity();
-    base::Goal                   *goal = pdef_->getGoal().get();
-    base::GoalSampleableRegion *goal_s = dynamic_cast<base::GoalSampleableRegion*>(goal);
+  checkValidity();
+  base::Goal *goal = pdef_->getGoal().get();
+  base::GoalSampleableRegion *goal_s = dynamic_cast<base::GoalSampleableRegion *>(goal);
 
-    while (const base::State *st = pis_.nextStart())
+  while (const base::State *st = pis_.nextStart())
+  {
+    auto *motion = new Motion(si_);
+    si_->copyState(motion->state, st);
+    addMotion(motion);
+  }
+
+  if (tree_->size() == 0)
+  {
+    OMPL_ERROR("%s: There are no valid initial states!", getName().c_str());
+    return base::PlannerStatus::INVALID_START;
+  }
+
+  if (!sampler_)
+    sampler_ = si_->allocValidStateSampler();
+
+  OMPL_INFORM("%s: Starting planning with %u states already in datastructure", getName().c_str(), tree_->size());
+
+  Motion *solution = nullptr;
+  Motion *approxsol = nullptr;
+  double approxdif = std::numeric_limits<double>::infinity();
+  base::State *xstate = si_->allocState();
+
+  while (ptc == false)
+  {
+    /* Decide on a state to expand from */
+    Motion *existing = selectMotion();
+    assert(existing);
+
+    /* sample random state (with goal biasing) */
+    if (goal_s && rng_.uniform01() < goalBias_ && goal_s->canSample())
+      goal_s->sampleGoal(xstate);
+    else if (!sampler_->sampleNear(xstate, existing->state, maxDistance_))
+      continue;
+
+    std::pair<base::State *, double> fail(xstate, 0.0);
+    bool keep = si_->checkMotion(existing->state, xstate, fail) || fail.second > minValidPathFraction_;
+
+    if (keep)
     {
-        auto *motion = new Motion(si_);
-        si_->copyState(motion->state, st);
-        addMotion(motion);
+      /* create a motion */
+      auto *motion = new Motion(si_);
+      si_->copyState(motion->state, xstate);
+      motion->parent = existing;
+
+      addMotion(motion);
+      double dist = 0.0;
+      bool solved = goal->isSatisfied(motion->state, &dist);
+      if (solved)
+      {
+        approxdif = dist;
+        solution = motion;
+        break;
+      }
+      if (dist < approxdif)
+      {
+        approxdif = dist;
+        approxsol = motion;
+      }
+    }
+  }
+
+  bool solved = false;
+  bool approximate = false;
+  if (solution == nullptr)
+  {
+    solution = approxsol;
+    approximate = true;
+  }
+
+  if (solution != nullptr)
+  {
+    /* construct the solution path */
+    std::vector<Motion *> mpath;
+    while (solution != nullptr)
+    {
+      mpath.push_back(solution);
+      solution = solution->parent;
     }
 
-    if (tree_->size() == 0)
-    {
-        OMPL_ERROR("%s: There are no valid initial states!", getName().c_str());
-        return base::PlannerStatus::INVALID_START;
-    }
+    /* set the solution path */
+    auto *path = new PathGeometric(si_);
+    for (int i = mpath.size() - 1; i >= 0; --i)
+      path->append(mpath[i]->state);
+    pdef_->addSolutionPath(base::PathPtr(path), approximate, approxdif, getName());
+    solved = true;
+  }
 
-    if (!sampler_)
-        sampler_ = si_->allocValidStateSampler();
+  si_->freeState(xstate);
 
-    OMPL_INFORM("%s: Starting planning with %u states already in datastructure", getName().c_str(), tree_->size());
+  OMPL_INFORM("%s: Created %u states", getName().c_str(), tree_->size());
 
-    Motion *solution  = nullptr;
-    Motion *approxsol = nullptr;
-    double  approxdif = std::numeric_limits<double>::infinity();
-    base::State *xstate = si_->allocState();
-
-    while (ptc == false)
-    {
-        /* Decide on a state to expand from */
-        Motion *existing = selectMotion();
-        assert(existing);
-
-        /* sample random state (with goal biasing) */
-        if (goal_s && rng_.uniform01() < goalBias_ && goal_s->canSample())
-            goal_s->sampleGoal(xstate);
-        else
-            if (!sampler_->sampleNear(xstate, existing->state, maxDistance_))
-                continue;
-
-        std::pair<base::State*, double> fail(xstate, 0.0);
-        bool keep = si_->checkMotion(existing->state, xstate, fail) || fail.second > minValidPathFraction_;
-
-        if (keep)
-        {
-            /* create a motion */
-            auto *motion = new Motion(si_);
-            si_->copyState(motion->state, xstate);
-            motion->parent = existing;
-
-            addMotion(motion);
-            double dist = 0.0;
-            bool solved = goal->isSatisfied(motion->state, &dist);
-            if (solved)
-            {
-                approxdif = dist;
-                solution = motion;
-                break;
-            }
-            if (dist < approxdif)
-            {
-                approxdif = dist;
-                approxsol = motion;
-            }
-        }
-    }
-
-    bool solved = false;
-    bool approximate = false;
-    if (solution == nullptr)
-    {
-        solution = approxsol;
-        approximate = true;
-    }
-
-    if (solution != nullptr)
-    {
-        /* construct the solution path */
-        std::vector<Motion*> mpath;
-        while (solution != nullptr)
-        {
-            mpath.push_back(solution);
-            solution = solution->parent;
-        }
-
-        /* set the solution path */
-        auto *path = new PathGeometric(si_);
-        for (int i = mpath.size() - 1 ; i >= 0 ; --i)
-            path->append(mpath[i]->state);
-        pdef_->addSolutionPath(base::PathPtr(path), approximate, approxdif, getName());
-        solved = true;
-    }
-
-    si_->freeState(xstate);
-
-    OMPL_INFORM("%s: Created %u states", getName().c_str(), tree_->size());
-
-    return base::PlannerStatus(solved, approximate);
+  return base::PlannerStatus(solved, approximate);
 }
 
 void ompl::geometric::STRIDE::addMotion(Motion *motion)
 {
-    tree_->add(motion);
+  tree_->add(motion);
 }
 
-ompl::geometric::STRIDE::Motion* ompl::geometric::STRIDE::selectMotion()
+ompl::geometric::STRIDE::Motion *ompl::geometric::STRIDE::selectMotion()
 {
-    return tree_->sample(rng_);
+  return tree_->sample(rng_);
 }
 
 void ompl::geometric::STRIDE::getPlannerData(base::PlannerData &data) const
 {
-    Planner::getPlannerData(data);
+  Planner::getPlannerData(data);
 
-    std::vector<Motion*> motions;
-    tree_->list(motions);
-    for (auto & motion : motions)
-    {
-        if(motion->parent == nullptr)
-            data.addStartVertex(base::PlannerDataVertex(motion->state,1));
-        else
-            data.addEdge(base::PlannerDataVertex(motion->parent->state,1),base::PlannerDataVertex(motion->state,1));
-    }
+  std::vector<Motion *> motions;
+  tree_->list(motions);
+  for (auto &motion : motions)
+  {
+    if (motion->parent == nullptr)
+      data.addStartVertex(base::PlannerDataVertex(motion->state, 1));
+    else
+      data.addEdge(base::PlannerDataVertex(motion->parent->state, 1), base::PlannerDataVertex(motion->state, 1));
+  }
 }

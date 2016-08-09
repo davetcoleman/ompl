@@ -41,21 +41,21 @@
 /// @cond IGNORE
 namespace ompl
 {
-    const control::OpenDEEnvironmentPtr& getOpenDEStateSpaceEnvironmentWithCheck(const base::StateSpacePtr &space)
-    {
-        if (!dynamic_cast<control::OpenDEStateSpace*>(space.get()))
-            throw Exception("OpenDE State Space needed for creating OpenDE Control Space");
-        return space->as<control::OpenDEStateSpace>()->getEnvironment();
-    }
+const control::OpenDEEnvironmentPtr &getOpenDEStateSpaceEnvironmentWithCheck(const base::StateSpacePtr &space)
+{
+  if (!dynamic_cast<control::OpenDEStateSpace *>(space.get()))
+    throw Exception("OpenDE State Space needed for creating OpenDE Control Space");
+  return space->as<control::OpenDEStateSpace>()->getEnvironment();
+}
 }
 /// @endcond
 
-ompl::control::OpenDEControlSpace::OpenDEControlSpace(const base::StateSpacePtr &stateSpace) :
-    RealVectorControlSpace(stateSpace, getOpenDEStateSpaceEnvironmentWithCheck(stateSpace)->getControlDimension())
+ompl::control::OpenDEControlSpace::OpenDEControlSpace(const base::StateSpacePtr &stateSpace)
+  : RealVectorControlSpace(stateSpace, getOpenDEStateSpaceEnvironmentWithCheck(stateSpace)->getControlDimension())
 {
-    setName("OpenDE" + getName());
-    type_ = CONTROL_SPACE_TYPE_COUNT + 1;
-    base::RealVectorBounds bounds(dimension_);
-    getEnvironment()->getControlBounds(bounds.low, bounds.high);
-    setBounds(bounds);
+  setName("OpenDE" + getName());
+  type_ = CONTROL_SPACE_TYPE_COUNT + 1;
+  base::RealVectorBounds bounds(dimension_);
+  getEnvironment()->getControlBounds(bounds.low, bounds.high);
+  setBounds(bounds);
 }

@@ -39,63 +39,58 @@
 
 #include "ompl/base/Goal.h"
 
-
 namespace ompl
 {
+namespace base
+{
+/** \brief Definition of a goal region */
+class GoalRegion : public Goal
+{
+public:
+  /** \brief Create a goal region */
+  GoalRegion(const SpaceInformationPtr &si);
 
-    namespace base
-    {
+  ~GoalRegion() override = default;
 
-        /** \brief Definition of a goal region */
-        class GoalRegion : public Goal
-        {
-        public:
+  /** \brief Equivalent to calling isSatisfied(const State *, double *) with a nullptr second argument. */
+  bool isSatisfied(const State *st) const override;
 
-            /** \brief Create a goal region */
-            GoalRegion(const SpaceInformationPtr &si);
+  /** \brief Decide whether a given state is part of the
+      goal region. Returns true if the distance to goal is
+      less than the threshold (using distanceGoal()) */
+  bool isSatisfied(const State *st, double *distance) const override;
 
-            ~GoalRegion() override = default;
+  /** \brief Compute the distance to the goal
+      (heuristic). This function is the one used in
+      computing the distance to the goal in a call to
+      isSatisfied() */
+  virtual double distanceGoal(const State *st) const = 0;
 
-            /** \brief Equivalent to calling isSatisfied(const State *, double *) with a nullptr second argument. */
-            bool isSatisfied(const State *st) const override;
+  /** \brief Print information about the goal data structure
+      to a stream */
+  void print(std::ostream &out = std::cout) const override;
 
-            /** \brief Decide whether a given state is part of the
-                goal region. Returns true if the distance to goal is
-                less than the threshold (using distanceGoal()) */
-            bool isSatisfied(const State *st, double *distance) const override;
+  /** \brief Set the distance to the goal that is allowed
+      for a state to be considered in the goal region */
+  void setThreshold(double threshold)
+  {
+    threshold_ = threshold;
+  }
 
-            /** \brief Compute the distance to the goal
-                (heuristic). This function is the one used in
-                computing the distance to the goal in a call to
-                isSatisfied() */
-            virtual double distanceGoal(const State *st) const = 0;
+  /** \brief Get the distance to the goal that is allowed
+      for a state to be considered in the goal region */
+  double getThreshold() const
+  {
+    return threshold_;
+  }
 
-            /** \brief Print information about the goal data structure
-                to a stream */
-            void print(std::ostream &out = std::cout) const override;
-
-            /** \brief Set the distance to the goal that is allowed
-                for a state to be considered in the goal region */
-            void setThreshold(double threshold)
-            {
-                threshold_ = threshold;
-            }
-
-            /** \brief Get the distance to the goal that is allowed
-                for a state to be considered in the goal region */
-            double getThreshold() const
-            {
-                return threshold_;
-            }
-
-        protected:
-
-            /** \brief The maximum distance that is allowed to the
-                goal. By default, this is initialized to the minimum
-                epsilon value a double can represent */
-            double threshold_;
-        };
-    }
+protected:
+  /** \brief The maximum distance that is allowed to the
+      goal. By default, this is initialized to the minimum
+      epsilon value a double can represent */
+  double threshold_;
+};
+}
 }
 
 #endif

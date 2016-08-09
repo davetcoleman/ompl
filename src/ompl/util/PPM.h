@@ -41,88 +41,87 @@
 
 namespace ompl
 {
+/** \brief Load and save .ppm files - "portable pixmap format" an image file formats designed
+    to be easily exchanged between platforms. */
+class PPM
+{
+public:
+  struct Color
+  {
+    unsigned char red, green, blue;
 
-    /** \brief Load and save .ppm files - "portable pixmap format" an image file formats designed
-        to be easily exchanged between platforms. */
-    class PPM
+    // needed for Python bindings
+    bool operator==(const Color c)
     {
-    public:
-        struct Color
-        {
-            unsigned char red, green, blue;
+      return red == c.red && green == c.green && blue == c.blue;
+    }
+  };
 
-            // needed for Python bindings
-            bool operator==(const Color c)
-            {
-                return red == c.red && green == c.green && blue == c.blue;
-            }
-        };
+  PPM();
 
-        PPM();
+  /** \brief Load a .ppm file. Throw an exception in case of an error. */
+  void loadFile(const char *filename);
 
-        /** \brief Load a .ppm file. Throw an exception in case of an error. */
-        void loadFile(const char *filename);
+  /** \brief Save image data to a .ppm file. Throw an exception in case of an error. */
+  void saveFile(const char *filename);
 
-        /** \brief Save image data to a .ppm file. Throw an exception in case of an error. */
-        void saveFile(const char *filename);
+  /** \brief Get the width of the loaded image. */
+  unsigned int getWidth() const
+  {
+    return width_;
+  }
 
-        /** \brief Get the width of the loaded image. */
-        unsigned int getWidth() const
-        {
-            return width_;
-        }
+  /** \brief Get the height of the loaded image. */
+  unsigned int getHeight() const
+  {
+    return height_;
+  }
 
-        /** \brief Get the height of the loaded image. */
-        unsigned int getHeight() const
-        {
-            return height_;
-        }
+  /** \brief Set the width for the loaded image. This must
+  eventually match the number of pixels, if saveFile() gets called. */
+  void setWidth(unsigned int width)
+  {
+    width_ = width;
+  }
 
-        /** \brief Set the width for the loaded image. This must
-        eventually match the number of pixels, if saveFile() gets called. */
-        void setWidth(unsigned int width)
-        {
-            width_ = width;
-        }
+  /** \brief Set the height for the loaded image. This must
+  eventually match the number of pixels, if saveFile() gets called. */
+  void setHeight(unsigned int height)
+  {
+    height_ = height;
+  }
 
-        /** \brief Set the height for the loaded image. This must
-        eventually match the number of pixels, if saveFile() gets called. */
-        void setHeight(unsigned int height)
-        {
-            height_ = height;
-        }
+  /** \brief Get read-only access to the pixels in the image. To access a pixel at coordinate (row,col),
+  use getPixels()[row * getWidth() + col]. */
+  const std::vector<Color> &getPixels() const
+  {
+    return pixels_;
+  }
+  /** \brief Get write access to the pixels in the image. To access a pixel at coordinate (row,col),
+  use getPixels()[row * getWidth() + col].  This must eventually match the width & height set
+  by setWidth() and setHeight(). */
+  std::vector<Color> &getPixels()
+  {
+    return pixels_;
+  }
 
-        /** \brief Get read-only access to the pixels in the image. To access a pixel at coordinate (row,col),
-        use getPixels()[row * getWidth() + col]. */
-        const std::vector<Color> &getPixels() const
-        {
-            return pixels_;
-        }
-        /** \brief Get write access to the pixels in the image. To access a pixel at coordinate (row,col),
-        use getPixels()[row * getWidth() + col].  This must eventually match the width & height set
-        by setWidth() and setHeight(). */
-        std::vector<Color> &getPixels()
-        {
-            return pixels_;
-        }
+  /** \brief Directly access a pixel in the image */
+  const Color &getPixel(const int row, const int col) const
+  {
+    return pixels_[row * width_ + col];
+  }
 
-        /** \brief Directly access a pixel in the image */
-        const Color& getPixel(const int row, const int col) const
-        {
-            return pixels_[row * width_ + col];
-        }
+  /** \brief Directly access a pixel in the image */
+  Color &getPixel(const int row, const int col)
+  {
+    return pixels_[row * width_ + col];
+  }
 
-        /** \brief Directly access a pixel in the image */
-        Color& getPixel(const int row, const int col)
-        {
-            return pixels_[row * width_ + col];
-        }
-    private:
-
-        std::vector<Color> pixels_;
-        unsigned int       width_;
-        unsigned int       height_;
-    };
+private:
+  std::vector<Color> pixels_;
+  unsigned int width_;
+  unsigned int height_;
+};
 }
 
 #endif

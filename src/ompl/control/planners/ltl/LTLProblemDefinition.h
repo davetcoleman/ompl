@@ -43,32 +43,32 @@
 
 namespace ompl
 {
-    namespace control
-    {
-        /// @cond IGNORE
-        /** \brief Forward declaration of ompl::control::LTLProblemDefinition */
-        OMPL_CLASS_FORWARD(LTLProblemDefinition);
-        /// @endcond
+namespace control
+{
+/// @cond IGNORE
+/** \brief Forward declaration of ompl::control::LTLProblemDefinition */
+OMPL_CLASS_FORWARD(LTLProblemDefinition);
+/// @endcond
 
-        /** \class ompl::control::LTLProblemDefinitionPtr
-            \brief A shared pointer wrapper for ompl::control::LTLProblemDefinition */
-        class LTLProblemDefinition : public base::ProblemDefinition
-        {
-        public:
-            LTLProblemDefinition(const control::LTLSpaceInformationPtr& ltlsi);
+/** \class ompl::control::LTLProblemDefinitionPtr
+    \brief A shared pointer wrapper for ompl::control::LTLProblemDefinition */
+class LTLProblemDefinition : public base::ProblemDefinition
+{
+public:
+  LTLProblemDefinition(const control::LTLSpaceInformationPtr& ltlsi);
 
-            ~LTLProblemDefinition() override = default;
+  ~LTLProblemDefinition() override = default;
 
-            void addLowerStartState(const base::State* s);
+  void addLowerStartState(const base::State* s);
 
-            base::PathPtr getLowerSolutionPath() const;
+  base::PathPtr getLowerSolutionPath() const;
 
-        protected:
-            void createGoal();
+protected:
+  void createGoal();
 
-            LTLSpaceInformationPtr ltlsi_;
-        };
-    }
+  LTLSpaceInformationPtr ltlsi_;
+};
+}
 }
 
 #endif

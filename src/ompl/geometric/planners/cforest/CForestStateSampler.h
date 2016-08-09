@@ -44,65 +44,62 @@
 
 namespace ompl
 {
-    namespace base
-    {
+namespace base
+{
+/** \brief Extended state sampler to use with the CForest planning algorithm. It wraps the user-specified
+    state sampler.*/
+class CForestStateSampler : public StateSampler
+{
+public:
+  /** \brief Constructor */
+  CForestStateSampler(const StateSpace *space, StateSamplerPtr sampler)
+    : StateSampler(space), sampler_(std::move(sampler))
+  {
+  }
 
-        /** \brief Extended state sampler to use with the CForest planning algorithm. It wraps the user-specified
-            state sampler.*/
-        class CForestStateSampler : public StateSampler
-        {
-        public:
+  /** \brief Destructor */
+  ~CForestStateSampler() override
+  {
+    clear();
+  }
 
-            /** \brief Constructor */
-            CForestStateSampler(const StateSpace *space, StateSamplerPtr sampler) : StateSampler(space), sampler_(std::move(sampler))
-            {
-            }
+  /** \brief It will sample the next state of the vector StatesToSample_. If this is empty,
+      it will call the sampleUniform() method of the specified sampler. */
+  void sampleUniform(State *state) override;
 
-            /** \brief Destructor */
-            ~CForestStateSampler() override
-            {
-                clear();
-            }
+  /** \brief It will sample the next state of the vector StatesToSample_. If this is empty,
+      it will call the sampleUniformNear() method of the specified sampler. */
+  void sampleUniformNear(State *state, const State *near, const double distance) override;
 
-            /** \brief It will sample the next state of the vector StatesToSample_. If this is empty,
-                it will call the sampleUniform() method of the specified sampler. */
-            void sampleUniform(State *state) override;
+  /** \brief It will sample the next state of the vector StatesToSample_. If this is empty,
+      it will call the sampleGaussian() method of the specified sampler. */
+  void sampleGaussian(State *state, const State *mean, const double stdDev) override;
 
-            /** \brief It will sample the next state of the vector StatesToSample_. If this is empty,
-                it will call the sampleUniformNear() method of the specified sampler. */
-            void sampleUniformNear(State *state, const State *near, const double distance) override;
+  const StateSpace *getStateSpace() const
+  {
+    return space_;
+  }
 
-            /** \brief It will sample the next state of the vector StatesToSample_. If this is empty,
-                it will call the sampleGaussian() method of the specified sampler. */
-            void sampleGaussian(State *state, const State *mean, const double stdDev) override;
+  /** \brief Fills the vector StatesToSample_ of states to be sampled in the next
+      calls to sampleUniform(), sampleUniformNear() or sampleGaussian(). */
+  void setStatesToSample(const std::vector<const State *> &states);
 
-            const StateSpace* getStateSpace() const
-            {
-                return space_;
-            }
+  void clear();
 
-            /** \brief Fills the vector StatesToSample_ of states to be sampled in the next
-                calls to sampleUniform(), sampleUniformNear() or sampleGaussian(). */
-            void setStatesToSample(const std::vector<const State *> &states);
+protected:
+  /** \brief Extracts the next sample when statesToSample_ is not empty. */
+  void getNextSample(State *state);
 
-            void clear();
+  /** \brief States to be sampled */
+  std::vector<State *> statesToSample_;
 
-        protected:
+  /** \brief Underlying, user-specified state sampler. */
+  StateSamplerPtr sampler_;
 
-            /** \brief Extracts the next sample when statesToSample_ is not empty. */
-            void getNextSample(State *state);
-
-            /** \brief States to be sampled */
-            std::vector<State*> statesToSample_;
-
-            /** \brief Underlying, user-specified state sampler. */
-            StateSamplerPtr sampler_;
-
-            /** \brief Lock to control the access to the statesToSample_ vector. */
-            std::mutex statesLock_;
-        };
-
-    }
+  /** \brief Lock to control the access to the statesToSample_ vector. */
+  std::mutex statesLock_;
+};
+}
 }
 
 #endif

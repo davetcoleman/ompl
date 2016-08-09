@@ -42,39 +42,34 @@
 
 namespace ompl
 {
-    namespace base
-    {
+namespace base
+{
+/** \brief Generate valid samples using obstacle based sampling.  First
+    sample an invalid state, then sample a valid state.  Then, interpolate from
+    the invalid state to the valid state, returning the first valid state
+    encountered.
 
+    @par External documentation
+    N. M. Amato, O. B. Bayazit, L. K. Dale, C. Jones, and D. Vallejo, OBPRM: an obstacle-based PRM for 3D workspaces, in
+   <em> Third Workshop on the Algorithmic Foundations of Robotics</em>, pp. 155-168, 1998.
+   [[URL]](https://parasol.tamu.edu/groups/amatogroup/research/OBPRM/)
+*/
+class ObstacleBasedValidStateSampler : public ValidStateSampler
+{
+public:
+  /** \brief Constructor */
+  ObstacleBasedValidStateSampler(const SpaceInformation *si);
 
-        /** \brief Generate valid samples using obstacle based sampling.  First
-            sample an invalid state, then sample a valid state.  Then, interpolate from
-            the invalid state to the valid state, returning the first valid state
-            encountered.
+  ~ObstacleBasedValidStateSampler() override = default;
 
-            @par External documentation
-            N. M. Amato, O. B. Bayazit, L. K. Dale, C. Jones, and D. Vallejo, OBPRM: an obstacle-based PRM for 3D workspaces, in <em> Third Workshop on the Algorithmic Foundations of Robotics</em>, pp. 155-168, 1998. [[URL]](https://parasol.tamu.edu/groups/amatogroup/research/OBPRM/)
-        */
-        class ObstacleBasedValidStateSampler : public ValidStateSampler
-        {
-        public:
+  bool sample(State *state) override;
+  bool sampleNear(State *state, const State *near, const double distance) override;
 
-            /** \brief Constructor */
-            ObstacleBasedValidStateSampler(const SpaceInformation *si);
-
-            ~ObstacleBasedValidStateSampler() override = default;
-
-            bool sample(State *state) override;
-            bool sampleNear(State *state, const State *near, const double distance) override;
-
-        protected:
-
-            /** \brief The sampler to build upon */
-            StateSamplerPtr sampler_;
-
-        };
-
-    }
+protected:
+  /** \brief The sampler to build upon */
+  StateSamplerPtr sampler_;
+};
 }
-
+}
 
 #endif

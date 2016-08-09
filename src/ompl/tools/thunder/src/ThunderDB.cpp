@@ -45,262 +45,261 @@
 // Boost
 #include <boost/filesystem.hpp>
 
-ompl::tools::ThunderDB::ThunderDB(const base::StateSpacePtr &space, VisualizerPtr visual)
-    : visual_(visual)
-    , numPathsInserted_(0)
-    , saving_enabled_(true)
+ompl::tools::ThunderDB::ThunderDB(const base::StateSpacePtr& space, VisualizerPtr visual)
+  : visual_(visual), numPathsInserted_(0), saving_enabled_(true)
 {
-    // Set space information
-    si_.reset(new base::SpaceInformation(space));
+  // Set space information
+  si_.reset(new base::SpaceInformation(space));
 }
 
 ompl::tools::ThunderDB::~ThunderDB()
 {
-    if (numPathsInserted_)
-        OMPL_WARN("The database is being unloaded with unsaved experiences");
+  if (numPathsInserted_)
+    OMPL_WARN("The database is being unloaded with unsaved experiences");
 }
 
 bool ompl::tools::ThunderDB::load(const std::string& fileName)
 {
-    // Error checking
-    if (fileName.empty())
-    {
-        OMPL_ERROR("Empty filename passed to save function");
-        return false;
-    }
-    if ( !boost::filesystem::exists( fileName ) )
-    {
-        OMPL_INFORM("Database file does not exist: %s.", fileName.c_str());
-        return false;
-    }
-    if (!spars_)
-    {
-        OMPL_ERROR("SPARSdb planner has not been passed into the ThunderDB yet");
-        return false;
-    }
+  // Error checking
+  if (fileName.empty())
+  {
+    OMPL_ERROR("Empty filename passed to save function");
+    return false;
+  }
+  if (!boost::filesystem::exists(fileName))
+  {
+    OMPL_INFORM("Database file does not exist: %s.", fileName.c_str());
+    return false;
+  }
+  if (!spars_)
+  {
+    OMPL_ERROR("SPARSdb planner has not been passed into the ThunderDB yet");
+    return false;
+  }
 
-    // Load database from file, track loading time
-    time::point start = time::now();
+  // Load database from file, track loading time
+  time::point start = time::now();
 
-    OMPL_INFORM("Loading database from file: %s", fileName.c_str());
+  OMPL_INFORM("Loading database from file: %s", fileName.c_str());
 
-    // Open a binary input stream
-    std::ifstream iStream(fileName.c_str(), std::ios::binary);
+  // Open a binary input stream
+  std::ifstream iStream(fileName.c_str(), std::ios::binary);
 
-    // Get the total number of paths saved
-    double numPaths = 0;
-    iStream >> numPaths;
+  // Get the total number of paths saved
+  double numPaths = 0;
+  iStream >> numPaths;
 
-    // Check that the number of paths makes sense
-    if (numPaths < 0 || numPaths > std::numeric_limits<double>::max())
-    {
-        OMPL_WARN("Number of paths to load %d is a bad value", numPaths);
-        return false;
-    }
+  // Check that the number of paths makes sense
+  if (numPaths < 0 || numPaths > std::numeric_limits<double>::max())
+  {
+    OMPL_WARN("Number of paths to load %d is a bad value", numPaths);
+    return false;
+  }
 
-    if (numPaths > 1)
-    {
-        OMPL_ERROR("Currently more than one planner data is disabled from loading");
-        return false;
-    }
+  if (numPaths > 1)
+  {
+    OMPL_ERROR("Currently more than one planner data is disabled from loading");
+    return false;
+  }
 
-    // Create a new planner data instance
-    ompl::base::PlannerDataPtr plannerData(new ompl::base::PlannerData(si_));
+  // Create a new planner data instance
+  ompl::base::PlannerDataPtr plannerData(new ompl::base::PlannerData(si_));
 
-    // Note: the StateStorage class checks if the states match for us
-    plannerDataStorage_.load(iStream, *plannerData.get());
+  // Note: the StateStorage class checks if the states match for us
+  plannerDataStorage_.load(iStream, *plannerData.get());
 
-    OMPL_INFORM("ThunderDB: Loaded planner data with \n  %d vertices\n  %d edges\n  %d start states\n  %d goal states",
-                plannerData->numVertices(), plannerData->numEdges(), plannerData->numStartVertices(), plannerData->numGoalVertices());
+  OMPL_INFORM("ThunderDB: Loaded planner data with \n  %d vertices\n  %d edges\n  %d start states\n  %d goal states",
+              plannerData->numVertices(), plannerData->numEdges(), plannerData->numStartVertices(),
+              plannerData->numGoalVertices());
 
-    // Add to SPARSdb
-    OMPL_INFORM("Adding plannerData to SPARSdb:");
-    spars_->setPlannerData(*plannerData);
+  // Add to SPARSdb
+  OMPL_INFORM("Adding plannerData to SPARSdb:");
+  spars_->setPlannerData(*plannerData);
 
-    // Output the number of connected components
-    OMPL_INFORM("  %d connected components", spars_->getNumConnectedComponents());
+  // Output the number of connected components
+  OMPL_INFORM("  %d connected components", spars_->getNumConnectedComponents());
 
-    // Close file
-    iStream.close();
+  // Close file
+  iStream.close();
 
-    double loadTime = time::seconds(time::now() - start);
-    OMPL_INFORM("Loaded database from file in %f sec ", loadTime);
-    return true;
+  double loadTime = time::seconds(time::now() - start);
+  OMPL_INFORM("Loaded database from file in %f sec ", loadTime);
+  return true;
 }
 
-bool ompl::tools::ThunderDB::addPath(ompl::geometric::PathGeometric& solutionPath, double &insertionTime)
+bool ompl::tools::ThunderDB::addPath(ompl::geometric::PathGeometric& solutionPath, double& insertionTime)
 {
-    // Error check
-    if (!spars_)
-    {
-        OMPL_ERROR("SPARSdb planner has not been passed into the ThunderDB yet");
-        insertionTime = 0;
-        return false;
-    }
+  // Error check
+  if (!spars_)
+  {
+    OMPL_ERROR("SPARSdb planner has not been passed into the ThunderDB yet");
+    insertionTime = 0;
+    return false;
+  }
 
-    // Prevent inserting into database
-    if (!saving_enabled_)
-    {
-      OMPL_WARN("ThunderDB: Saving is disabled so not adding path");
-      return false;
-    }
+  // Prevent inserting into database
+  if (!saving_enabled_)
+  {
+    OMPL_WARN("ThunderDB: Saving is disabled so not adding path");
+    return false;
+  }
 
-    bool result;
-    double seconds = 120; //10; // a large number, should never need to use this
-    ompl::base::PlannerTerminationCondition ptc = ompl::base::timedPlannerTerminationCondition( seconds, 0.1 );
+  bool result;
+  double seconds = 120;  // 10; // a large number, should never need to use this
+  ompl::base::PlannerTerminationCondition ptc = ompl::base::timedPlannerTerminationCondition(seconds, 0.1);
 
-    // Benchmark runtime
-    time::point startTime = time::now();
-    {
-        result = spars_->addPathToRoadmap(ptc, solutionPath);
-    }
-    insertionTime = time::seconds(time::now() - startTime);
+  // Benchmark runtime
+  time::point startTime = time::now();
+  {
+    result = spars_->addPathToRoadmap(ptc, solutionPath);
+  }
+  insertionTime = time::seconds(time::now() - startTime);
 
-    OMPL_INFORM("SPARSdb now has %d states", spars_->getNumVertices());
+  OMPL_INFORM("SPARSdb now has %d states", spars_->getNumVertices());
 
-    // Record this new addition
-    numPathsInserted_++;
+  // Record this new addition
+  numPathsInserted_++;
 
-    return result;
+  return result;
 }
 
 bool ompl::tools::ThunderDB::saveIfChanged(const std::string& fileName)
 {
-    if (numPathsInserted_)
-        return save(fileName);
-    else
-        OMPL_INFORM("Not saving because database has not changed");
-    return true;
+  if (numPathsInserted_)
+    return save(fileName);
+  else
+    OMPL_INFORM("Not saving because database has not changed");
+  return true;
 }
 
 bool ompl::tools::ThunderDB::save(const std::string& fileName)
 {
-    // Disabled
-    if (!saving_enabled_)
+  // Disabled
+  if (!saving_enabled_)
+  {
+    OMPL_WARN("Not saving because option disabled for ExperienceDB");
+    return false;
+  }
+
+  // Error checking
+  if (fileName.empty())
+  {
+    OMPL_ERROR("Empty filename passed to save function");
+    return false;
+  }
+  if (!spars_)
+  {
+    OMPL_ERROR("SPARSdb planner has not been passed into the ThunderDB yet");
+    return false;
+  }
+
+  // Save database from file, track saving time
+  time::point start = time::now();
+
+  OMPL_INFORM("Saving database to file: %s", fileName.c_str());
+
+  // Open a binary output stream
+  std::ofstream outStream(fileName.c_str(), std::ios::binary);
+
+  // Populate multiple planner Datas
+  std::vector<ompl::base::PlannerDataPtr> plannerDatas;
+
+  // TODO: make this more than 1 planner data perhaps
+  base::PlannerDataPtr data(new base::PlannerData(si_));
+  spars_->getPlannerData(*data);
+  OMPL_INFORM("Get planner data from SPARS2 with \n  %d vertices\n  %d edges\n  %d start states\n  %d goal states",
+              data->numVertices(), data->numEdges(), data->numStartVertices(), data->numGoalVertices());
+
+  plannerDatas.push_back(data);
+
+  // Write the number of paths we will be saving
+  double numPaths = plannerDatas.size();
+  outStream << numPaths;
+
+  // Start saving each planner data object
+  for (std::size_t i = 0; i < numPaths; ++i)
+  {
+    ompl::base::PlannerData& pd = *plannerDatas[i].get();
+
+    OMPL_INFORM("Saving experience %d with %d verticies and %d edges", i, pd.numVertices(), pd.numEdges());
+
+    if (false)  // debug code
     {
-        OMPL_WARN("Not saving because option disabled for ExperienceDB");
-        return false;
+      for (std::size_t i = 0; i < pd.numVertices(); ++i)
+      {
+        OMPL_INFORM("Vertex %d:", i);
+        debugVertex(pd.getVertex(i));
+      }
     }
 
-    // Error checking
-    if (fileName.empty())
-    {
-        OMPL_ERROR("Empty filename passed to save function");
-        return false;
-    }
-    if (!spars_)
-    {
-        OMPL_ERROR("SPARSdb planner has not been passed into the ThunderDB yet");
-        return false;
-    }
+    // Save a single planner data
+    plannerDataStorage_.store(pd, outStream);
+  }
 
-    // Save database from file, track saving time
-    time::point start = time::now();
+  // Close file
+  outStream.close();
 
-    OMPL_INFORM("Saving database to file: %s", fileName.c_str());
+  // Benchmark
+  double loadTime = time::seconds(time::now() - start);
+  OMPL_INFORM("Saved database to file in %f sec with %d planner datas", loadTime, plannerDatas.size());
 
-    // Open a binary output stream
-    std::ofstream outStream(fileName.c_str(), std::ios::binary);
+  numPathsInserted_ = 0;
 
-    // Populate multiple planner Datas
-    std::vector<ompl::base::PlannerDataPtr> plannerDatas;
-
-    // TODO: make this more than 1 planner data perhaps
-    base::PlannerDataPtr data(new base::PlannerData(si_));
-    spars_->getPlannerData(*data);
-    OMPL_INFORM("Get planner data from SPARS2 with \n  %d vertices\n  %d edges\n  %d start states\n  %d goal states",
-                data->numVertices(), data->numEdges(), data->numStartVertices(), data->numGoalVertices());
-
-    plannerDatas.push_back(data);
-
-    // Write the number of paths we will be saving
-    double numPaths = plannerDatas.size();
-    outStream << numPaths;
-
-    // Start saving each planner data object
-    for (std::size_t i = 0; i < numPaths; ++i)
-    {
-        ompl::base::PlannerData &pd = *plannerDatas[i].get();
-
-        OMPL_INFORM("Saving experience %d with %d verticies and %d edges", i, pd.numVertices(), pd.numEdges());
-
-        if (false) // debug code
-        {
-            for (std::size_t i = 0; i < pd.numVertices(); ++i)
-            {
-                OMPL_INFORM("Vertex %d:", i);
-                debugVertex(pd.getVertex(i));
-            }
-        }
-
-        // Save a single planner data
-        plannerDataStorage_.store(pd, outStream);
-    }
-
-    // Close file
-    outStream.close();
-
-    // Benchmark
-    double loadTime = time::seconds(time::now() - start);
-    OMPL_INFORM("Saved database to file in %f sec with %d planner datas", loadTime, plannerDatas.size());
-
-    numPathsInserted_ = 0;
-
-    return true;
+  return true;
 }
 
-void ompl::tools::ThunderDB::setSPARSdb(ompl::tools::SPARSdbPtr &prm)
+void ompl::tools::ThunderDB::setSPARSdb(ompl::tools::SPARSdbPtr& prm)
 {
-    // OMPL_INFORM("-------------------------------------------------------");
-    // OMPL_INFORM("setSPARSdb ");
-    // OMPL_INFORM("-------------------------------------------------------");
-    spars_ = prm;
+  // OMPL_INFORM("-------------------------------------------------------");
+  // OMPL_INFORM("setSPARSdb ");
+  // OMPL_INFORM("-------------------------------------------------------");
+  spars_ = prm;
 }
 
 ompl::tools::SPARSdbPtr& ompl::tools::ThunderDB::getSPARSdb()
 {
-    return spars_;
+  return spars_;
 }
 
-void ompl::tools::ThunderDB::getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const
+void ompl::tools::ThunderDB::getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr>& plannerDatas) const
 {
-    if (!spars_)
-    {
-        OMPL_ERROR("SPARSdb planner has not been passed into the ThunderDB yet");
-        return;
-    }
+  if (!spars_)
+  {
+    OMPL_ERROR("SPARSdb planner has not been passed into the ThunderDB yet");
+    return;
+  }
 
-    base::PlannerDataPtr data(new base::PlannerData(si_));
-    spars_->getPlannerData(*data);
-    plannerDatas.push_back(data);
+  base::PlannerDataPtr data(new base::PlannerData(si_));
+  spars_->getPlannerData(*data);
+  plannerDatas.push_back(data);
 
-    //OMPL_DEBUG("ThunderDB::getAllPlannerDatas: Number of planner databases found: %d", plannerDatas.size());
+  // OMPL_DEBUG("ThunderDB::getAllPlannerDatas: Number of planner databases found: %d", plannerDatas.size());
 }
 
 bool ompl::tools::ThunderDB::findNearestStartGoal(int nearestK, const base::State* start, const base::State* goal,
-                                                      ompl::geometric::SPARSdb::CandidateSolution &candidateSolution,
-                                                      const base::PlannerTerminationCondition& ptc)
+                                                  ompl::geometric::SPARSdb::CandidateSolution& candidateSolution,
+                                                  const base::PlannerTerminationCondition& ptc)
 {
-    bool result = spars_->getSimilarPaths(nearestK, start, goal, candidateSolution, ptc);
+  bool result = spars_->getSimilarPaths(nearestK, start, goal, candidateSolution, ptc);
 
-    if (!result)
-    {
-        OMPL_INFORM("RETRIEVE COULD NOT FIND SOLUTION ");
-        OMPL_INFORM("spars::getSimilarPaths() returned false - retrieve could not find solution");
-        return false;
-    }
+  if (!result)
+  {
+    OMPL_INFORM("RETRIEVE COULD NOT FIND SOLUTION ");
+    OMPL_INFORM("spars::getSimilarPaths() returned false - retrieve could not find solution");
+    return false;
+  }
 
-    OMPL_INFORM("spars::getSimilarPaths() returned true - found a solution of size %d",
-                candidateSolution.getStateCount());
-    return true;
+  OMPL_INFORM("spars::getSimilarPaths() returned true - found a solution of size %d",
+              candidateSolution.getStateCount());
+  return true;
 }
 
 void ompl::tools::ThunderDB::debugVertex(const ompl::base::PlannerDataVertex& vertex)
 {
-    debugState(vertex.getState());
+  debugState(vertex.getState());
 }
 
 void ompl::tools::ThunderDB::debugState(const ompl::base::State* state)
 {
-    si_->printState(state, std::cout);
+  si_->printState(state, std::cout);
 }

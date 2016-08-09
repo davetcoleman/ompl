@@ -39,70 +39,71 @@
 
 void ompl::base::CompoundStateSampler::addSampler(const StateSamplerPtr &sampler, double weightImportance)
 {
-    samplers_.push_back(sampler);
-    weightImportance_.push_back(weightImportance);
-    samplerCount_ = samplers_.size();
+  samplers_.push_back(sampler);
+  weightImportance_.push_back(weightImportance);
+  samplerCount_ = samplers_.size();
 }
 
 void ompl::base::CompoundStateSampler::sampleUniform(State *state)
 {
-    State **comps = state->as<CompoundState>()->components;
-    for (unsigned int i = 0 ; i < samplerCount_ ; ++i)
-        samplers_[i]->sampleUniform(comps[i]);
+  State **comps = state->as<CompoundState>()->components;
+  for (unsigned int i = 0; i < samplerCount_; ++i)
+    samplers_[i]->sampleUniform(comps[i]);
 }
 
 void ompl::base::CompoundStateSampler::sampleUniformNear(State *state, const State *near, const double distance)
 {
-    State **comps = state->as<CompoundState>()->components;
-    State **nearComps = near->as<CompoundState>()->components;
-    for (unsigned int i = 0 ; i < samplerCount_ ; ++i)
-        if (weightImportance_[i] > std::numeric_limits<double>::epsilon())
-            samplers_[i]->sampleUniformNear(comps[i], nearComps[i], distance * weightImportance_[i]);
-        else
-            samplers_[i]->sampleUniform(comps[i]);
-
+  State **comps = state->as<CompoundState>()->components;
+  State **nearComps = near->as<CompoundState>()->components;
+  for (unsigned int i = 0; i < samplerCount_; ++i)
+    if (weightImportance_[i] > std::numeric_limits<double>::epsilon())
+      samplers_[i]->sampleUniformNear(comps[i], nearComps[i], distance * weightImportance_[i]);
+    else
+      samplers_[i]->sampleUniform(comps[i]);
 }
 
 void ompl::base::CompoundStateSampler::sampleGaussian(State *state, const State *mean, const double stdDev)
 {
-    State **comps = state->as<CompoundState>()->components;
-    State **meanComps = mean->as<CompoundState>()->components;
-    for (unsigned int i = 0 ; i < samplerCount_ ; ++i)
-        samplers_[i]->sampleGaussian(comps[i], meanComps[i], stdDev * weightImportance_[i]);
+  State **comps = state->as<CompoundState>()->components;
+  State **meanComps = mean->as<CompoundState>()->components;
+  for (unsigned int i = 0; i < samplerCount_; ++i)
+    samplers_[i]->sampleGaussian(comps[i], meanComps[i], stdDev * weightImportance_[i]);
 }
 
-ompl::base::SubspaceStateSampler::SubspaceStateSampler(const StateSpace *space, const StateSpace *subspace, double weight) : StateSampler(space), subspace_(subspace), weight_(weight)
+ompl::base::SubspaceStateSampler::SubspaceStateSampler(const StateSpace *space, const StateSpace *subspace,
+                                                       double weight)
+  : StateSampler(space), subspace_(subspace), weight_(weight)
 {
-    work_ = subspace_->allocState();
-    work2_ = subspace_->allocState();
-    subspaceSampler_ = subspace_->allocStateSampler();
-    space_->getCommonSubspaces(subspace_, subspaces_);
-    if (subspaces_.empty())
-        OMPL_WARN("Subspace state sampler did not find any common subspaces. Sampling will have no effect.");
+  work_ = subspace_->allocState();
+  work2_ = subspace_->allocState();
+  subspaceSampler_ = subspace_->allocStateSampler();
+  space_->getCommonSubspaces(subspace_, subspaces_);
+  if (subspaces_.empty())
+    OMPL_WARN("Subspace state sampler did not find any common subspaces. Sampling will have no effect.");
 }
 
 ompl::base::SubspaceStateSampler::~SubspaceStateSampler()
 {
-    subspace_->freeState(work_);
-    subspace_->freeState(work2_);
+  subspace_->freeState(work_);
+  subspace_->freeState(work2_);
 }
 
 void ompl::base::SubspaceStateSampler::sampleUniform(State *state)
 {
-    subspaceSampler_->sampleUniform(work_);
-    copyStateData(space_, state, subspace_, work_, subspaces_);
+  subspaceSampler_->sampleUniform(work_);
+  copyStateData(space_, state, subspace_, work_, subspaces_);
 }
 
 void ompl::base::SubspaceStateSampler::sampleUniformNear(State *state, const State *near, const double distance)
 {
-    copyStateData(subspace_, work2_, space_, near);
-    subspaceSampler_->sampleUniformNear(work_, work2_, distance * weight_);
-    copyStateData(space_, state, subspace_, work_, subspaces_);
+  copyStateData(subspace_, work2_, space_, near);
+  subspaceSampler_->sampleUniformNear(work_, work2_, distance * weight_);
+  copyStateData(space_, state, subspace_, work_, subspaces_);
 }
 
 void ompl::base::SubspaceStateSampler::sampleGaussian(State *state, const State *mean, const double stdDev)
 {
-    copyStateData(subspace_, work2_, space_, mean);
-    subspaceSampler_->sampleGaussian(work_, work2_, stdDev * weight_);
-    copyStateData(space_, state, subspace_, work_, subspaces_);
+  copyStateData(subspace_, work2_, space_, mean);
+  subspaceSampler_->sampleGaussian(work_, work2_, stdDev * weight_);
+  copyStateData(space_, state, subspace_, work_, subspaces_);
 }

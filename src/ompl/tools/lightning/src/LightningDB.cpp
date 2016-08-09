@@ -44,231 +44,233 @@
 // Boost
 #include <boost/filesystem.hpp>
 
-ompl::tools::LightningDB::LightningDB(const base::StateSpacePtr &space)
-    : numUnsavedPaths_(0)
+ompl::tools::LightningDB::LightningDB(const base::StateSpacePtr &space) : numUnsavedPaths_(0)
 {
-    si_.reset(new base::SpaceInformation(space));
+  si_.reset(new base::SpaceInformation(space));
 
-    // Set nearest neighbor type
-    nn_.reset(new ompl::NearestNeighborsSqrtApprox<ompl::base::PlannerDataPtr>());
+  // Set nearest neighbor type
+  nn_.reset(new ompl::NearestNeighborsSqrtApprox<ompl::base::PlannerDataPtr>());
 
-    // Use our custom distance function for nearest neighbor tree
-    nn_->setDistanceFunction(std::bind(&ompl::tools::LightningDB::distanceFunction, this, std::placeholders::_1, std::placeholders::_2));
+  // Use our custom distance function for nearest neighbor tree
+  nn_->setDistanceFunction(
+      std::bind(&ompl::tools::LightningDB::distanceFunction, this, std::placeholders::_1, std::placeholders::_2));
 
-    // Load the PlannerData instance to be used for searching
-    nnSearchKey_.reset(new ompl::base::PlannerData(si_));
+  // Load the PlannerData instance to be used for searching
+  nnSearchKey_.reset(new ompl::base::PlannerData(si_));
 }
 
 ompl::tools::LightningDB::~LightningDB()
 {
-    if (numUnsavedPaths_)
-        OMPL_WARN("The database is being unloaded with unsaved experiences");
+  if (numUnsavedPaths_)
+    OMPL_WARN("The database is being unloaded with unsaved experiences");
 }
 
 bool ompl::tools::LightningDB::load(const std::string &fileName)
 {
-    // Error checking
-    if (fileName.empty())
-    {
-        OMPL_ERROR("Empty filename passed to save function");
-        return false;
-    }
-    if ( !boost::filesystem::exists( fileName ) )
-    {
-        OMPL_WARN("Database file does not exist: %s", fileName.c_str());
-        return false;
-    }
+  // Error checking
+  if (fileName.empty())
+  {
+    OMPL_ERROR("Empty filename passed to save function");
+    return false;
+  }
+  if (!boost::filesystem::exists(fileName))
+  {
+    OMPL_WARN("Database file does not exist: %s", fileName.c_str());
+    return false;
+  }
 
-    // Load database from file, track loading time
-    time::point start = time::now();
+  // Load database from file, track loading time
+  time::point start = time::now();
 
-    OMPL_INFORM("Loading database from file: %s", fileName.c_str());
+  OMPL_INFORM("Loading database from file: %s", fileName.c_str());
 
-    // Open a binary input stream
-    std::ifstream iStream(fileName.c_str(), std::ios::binary);
+  // Open a binary input stream
+  std::ifstream iStream(fileName.c_str(), std::ios::binary);
 
-    // Get the total number of paths saved
-    double numPaths = 0;
-    iStream >> numPaths;
+  // Get the total number of paths saved
+  double numPaths = 0;
+  iStream >> numPaths;
 
-    // Check that the number of paths makes sense
-    if (numPaths < 0 || numPaths > std::numeric_limits<double>::max())
-    {
-        OMPL_WARN("Number of paths to load %d is a bad value", numPaths);
-        return false;
-    }
+  // Check that the number of paths makes sense
+  if (numPaths < 0 || numPaths > std::numeric_limits<double>::max())
+  {
+    OMPL_WARN("Number of paths to load %d is a bad value", numPaths);
+    return false;
+  }
 
-    // Start loading all the PlannerDatas
-    for (std::size_t i = 0; i < numPaths; ++i)
-    {
-        // Create a new planner data instance
-        ompl::base::PlannerDataPtr plannerData(new ompl::base::PlannerData(si_));
+  // Start loading all the PlannerDatas
+  for (std::size_t i = 0; i < numPaths; ++i)
+  {
+    // Create a new planner data instance
+    ompl::base::PlannerDataPtr plannerData(new ompl::base::PlannerData(si_));
 
-        // Note: the StateStorage class checks if the states match for us
-        plannerDataStorage_.load(iStream, *plannerData.get());
+    // Note: the StateStorage class checks if the states match for us
+    plannerDataStorage_.load(iStream, *plannerData.get());
 
-        // Add to nearest neighbor tree
-        nn_->add(plannerData);
-    }
+    // Add to nearest neighbor tree
+    nn_->add(plannerData);
+  }
 
-    // Close file
-    iStream.close();
+  // Close file
+  iStream.close();
 
-    double loadTime = time::seconds(time::now() - start);
-    OMPL_INFORM("Loaded database from file in %f sec with %d paths", loadTime, nn_->size());
-    return true;
+  double loadTime = time::seconds(time::now() - start);
+  OMPL_INFORM("Loaded database from file in %f sec with %d paths", loadTime, nn_->size());
+  return true;
 }
 
-void ompl::tools::LightningDB::addPath(ompl::geometric::PathGeometric& solutionPath, double &insertionTime)
+void ompl::tools::LightningDB::addPath(ompl::geometric::PathGeometric &solutionPath, double &insertionTime)
 {
-    // Benchmark runtime
-    time::point startTime = time::now();
-    {
-        addPathHelper(solutionPath);
-    }
-    insertionTime = time::seconds(time::now() - startTime);
+  // Benchmark runtime
+  time::point startTime = time::now();
+  {
+    addPathHelper(solutionPath);
+  }
+  insertionTime = time::seconds(time::now() - startTime);
 }
 
 void ompl::tools::LightningDB::addPathHelper(ompl::geometric::PathGeometric &solutionPath)
 {
-    // Create a new planner data instance
-    ompl::base::PlannerDataPtr plannerData(new ompl::base::PlannerData(si_));
+  // Create a new planner data instance
+  ompl::base::PlannerDataPtr plannerData(new ompl::base::PlannerData(si_));
 
-    // Add the states to one nodes files
-    for (auto & i : solutionPath.getStates())
-    {
-        ompl::base::PlannerDataVertex vert( i ); // TODO tag?
+  // Add the states to one nodes files
+  for (auto &i : solutionPath.getStates())
+  {
+    ompl::base::PlannerDataVertex vert(i);  // TODO tag?
 
-        plannerData->addVertex(vert);
-    }
+    plannerData->addVertex(vert);
+  }
 
-    // Deep copy the states in the vertices so that when the planner goes out of scope, all data remains intact
-    plannerData->decoupleFromPlanner();
+  // Deep copy the states in the vertices so that when the planner goes out of scope, all data remains intact
+  plannerData->decoupleFromPlanner();
 
-    // Add to nearest neighbor tree
-    nn_->add(plannerData);
+  // Add to nearest neighbor tree
+  nn_->add(plannerData);
 
-    numUnsavedPaths_++;
+  numUnsavedPaths_++;
 }
 
 bool ompl::tools::LightningDB::saveIfChanged(const std::string &fileName)
 {
-    if (numUnsavedPaths_)
-        return save(fileName);
-    else
-        OMPL_INFORM("Not saving because database has not changed");
-    return true;
+  if (numUnsavedPaths_)
+    return save(fileName);
+  else
+    OMPL_INFORM("Not saving because database has not changed");
+  return true;
 }
 
 bool ompl::tools::LightningDB::save(const std::string &fileName)
 {
-    // Error checking
-    if (fileName.empty())
-    {
-        OMPL_ERROR("Empty filename passed to save function");
-        return false;
-    }
+  // Error checking
+  if (fileName.empty())
+  {
+    OMPL_ERROR("Empty filename passed to save function");
+    return false;
+  }
 
-    // Save database from file, track saving time
-    time::point start = time::now();
+  // Save database from file, track saving time
+  time::point start = time::now();
 
-    OMPL_INFORM("Saving database to file: %s", fileName.c_str());
+  OMPL_INFORM("Saving database to file: %s", fileName.c_str());
 
-    // Open a binary output stream
-    std::ofstream outStream(fileName.c_str(), std::ios::binary);
+  // Open a binary output stream
+  std::ofstream outStream(fileName.c_str(), std::ios::binary);
 
-    // Convert the NN tree to a vector
-    std::vector<ompl::base::PlannerDataPtr> plannerDatas;
-    nn_->list(plannerDatas);
+  // Convert the NN tree to a vector
+  std::vector<ompl::base::PlannerDataPtr> plannerDatas;
+  nn_->list(plannerDatas);
 
-    // Write the number of paths we will be saving
-    double numPaths = plannerDatas.size();
-    outStream << numPaths;
+  // Write the number of paths we will be saving
+  double numPaths = plannerDatas.size();
+  outStream << numPaths;
 
-    // Start saving each planner data object
-    for (std::size_t i = 0; i < numPaths; ++i)
-    {
-        ompl::base::PlannerData &pd = *plannerDatas[i].get();
+  // Start saving each planner data object
+  for (std::size_t i = 0; i < numPaths; ++i)
+  {
+    ompl::base::PlannerData &pd = *plannerDatas[i].get();
 
-        // Save a single planner data
-        plannerDataStorage_.store(pd, outStream);
-    }
+    // Save a single planner data
+    plannerDataStorage_.store(pd, outStream);
+  }
 
-    // Close file
-    outStream.close();
+  // Close file
+  outStream.close();
 
-    // Benchmark
-    double loadTime = time::seconds(time::now() - start);
-    OMPL_INFORM("Saved database to file in %f sec with %d paths", loadTime, plannerDatas.size());
+  // Benchmark
+  double loadTime = time::seconds(time::now() - start);
+  OMPL_INFORM("Saved database to file in %f sec with %d paths", loadTime, plannerDatas.size());
 
-    numUnsavedPaths_ = 0;
+  numUnsavedPaths_ = 0;
 
-    return true;
+  return true;
 }
 
 void ompl::tools::LightningDB::getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const
 {
-    OMPL_DEBUG("LightningDB: getAllPlannerDatas");
+  OMPL_DEBUG("LightningDB: getAllPlannerDatas");
 
-    // Convert the NN tree to a vector
-    nn_->list(plannerDatas);
+  // Convert the NN tree to a vector
+  nn_->list(plannerDatas);
 
-    OMPL_DEBUG("Number of paths found: %d", plannerDatas.size());
+  OMPL_DEBUG("Number of paths found: %d", plannerDatas.size());
 }
 
-std::vector<ompl::base::PlannerDataPtr> ompl::tools::LightningDB::findNearestStartGoal(
-    int nearestK, const base::State *start, const base::State *goal)
+std::vector<ompl::base::PlannerDataPtr> ompl::tools::LightningDB::findNearestStartGoal(int nearestK,
+                                                                                       const base::State *start,
+                                                                                       const base::State *goal)
 {
-    // Fill in our pre-made PlannerData instance with the new start and goal states to be searched for
-    if (nnSearchKey_->numVertices() == 2)
-    {
-        nnSearchKey_->getVertex(0) = ompl::base::PlannerDataVertex(start);
-        nnSearchKey_->getVertex(1) = ompl::base::PlannerDataVertex(goal);
-    }
-    else
-    {
-        nnSearchKey_->addVertex(ompl::base::PlannerDataVertex(start));
-        nnSearchKey_->addVertex(ompl::base::PlannerDataVertex(goal));
-    }
-    assert( nnSearchKey_->numVertices() == 2);
+  // Fill in our pre-made PlannerData instance with the new start and goal states to be searched for
+  if (nnSearchKey_->numVertices() == 2)
+  {
+    nnSearchKey_->getVertex(0) = ompl::base::PlannerDataVertex(start);
+    nnSearchKey_->getVertex(1) = ompl::base::PlannerDataVertex(goal);
+  }
+  else
+  {
+    nnSearchKey_->addVertex(ompl::base::PlannerDataVertex(start));
+    nnSearchKey_->addVertex(ompl::base::PlannerDataVertex(goal));
+  }
+  assert(nnSearchKey_->numVertices() == 2);
 
-    std::vector<ompl::base::PlannerDataPtr> nearest;
-    nn_->nearestK(nnSearchKey_, nearestK, nearest);
+  std::vector<ompl::base::PlannerDataPtr> nearest;
+  nn_->nearestK(nnSearchKey_, nearestK, nearest);
 
-    return nearest;
+  return nearest;
 }
 
-double ompl::tools::LightningDB::distanceFunction(const ompl::base::PlannerDataPtr& a, const ompl::base::PlannerDataPtr& b) const
+double ompl::tools::LightningDB::distanceFunction(const ompl::base::PlannerDataPtr &a,
+                                                  const ompl::base::PlannerDataPtr &b) const
 {
-    // Bi-directional implementation - check path b from [start, goal] and [goal, start]
-    return std::min(
-        // [ a.start, b.start] + [a.goal + b.goal]
-        si_->distance(a->getVertex(0).getState(), b->getVertex(0).getState()) +
-        si_->distance(a->getVertex(a->numVertices()-1).getState(), b->getVertex(b->numVertices()-1).getState()),
-        // [ a.start, b.goal] + [a.goal + b.start]
-        si_->distance(a->getVertex(0).getState(), b->getVertex(b->numVertices()-1).getState()) +
-        si_->distance(a->getVertex(a->numVertices()-1).getState(), b->getVertex(0).getState()));
+  // Bi-directional implementation - check path b from [start, goal] and [goal, start]
+  return std::min(
+      // [ a.start, b.start] + [a.goal + b.goal]
+      si_->distance(a->getVertex(0).getState(), b->getVertex(0).getState()) +
+          si_->distance(a->getVertex(a->numVertices() - 1).getState(), b->getVertex(b->numVertices() - 1).getState()),
+      // [ a.start, b.goal] + [a.goal + b.start]
+      si_->distance(a->getVertex(0).getState(), b->getVertex(b->numVertices() - 1).getState()) +
+          si_->distance(a->getVertex(a->numVertices() - 1).getState(), b->getVertex(0).getState()));
 }
 
 std::size_t ompl::tools::LightningDB::getExperiencesCount() const
 {
-    return nn_->size();
+  return nn_->size();
 }
 
 std::size_t ompl::tools::LightningDB::getStatesCount() const
 {
-    // Loop through every PlannerData and sum the number of states
-    std::size_t statesCount = 0;
+  // Loop through every PlannerData and sum the number of states
+  std::size_t statesCount = 0;
 
-    // Convert the NN tree to a vector
-    std::vector<ompl::base::PlannerDataPtr> plannerDatas;
-    nn_->list(plannerDatas);
+  // Convert the NN tree to a vector
+  std::vector<ompl::base::PlannerDataPtr> plannerDatas;
+  nn_->list(plannerDatas);
 
-    // Start saving each planner data object
-    for (auto & plannerData : plannerDatas)
-    {
-        statesCount += plannerData->numVertices();
-    }
+  // Start saving each planner data object
+  for (auto &plannerData : plannerDatas)
+  {
+    statesCount += plannerData->numVertices();
+  }
 
-    return statesCount;
+  return statesCount;
 }

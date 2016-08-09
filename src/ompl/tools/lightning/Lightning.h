@@ -67,159 +67,152 @@
 
 namespace ompl
 {
+namespace tools
+{
+// class LightningDB; // forward declaration
+OMPL_CLASS_FORWARD(LightningDB);
+OMPL_CLASS_FORWARD(ParallelPlan);
 
-    namespace tools
-    {
-        //class LightningDB; // forward declaration
-        OMPL_CLASS_FORWARD(LightningDB);
-        OMPL_CLASS_FORWARD(ParallelPlan);
+/**
+   @anchor Lightning
+   @par Short description
+   The Lightning Framework is a experienced-based motion planner that recalls from a database of
+   previously generated paths the most similar one to the current planning problem and attempts to repair it,
+   while at the same time planning from scratch in a different thread
+   @par External documentation
+   Berenson, Dmitry, Pieter Abbeel, and Ken Goldberg: A robot path planning framework that learns from experience,
+   in <em>Robotics and Automation (ICRA), 2012 IEEE International Conference on. IEEE</em>, 2012.
+   DOI: <a href="http://dx.doi.org/10.1109/ICRA.2012.6224742">10.1109/ICRA.2012.6224742</a><br>
+   <a href="http://users.wpi.edu/~dberenson/lightning.pdf">[PDF]</a>
+*/
 
-        /**
-           @anchor Lightning
-           @par Short description
-           The Lightning Framework is a experienced-based motion planner that recalls from a database of
-           previously generated paths the most similar one to the current planning problem and attempts to repair it,
-           while at the same time planning from scratch in a different thread
-           @par External documentation
-           Berenson, Dmitry, Pieter Abbeel, and Ken Goldberg: A robot path planning framework that learns from experience,
-           in <em>Robotics and Automation (ICRA), 2012 IEEE International Conference on. IEEE</em>, 2012.
-           DOI: <a href="http://dx.doi.org/10.1109/ICRA.2012.6224742">10.1109/ICRA.2012.6224742</a><br>
-           <a href="http://users.wpi.edu/~dberenson/lightning.pdf">[PDF]</a>
-        */
+/// @cond IGNORE
+OMPL_CLASS_FORWARD(Lightning);
+/// @endcond
 
-        /// @cond IGNORE
-        OMPL_CLASS_FORWARD(Lightning);
-        /// @endcond
+/** \class ompl::geometric::LightningPtr
+    \brief A shared pointer wrapper for ompl::tools::Lightning */
 
-        /** \class ompl::geometric::LightningPtr
-            \brief A shared pointer wrapper for ompl::tools::Lightning */
+/** \brief Built off of SimpleSetup but provides support for planning from experience */
+class Lightning : public ompl::tools::ExperienceSetup
+{
+public:
+  /** \brief Constructor needs the state space used for planning. */
+  explicit Lightning(const base::SpaceInformationPtr &si);
 
-        /** \brief Built off of SimpleSetup but provides support for planning from experience */
-        class Lightning : public ompl::tools::ExperienceSetup
-        {
-        public:
+  /** \brief Constructor needs the state space used for planning.
+   *  \param space - the state space to plan in
+   */
+  explicit Lightning(const base::StateSpacePtr &space);
 
-            /** \brief Constructor needs the state space used for planning. */
-            explicit
-            Lightning(const base::SpaceInformationPtr &si);
+private:
+  /**
+   * \brief Shared constructor functions
+   */
+  void initialize();
 
-            /** \brief Constructor needs the state space used for planning.
-             *  \param space - the state space to plan in
-             */
-            explicit
-            Lightning(const base::StateSpacePtr &space);
+public:
+  /** \brief Display debug data about potential available solutions */
+  void printResultsInfo(std::ostream &out = std::cout) const override;
 
-        private:
+  /** \brief Display debug data about overall results from Lightning since being loaded */
+  void printLogs(std::ostream &out = std::cout) const override;
 
-            /**
-             * \brief Shared constructor functions
-             */
-            void initialize();
+  /**
+   * \brief Get a pointer to the retrieve repair planner
+   */
+  ompl::geometric::LightningRetrieveRepair &getLightningRetrieveRepairPlanner() const
+  {
+    return static_cast<ompl::geometric::LightningRetrieveRepair &>(*rrPlanner_);
+  }
 
-        public:
+  /** \brief Set the planner to use for repairing experience paths
+      inside the LightningRetrieveRepair planner. If the planner is not
+      set, a default planner is set. */
+  void setRepairPlanner(const base::PlannerPtr &planner) override
+  {
+    static_cast<og::LightningRetrieveRepair &>(*rrPlanner_).setRepairPlanner(planner);
+  }
 
-            /** \brief Display debug data about potential available solutions */
-            void printResultsInfo(std::ostream &out = std::cout) const override;
+  /** \brief Set the planner allocator to use. This is only
+      used if no planner has been set. This is optional -- a default
+      planner will be used if no planner is otherwise specified. */
+  void setPlannerAllocator(const base::PlannerAllocator &pa)
+  {
+    pa_ = pa;
+    planner_.reset();
+    // note: the rrPlanner_ never uses the allocator so does not need to be reset
+    configured_ = false;
+  }
 
-            /** \brief Display debug data about overall results from Lightning since being loaded */
-            void printLogs(std::ostream &out = std::cout) const override;
+  /** \brief Run the planner for up to a specified amount of time (default is 1 second) */
+  base::PlannerStatus solve(double time = 1.0) override;
 
-            /**
-             * \brief Get a pointer to the retrieve repair planner
-             */
-            ompl::geometric::LightningRetrieveRepair& getLightningRetrieveRepairPlanner() const
-            {
-                return static_cast<ompl::geometric::LightningRetrieveRepair&>(*rrPlanner_);
-            }
+  /** \brief Run the planner until \e ptc becomes true (at most) */
+  base::PlannerStatus solve(const base::PlannerTerminationCondition &ptc) override;
 
-            /** \brief Set the planner to use for repairing experience paths
-                inside the LightningRetrieveRepair planner. If the planner is not
-                set, a default planner is set. */
-            void setRepairPlanner(const base::PlannerPtr &planner) override
-            {
-                static_cast<og::LightningRetrieveRepair&>(*rrPlanner_).setRepairPlanner(planner);
-            }
+  /** \brief Save the experience database to file */
+  bool save() override;
 
-            /** \brief Set the planner allocator to use. This is only
-                used if no planner has been set. This is optional -- a default
-                planner will be used if no planner is otherwise specified. */
-            void setPlannerAllocator(const base::PlannerAllocator &pa)
-            {
-                pa_ = pa;
-                planner_.reset();
-                // note: the rrPlanner_ never uses the allocator so does not need to be reset
-                configured_ = false;
-            }
+  /** \brief Save the experience database to file if there has been a change */
+  bool saveIfChanged() override;
 
-            /** \brief Run the planner for up to a specified amount of time (default is 1 second) */
-            base::PlannerStatus solve(double time = 1.0) override;
+  /** \brief Clear all planning data. This only includes
+      data generated by motion plan computation. Planner
+      settings, start & goal states are not affected. */
+  void clear() override;
 
-            /** \brief Run the planner until \e ptc becomes true (at most) */
-            base::PlannerStatus solve(const base::PlannerTerminationCondition &ptc) override;
+  /** \brief Print information about the current setup */
+  void print(std::ostream &out = std::cout) const override;
 
-            /** \brief Save the experience database to file */
-            bool save() override;
+  /** \brief This method will create the necessary classes
+      for planning. The solve() method will call this
+      function automatically. */
+  void setup() override;
 
-            /** \brief Save the experience database to file if there has been a change */
-            bool saveIfChanged() override;
+  /** \brief Get a vector of all the planning data in the database */
+  void getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const override;
 
-            /** \brief Clear all planning data. This only includes
-                data generated by motion plan computation. Planner
-                settings, start & goal states are not affected. */
-            void clear() override;
+  /** \brief Get the total number of paths stored in the database */
+  std::size_t getExperiencesCount() const override;
 
-            /** \brief Print information about the current setup */
-            void print(std::ostream &out = std::cout) const override;
+  /**
+   * \brief Convert PlannerData to PathGeometric. Assume ordering of verticies is order of path
+   * \param PlannerData
+   * \param PathGeometric
+   */
+  void convertPlannerData(const ompl::base::PlannerDataPtr &plannerData, ompl::geometric::PathGeometric &path);
 
-            /** \brief This method will create the necessary classes
-                for planning. The solve() method will call this
-                function automatically. */
-            void setup() override;
+  /** \brief Tool for comparing two paths and scoring them */
+  const ompl::tools::DynamicTimeWarpPtr &getDynamicTimeWarp() const
+  {
+    return dtw_;
+  }
 
-            /** \brief Get a vector of all the planning data in the database */
-            void getAllPlannerDatas(std::vector<ompl::base::PlannerDataPtr> &plannerDatas) const override;
+protected:
+  /**
+   * \brief If path1 and path2 have a better start/goal match when reverse, then reverse path2
+   * \param path to test against
+   * \param path to reverse
+   * \return true if reverse was necessary
+   */
+  bool reversePathIfNecessary(ompl::geometric::PathGeometric &path1, ompl::geometric::PathGeometric &path2);
 
-            /** \brief Get the total number of paths stored in the database */
-            std::size_t getExperiencesCount() const override;
+  /// The maintained experience planner instance
+  base::PlannerPtr rrPlanner_;
 
-            /**
-             * \brief Convert PlannerData to PathGeometric. Assume ordering of verticies is order of path
-             * \param PlannerData
-             * \param PathGeometric
-             */
-            void convertPlannerData(const ompl::base::PlannerDataPtr& plannerData, ompl::geometric::PathGeometric &path);
+  /** \brief Instance of parallel planning to use for computing solutions in parallel */
+  ompl::tools::ParallelPlanPtr pp_;
 
-            /** \brief Tool for comparing two paths and scoring them */
-            const ompl::tools::DynamicTimeWarpPtr& getDynamicTimeWarp() const
-            {
-                return dtw_;
-            }
+  /** \brief A shared object between all the planners for saving and loading previous experience */
+  ompl::tools::LightningDBPtr experienceDB_;
 
-        protected:
+  /** \brief Tool for comparing two paths and scoring them */
+  ompl::tools::DynamicTimeWarpPtr dtw_;
 
-            /**
-             * \brief If path1 and path2 have a better start/goal match when reverse, then reverse path2
-             * \param path to test against
-             * \param path to reverse
-             * \return true if reverse was necessary
-             */
-            bool reversePathIfNecessary(ompl::geometric::PathGeometric &path1, ompl::geometric::PathGeometric &path2);
+};  // end of class Lightning
 
-            /// The maintained experience planner instance
-            base::PlannerPtr                  rrPlanner_;
+}  // end of namespace
 
-            /** \brief Instance of parallel planning to use for computing solutions in parallel */
-            ompl::tools::ParallelPlanPtr      pp_;
-
-            /** \brief A shared object between all the planners for saving and loading previous experience */
-            ompl::tools::LightningDBPtr      experienceDB_;
-
-            /** \brief Tool for comparing two paths and scoring them */
-            ompl::tools::DynamicTimeWarpPtr   dtw_;
-
-        }; // end of class Lightning
-
-    } // end of namespace
-
-} // end of namespace
+}  // end of namespace
 #endif

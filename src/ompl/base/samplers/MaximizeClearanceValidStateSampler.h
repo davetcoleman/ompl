@@ -42,51 +42,45 @@
 
 namespace ompl
 {
-    namespace base
-    {
+namespace base
+{
+/** \brief Generate valid samples randomly, but with a bias towards higher clearance. */
+class MaximizeClearanceValidStateSampler : public ValidStateSampler
+{
+public:
+  /** \brief Constructor */
+  MaximizeClearanceValidStateSampler(const SpaceInformation *si);
 
+  ~MaximizeClearanceValidStateSampler() override;
 
-        /** \brief Generate valid samples randomly, but with a bias towards higher clearance. */
-        class MaximizeClearanceValidStateSampler : public ValidStateSampler
-        {
-        public:
+  bool sample(State *state) override;
 
-            /** \brief Constructor */
-            MaximizeClearanceValidStateSampler(const SpaceInformation *si);
+  bool sampleNear(State *state, const State *near, const double distance) override;
 
-            ~MaximizeClearanceValidStateSampler() override;
+  /** \brief The number of attempts at improving the clearance of the sampled state. */
+  void setNrImproveAttempts(unsigned int attempts)
+  {
+    improveAttempts_ = attempts;
+  }
 
-            bool sample(State *state) override;
+  /** \brief Get the number of attempts to improve a sampled state */
+  unsigned int getNrImproveAttempts() const
+  {
+    return improveAttempts_;
+  }
 
-            bool sampleNear(State *state, const State *near, const double distance) override;
+protected:
+  /** \brief The sampler to build upon */
+  StateSamplerPtr sampler_;
 
-            /** \brief The number of attempts at improving the clearance of the sampled state. */
-            void setNrImproveAttempts(unsigned int attempts)
-            {
-                improveAttempts_ = attempts;
-            }
+  /** \brief Number of attempts to improve a valid sample */
+  unsigned int improveAttempts_;
 
-            /** \brief Get the number of attempts to improve a sampled state */
-            unsigned int getNrImproveAttempts() const
-            {
-                return improveAttempts_;
-            }
-
-        protected:
-
-            /** \brief The sampler to build upon */
-            StateSamplerPtr sampler_;
-
-            /** \brief Number of attempts to improve a valid sample */
-            unsigned int    improveAttempts_;
-
-        private:
-            /** \brief Temporary work area */
-            State          *work_;
-        };
-
-    }
+private:
+  /** \brief Temporary work area */
+  State *work_;
+};
 }
-
+}
 
 #endif

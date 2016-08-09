@@ -41,102 +41,95 @@
 
 namespace ompl
 {
-    namespace base
-    {
+namespace base
+{
+/** \brief Definition of an abstract state.
 
-        /** \brief Definition of an abstract state.
+    See \ref stateAlloc and \ref stateOps. */
+class State
+{
+private:
+  /** \brief Disable copy-constructor */
+  State(const State&);
 
-            See \ref stateAlloc and \ref stateOps. */
-        class State
-        {
-        private:
+  /** \brief Disable copy operator */
+  const State& operator=(const State&);
 
-            /** \brief Disable copy-constructor */
-            State(const State&);
+protected:
+  State() = default;
 
-            /** \brief Disable copy operator */
-            const State& operator=(const State&);
+  virtual ~State() = default;
 
-        protected:
+public:
+  /** \brief Cast this instance to a desired type. */
+  template <class T>
+  const T* as() const
+  {
+    /** \brief Make sure the type we are allocating is indeed a state */
+    BOOST_CONCEPT_ASSERT((boost::Convertible<T*, State*>));
 
-            State() = default;
+    return static_cast<const T*>(this);
+  }
 
-            virtual ~State() = default;
+  /** \brief Cast this instance to a desired type. */
+  template <class T>
+  T* as()
+  {
+    /** \brief Make sure the type we are allocating is indeed a state */
+    BOOST_CONCEPT_ASSERT((boost::Convertible<T*, State*>));
 
-        public:
+    return static_cast<T*>(this);
+  }
+};
 
-            /** \brief Cast this instance to a desired type. */
-            template<class T>
-            const T* as() const
-            {
-                /** \brief Make sure the type we are allocating is indeed a state */
-                BOOST_CONCEPT_ASSERT((boost::Convertible<T*, State*>));
+/** \brief Definition of a compound state */
+class CompoundState : public State
+{
+public:
+  CompoundState() : State(), components(nullptr)
+  {
+  }
 
-                return static_cast<const T*>(this);
-            }
+  ~CompoundState() override = default;
 
-            /** \brief Cast this instance to a desired type. */
-            template<class T>
-            T* as()
-            {
-                /** \brief Make sure the type we are allocating is indeed a state */
-                BOOST_CONCEPT_ASSERT((boost::Convertible<T*, State*>));
+  /** \brief Cast a component of this instance to a desired type. */
+  template <class T>
+  const T* as(const unsigned int index) const
+  {
+    /** \brief Make sure the type we are allocating is indeed a state */
+    BOOST_CONCEPT_ASSERT((boost::Convertible<T*, State*>));
 
-                return static_cast<T*>(this);
-            }
+    return static_cast<const T*>(components[index]);
+  }
 
-        };
+  /** \brief Cast a component of this instance to a desired type. */
+  template <class T>
+  T* as(const unsigned int index)
+  {
+    /** \brief Make sure the type we are allocating is indeed a state */
+    BOOST_CONCEPT_ASSERT((boost::Convertible<T*, State*>));
 
-        /** \brief Definition of a compound state */
-        class CompoundState : public State
-        {
-        public:
+    return static_cast<T*>(components[index]);
+  }
 
-            CompoundState() : State(), components(nullptr)
-            {
-            }
+  /** \brief Access const element i<sup>th</sup> component. This
+      does not check whether the index is within bounds. */
+  const State* operator[](unsigned int i) const
+  {
+    return components[i];
+  }
 
-            ~CompoundState() override = default;
+  /** \brief Access element i<sup>th</sup> component. This
+      does not check whether the index is within bounds. */
+  State* operator[](unsigned int i)
+  {
+    return components[i];
+  }
 
-            /** \brief Cast a component of this instance to a desired type. */
-            template<class T>
-            const T* as(const unsigned int index) const
-            {
-                /** \brief Make sure the type we are allocating is indeed a state */
-                BOOST_CONCEPT_ASSERT((boost::Convertible<T*, State*>));
-
-                return static_cast<const T*>(components[index]);
-            }
-
-            /** \brief Cast a component of this instance to a desired type. */
-            template<class T>
-            T* as(const unsigned int index)
-            {
-                /** \brief Make sure the type we are allocating is indeed a state */
-                BOOST_CONCEPT_ASSERT((boost::Convertible<T*, State*>));
-
-                return static_cast<T*>(components[index]);
-            }
-
-            /** \brief Access const element i<sup>th</sup> component. This
-                does not check whether the index is within bounds. */
-            const State* operator[](unsigned int i) const
-            {
-                return components[i];
-            }
-
-            /** \brief Access element i<sup>th</sup> component. This
-                does not check whether the index is within bounds. */
-            State* operator[](unsigned int i)
-            {
-                return components[i];
-            }
-
-            /** \brief The components that make up a compound state */
-            State **components;
-        };
-
-    }
+  /** \brief The components that make up a compound state */
+  State** components;
+};
+}
 }
 
 #endif

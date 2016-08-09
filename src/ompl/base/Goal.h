@@ -48,109 +48,107 @@
 
 namespace ompl
 {
-    namespace base
-    {
-        /// @cond IGNORE
-        /** \brief Forward declaration of ompl::base::Goal */
-        OMPL_CLASS_FORWARD(Goal);
-        /// @endcond
+namespace base
+{
+/// @cond IGNORE
+/** \brief Forward declaration of ompl::base::Goal */
+OMPL_CLASS_FORWARD(Goal);
+/// @endcond
 
-        /** \class ompl::base::GoalPtr
-            \brief A shared pointer wrapper for ompl::base::Goal */
+/** \class ompl::base::GoalPtr
+    \brief A shared pointer wrapper for ompl::base::Goal */
 
-        /** \brief Abstract definition of goals.*/
-        class Goal
-        {
-        public:
-            // non-copyable
-            Goal(const Goal&) = delete;
-            Goal& operator=(const Goal&) = delete;
+/** \brief Abstract definition of goals.*/
+class Goal
+{
+public:
+  // non-copyable
+  Goal(const Goal &) = delete;
+  Goal &operator=(const Goal &) = delete;
 
-            /** \brief Constructor. The goal must always know the space information it is part of */
-            Goal(SpaceInformationPtr si);
+  /** \brief Constructor. The goal must always know the space information it is part of */
+  Goal(SpaceInformationPtr si);
 
-            /** \brief Destructor.*/
-            virtual ~Goal() = default;
+  /** \brief Destructor.*/
+  virtual ~Goal() = default;
 
-            /** \brief Cast this instance to a desired type. */
-            template<class T>
-            T* as()
-            {
-                /** \brief Make sure the type we are casting to is indeed a goal */
-                BOOST_CONCEPT_ASSERT((boost::Convertible<T*, Goal*>));
+  /** \brief Cast this instance to a desired type. */
+  template <class T>
+  T *as()
+  {
+    /** \brief Make sure the type we are casting to is indeed a goal */
+    BOOST_CONCEPT_ASSERT((boost::Convertible<T *, Goal *>));
 
-                return static_cast<T*>(this);
-            }
+    return static_cast<T *>(this);
+  }
 
-            /** \brief Cast this instance to a desired type. */
-            template<class T>
-            const T* as() const
-            {
-                /** \brief Make sure the type we are casting to is indeed a goal */
-                BOOST_CONCEPT_ASSERT((boost::Convertible<T*, Goal*>));
+  /** \brief Cast this instance to a desired type. */
+  template <class T>
+  const T *as() const
+  {
+    /** \brief Make sure the type we are casting to is indeed a goal */
+    BOOST_CONCEPT_ASSERT((boost::Convertible<T *, Goal *>));
 
-                return static_cast<const T*>(this);
-            }
+    return static_cast<const T *>(this);
+  }
 
-            /** \brief Return the goal type */
-            GoalType getType() const
-            {
-                return type_;
-            }
+  /** \brief Return the goal type */
+  GoalType getType() const
+  {
+    return type_;
+  }
 
-            /** \brief Check if this goal can be cast to a particular goal type */
-            bool hasType(GoalType type) const
-            {
-                return (type_ & type) == type;
-            }
+  /** \brief Check if this goal can be cast to a particular goal type */
+  bool hasType(GoalType type) const
+  {
+    return (type_ & type) == type;
+  }
 
-            /** \brief Get the space information this goal is for */
-            const SpaceInformationPtr& getSpaceInformation() const
-            {
-                return si_;
-            }
+  /** \brief Get the space information this goal is for */
+  const SpaceInformationPtr &getSpaceInformation() const
+  {
+    return si_;
+  }
 
-            /** \brief Return true if the state satisfies the goal
-             *  constraints. */
-            virtual bool isSatisfied(const State *st) const = 0;
+  /** \brief Return true if the state satisfies the goal
+   *  constraints. */
+  virtual bool isSatisfied(const State *st) const = 0;
 
-            /** \brief Return true if the state satisfies the goal
-             *  constraints and compute the distance between the state
-             *  given as argument and the goal (even if the goal is
-             *  not satisfied). This distance can be an
-             *  approximation. It can even be set to a constant, if
-             *  such a computation is not possible.
-             *  \param st the state to check for validity
-             *  \param distance location at which distance to goal will be stored
-             *  \note The default implementation sets the distance to a constant.
-             *  \note If this function returns true,
-             *  isStartGoalPairValid() need not be called. */
-            virtual bool isSatisfied(const State *st, double *distance) const;
+  /** \brief Return true if the state satisfies the goal
+   *  constraints and compute the distance between the state
+   *  given as argument and the goal (even if the goal is
+   *  not satisfied). This distance can be an
+   *  approximation. It can even be set to a constant, if
+   *  such a computation is not possible.
+   *  \param st the state to check for validity
+   *  \param distance location at which distance to goal will be stored
+   *  \note The default implementation sets the distance to a constant.
+   *  \note If this function returns true,
+   *  isStartGoalPairValid() need not be called. */
+  virtual bool isSatisfied(const State *st, double *distance) const;
 
-            /** \brief Since there can be multiple starting states
-                (and multiple goal states) it is possible certain
-                pairs are not to be allowed. By default we however
-                assume all such pairs are allowed. Note: if this
-                function returns true, isSatisfied() need not be
-                called. */
-            virtual bool isStartGoalPairValid(const State * /* start */, const State * /* goal */) const
-            {
-                return true;
-            }
+  /** \brief Since there can be multiple starting states
+      (and multiple goal states) it is possible certain
+      pairs are not to be allowed. By default we however
+      assume all such pairs are allowed. Note: if this
+      function returns true, isSatisfied() need not be
+      called. */
+  virtual bool isStartGoalPairValid(const State * /* start */, const State * /* goal */) const
+  {
+    return true;
+  }
 
-            /** \brief Print information about the goal */
-            virtual void print(std::ostream &out = std::cout) const;
+  /** \brief Print information about the goal */
+  virtual void print(std::ostream &out = std::cout) const;
 
-        protected:
+protected:
+  /** \brief Goal type */
+  GoalType type_;
 
-            /** \brief Goal type */
-            GoalType                     type_;
-
-            /** \brief The space information for this goal */
-            SpaceInformationPtr          si_;
-        };
-
-    }
+  /** \brief The space information for this goal */
+  SpaceInformationPtr si_;
+};
+}
 }
 
 #endif

@@ -45,352 +45,344 @@
 
 namespace ompl
 {
+/** \brief Representation of a simple grid */
+template <typename _T>
+class Grid
+{
+public:
+  /// Definition of a coordinate within this grid
+  using Coord = std::vector<int>;
 
-    /** \brief Representation of a simple grid */
-    template <typename _T>
-    class Grid
+  /// Definition of a cell in this grid
+  struct Cell
+  {
+    /// The data we store in the cell
+    _T data;
+
+    /// The coordinate of the cell
+    Coord coord;
+
+    Cell() = default;
+
+    virtual ~Cell() = default;
+  };
+
+  /// The datatype for arrays of cells
+  using CellArray = std::vector<Cell *>;
+
+  /// The constructor takes the dimension of the grid as argument
+  explicit Grid(unsigned int dimension)
+  {
+    setDimension(dimension);
+  }
+
+  /// Destructor
+  virtual ~Grid()
+  {
+    freeMemory();
+  }
+
+  /// Clear all cells in the grid
+  virtual void clear()
+  {
+    freeMemory();
+  }
+
+  /// Return the dimension of the grid
+  unsigned int getDimension() const
+  {
+    return dimension_;
+  }
+
+  /// Update the dimension of the grid; this should not be done
+  /// unless the grid is empty
+  void setDimension(unsigned int dimension)
+  {
+    if (!empty())
+      throw;
+    dimension_ = dimension;
+    maxNeighbors_ = 2 * dimension_;
+  }
+
+  /// Check if a cell exists at the specified coordinate
+  bool has(const Coord &coord) const
+  {
+    return getCell(coord) != nullptr;
+  }
+
+  /// Get the cell at a specified coordinate
+  Cell *getCell(const Coord &coord) const
+  {
+    auto pos = hash_.find(const_cast<Coord *>(&coord));
+    Cell *c = (pos != hash_.end()) ? pos->second : nullptr;
+    return c;
+  }
+
+  /// Get the list of neighbors for a given cell
+  void neighbors(const Cell *cell, CellArray &list) const
+  {
+    Coord test = cell->coord;
+    neighbors(test, list);
+  }
+
+  /// Get the list of neighbors for a given coordinate
+  void neighbors(const Coord &coord, CellArray &list) const
+  {
+    Coord test = coord;
+    neighbors(test, list);
+  }
+
+  /// Get the list of neighbors for a given coordinate
+  void neighbors(Coord &coord, CellArray &list) const
+  {
+    list.reserve(list.size() + maxNeighbors_);
+
+    for (int i = dimension_ - 1; i >= 0; --i)
     {
-    public:
+      coord[i]--;
 
-        /// Definition of a coordinate within this grid
-        using Coord = std::vector<int>;
+      auto pos = hash_.find(&coord);
+      Cell *cell = (pos != hash_.end()) ? pos->second : nullptr;
 
-        /// Definition of a cell in this grid
-        struct Cell
+      if (cell)
+        list.push_back(cell);
+      coord[i] += 2;
+
+      pos = hash_.find(&coord);
+      cell = (pos != hash_.end()) ? pos->second : nullptr;
+
+      if (cell)
+        list.push_back(cell);
+      coord[i]--;
+    }
+  }
+
+  /// Get the connected components formed by the cells in this grid (based on neighboring relation)
+  std::vector<std::vector<Cell *> > components() const
+  {
+    using ComponentHash = std::unordered_map<Coord *, int, HashFunCoordPtr, EqualCoordPtr>;
+
+    int components = 0;
+    ComponentHash ch;
+    std::vector<std::vector<Cell *> > res;
+
+    for (auto i = hash_.begin(); i != hash_.end(); ++i)
+    {
+      Cell *c0 = i->second;
+      auto pos = ch.find(&c0->coord);
+      int comp = (pos != ch.end()) ? pos->second : -1;
+
+      if (comp < 0)
+      {
+        res.resize(res.size() + 1);
+        std::vector<Cell *> &q = res.back();
+        q.push_back(c0);
+        std::size_t index = 0;
+        while (index < q.size())
         {
-            /// The data we store in the cell
-            _T                  data;
+          Cell *c = q[index++];
+          pos = ch.find(&c->coord);
+          comp = (pos != ch.end()) ? pos->second : -1;
 
-            /// The coordinate of the cell
-            Coord               coord;
-
-            Cell() = default;
-
-            virtual ~Cell() = default;
-        };
-
-        /// The datatype for arrays of cells
-        using CellArray = std::vector<Cell *>;
-
-
-        /// The constructor takes the dimension of the grid as argument
-        explicit
-        Grid(unsigned int dimension)
-        {
-            setDimension(dimension);
-        }
-
-        /// Destructor
-        virtual ~Grid()
-        {
-            freeMemory();
-        }
-
-        /// Clear all cells in the grid
-        virtual void clear()
-        {
-            freeMemory();
-        }
-
-        /// Return the dimension of the grid
-        unsigned int getDimension() const
-        {
-            return dimension_;
-        }
-
-        /// Update the dimension of the grid; this should not be done
-        /// unless the grid is empty
-        void setDimension(unsigned int dimension)
-        {
-            if (!empty())
-                throw;
-            dimension_ = dimension;
-            maxNeighbors_ = 2 * dimension_;
-        }
-
-        /// Check if a cell exists at the specified coordinate
-        bool has(const Coord &coord) const
-        {
-            return getCell(coord) != nullptr;
-        }
-
-        /// Get the cell at a specified coordinate
-        Cell* getCell(const Coord &coord) const
-        {
-            auto pos = hash_.find(const_cast<Coord*>(&coord));
-            Cell *c = (pos != hash_.end()) ? pos->second : nullptr;
-            return c;
-        }
-
-        /// Get the list of neighbors for a given cell
-        void    neighbors(const Cell* cell, CellArray& list) const
-        {
-            Coord test = cell->coord;
-            neighbors(test, list);
-        }
-
-        /// Get the list of neighbors for a given coordinate
-        void    neighbors(const Coord& coord, CellArray& list) const
-        {
-            Coord test = coord;
-            neighbors(test, list);
-        }
-
-        /// Get the list of neighbors for a given coordinate
-        void    neighbors(Coord& coord, CellArray& list) const
-        {
-            list.reserve(list.size() + maxNeighbors_);
-
-            for (int i = dimension_ - 1 ; i >= 0 ; --i)
+          if (comp < 0)
+          {
+            ch.insert(std::make_pair(&c->coord, components));
+            std::vector<Cell *> nbh;
+            neighbors(c, nbh);
+            for (unsigned int j = 0; j < nbh.size(); ++j)
             {
-                coord[i]--;
-
-                auto pos = hash_.find(&coord);
-                Cell *cell = (pos != hash_.end()) ? pos->second : nullptr;
-
-                if (cell)
-                    list.push_back(cell);
-                coord[i] += 2;
-
-                pos = hash_.find(&coord);
-                cell = (pos != hash_.end()) ? pos->second : nullptr;
-
-                if (cell)
-                    list.push_back(cell);
-                coord[i]--;
+              pos = ch.find(&nbh[j]->coord);
+              comp = (pos != ch.end()) ? pos->second : -1;
+              if (comp < 0)
+                q.push_back(nbh[j]);
             }
+          }
+          else
+          {
+            --index;
+            q.erase(q.begin() + index);
+          }
         }
+        ++components;
+      }
+    }
+    std::sort(res.begin(), res.end(), SortComponents());
+    return res;
+  }
 
-        /// Get the connected components formed by the cells in this grid (based on neighboring relation)
-        std::vector< std::vector<Cell*> > components() const
-        {
-            using ComponentHash = std::unordered_map<Coord*, int, HashFunCoordPtr, EqualCoordPtr>;
+  /// Instantiate a new cell at given coordinates; optionally
+  /// Return the list of future neighbors.
+  /// Note: this call only creates the cell, but does not add it to the grid.
+  /// It however updates the neighbor count for neighboring cells
+  virtual Cell *createCell(const Coord &coord, CellArray *nbh = nullptr)
+  {
+    auto *cell = new Cell();
+    cell->coord = coord;
+    if (nbh)
+      neighbors(cell->coord, *nbh);
+    return cell;
+  }
 
-            int components = 0;
-            ComponentHash ch;
-            std::vector< std::vector<Cell*> > res;
+  /// Remove a cell from the grid. If the cell has not been
+  /// Added to the grid, only update the neighbor list
+  virtual bool remove(Cell *cell)
+  {
+    if (cell)
+    {
+      auto pos = hash_.find(&cell->coord);
+      if (pos != hash_.end())
+      {
+        hash_.erase(pos);
+        return true;
+      }
+    }
+    return false;
+  }
 
-            for (auto i = hash_.begin() ; i != hash_.end() ; ++i)
-            {
-                Cell *c0 = i->second;
-                auto pos = ch.find(&c0->coord);
-                int comp = (pos != ch.end()) ? pos->second : -1;
+  /// Add an instantiated cell to the grid
+  virtual void add(Cell *cell)
+  {
+    hash_.insert(std::make_pair(&cell->coord, cell));
+  }
 
-                if (comp < 0)
-                {
-                    res.resize(res.size() + 1);
-                    std::vector<Cell*> &q = res.back();
-                    q.push_back(c0);
-                    std::size_t index = 0;
-                    while (index < q.size())
-                    {
-                        Cell *c = q[index++];
-                        pos = ch.find(&c->coord);
-                        comp = (pos != ch.end()) ? pos->second : -1;
+  /// Clear the memory occupied by a cell; do not call this function unless remove() was called first
+  virtual void destroyCell(Cell *cell) const
+  {
+    delete cell;
+  }
 
-                        if (comp < 0)
-                        {
-                            ch.insert(std::make_pair(&c->coord, components));
-                            std::vector< Cell* > nbh;
-                            neighbors(c, nbh);
-                            for (unsigned int j = 0 ; j < nbh.size() ; ++j)
-                            {
-                                pos = ch.find(&nbh[j]->coord);
-                                comp = (pos != ch.end()) ? pos->second : -1;
-                                if (comp < 0)
-                                    q.push_back(nbh[j]);
-                            }
-                        }
-                        else
-                        {
-                            --index;
-                            q.erase(q.begin() + index);
-                        }
-                    }
-                    ++components;
-                }
-            }
-            std::sort(res.begin(), res.end(), SortComponents());
-            return res;
-        }
+  /// Get the data stored in the cells we are aware of
+  void getContent(std::vector<_T> &content) const
+  {
+    for (auto i = hash_.begin(); i != hash_.end(); ++i)
+      content.push_back(i->second->data);
+  }
 
-        /// Instantiate a new cell at given coordinates; optionally
-        /// Return the list of future neighbors.
-        /// Note: this call only creates the cell, but does not add it to the grid.
-        /// It however updates the neighbor count for neighboring cells
-        virtual Cell* createCell(const Coord& coord, CellArray *nbh = nullptr)
-        {
-            auto *cell = new Cell();
-            cell->coord = coord;
-            if (nbh)
-                neighbors(cell->coord, *nbh);
-            return cell;
-        }
+  /// Get the set of coordinates where there are cells
+  void getCoordinates(std::vector<Coord *> &coords) const
+  {
+    for (iterator i = hash_.begin(); i != hash_.end(); ++i)
+      coords.push_back(i->first);
+  }
 
-        /// Remove a cell from the grid. If the cell has not been
-        /// Added to the grid, only update the neighbor list
-        virtual bool remove(Cell *cell)
-        {
-            if (cell)
-            {
-                auto pos = hash_.find(&cell->coord);
-                if (pos != hash_.end())
-                {
-                    hash_.erase(pos);
-                    return true;
-                }
-            }
-            return false;
-        }
+  /// Get the set of instantiated cells in the grid
+  void getCells(CellArray &cells) const
+  {
+    for (auto i = hash_.begin(); i != hash_.end(); ++i)
+      cells.push_back(i->second);
+  }
 
-        /// Add an instantiated cell to the grid
-        virtual void add(Cell *cell)
-        {
-            hash_.insert(std::make_pair(&cell->coord, cell));
-        }
+  /// Print the value of a coordinate to a stream
+  void printCoord(Coord &coord, std::ostream &out = std::cout) const
+  {
+    out << "[ ";
+    for (unsigned int i = 0; i < dimension_; ++i)
+      out << coord[i] << " ";
+    out << "]" << std::endl;
+  }
 
-        /// Clear the memory occupied by a cell; do not call this function unless remove() was called first
-        virtual void destroyCell(Cell *cell) const
-        {
-            delete cell;
-        }
+  /// Check if the grid is empty
+  bool empty() const
+  {
+    return hash_.empty();
+  }
 
-        /// Get the data stored in the cells we are aware of
-        void getContent(std::vector<_T> &content) const
-        {
-            for (auto i = hash_.begin() ; i != hash_.end() ; ++i)
-                content.push_back(i->second->data);
-        }
+  /// Check the size of the grid
+  unsigned int size() const
+  {
+    return hash_.size();
+  }
 
-        /// Get the set of coordinates where there are cells
-        void getCoordinates(std::vector<Coord*> &coords) const
-        {
-            for (iterator i = hash_.begin() ; i != hash_.end() ; ++i)
-                coords.push_back(i->first);
-        }
+  /// Print information about the data in this grid structure
+  virtual void status(std::ostream &out = std::cout) const
+  {
+    out << size() << " total cells " << std::endl;
+    const std::vector<std::vector<Cell *> > &comp = components();
+    out << comp.size() << " connected components: ";
+    for (std::size_t i = 0; i < comp.size(); ++i)
+      out << comp[i].size() << " ";
+    out << std::endl;
+  }
 
-        /// Get the set of instantiated cells in the grid
-        void getCells(CellArray &cells) const
-        {
-            for (auto i = hash_.begin() ; i != hash_.end() ; ++i)
-                cells.push_back(i->second);
-        }
+protected:
+  /// Free the allocated memory
+  void freeMemory()
+  {
+    CellArray content;
+    getCells(content);
+    hash_.clear();
 
-        /// Print the value of a coordinate to a stream
-        void printCoord(Coord& coord, std::ostream &out = std::cout) const
-        {
-            out << "[ ";
-            for (unsigned int i = 0 ; i < dimension_ ; ++i)
-                out << coord[i] << " ";
-            out << "]" << std::endl;
-        }
+    for (unsigned int i = 0; i < content.size(); ++i)
+      delete content[i];
+  }
 
-        /// Check if the grid is empty
-        bool empty() const
-        {
-            return hash_.empty();
-        }
+  /// Hash function for coordinates; see http://www.cs.hmc.edu/~geoff/classes/hmc.cs070.200101/homework10/hashfuncs.html
+  struct HashFunCoordPtr
+  {
+    /// Hash function for coordinates
+    std::size_t operator()(const Coord *const s) const
+    {
+      unsigned long h = 0;
+      for (int i = s->size() - 1; i >= 0; --i)
+      {
+        int high = h & 0xf8000000;
+        h = h << 5;
+        h = h ^ (high >> 27);
+        h = h ^ s->at(i);
+      }
+      return (std::size_t)h;
+    }
+  };
 
-        /// Check the size of the grid
-        unsigned int size() const
-        {
-            return hash_.size();
-        }
+  /// Equality operator for coordinate pointers
+  struct EqualCoordPtr
+  {
+    /// Equality operator for coordinate pointers
+    bool operator()(const Coord *const c1, const Coord *const c2) const
+    {
+      return *c1 == *c2;
+    }
+  };
 
-        /// Print information about the data in this grid structure
-        virtual void status(std::ostream &out = std::cout) const
-        {
-            out << size() << " total cells " << std::endl;
-            const std::vector< std::vector<Cell*> > &comp = components();
-            out << comp.size() << " connected components: ";
-            for (std::size_t i = 0 ; i < comp.size() ; ++i)
-                out << comp[i].size() << " ";
-            out << std::endl;
-        }
+  /// Define the datatype for the used hash structure
+  using CoordHash = std::unordered_map<Coord *, Cell *, HashFunCoordPtr, EqualCoordPtr>;
 
-    protected:
+  /// Helper to sort components by size
+  struct SortComponents
+  {
+    /// Helper to sort components by size
+    bool operator()(const std::vector<Cell *> &a, const std::vector<Cell *> &b) const
+    {
+      return a.size() > b.size();
+    }
+  };
 
-        /// Free the allocated memory
-        void freeMemory()
-        {
-            CellArray content;
-            getCells(content);
-            hash_.clear();
+public:
+  /// We only allow const iterators
+  using iterator = typename CoordHash::const_iterator;
 
-            for (unsigned int i = 0 ; i < content.size() ; ++i)
-                delete content[i];
-        }
+  /// Return the begin() iterator for the grid
+  iterator begin() const
+  {
+    return hash_.begin();
+  }
 
-        /// Hash function for coordinates; see http://www.cs.hmc.edu/~geoff/classes/hmc.cs070.200101/homework10/hashfuncs.html
-        struct HashFunCoordPtr
-        {
-            /// Hash function for coordinates
-            std::size_t operator()(const Coord* const s) const
-            {
-                unsigned long h = 0;
-                for (int i = s->size() - 1; i >= 0; --i)
-                {
-                    int high = h & 0xf8000000;
-                    h = h << 5;
-                    h = h ^ (high >> 27);
-                    h = h ^ s->at(i);
-                }
-                return (std::size_t) h;
-            }
-        };
+  /// Return the end() iterator for the grid
+  iterator end() const
+  {
+    return hash_.end();
+  }
 
+protected:
+  /// The dimension of the grid
+  unsigned int dimension_;
 
-        /// Equality operator for coordinate pointers
-        struct EqualCoordPtr
-        {
-            /// Equality operator for coordinate pointers
-            bool operator()(const Coord* const c1, const Coord* const c2) const
-            {
-                return *c1 == *c2;
-            }
-        };
+  /// The maximum number of neighbors a cell can have (2 * dimension)
+  unsigned int maxNeighbors_;
 
-        /// Define the datatype for the used hash structure
-        using CoordHash = std::unordered_map<Coord*, Cell*, HashFunCoordPtr, EqualCoordPtr>;
-
-        /// Helper to sort components by size
-        struct SortComponents
-        {
-            /// Helper to sort components by size
-            bool operator()(const std::vector<Cell*> &a, const std::vector<Cell*> &b) const
-            {
-                return a.size() > b.size();
-            }
-        };
-
-    public:
-
-        /// We only allow const iterators
-        using iterator = typename CoordHash::const_iterator;
-
-        /// Return the begin() iterator for the grid
-        iterator begin() const
-        {
-            return hash_.begin();
-        }
-
-        /// Return the end() iterator for the grid
-        iterator end() const
-        {
-            return hash_.end();
-        }
-
-    protected:
-
-        /// The dimension of the grid
-        unsigned int     dimension_;
-
-        /// The maximum number of neighbors a cell can have (2 * dimension)
-        unsigned int     maxNeighbors_;
-
-        /// The hash holding the cells
-        CoordHash        hash_;
-    };
+  /// The hash holding the cells
+  CoordHash hash_;
+};
 }
 
 #endif

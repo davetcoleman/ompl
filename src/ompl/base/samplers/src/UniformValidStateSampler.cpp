@@ -37,34 +37,34 @@
 #include "ompl/base/samplers/UniformValidStateSampler.h"
 #include "ompl/base/SpaceInformation.h"
 
-ompl::base::UniformValidStateSampler::UniformValidStateSampler(const SpaceInformation *si) :
-    ValidStateSampler(si), sampler_(si->allocStateSampler())
+ompl::base::UniformValidStateSampler::UniformValidStateSampler(const SpaceInformation *si)
+  : ValidStateSampler(si), sampler_(si->allocStateSampler())
 {
-    name_ = "uniform";
+  name_ = "uniform";
 }
 
 bool ompl::base::UniformValidStateSampler::sample(State *state)
 {
-    unsigned int attempts = 0;
-    bool valid = false;
-    do
-    {
-        sampler_->sampleUniform(state);
-        valid = si_->isValid(state);
-        ++attempts;
-    } while (!valid && attempts < attempts_);
-    return valid;
+  unsigned int attempts = 0;
+  bool valid = false;
+  do
+  {
+    sampler_->sampleUniform(state);
+    valid = si_->isValid(state);
+    ++attempts;
+  } while (!valid && attempts < attempts_);
+  return valid;
 }
 
 bool ompl::base::UniformValidStateSampler::sampleNear(State *state, const State *near, const double distance)
 {
-    unsigned int attempts = 0;
-    bool valid = false;
-    do
-    {
-        sampler_->sampleUniformNear(state, near, distance);
-        valid = si_->isValid(state);
-        ++attempts;
-    } while (!valid && attempts < attempts_);
-    return valid;
+  unsigned int attempts = 0;
+  bool valid = false;
+  do
+  {
+    sampler_->sampleUniformNear(state, near, distance);
+    valid = si_->isValid(state);
+    ++attempts;
+  } while (!valid && attempts < attempts_);
+  return valid;
 }
