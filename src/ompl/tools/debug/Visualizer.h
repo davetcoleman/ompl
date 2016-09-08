@@ -39,10 +39,12 @@
 #ifndef OMPL_TOOLS_DEBUG_VISUALIZER_
 #define OMPL_TOOLS_DEBUG_VISUALIZER_
 
-#include <ompl/base/Planner.h>
-#include <ompl/geometric/PathGeometric.h>
-#include <functional>
+//#include <ompl/base/Planner.h>
 #include <ompl/tools/debug/VizWindow.h>
+
+// C++
+#include <functional>
+#include <cassert>
 
 namespace ompl
 {
@@ -71,11 +73,6 @@ namespace ompl
          */
         typedef std::function<void(const std::string &)> VizWaitFeedback;
 
-        /**
-         * \brief Visualization callback hook for external debugging that tells OMPL when to end early by SIG INT
-         */
-        // typedef std::function<bool(void)> VizCheckSigInt;
-
         /** \brief Use an external program to visualize search */
         class Visualizer
         {
@@ -84,7 +81,6 @@ namespace ompl
 
             Visualizer()
             {
-                OMPL_INFORM("Setting visualizers to count %u", NUM_VISUALIZERS);
                 viz_.resize(NUM_VISUALIZERS);
             }
 

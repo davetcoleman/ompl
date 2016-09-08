@@ -251,6 +251,18 @@ namespace ompl
                 return states_.size();
             }
 
+            /** \brief Set this flag to false to avoid freeing the memory allocated for states when class is unloaded */
+            void freeStates(bool flag)
+            {
+                freeStates_ = flag;
+            }
+
+            /** \brief Return true if the memory of states is freed when class unloaded */
+            bool freeStates() const
+            {
+                return freeStates_;
+            }
+
             /** @} */
 
         protected:
@@ -262,6 +274,9 @@ namespace ompl
 
             /** \brief The list of states that make up the path */
             std::vector<base::State *> states_;
+
+            /** \brief Flag indicating whether the states should be deleted automatically when class unloaded */
+            bool freeStates_ = true;
         };
     }
 }

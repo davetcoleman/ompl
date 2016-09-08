@@ -39,6 +39,7 @@
 
 #include "ompl/base/State.h"
 #include "ompl/util/ClassForward.h"
+#include <ompl/tools/debug/Visualizer.h>
 
 namespace ompl
 {
@@ -167,6 +168,18 @@ namespace ompl
                 clearanceSearchDistance_ = clearanceSearchDistance;
             }
 
+            /** \brief Get class for managing various visualization features */
+            ompl::tools::VisualizerPtr getVisual()
+            {
+                return visual_;
+            }
+
+            /** \brief Set class for managing various visualization features */
+            void setVisual(ompl::tools::VisualizerPtr visual)
+            {
+                visual_ = visual;
+            }
+
         protected:
             /** \brief The instance of space information this state validity checker operates on */
             SpaceInformation *si_;
@@ -178,6 +191,9 @@ namespace ompl
                 the search distance to look for nearby obstacles. This is likely the
                 same value as your minimum required clearance. */
             double clearanceSearchDistance_;
+
+            /** \brief Class for managing various visualization features */
+            ompl::tools::VisualizerPtr visual_;
         };
 
         /** \brief The simplest state validity checker: all states are valid */

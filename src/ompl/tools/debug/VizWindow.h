@@ -39,7 +39,19 @@
 #ifndef OMPL_TOOLS_DEBUG_VIZ_WINDOW_
 #define OMPL_TOOLS_DEBUG_VIZ_WINDOW_
 
-#include <ompl/geometric/PathGeometric.h>
+#include <ompl/util/ClassForward.h>
+#include <ompl/base/State.h>
+
+// C++
+#include <vector>
+
+namespace ompl
+{
+namespace geometric
+{
+OMPL_CLASS_FORWARD(PathGeometric);
+}
+}
 
 namespace ompl
 {

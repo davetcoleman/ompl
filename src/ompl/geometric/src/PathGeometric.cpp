@@ -84,8 +84,9 @@ void ompl::geometric::PathGeometric::copyFrom(const PathGeometric &other)
 
 void ompl::geometric::PathGeometric::freeMemory()
 {
-    for (auto &state : states_)
-        si_->freeState(state);
+    if (freeStates_)
+        for (auto &state : states_)
+            si_->freeState(state);
 }
 
 ompl::base::Cost ompl::geometric::PathGeometric::cost(const base::OptimizationObjectivePtr &opt) const
