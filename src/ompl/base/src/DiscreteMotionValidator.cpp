@@ -89,11 +89,16 @@ bool ompl::base::DiscreteMotionValidator::checkMotion(const State *s1, const Sta
     return result;
 }
 
-bool ompl::base::DiscreteMotionValidator::checkMotion(const State *s1, const State *s2) const
+bool ompl::base::DiscreteMotionValidator::checkMotion(const State *s1, const State *s2, tools::VisualizerPtr visualizer) const
 {
     /* assume motion starts in a valid configuration so s1 is valid */
     if (!isValid(s2))
     {
+        if (visualizer)
+        {
+            visualizer->viz2()->state(s2, tools::MEDIUM, tools::RED, 0);
+        }
+
         invalid_++;
         return false;
     }
@@ -120,6 +125,11 @@ bool ompl::base::DiscreteMotionValidator::checkMotion(const State *s1, const Sta
 
             if (!isValid(test))
             {
+                if (visualizer)
+                {
+                    visualizer->viz2()->state(test, tools::SMALL, tools::RED, 0);
+                }
+
                 result = false;
                 break;
             }
@@ -154,7 +164,9 @@ bool ompl::base::DiscreteMotionValidator::isValid(const State *state) const
             return false;                                           // state not valid, do not bother checking clearance
 
         if (dist < clearance_)
+        {
             return false;  // not enough clearance
+        }
 
         return true;
     }
