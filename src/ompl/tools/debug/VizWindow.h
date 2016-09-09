@@ -155,6 +155,9 @@ namespace ompl
             /** \brief Trigger visualizer to clear all graphics */
             virtual void deleteAllMarkers() = 0;
 
+            /** \brief Pause process and only accept incoming ROS messages */
+            virtual void spin() = 0;
+
             /** \brief Check if SIGINT has been called for shutdown */
             virtual bool shutdownRequested() = 0;
 
