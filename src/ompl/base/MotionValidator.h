@@ -81,7 +81,7 @@ namespace ompl
                is valid.
 
                 \note This function updates the number of valid and invalid segments. */
-            virtual bool checkMotion(const State *s1, const State *s2, tools::VisualizerPtr visualizer = NULL) const = 0;
+            virtual bool checkMotion(const State *s1, const State *s2, tools::VisualizerPtr visual = NULL) const = 0;
 
             /** \brief Check if the path between two states is valid. Also compute the last state that was
                 valid and the time of that state. The time is used to parametrize the motion from \e s1 to \e s2, \e s1
