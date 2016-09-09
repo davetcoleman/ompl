@@ -450,7 +450,9 @@ void ompl::geometric::PathSimplifier::simplify(PathGeometric &path, const base::
         // we always run this if the metric-space algorithms were run.  In non-metric spaces this does not work.
         const std::pair<bool, bool> &p = path.checkAndRepair(magic::MAX_VALID_SAMPLE_ATTEMPTS);
         if (!p.second)
+        {
             OMPL_WARN("Solution path may slightly touch on an invalid region of the state space");
+        }
         // else
         //     if (!p.first)
         //         OMPL_DEBUG("The solution path was slightly touching on an invalid region of the state space, but it

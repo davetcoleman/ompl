@@ -89,14 +89,14 @@ bool ompl::base::DiscreteMotionValidator::checkMotion(const State *s1, const Sta
     return result;
 }
 
-bool ompl::base::DiscreteMotionValidator::checkMotion(const State *s1, const State *s2, tools::VisualizerPtr visualizer) const
+bool ompl::base::DiscreteMotionValidator::checkMotion(const State *s1, const State *s2, tools::VisualizerPtr visual) const
 {
     /* assume motion starts in a valid configuration so s1 is valid */
     if (!isValid(s2))
     {
-        if (visualizer)
+        if (visual)
         {
-            visualizer->viz2()->state(s2, tools::MEDIUM, tools::RED, 0);
+            visual->viz2()->state(s2, tools::MEDIUM, tools::RED, 0);
         }
 
         invalid_++;
@@ -125,9 +125,9 @@ bool ompl::base::DiscreteMotionValidator::checkMotion(const State *s1, const Sta
 
             if (!isValid(test))
             {
-                if (visualizer)
+                if (visual)
                 {
-                    visualizer->viz2()->state(test, tools::SMALL, tools::RED, 0);
+                    visual->viz2()->state(test, tools::SMALL, tools::RED, 0);
                 }
 
                 result = false;
