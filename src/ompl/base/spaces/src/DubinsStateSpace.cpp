@@ -382,7 +382,7 @@ bool ompl::base::DubinsMotionValidator::checkMotion(const State *s1, const State
     return result;
 }
 
-bool ompl::base::DubinsMotionValidator::checkMotion(const State *s1, const State *s2) const
+bool ompl::base::DubinsMotionValidator::checkMotion(const State *s1, const State *s2, tools::VisualizerPtr visualizer) const
 {
     /* assume motion starts in a valid configuration so s1 is valid */
     if (!si_->isValid(s2))

@@ -63,7 +63,7 @@ namespace ompl
 
             ~DiscreteMotionValidator() override = default;
 
-            bool checkMotion(const State *s1, const State *s2) const override;
+            bool checkMotion(const State *s1, const State *s2, tools::VisualizerPtr visualizer = NULL) const override;
 
             bool checkMotion(const State *s1, const State *s2, std::pair<State *, double> &lastValid) const override;
 
@@ -72,6 +72,11 @@ namespace ompl
             void setRequiredStateClearance(double clearance)
             {
                 clearance_ = clearance;
+            }
+
+            double getRequiredStateClearance()
+            {
+                return clearance_;
             }
 
         private:

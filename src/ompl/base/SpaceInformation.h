@@ -177,7 +177,7 @@ namespace ompl
                 return motionValidator_;
             }
 
-            MotionValidatorPtr &getMotionValidatorNonConst()
+            MotionValidatorPtr &getMotionValidator()
             {
                 return motionValidator_;
             }
