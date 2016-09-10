@@ -43,6 +43,7 @@
 #include "ompl/util/Time.h"
 #include "ompl/util/Hash.h"
 #include "ompl/tools/debug/Visualizer.h"
+#include "ompl/base/samplers/MinimumClearanceValidStateSampler.h"
 
 #include <boost/range/adaptor/map.hpp>
 #include <unordered_map>
@@ -388,6 +389,8 @@ namespace ompl
                 visual_ = visual;
             }
 
+            bool checkSparseGraphOptimality();
+
         protected:
             /** \brief Free all the memory allocated by the planner */
             void freeMemory();
@@ -490,10 +493,7 @@ namespace ompl
             }
 
             /** \brief Sampler user for generating valid samples in the state space */
-            base::ValidStateSamplerPtr sampler_;
-
-            /** \brief Sampler user for generating random in the state space */
-            base::StateSamplerPtr simpleSampler_;
+            base::MinimumClearanceValidStateSamplerPtr sampler_;
 
             /** \brief Nearest neighbors data structure */
             std::shared_ptr<NearestNeighbors<Vertex>> nn_;

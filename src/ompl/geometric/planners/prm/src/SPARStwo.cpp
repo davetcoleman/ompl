@@ -39,6 +39,8 @@
 #include "ompl/base/goals/GoalSampleableRegion.h"
 #include "ompl/base/objectives/PathLengthOptimizationObjective.h"
 #include "ompl/tools/config/SelfConfig.h"
+#include <ompl/base/DiscreteMotionValidator.h>
+
 #include <boost/graph/astar_search.hpp>
 #include <boost/graph/incremental_components.hpp>
 #include <boost/property_map/vector_property_map.hpp>
@@ -167,7 +169,6 @@ void ompl::geometric::SPARStwo::freeMemory()
 {
     Planner::clear();
     sampler_.reset();
-    simpleSampler_.reset();
 
     foreach (Vertex v, boost::vertices(g_))
     {
@@ -242,7 +243,7 @@ void ompl::geometric::SPARStwo::copyPasteState(std::size_t numSets)
     std::stringstream line;
 
     // clang-format off
-    line << "=SPLIT('SPARS2, "
+    line << "=SPLIT(\"SPARS2, "
          << map_name_ << ", "
          << sparseDeltaFraction_ << ", "
          << sparseDelta_ << ", "
@@ -261,7 +262,7 @@ void ompl::geometric::SPARStwo::copyPasteState(std::size_t numSets)
          << milestoneCount() << ", "
          << getNumEdges() << ", "
          << 0 << ", "
-         << duration << "', ',')";
+         << duration << "\", \",\")";
     // clang-format on
 
     // Save log
@@ -313,9 +314,15 @@ void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationC
     if (!isSetup())
         setup();
     if (!sampler_)
-        sampler_ = si_->allocValidStateSampler();
-    if (!simpleSampler_)
-        simpleSampler_ = si_->allocStateSampler();
+    {
+        double clearance = 1;
+        OMPL_WARN("set clearance TODO");
+
+        // Load minimum clearance state sampler
+        sampler_ = base::MinimumClearanceValidStateSamplerPtr(new base::MinimumClearanceValidStateSampler(si_.get()));
+        sampler_->setMinimumObstacleClearance(clearance);
+        si_->getStateValidityChecker()->setClearanceSearchDistance(clearance);
+    }
 
     base::State *qNew = si_->allocState();
     base::State *workState = si_->allocState();
@@ -629,8 +636,12 @@ bool ompl::geometric::SPARStwo::checkAddPath(Vertex v)
                         p->append(d.sigmaA_);
                     }
 
-                    psimp_->reduceVertices(*p, 10);
-                    psimp_->shortcutPath(*p, 50);
+                    // Smoothing path - old method
+                    // psimp_->reduceVertices(*p, 10);
+                    // psimp_->shortcutPath(*p, 50);
+
+                    // Smoothing path - new method
+
 
                     if (p->checkAndRepair(100).second)
                     {
@@ -953,20 +964,6 @@ ompl::base::PathPtr ompl::geometric::SPARStwo::constructSolution(const Vertex st
     }
 }
 
-void ompl::geometric::SPARStwo::printDebug(std::ostream &out) const
-{
-    out << "SPARStwo Debug Output: " << std::endl;
-    out << "  Settings: " << std::endl;
-    out << "    Max Failures: " << getMaxFailures() << std::endl;
-    out << "    Dense Delta Fraction: " << getDenseDeltaFraction() << std::endl;
-    out << "    Sparse Delta Fraction: " << getSparseDeltaFraction() << std::endl;
-    out << "    Stretch Factor: " << getStretchFactor() << std::endl;
-    out << "  Status: " << std::endl;
-    out << "    Milestone Count: " << milestoneCount() << std::endl;
-    out << "    Iterations: " << getIterationCount() << std::endl;
-    out << "    Consecutive Failures: " << consecutiveFailures_ << std::endl;
-}
-
 void ompl::geometric::SPARStwo::getPlannerData(base::PlannerData &data) const
 {
     Planner::getPlannerData(data);
@@ -1001,6 +998,203 @@ void ompl::geometric::SPARStwo::getPlannerData(base::PlannerData &data) const
     foreach (const Vertex n, boost::vertices(g_))
         if (boost::out_degree(n, g_) == 0)
             data.addVertex(base::PlannerDataVertex(stateProperty_[n], (int)colorProperty_[n]));
+}
+
+void ompl::geometric::SPARStwo::printDebug(std::ostream &out) const
+{
+    out << "SPARStwo Debug Output: " << std::endl;
+    out << "  Settings: " << std::endl;
+    out << "    Max Failures: " << getMaxFailures() << std::endl;
+    out << "    Dense Delta Fraction: " << getDenseDeltaFraction() << std::endl;
+    out << "    Sparse Delta Fraction: " << getSparseDeltaFraction() << std::endl;
+    out << "    Stretch Factor: " << getStretchFactor() << std::endl;
+    out << "  Status: " << std::endl;
+    out << "    Milestone Count: " << milestoneCount() << std::endl;
+    out << "    Iterations: " << getIterationCount() << std::endl;
+    out << "    Consecutive Failures: " << consecutiveFailures_ << std::endl;
+}
+
+bool ompl::geometric::SPARStwo::checkSparseGraphOptimality()
+{
+    OMPL_INFORM("checkSparseGraphOptimality()");
+
+    std::size_t numTests = 1000;
+    std::size_t numFailedPlans = 0;
+
+    // Make sure motion validator is set to zero clearance
+    // base::DiscreteMotionValidator *dmv =
+    //     dynamic_cast<base::DiscreteMotionValidator *>(si_->getMotionValidator().get());
+    // BOOST_ASSERT_MSG(dmv->getRequiredStateClearance() == 0, "Discrete motion validator should have clearance = 0");
+
+    // For each test
+    for (std::size_t i = 0; i < numTests; ++i)
+    {
+        if (visual_->viz1()->shutdownRequested())
+            break;
+
+        /* The whole neighborhood set which has been most recently computed */
+        std::vector<std::vector<Vertex>> graphNeighborhood(2);
+        /* The visible neighborhood set which has been most recently computed */
+        std::vector<std::vector<Vertex>> visibleNeighborhood(2);
+
+        // Choose random start and goal state that has a nearest neighbor
+        std::vector<base::State*> endPoints(2);
+
+        for (std::size_t i = 0; i < 2; ++i)
+        {
+            base::State*& state = endPoints[i];
+
+            // Allocate
+            state = si_->getStateSpace()->allocState();
+
+            // Sample
+            if (!sampler_->sample(state))
+                throw Exception(name_, "No valid sample found");
+
+            // Allow edges to be 5% longer than SparseDelta
+            //const double dist = sparseDelta_ * 1.05;
+
+            // Find nearest neighbor
+            findGraphNeighbors(state, graphNeighborhood[i], visibleNeighborhood[i]);
+
+            // Check if neighbor exists - should always have at least one neighbor otherwise graph lacks coverage
+            if (visibleNeighborhood[i].empty())
+                throw Exception(name_, "No neighbors!");
+            // debugNoNeighbors(point, indent);
+
+            // Check if first state is same as input
+            if (si_->getStateSpace()->equalStates(state, stateProperty_[visibleNeighborhood[i][0]]))
+                throw Exception(name_, "First neighbor is itself");
+        }
+
+        // Astar search through graph
+        const base::State *actualStart = endPoints.front();
+        const base::State *actualGoal = endPoints.back();
+        const Vertex start = visibleNeighborhood[0][0];
+        const Vertex goal = visibleNeighborhood[1][0];
+
+        base::PathPtr vertexPath;
+        bool solutionFound = true;
+
+        // Do not search astar if start goal are the same
+        if (si_->getStateSpace()->equalStates(stateProperty_[start], stateProperty_[goal]))
+        {
+            //OMPL_INFORM("start and goal are the same");
+            auto p(std::make_shared<PathGeometric>(si_));
+            p->append(stateProperty_[start]);
+            vertexPath = p;
+        }
+        else // search astar
+        {
+            try
+            {
+                vertexPath = constructSolution(start, goal);
+            }
+            catch(...)
+            {
+                solutionFound = false;
+            }
+        }
+
+        if (!solutionFound || !vertexPath)
+        {
+            OMPL_ERROR("No path found through graph");
+
+            // Clear out previous path for clarity
+            visual_->viz2()->deleteAllMarkers();
+            visual_->viz2()->trigger();
+            usleep(0.001 * 1000000);
+
+            // Visualize actual and snapped states
+            visual_->viz3()->deleteAllMarkers();
+            visual_->viz3()->state(actualStart, tools::LARGE, tools::RED, 0);
+            visual_->viz3()->state(actualGoal, tools::LARGE, tools::GREEN, 0);
+            visual_->viz3()->state(stateProperty_[start], tools::LARGE, tools::BLACK, 0);
+            visual_->viz3()->state(stateProperty_[goal], tools::LARGE, tools::BLACK, 0);
+            visual_->viz3()->trigger();
+            visual_->viz1()->spin();
+            exit(0);
+            continue;
+        }
+
+        // If path found (same connected component) sum up total length
+        geometric::PathGeometric *geometricSolutionPtr = static_cast<geometric::PathGeometric *>(vertexPath.get());
+        geometric::PathGeometric geometricSolution = *geometricSolutionPtr;
+
+        //convertVertexPathToStatePath(vertexPath, actualStart, actualGoal, geometricSolution);
+
+        // Smooth path to find the "optimal" path
+        geometric::PathGeometric smoothedPath = geometricSolution;
+        geometric::PathGeometric *smoothedPathPtr = &smoothedPath;
+
+        psimp_->reduceVertices(smoothedPath, 10);
+        psimp_->shortcutPath(smoothedPath, 50);
+        //sg_->smoothMax(smoothedPathPtr, indent);
+
+        // Show the two paths
+        bool showEveryPath = true;
+        if (showEveryPath)
+        {
+            visual_->viz2()->deleteAllMarkers();
+            visual_->viz2()->path(&geometricSolution, tools::SMALL, tools::RED);
+            visual_->viz2()->path(smoothedPathPtr, tools::MEDIUM, tools::GREEN);
+            visual_->viz2()->trigger();
+            usleep(0.001 * 1000000);
+        }
+
+        // calculate theoretical guarantees
+        double optimalLength = smoothedPathPtr->length();
+        double sparseLength = geometricSolution.length();
+        double theoryLength = stretchFactor_ * optimalLength + std::numeric_limits<double>::epsilon(); // + 4 * sparseCriteria_->getSparseDelta();
+        double percentOfMaxAllows = sparseLength / theoryLength * 100.0;
+
+        bool show = sparseLength >= theoryLength;
+
+        if (show)
+        {
+            std::cout << "-----------------------------------------" << std::endl;
+            std::cout << "Checking Asymptotic Optimality Guarantees" << std::endl;
+            std::cout << "Raw Path Length:         " << sparseLength << std::endl;
+            std::cout << "Smoothed Path Length:    " << optimalLength << std::endl;
+            std::cout << "Smoothed Path States:    " << smoothedPathPtr->getStateCount() << std::endl;
+            std::cout << "Theoretical Path Length: " << theoryLength << std::endl;
+            std::cout << "Stretch Factor t:        " << stretchFactor_ << std::endl;
+            std::cout << "Sparse Delta:            " << sparseDelta_ << std::endl;
+
+            if (sparseLength >= theoryLength)
+            {
+                OMPL_ERROR("Asymptotic optimality guarantee VIOLATED");
+
+                // Show the two paths
+                visual_->viz2()->deleteAllMarkers();
+                visual_->viz2()->path(&geometricSolution, tools::SMALL, tools::RED);
+                visual_->viz2()->path(smoothedPathPtr, tools::MEDIUM, tools::GREEN);
+                visual_->viz2()->trigger();
+                usleep(0.001 * 1000000);
+
+                // Show database with visibility regions (coverage)
+                // sg_->visualizeDatabaseCoverage_ = true;
+                // sg_->displayDatabase();
+
+                visual_->viz1()->spin();
+                exit(0);
+                return false;
+            }
+            else
+                OMPL_INFORM("Asymptotic optimality guarantee maintained");
+            std::cout << "Percent of max allowed:  " << percentOfMaxAllows << " %" << std::endl;
+            std::cout << "-----------------------------------------" << std::endl;
+        }
+    }
+
+    // Summary
+    std::cout <<  "-----------------------------------------" << std::endl;
+    std::cout <<  "Checking Asymptotic Optimality Guarantees" << std::endl;
+    std::cout <<  "Total tests:               " << numTests << std::endl;
+    std::cout <<  "Number failed plans:       " << numFailedPlans << std::endl;
+    std::cout <<  "-----------------------------------------" << std::endl;
+
+    return true;
 }
 
 ompl::base::Cost ompl::geometric::SPARStwo::costHeuristic(Vertex u, Vertex v) const
