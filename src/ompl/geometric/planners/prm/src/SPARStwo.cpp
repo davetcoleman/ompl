@@ -235,31 +235,51 @@ bool ompl::geometric::SPARStwo::reachedTerminationCriterion() const
     return consecutiveFailures_ >= maxFailures_ || addedSolution_;
 }
 
-void ompl::geometric::SPARStwo::copyPasteState(std::size_t numSets) const
+void ompl::geometric::SPARStwo::copyPasteState(std::size_t numSets)
 {
     double duration = time::seconds(time::now() - timeDiscretizeAndRandomStarted_);
+    std::stringstream line;
 
     // clang-format off
-    std::cout << "=SPLIT('SPARS2, "
-              << sparseDeltaFraction_ << ", "
-              << sparseDelta_ << ", "
-              << 0 << ", "
-              << stretchFactor_ << ", "
-              << 2 << ", " // nearSamplePointsFactor hardcoded at top
-              << 0 << ", " // useDiscretizedSamples
-              << 1 << ", " // useRandomSamples
-              << 0 << ", " // useCheckRemoveCloseVertices
-              << 0 << ", " // useClearEdgesNearVertex_
-              << 0 << ", " // useOriginalSmoother_
-              << 0 << ", " // useEdgeImprovementRule_
-              << 0 << ", " // fourthCriteriaAfterFailures_
-              << maxFailures_ << ", "
-              << consecutiveFailures_ << ", "
-              << milestoneCount() << ", "
-              << getNumEdges() << ", "
-              << 0 << ", "
-              << duration << "', ',')" << std::endl;
+    line << "=SPLIT('SPARS2, "
+         << map_name_ << ", "
+         << sparseDeltaFraction_ << ", "
+         << sparseDelta_ << ", "
+         << 0 << ", "
+         << stretchFactor_ << ", "
+         << 2 << ", " // nearSamplePointsFactor hardcoded at top
+         << 0 << ", " // useDiscretizedSamples
+         << 1 << ", " // useRandomSamples
+         << 0 << ", " // useCheckRemoveCloseVertices
+         << 0 << ", " // useClearEdgesNearVertex_
+         << 0 << ", " // useOriginalSmoother_
+         << 0 << ", " // useEdgeImprovementRule_
+         << 0 << ", " // fourthCriteriaAfterFailures_
+         << maxFailures_ << ", "
+         << consecutiveFailures_ << ", "
+         << milestoneCount() << ", "
+         << getNumEdges() << ", "
+         << 0 << ", "
+         << duration << "', ',')";
     // clang-format on
+
+    // Save log
+    stringLog_.push_back(line.str());
+
+    if (stringLog_.size() > 1000)
+        OMPL_WARN("Copy Paste Log is getting big: %i", stringLog_.size());
+
+    // Output to console
+    std::cout << stringLog_.back() << std::endl;
+}
+
+void ompl::geometric::SPARStwo::dumpLog()
+{
+  // Dump to console
+  for (auto line : stringLog_)
+    std::cout << line << std::endl;
+
+  stringLog_.clear();
 }
 
 void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationCondition &ptc, bool stopOnMaxFail)
@@ -309,6 +329,8 @@ void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationC
         ++consecutiveFailures_;
 
         showFailureProgress();
+        if (visual_->viz1()->shutdownRequested())
+            break;
 
         // Generate a single sample, and attempt to connect it to nearest neighbors.
         if (!sampler_->sample(qNew))
