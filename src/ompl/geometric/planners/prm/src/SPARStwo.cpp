@@ -167,6 +167,7 @@ void ompl::geometric::SPARStwo::freeMemory()
 {
     Planner::clear();
     sampler_.reset();
+    simpleSampler_.reset();
 
     foreach (Vertex v, boost::vertices(g_))
     {
@@ -235,53 +236,6 @@ bool ompl::geometric::SPARStwo::reachedTerminationCriterion() const
     return consecutiveFailures_ >= maxFailures_ || addedSolution_;
 }
 
-void ompl::geometric::SPARStwo::copyPasteState(std::size_t numSets)
-{
-    double duration = time::seconds(time::now() - timeDiscretizeAndRandomStarted_);
-    std::stringstream line;
-
-    // clang-format off
-    line << "=SPLIT('SPARS2, "
-         << map_name_ << ", "
-         << sparseDeltaFraction_ << ", "
-         << sparseDelta_ << ", "
-         << 0 << ", "
-         << stretchFactor_ << ", "
-         << 2 << ", " // nearSamplePointsFactor hardcoded at top
-         << 0 << ", " // useDiscretizedSamples
-         << 1 << ", " // useRandomSamples
-         << 0 << ", " // useCheckRemoveCloseVertices
-         << 0 << ", " // useClearEdgesNearVertex_
-         << 0 << ", " // useOriginalSmoother_
-         << 0 << ", " // useEdgeImprovementRule_
-         << 0 << ", " // fourthCriteriaAfterFailures_
-         << maxFailures_ << ", "
-         << consecutiveFailures_ << ", "
-         << milestoneCount() << ", "
-         << getNumEdges() << ", "
-         << 0 << ", "
-         << duration << "', ',')";
-    // clang-format on
-
-    // Save log
-    stringLog_.push_back(line.str());
-
-    if (stringLog_.size() > 1000)
-        OMPL_WARN("Copy Paste Log is getting big: %i", stringLog_.size());
-
-    // Output to console
-    std::cout << stringLog_.back() << std::endl;
-}
-
-void ompl::geometric::SPARStwo::dumpLog()
-{
-  // Dump to console
-  for (auto line : stringLog_)
-    std::cout << line << std::endl;
-
-  stringLog_.clear();
-}
-
 void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationCondition &ptc, bool stopOnMaxFail)
 {
     if (stopOnMaxFail)
@@ -295,24 +249,18 @@ void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationC
     }
     else
         constructRoadmap(ptc);
-
-    OMPL_INFORM("Construct Roadmap Finished");
-    copyPasteState(0);
 }
 
 void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationCondition &ptc)
 {
-    // DTC
-    timeDiscretizeAndRandomStarted_ = time::now();
-    maxConsecutiveFailures_ = 0;
-    maxPercentComplete_ = 0;
-
     checkQueryStateInitialization();
 
     if (!isSetup())
         setup();
     if (!sampler_)
         sampler_ = si_->allocValidStateSampler();
+    if (!simpleSampler_)
+        simpleSampler_ = si_->allocStateSampler();
 
     base::State *qNew = si_->allocState();
     base::State *workState = si_->allocState();
@@ -323,14 +271,10 @@ void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationC
     std::vector<Vertex> visibleNeighborhood;
 
     bestCost_ = opt_->infiniteCost();
-    while (ptc == false && !visual_->viz1()->shutdownRequested())
+    while (ptc == false)
     {
         ++iterations_;
         ++consecutiveFailures_;
-
-        showFailureProgress();
-        if (visual_->viz1()->shutdownRequested())
-            break;
 
         // Generate a single sample, and attempt to connect it to nearest neighbors.
         if (!sampler_->sample(qNew))
@@ -364,29 +308,6 @@ void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationC
     }
     si_->freeState(workState);
     si_->freeState(qNew);
-}
-
-void ompl::geometric::SPARStwo::showFailureProgress()
-{
-    if (consecutiveFailures_ > maxConsecutiveFailures_)
-    {
-        maxConsecutiveFailures_ = consecutiveFailures_;
-
-        std::size_t percentComplete = ceil(maxConsecutiveFailures_ / double(maxFailures_) * 100.0);
-
-        // Every time the whole number of percent compelete changes, show to user
-        if (percentComplete > maxPercentComplete_)
-        {
-            maxPercentComplete_ = percentComplete;
-
-            // Show varying granularity based on number of dimensions
-            static const std::size_t showEvery = std::max(1, int(12 - si_->getStateDimension() * 2));
-            if (percentComplete % showEvery == 0)
-            {
-                OMPL_INFORM("Termination progress: %u", percentComplete);
-            }
-        }
-    }
 }
 
 void ompl::geometric::SPARStwo::checkQueryStateInitialization()
@@ -601,7 +522,7 @@ bool ompl::geometric::SPARStwo::checkAddPath(Vertex v)
             InterfaceData &d = getData(v, r, rp);
 
             // Then, if the spanner property is violated
-            if (rm_dist > stretchFactor_ * d.d_)  // TODO - check that d.d_ is not zero!!
+            if (rm_dist > stretchFactor_ * d.d_)
             {
                 ret = true;  // Report that we added for the path
                 if (si_->checkMotion(stateProperty_[r], stateProperty_[rp]))
@@ -870,10 +791,6 @@ void ompl::geometric::SPARStwo::abandonLists(base::State *st)
 
 ompl::geometric::SPARStwo::Vertex ompl::geometric::SPARStwo::addGuard(base::State *state, GuardType type)
 {
-    // Visualize vertex
-    visual_->viz1()->state(state, tools::LARGE, tools::BLACK, 0);
-    visual_->viz1()->trigger();
-
     std::lock_guard<std::mutex> _(graphMutex_);
 
     Vertex m = boost::add_vertex(g_);
@@ -897,10 +814,6 @@ void ompl::geometric::SPARStwo::connectGuards(Vertex v, Vertex vp)
 
     const base::Cost weight(costHeuristic(v, vp));
     const Graph::edge_property_type properties(weight);
-
-    // Visualize edge
-    visual_->viz1()->edge(stateProperty_[v], stateProperty_[vp], tools::MEDIUM, tools::ORANGE);
-
     std::lock_guard<std::mutex> _(graphMutex_);
     boost::add_edge(v, vp, properties, g_);
     disjointSets_.union_set(v, vp);

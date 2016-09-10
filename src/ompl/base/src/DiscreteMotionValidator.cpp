@@ -52,6 +52,7 @@ bool ompl::base::DiscreteMotionValidator::checkMotion(const State *s1, const Sta
 
     bool result = true;
     int nd = stateSpace_->validSegmentCount(s1, s2);
+
     if (nd > 1)
     {
         /* temporary storage for the checked state */
