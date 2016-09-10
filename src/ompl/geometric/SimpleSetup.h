@@ -174,8 +174,8 @@ namespace ompl
                                        const double threshold = std::numeric_limits<double>::epsilon());
 
             /** \brief Set the start and goal states to use. */
-            void setStartAndGoalStates(const base::State *start, const base::State *goal,
-                                       const double threshold = std::numeric_limits<double>::epsilon());
+            // void setStartAndGoalStates(const base::State *start, const base::State *goal,
+            //                            const double threshold = std::numeric_limits<double>::epsilon());
 
             /** \brief Add a starting state for planning. This call is not
                 needed if setStartAndGoalStates() has been called. */
