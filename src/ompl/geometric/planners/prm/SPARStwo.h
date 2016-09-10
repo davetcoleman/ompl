@@ -293,7 +293,13 @@ namespace ompl
             }
 
             /** \brief Output debug info about the graph */
-            void copyPasteState(std::size_t numSets) const;
+            void copyPasteState(std::size_t numSets);
+            void dumpLog();
+
+            void setMapName(std::string map_name)
+            {
+                map_name_ = map_name;
+            }
 
             /** \brief While the termination condition permits, construct the spanner graph */
             void constructRoadmap(const base::PlannerTerminationCondition &ptc);
@@ -575,6 +581,9 @@ namespace ompl
             /** \brief Class for managing various visualization features */
             ompl::tools::VisualizerPtr visual_;
             time::point timeDiscretizeAndRandomStarted_;
+
+            std::vector<std::string> stringLog_;
+            std::string map_name_; // meta data for the logging
         };
     }
 }
