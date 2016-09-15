@@ -451,7 +451,7 @@ void ompl::geometric::PathSimplifier::simplify(PathGeometric &path, const base::
         const std::pair<bool, bool> &p = path.checkAndRepair(magic::MAX_VALID_SAMPLE_ATTEMPTS);
         if (!p.second)
         {
-            OMPL_INFORM("Path may slightly touch on an invalid region of the state space (PathSimplifier.cpp)");
+            //OMPL_INFORM("Path may slightly touch on an invalid region of the state space (PathSimplifier.cpp)");
         }
         // else
         //     if (!p.first)

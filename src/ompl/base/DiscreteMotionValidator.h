@@ -85,7 +85,7 @@ namespace ompl
             void defaultSettings();
 
             /** \brief Minimum required distance of sample from nearest obstacle to be considered valid */
-            double clearance_;
+            double clearance_ = 0;
         };
     }
 }
