@@ -150,7 +150,7 @@ namespace ompl
             virtual void path(ompl::geometric::PathGeometric *path, VizSizes type, VizColors color) = 0;
 
             /** \brief Trigger visualizer to refresh/repaint/display all graphics */
-            virtual void trigger() = 0;
+            virtual void trigger(std::size_t queueSize = 0) = 0;
 
             /** \brief Trigger visualizer to clear all graphics */
             virtual void deleteAllMarkers() = 0;
