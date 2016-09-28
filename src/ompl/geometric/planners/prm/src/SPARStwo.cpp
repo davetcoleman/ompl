@@ -1136,8 +1136,8 @@ bool ompl::geometric::SPARStwo::checkSparseGraphOptimality()
         if (showEveryPath)
         {
             visual_->viz2()->deleteAllMarkers();
-            visual_->viz2()->path(&geometricSolution, tools::SMALL, tools::RED);
-            visual_->viz2()->path(smoothedPathPtr, tools::MEDIUM, tools::GREEN);
+            visual_->viz2()->path(&geometricSolution, tools::SMALL, tools::BLACK, tools::RED);
+            visual_->viz2()->path(smoothedPathPtr, tools::MEDIUM, tools::BLACK, tools::GREEN);
             visual_->viz2()->trigger();
             usleep(0.001 * 1000000);
         }
@@ -1167,8 +1167,8 @@ bool ompl::geometric::SPARStwo::checkSparseGraphOptimality()
 
                 // Show the two paths
                 visual_->viz2()->deleteAllMarkers();
-                visual_->viz2()->path(&geometricSolution, tools::SMALL, tools::RED);
-                visual_->viz2()->path(smoothedPathPtr, tools::MEDIUM, tools::GREEN);
+                visual_->viz2()->path(&geometricSolution, tools::SMALL, tools::BLACK, tools::RED);
+                visual_->viz2()->path(smoothedPathPtr, tools::MEDIUM, tools::BLACK, tools::GREEN);
                 visual_->viz2()->trigger();
                 usleep(0.001 * 1000000);
 

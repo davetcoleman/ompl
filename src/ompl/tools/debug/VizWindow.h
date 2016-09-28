@@ -147,7 +147,7 @@ namespace ompl
             }
 
             /** \brief Visualize path during runtime, externally */
-            virtual void path(ompl::geometric::PathGeometric *path, VizSizes type, VizColors color) = 0;
+            virtual void path(ompl::geometric::PathGeometric *path, VizSizes type, VizColors vertexColor, VizColors edgeColor) = 0;
 
             /** \brief Trigger visualizer to refresh/repaint/display all graphics */
             virtual void trigger(std::size_t queueSize = 0) = 0;

@@ -380,13 +380,6 @@ namespace ompl
             /** \brief Free the memory of the allocated state */
             virtual void freeState(State *state) const = 0;
 
-            /** \brief Populate a state with values in vector */
-            virtual bool populateState(State *state, const std::vector<double> &values)
-            {
-                OMPL_ERROR("populateState() in StateSpace.h not implemented ");
-                return true;  // Not implemented
-            }
-
             /** @} */
 
             /** @name Functionality specific to accessing real values in a state
