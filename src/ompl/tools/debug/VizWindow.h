@@ -47,10 +47,18 @@
 
 namespace ompl
 {
-namespace geometric
-{
-OMPL_CLASS_FORWARD(PathGeometric);
+    namespace geometric
+    {
+        OMPL_CLASS_FORWARD(PathGeometric);
+    }
 }
+
+namespace ompl
+{
+    namespace base
+    {
+        OMPL_CLASS_FORWARD(SpaceInformation);
+    }
 }
 
 namespace ompl
@@ -119,12 +127,20 @@ namespace ompl
         class VizWindow
         {
         public:
-            VizWindow()
+            VizWindow(ompl::base::SpaceInformationPtr si)
+                : si_(si)
             {
             }
 
             /** \brief Visualize a state during runtime, externally */
-            virtual void state(const ompl::base::State *state, VizSizes type, VizColors color, double extraData) = 0;
+            virtual void state(const ompl::base::State *state, VizSizes type, VizColors color, double extraData,
+                               ompl::base::SpaceInformationPtr si) = 0;
+
+            /** \brief Visualize a state during runtime, externally */
+            void state(const ompl::base::State *state, VizSizes size, VizColors color, double extraData = 0)
+            {
+                this->state(state, size, color, extraData, si_);
+            }
 
             /** \brief Visualize multiple states during runtime, externally */
             virtual void states(std::vector<const ompl::base::State *> states,
@@ -147,7 +163,8 @@ namespace ompl
             }
 
             /** \brief Visualize path during runtime, externally */
-            virtual void path(ompl::geometric::PathGeometric *path, VizSizes type, VizColors vertexColor, VizColors edgeColor) = 0;
+            virtual void path(ompl::geometric::PathGeometric *path, VizSizes type, VizColors vertexColor,
+                              VizColors edgeColor) = 0;
 
             /** \brief Trigger visualizer to refresh/repaint/display all graphics */
             virtual void trigger(std::size_t queueSize = 0) = 0;
@@ -160,6 +177,14 @@ namespace ompl
 
             /** \brief Check if SIGINT has been called for shutdown */
             virtual bool shutdownRequested() = 0;
+
+            /** \brief Getter for SpaceInformation */
+            const ompl::base::SpaceInformationPtr &getSpaceInformation() const
+            {
+                return si_;
+            }
+
+            ompl::base::SpaceInformationPtr si_;
 
         };  // end of class VizWindow
     }       // namespace tools
