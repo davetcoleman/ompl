@@ -394,6 +394,16 @@ void ompl::base::StateSpace::deserialize(State * /*state*/, const void * /*seria
 {
 }
 
+void ompl::base::StateSpace::allocStates(std::size_t numStates, State *states) const
+{
+    throw Exception("allocStates() not implemented!");
+}
+
+void ompl::base::StateSpace::freeStates(State *states) const
+{
+    throw Exception("freeStates() not implemented!");
+}
+
 void ompl::base::StateSpace::printState(const State *state, std::ostream &out) const
 {
     out << "State instance [" << state << ']' << std::endl;

@@ -58,6 +58,7 @@ namespace ompl
         /// @cond IGNORE
         /** \brief Forward declaration of ompl::base::StateSpace */
         OMPL_CLASS_FORWARD(StateSpace);
+        OMPL_CLASS_FORWARD(CompoundStateSpace);
         /// @endcond
 
         /** \class ompl::base::StateSpacePtr
@@ -296,19 +297,6 @@ namespace ompl
                 return bounds_;
             }
 
-            /** \brief Get the mode (for hybrid task planning) of this state */
-            virtual int getLevel(const State *state) const
-            {
-                OMPL_ERROR("No level function implemented, unable to get level");
-                return 0;
-            }
-
-            /** \brief Set the mode (for hybrid task planning) of this state */
-            virtual void setLevel(State *state, int level)
-            {
-                OMPL_ERROR("No level function implemented, unable to set level");
-            }
-
             /** \brief Get the maximum value a call to distance() can return (or an upper bound).
                 For unbounded state spaces, this function can return infinity.
 
@@ -379,6 +367,12 @@ namespace ompl
 
             /** \brief Free the memory of the allocated state */
             virtual void freeState(State *state) const = 0;
+
+            /** \brief Allocate an array of states */
+            virtual void allocStates(std::size_t numStates, State *states) const;
+
+            /** \brief Free an array of states */
+            virtual void freeStates(State *states)  const;
 
             /** @} */
 

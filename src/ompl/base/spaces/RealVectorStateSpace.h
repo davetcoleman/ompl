@@ -77,7 +77,7 @@ namespace ompl
             class StateType : public State
             {
             public:
-                StateType() : State(), level_(0)
+                StateType() : State()
                 {
                 }
 
@@ -97,9 +97,6 @@ namespace ompl
 
                 /** \brief The value of the actual vector in R<sup>n</sup> */
                 double *values;
-
-                /** \brief The discrete mode/level of the state */
-                int level_;
             };
 
             /** \brief Constructor. The dimension of of the space needs to be specified. A space representing
@@ -187,12 +184,6 @@ namespace ompl
             void registerProjections() override;
 
             void setup() override;
-
-            /** \brief Get the mode (for hybrid task planning) of this state */
-            virtual int getLevel(const ompl::base::State *state) const;
-
-            /** \brief Set the mode (for hybrid task planning) of this state */
-            virtual void setLevel(ompl::base::State *state, int level);
 
         protected:
             /** \brief The dimension of the space */
