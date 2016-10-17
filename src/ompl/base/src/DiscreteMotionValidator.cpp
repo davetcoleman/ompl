@@ -96,7 +96,8 @@ bool ompl::base::DiscreteMotionValidator::checkMotion(const State *s1, const Sta
     {
         if (visual)
         {
-            visual->viz2()->state(s2, tools::MEDIUM, tools::RED, 0);
+            std::cout << "s2 invalid " << std::endl;
+            visual->viz2()->state(s2, tools::ROBOT, tools::RED, 0);
         }
 
         invalid_++;
@@ -127,11 +128,20 @@ bool ompl::base::DiscreteMotionValidator::checkMotion(const State *s1, const Sta
             {
                 if (visual)
                 {
-                    visual->viz2()->state(test, tools::SMALL, tools::RED, 0);
+                    std::cout << "midpoint invalid " << std::endl;
+                    visual->viz2()->state(test, tools::ROBOT, tools::RED, 0);
+                    visual->waitForUserFeedback("invalid");
                 }
 
                 result = false;
                 break;
+            }
+
+            if (visual)
+            {
+                std::cout << "midpoint valid " << std::endl;
+                visual->viz2()->state(test, tools::ROBOT, tools::GREEN, 0);
+                visual->waitForUserFeedback("valid");
             }
 
             pos.pop();
