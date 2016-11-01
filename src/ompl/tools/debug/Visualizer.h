@@ -89,14 +89,11 @@ namespace ompl
             /** \brief Wait for user feedback i.e. through a button or joystick */
             void waitForUserFeedback(const std::string &msg)
             {
-                if (waitForUserFeedback_)
-                    waitForUserFeedback_(msg);
+                viz_.front()->prompt(msg);
             }
-
-            /** \brief Set the callback to wait for user feedback */
-            void setWaitForUserFeedback(ompl::tools::VizWaitFeedback waitForUserFeedback)
+            void prompt(const std::string &msg)
             {
-                waitForUserFeedback_ = waitForUserFeedback;
+                viz_.front()->prompt(msg);
             }
 
             // ------------------------------------------------------------------------------------
@@ -163,9 +160,6 @@ namespace ompl
             }
 
         private:
-            /** \brief Callback to wait for user input before proceeding */
-            VizWaitFeedback waitForUserFeedback_;
-
             /** \brief Callback to display the node covereage in 2D */
             VizTrigger vizVoronoiDiagram_;
 

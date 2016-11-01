@@ -184,6 +184,15 @@ namespace ompl
                 return si_;
             }
 
+            /** \brief Setter for SpaceInformation */
+            void setSpaceInformation(ompl::base::SpaceInformationPtr si)
+            {
+                si_ = si;
+            }
+
+            /** \brief Wait for user feedback i.e. through a button or joystick */
+            virtual void prompt(const std::string &msg) = 0;
+
             ompl::base::SpaceInformationPtr si_;
 
         };  // end of class VizWindow
