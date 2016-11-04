@@ -42,8 +42,6 @@
 #include "ompl/geometric/PathSimplifier.h"
 #include "ompl/util/Time.h"
 #include "ompl/util/Hash.h"
-#include "ompl/tools/debug/Visualizer.h"
-#include "ompl/base/samplers/MinimumClearanceValidStateSampler.h"
 
 #include <boost/range/adaptor/map.hpp>
 #include <unordered_map>
@@ -61,13 +59,6 @@ namespace ompl
 {
     namespace geometric
     {
-        /// @cond IGNORE
-        OMPL_CLASS_FORWARD(SPARStwo);
-        /// @endcond
-
-        /** \class ompl::geometric::SPARStwoPtr
-            \brief A shared pointer wrapper for ompl::geometric::SPARStwo */
-
         /**
            @anchor gSPARStwo
            @par Short description
@@ -98,10 +89,10 @@ namespace ompl
             };
 
             /** \brief The type used internally for representing vertex IDs */
-            using VertexIndexType = unsigned long;
+            typedef unsigned long VertexIndexType;
 
             /** \brief Pair of vertices which support an interface. */
-            using VertexPair = std::pair<VertexIndexType, VertexIndexType>;
+            typedef std::pair<VertexIndexType, VertexIndexType> VertexPair;
 
             /** \brief Interface information storage class, which does bookkeeping for criterion four. */
             struct InterfaceData
@@ -185,21 +176,21 @@ namespace ompl
             };
 
             /** \brief the hash which maps pairs of neighbor points to pairs of states */
-            using InterfaceHash = std::unordered_map<VertexPair, InterfaceData>;
+            typedef std::unordered_map<VertexPair, InterfaceData> InterfaceHash;
 
             struct vertex_state_t
             {
-                using kind = boost::vertex_property_tag;
+                typedef boost::vertex_property_tag kind;
             };
 
             struct vertex_color_t
             {
-                using kind = boost::vertex_property_tag;
+                typedef boost::vertex_property_tag kind;
             };
 
             struct vertex_interface_data_t
             {
-                using kind = boost::vertex_property_tag;
+                typedef boost::vertex_property_tag kind;
             };
 
             /**
@@ -217,21 +208,23 @@ namespace ompl
 
              @par Edges should be undirected and have a weight property.
              */
-            using Graph = boost::adjacency_list<
+            typedef boost::adjacency_list<
                 boost::vecS, boost::vecS, boost::undirectedS,
-                boost::property<vertex_state_t, base::State *,
-                                boost::property<boost::vertex_predecessor_t, VertexIndexType,
-                                                boost::property<boost::vertex_rank_t, VertexIndexType,
-                                                                boost::property<vertex_color_t, GuardType,
-                                                                                boost::property<vertex_interface_data_t,
-                                                                                                InterfaceHash>>>>>,
-                boost::property<boost::edge_weight_t, base::Cost>>;
+                boost::property<
+                    vertex_state_t, base::State *,
+                    boost::property<
+                        boost::vertex_predecessor_t, VertexIndexType,
+                        boost::property<boost::vertex_rank_t, VertexIndexType,
+                                        boost::property<vertex_color_t, GuardType,
+                                                        boost::property<vertex_interface_data_t, InterfaceHash>>>>>,
+                boost::property<boost::edge_weight_t, base::Cost>>
+                Graph;
 
             /** \brief Vertex in Graph */
-            using Vertex = boost::graph_traits<Graph>::vertex_descriptor;
+            typedef boost::graph_traits<Graph>::vertex_descriptor Vertex;
 
             /** \brief Edge in Graph */
-            using Edge = boost::graph_traits<Graph>::edge_descriptor;
+            typedef boost::graph_traits<Graph>::edge_descriptor Edge;
 
             /** \brief Constructor */
             SPARStwo(const base::SpaceInformationPtr &si);
@@ -293,15 +286,6 @@ namespace ompl
                 return stretchFactor_;
             }
 
-            /** \brief Output debug info about the graph */
-            void copyPasteState(std::size_t numSets);
-            void dumpLog();
-
-            void setMapName(std::string map_name)
-            {
-                map_name_ = map_name;
-            }
-
             /** \brief While the termination condition permits, construct the spanner graph */
             void constructRoadmap(const base::PlannerTerminationCondition &ptc);
 
@@ -336,6 +320,9 @@ namespace ompl
             template <template <typename T> class NN>
             void setNearestNeighbors()
             {
+                if (nn_ && nn_->size() == 0)
+                    OMPL_WARN("Calling setNearestNeighbors will clear all states.");
+                clear();
                 nn_ = std::make_shared<NN<Vertex>>();
                 if (isSetup())
                     setup();
@@ -355,12 +342,6 @@ namespace ompl
                 return boost::num_vertices(g_);
             }
 
-            /** \brief Get the number of edges in the sparse roadmap. */
-            unsigned int getNumEdges() const
-            {
-                return boost::num_edges(g_);
-            }
-
             void getPlannerData(base::PlannerData &data) const override;
 
             /** \brief Print debug information about planner */
@@ -377,25 +358,9 @@ namespace ompl
                 return boost::lexical_cast<std::string>(bestCost_);
             }
 
-            /** \brief Get class for managing various visualization features */
-            ompl::tools::VisualizerPtr getVisual()
-            {
-                return visual_;
-            }
-
-            /** \brief Set class for managing various visualization features */
-            void setVisual(ompl::tools::VisualizerPtr visual)
-            {
-                visual_ = visual;
-            }
-
-            bool checkSparseGraphOptimality();
-
         protected:
             /** \brief Free all the memory allocated by the planner */
             void freeMemory();
-
-            void showFailureProgress();
 
             /** \brief Check that the query vertex is initialized (used for internal nearest neighbor searches) */
             void checkQueryStateInitialization();
@@ -493,7 +458,7 @@ namespace ompl
             }
 
             /** \brief Sampler user for generating valid samples in the state space */
-            base::MinimumClearanceValidStateSamplerPtr sampler_;
+            base::ValidStateSamplerPtr sampler_;
 
             /** \brief Nearest neighbors data structure */
             std::shared_ptr<NearestNeighbors<Vertex>> nn_;
@@ -552,8 +517,6 @@ namespace ompl
 
             /** \brief A counter for the number of consecutive failed iterations of the algorithm */
             unsigned int consecutiveFailures_;
-            unsigned int maxConsecutiveFailures_;
-            unsigned int maxPercentComplete_;
 
             /** \brief Maximum visibility range for nodes in the graph */
             double sparseDelta_;
@@ -577,13 +540,6 @@ namespace ompl
             long unsigned int iterations_;
             /** \brief Best cost found so far by algorithm */
             base::Cost bestCost_;
-
-            /** \brief Class for managing various visualization features */
-            ompl::tools::VisualizerPtr visual_;
-            time::point timeDiscretizeAndRandomStarted_;
-
-            std::vector<std::string> stringLog_;
-            std::string map_name_; // meta data for the logging
         };
     }
 }
