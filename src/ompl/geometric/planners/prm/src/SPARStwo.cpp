@@ -39,8 +39,6 @@
 #include "ompl/base/goals/GoalSampleableRegion.h"
 #include "ompl/base/objectives/PathLengthOptimizationObjective.h"
 #include "ompl/tools/config/SelfConfig.h"
-#include <ompl/base/DiscreteMotionValidator.h>
-
 #include <boost/graph/astar_search.hpp>
 #include <boost/graph/incremental_components.hpp>
 #include <boost/property_map/vector_property_map.hpp>
@@ -237,53 +235,6 @@ bool ompl::geometric::SPARStwo::reachedTerminationCriterion() const
     return consecutiveFailures_ >= maxFailures_ || addedSolution_;
 }
 
-void ompl::geometric::SPARStwo::copyPasteState(std::size_t numSets)
-{
-    double duration = time::seconds(time::now() - timeDiscretizeAndRandomStarted_);
-    std::stringstream line;
-
-    // clang-format off
-    line << "=SPLIT(\"SPARS2, "
-         << map_name_ << ", "
-         << sparseDeltaFraction_ << ", "
-         << sparseDelta_ << ", "
-         << 0 << ", "
-         << stretchFactor_ << ", "
-         << 2 << ", " // nearSamplePointsFactor hardcoded at top
-         << 0 << ", " // useDiscretizedSamples
-         << 1 << ", " // useRandomSamples
-         << 0 << ", " // useCheckRemoveCloseVertices
-         << 0 << ", " // useClearEdgesNearVertex_
-         << 0 << ", " // useOriginalSmoother_
-         << 0 << ", " // useEdgeImprovementRule_
-         << 0 << ", " // fourthCriteriaAfterFailures_
-         << maxFailures_ << ", "
-         << consecutiveFailures_ << ", "
-         << milestoneCount() << ", "
-         << getNumEdges() << ", "
-         << 0 << ", "
-         << duration << "\", \",\")";
-    // clang-format on
-
-    // Save log
-    stringLog_.push_back(line.str());
-
-    if (stringLog_.size() > 1000)
-        OMPL_WARN("Copy Paste Log is getting big: %i", stringLog_.size());
-
-    // Output to console
-    std::cout << stringLog_.back() << std::endl;
-}
-
-void ompl::geometric::SPARStwo::dumpLog()
-{
-  // Dump to console
-  for (auto line : stringLog_)
-    std::cout << line << std::endl;
-
-  stringLog_.clear();
-}
-
 void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationCondition &ptc, bool stopOnMaxFail)
 {
     if (stopOnMaxFail)
@@ -297,32 +248,16 @@ void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationC
     }
     else
         constructRoadmap(ptc);
-
-    OMPL_INFORM("Construct Roadmap Finished");
-    copyPasteState(0);
 }
 
 void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationCondition &ptc)
 {
-    // DTC
-    timeDiscretizeAndRandomStarted_ = time::now();
-    maxConsecutiveFailures_ = 0;
-    maxPercentComplete_ = 0;
-
     checkQueryStateInitialization();
 
     if (!isSetup())
         setup();
     if (!sampler_)
-    {
-        double clearance = 1;
-        OMPL_WARN("set clearance TODO");
-
-        // Load minimum clearance state sampler
-        sampler_ = base::MinimumClearanceValidStateSamplerPtr(new base::MinimumClearanceValidStateSampler(si_.get()));
-        sampler_->setMinimumObstacleClearance(clearance);
-        si_->getStateValidityChecker()->setClearanceSearchDistance(clearance);
-    }
+        sampler_ = si_->allocValidStateSampler();
 
     base::State *qNew = si_->allocState();
     base::State *workState = si_->allocState();
@@ -333,14 +268,10 @@ void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationC
     std::vector<Vertex> visibleNeighborhood;
 
     bestCost_ = opt_->infiniteCost();
-    while (ptc == false && !visual_->viz1()->shutdownRequested())
+    while (ptc == false)
     {
         ++iterations_;
         ++consecutiveFailures_;
-
-        showFailureProgress();
-        if (visual_->viz1()->shutdownRequested())
-            break;
 
         // Generate a single sample, and attempt to connect it to nearest neighbors.
         if (!sampler_->sample(qNew))
@@ -374,29 +305,6 @@ void ompl::geometric::SPARStwo::constructRoadmap(const base::PlannerTerminationC
     }
     si_->freeState(workState);
     si_->freeState(qNew);
-}
-
-void ompl::geometric::SPARStwo::showFailureProgress()
-{
-    if (consecutiveFailures_ > maxConsecutiveFailures_)
-    {
-        maxConsecutiveFailures_ = consecutiveFailures_;
-
-        std::size_t percentComplete = ceil(maxConsecutiveFailures_ / double(maxFailures_) * 100.0);
-
-        // Every time the whole number of percent compelete changes, show to user
-        if (percentComplete > maxPercentComplete_)
-        {
-            maxPercentComplete_ = percentComplete;
-
-            // Show varying granularity based on number of dimensions
-            static const std::size_t showEvery = std::max(1, int(12 - si_->getStateDimension() * 2));
-            if (percentComplete % showEvery == 0)
-            {
-                OMPL_INFORM("Termination progress: %u", percentComplete);
-            }
-        }
-    }
 }
 
 void ompl::geometric::SPARStwo::checkQueryStateInitialization()
@@ -611,7 +519,7 @@ bool ompl::geometric::SPARStwo::checkAddPath(Vertex v)
             InterfaceData &d = getData(v, r, rp);
 
             // Then, if the spanner property is violated
-            if (rm_dist > stretchFactor_ * d.d_)  // TODO - check that d.d_ is not zero!!
+            if (rm_dist > stretchFactor_ * d.d_)
             {
                 ret = true;  // Report that we added for the path
                 if (si_->checkMotion(stateProperty_[r], stateProperty_[rp]))
@@ -636,12 +544,8 @@ bool ompl::geometric::SPARStwo::checkAddPath(Vertex v)
                         p->append(d.sigmaA_);
                     }
 
-                    // Smoothing path - old method
-                    // psimp_->reduceVertices(*p, 10);
-                    // psimp_->shortcutPath(*p, 50);
-
-                    // Smoothing path - new method
-
+                    psimp_->reduceVertices(*p, 10);
+                    psimp_->shortcutPath(*p, 50);
 
                     if (p->checkAndRepair(100).second)
                     {
@@ -884,10 +788,6 @@ void ompl::geometric::SPARStwo::abandonLists(base::State *st)
 
 ompl::geometric::SPARStwo::Vertex ompl::geometric::SPARStwo::addGuard(base::State *state, GuardType type)
 {
-    // Visualize vertex
-    visual_->viz1()->state(state, tools::LARGE, tools::BLACK, 0);
-    visual_->viz1()->trigger();
-
     std::lock_guard<std::mutex> _(graphMutex_);
 
     Vertex m = boost::add_vertex(g_);
@@ -911,10 +811,6 @@ void ompl::geometric::SPARStwo::connectGuards(Vertex v, Vertex vp)
 
     const base::Cost weight(costHeuristic(v, vp));
     const Graph::edge_property_type properties(weight);
-
-    // Visualize edge
-    visual_->viz1()->edge(stateProperty_[v], stateProperty_[vp], tools::MEDIUM, tools::ORANGE);
-
     std::lock_guard<std::mutex> _(graphMutex_);
     boost::add_edge(v, vp, properties, g_);
     disjointSets_.union_set(v, vp);
@@ -964,6 +860,20 @@ ompl::base::PathPtr ompl::geometric::SPARStwo::constructSolution(const Vertex st
     }
 }
 
+void ompl::geometric::SPARStwo::printDebug(std::ostream &out) const
+{
+    out << "SPARStwo Debug Output: " << std::endl;
+    out << "  Settings: " << std::endl;
+    out << "    Max Failures: " << getMaxFailures() << std::endl;
+    out << "    Dense Delta Fraction: " << getDenseDeltaFraction() << std::endl;
+    out << "    Sparse Delta Fraction: " << getSparseDeltaFraction() << std::endl;
+    out << "    Stretch Factor: " << getStretchFactor() << std::endl;
+    out << "  Status: " << std::endl;
+    out << "    Milestone Count: " << milestoneCount() << std::endl;
+    out << "    Iterations: " << getIterationCount() << std::endl;
+    out << "    Consecutive Failures: " << consecutiveFailures_ << std::endl;
+}
+
 void ompl::geometric::SPARStwo::getPlannerData(base::PlannerData &data) const
 {
     Planner::getPlannerData(data);
@@ -998,203 +908,6 @@ void ompl::geometric::SPARStwo::getPlannerData(base::PlannerData &data) const
     foreach (const Vertex n, boost::vertices(g_))
         if (boost::out_degree(n, g_) == 0)
             data.addVertex(base::PlannerDataVertex(stateProperty_[n], (int)colorProperty_[n]));
-}
-
-void ompl::geometric::SPARStwo::printDebug(std::ostream &out) const
-{
-    out << "SPARStwo Debug Output: " << std::endl;
-    out << "  Settings: " << std::endl;
-    out << "    Max Failures: " << getMaxFailures() << std::endl;
-    out << "    Dense Delta Fraction: " << getDenseDeltaFraction() << std::endl;
-    out << "    Sparse Delta Fraction: " << getSparseDeltaFraction() << std::endl;
-    out << "    Stretch Factor: " << getStretchFactor() << std::endl;
-    out << "  Status: " << std::endl;
-    out << "    Milestone Count: " << milestoneCount() << std::endl;
-    out << "    Iterations: " << getIterationCount() << std::endl;
-    out << "    Consecutive Failures: " << consecutiveFailures_ << std::endl;
-}
-
-bool ompl::geometric::SPARStwo::checkSparseGraphOptimality()
-{
-    OMPL_INFORM("checkSparseGraphOptimality()");
-
-    std::size_t numTests = 1000;
-    std::size_t numFailedPlans = 0;
-
-    // Make sure motion validator is set to zero clearance
-    // base::DiscreteMotionValidator *dmv =
-    //     dynamic_cast<base::DiscreteMotionValidator *>(si_->getMotionValidator().get());
-    // BOOST_ASSERT_MSG(dmv->getRequiredStateClearance() == 0, "Discrete motion validator should have clearance = 0");
-
-    // For each test
-    for (std::size_t i = 0; i < numTests; ++i)
-    {
-        if (visual_->viz1()->shutdownRequested())
-            break;
-
-        /* The whole neighborhood set which has been most recently computed */
-        std::vector<std::vector<Vertex>> graphNeighborhood(2);
-        /* The visible neighborhood set which has been most recently computed */
-        std::vector<std::vector<Vertex>> visibleNeighborhood(2);
-
-        // Choose random start and goal state that has a nearest neighbor
-        std::vector<base::State*> endPoints(2);
-
-        for (std::size_t i = 0; i < 2; ++i)
-        {
-            base::State*& state = endPoints[i];
-
-            // Allocate
-            state = si_->getStateSpace()->allocState();
-
-            // Sample
-            if (!sampler_->sample(state))
-                throw Exception(name_, "No valid sample found");
-
-            // Allow edges to be 5% longer than SparseDelta
-            //const double dist = sparseDelta_ * 1.05;
-
-            // Find nearest neighbor
-            findGraphNeighbors(state, graphNeighborhood[i], visibleNeighborhood[i]);
-
-            // Check if neighbor exists - should always have at least one neighbor otherwise graph lacks coverage
-            if (visibleNeighborhood[i].empty())
-                throw Exception(name_, "No neighbors!");
-            // debugNoNeighbors(point, indent);
-
-            // Check if first state is same as input
-            if (si_->getStateSpace()->equalStates(state, stateProperty_[visibleNeighborhood[i][0]]))
-                throw Exception(name_, "First neighbor is itself");
-        }
-
-        // Astar search through graph
-        const base::State *actualStart = endPoints.front();
-        const base::State *actualGoal = endPoints.back();
-        const Vertex start = visibleNeighborhood[0][0];
-        const Vertex goal = visibleNeighborhood[1][0];
-
-        base::PathPtr vertexPath;
-        bool solutionFound = true;
-
-        // Do not search astar if start goal are the same
-        if (si_->getStateSpace()->equalStates(stateProperty_[start], stateProperty_[goal]))
-        {
-            //OMPL_INFORM("start and goal are the same");
-            auto p(std::make_shared<PathGeometric>(si_));
-            p->append(stateProperty_[start]);
-            vertexPath = p;
-        }
-        else // search astar
-        {
-            try
-            {
-                vertexPath = constructSolution(start, goal);
-            }
-            catch(...)
-            {
-                solutionFound = false;
-            }
-        }
-
-        if (!solutionFound || !vertexPath)
-        {
-            OMPL_ERROR("No path found through graph");
-
-            // Clear out previous path for clarity
-            visual_->viz2()->deleteAllMarkers();
-            visual_->viz2()->trigger();
-            usleep(0.001 * 1000000);
-
-            // Visualize actual and snapped states
-            visual_->viz3()->deleteAllMarkers();
-            visual_->viz3()->state(actualStart, tools::LARGE, tools::RED, 0);
-            visual_->viz3()->state(actualGoal, tools::LARGE, tools::GREEN, 0);
-            visual_->viz3()->state(stateProperty_[start], tools::LARGE, tools::BLACK, 0);
-            visual_->viz3()->state(stateProperty_[goal], tools::LARGE, tools::BLACK, 0);
-            visual_->viz3()->trigger();
-            visual_->viz1()->spin();
-            exit(0);
-            continue;
-        }
-
-        // If path found (same connected component) sum up total length
-        geometric::PathGeometric *geometricSolutionPtr = static_cast<geometric::PathGeometric *>(vertexPath.get());
-        geometric::PathGeometric geometricSolution = *geometricSolutionPtr;
-
-        //convertVertexPathToStatePath(vertexPath, actualStart, actualGoal, geometricSolution);
-
-        // Smooth path to find the "optimal" path
-        geometric::PathGeometric smoothedPath = geometricSolution;
-        geometric::PathGeometric *smoothedPathPtr = &smoothedPath;
-
-        psimp_->reduceVertices(smoothedPath, 10);
-        psimp_->shortcutPath(smoothedPath, 50);
-        //sg_->smoothMax(smoothedPathPtr, indent);
-
-        // Show the two paths
-        bool showEveryPath = true;
-        if (showEveryPath)
-        {
-            visual_->viz2()->deleteAllMarkers();
-            visual_->viz2()->path(&geometricSolution, tools::SMALL, tools::BLACK, tools::RED);
-            visual_->viz2()->path(smoothedPathPtr, tools::MEDIUM, tools::BLACK, tools::GREEN);
-            visual_->viz2()->trigger();
-            usleep(0.001 * 1000000);
-        }
-
-        // calculate theoretical guarantees
-        double optimalLength = smoothedPathPtr->length();
-        double sparseLength = geometricSolution.length();
-        double theoryLength = stretchFactor_ * optimalLength + std::numeric_limits<double>::epsilon(); // + 4 * sparseCriteria_->getSparseDelta();
-        double percentOfMaxAllows = sparseLength / theoryLength * 100.0;
-
-        bool show = sparseLength >= theoryLength;
-
-        if (show)
-        {
-            std::cout << "-----------------------------------------" << std::endl;
-            std::cout << "Checking Asymptotic Optimality Guarantees" << std::endl;
-            std::cout << "Raw Path Length:         " << sparseLength << std::endl;
-            std::cout << "Smoothed Path Length:    " << optimalLength << std::endl;
-            std::cout << "Smoothed Path States:    " << smoothedPathPtr->getStateCount() << std::endl;
-            std::cout << "Theoretical Path Length: " << theoryLength << std::endl;
-            std::cout << "Stretch Factor t:        " << stretchFactor_ << std::endl;
-            std::cout << "Sparse Delta:            " << sparseDelta_ << std::endl;
-
-            if (sparseLength >= theoryLength)
-            {
-                OMPL_ERROR("Asymptotic optimality guarantee VIOLATED");
-
-                // Show the two paths
-                visual_->viz2()->deleteAllMarkers();
-                visual_->viz2()->path(&geometricSolution, tools::SMALL, tools::BLACK, tools::RED);
-                visual_->viz2()->path(smoothedPathPtr, tools::MEDIUM, tools::BLACK, tools::GREEN);
-                visual_->viz2()->trigger();
-                usleep(0.001 * 1000000);
-
-                // Show database with visibility regions (coverage)
-                // sg_->visualizeDatabaseCoverage_ = true;
-                // sg_->displayDatabase();
-
-                visual_->viz1()->spin();
-                exit(0);
-                return false;
-            }
-            else
-                OMPL_INFORM("Asymptotic optimality guarantee maintained");
-            std::cout << "Percent of max allowed:  " << percentOfMaxAllows << " %" << std::endl;
-            std::cout << "-----------------------------------------" << std::endl;
-        }
-    }
-
-    // Summary
-    std::cout <<  "-----------------------------------------" << std::endl;
-    std::cout <<  "Checking Asymptotic Optimality Guarantees" << std::endl;
-    std::cout <<  "Total tests:               " << numTests << std::endl;
-    std::cout <<  "Number failed plans:       " << numFailedPlans << std::endl;
-    std::cout <<  "-----------------------------------------" << std::endl;
-
-    return true;
 }
 
 ompl::base::Cost ompl::geometric::SPARStwo::costHeuristic(Vertex u, Vertex v) const
