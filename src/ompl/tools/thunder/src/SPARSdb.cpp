@@ -1659,7 +1659,7 @@ void ompl::geometric::SPARSdb::connectGuards(Vertex v1, Vertex v2)
     disjointSets_.union_set(v1, v2);
 
     // Debug in Rviz
-    visual_->viz1()->edge(stateProperty_[v1], stateProperty_[v2], 100);
+    visual_->viz1()->edge(stateProperty_[v1], stateProperty_[v2], tools::MEDIUM, tools::BLUE);
     visual_->viz1()->trigger();
     sleep(0.8);
 }

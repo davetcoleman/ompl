@@ -45,6 +45,7 @@
 #include "ompl/util/RandomNumbers.h"
 #include "ompl/util/Console.h"
 #include <limits>
+#include <ompl/tools/debug/Visualizer.h>
 
 namespace ompl
 {
@@ -68,7 +69,8 @@ namespace ompl
             /** \brief Create an instance for a specified space information.
             Optionally, a GoalSampleableRegion may be passed in to attempt
             improvements at the end of the path as well. */
-            PathSimplifier(base::SpaceInformationPtr si, const base::GoalPtr &goal = ompl::base::GoalPtr());
+            PathSimplifier(base::SpaceInformationPtr si, const base::GoalPtr &goal = ompl::base::GoalPtr(),
+                tools::VisualizerPtr visual = tools::VisualizerPtr());
 
             virtual ~PathSimplifier() = default;
 
@@ -269,6 +271,9 @@ namespace ompl
 
             /** \brief Instance of random number generator */
             RNG rng_;
+
+            /** \brief Class for managing various visualization features */
+            tools::VisualizerPtr visual_;
         };
     }
 }

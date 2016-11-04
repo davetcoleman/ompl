@@ -199,7 +199,7 @@ void ompl::geometric::PathGeometric::printAsMatrix(std::ostream &out) const
     out << std::endl;
 }
 
-std::pair<bool, bool> ompl::geometric::PathGeometric::checkAndRepair(unsigned int attempts)
+std::pair<bool, bool> ompl::geometric::PathGeometric::checkAndRepair(unsigned int attempts, tools::VisualizerPtr visual)
 {
     if (states_.empty())
         return std::make_pair(true, true);
@@ -218,13 +218,23 @@ std::pair<bool, bool> ompl::geometric::PathGeometric::checkAndRepair(unsigned in
     base::UniformValidStateSampler *uvss = nullptr;
     bool result = true;
 
+    std::cout << "checkAndRepair() " << std::endl;
+
     for (int i = 1; i < n1; ++i)
+    {
         if (!si_->checkMotion(states_[i - 1], states_[i]) ||
             // the penultimate state in the path needs an additional check:
             // the motion between that state and the last state needs to be
             // valid as well since we cannot change the last state.
             (i == n1 - 1 && !si_->checkMotion(states_[i], states_[i + 1])))
         {
+            if (visual)
+            {
+                visual->viz6()->edge(states_[i - 1], states_[i], tools::MEDIUM, tools::RED);
+                visual->viz6()->trigger();
+                visual->waitForUserFeedback("found invalid edge");
+            }
+
             // we now compute a state around which to sample
             if (!temp)
                 temp = si_->allocState();
@@ -255,29 +265,57 @@ std::pair<bool, bool> ompl::geometric::PathGeometric::checkAndRepair(unsigned in
                 si_->getStateSpace()->interpolate(states_[i - 1], states_[nextValid], 0.5, temp);
                 radius = std::max(si_->distance(states_[i - 1], temp), si_->distance(states_[i - 1], states_[i]));
             }
+            std::cout << "radius: " << radius << std::endl;
 
             bool success = false;
 
+            if (visual)
+            {
+                visual->viz6()->state(temp, tools::LARGE, tools::ORANGE);
+                visual->viz6()->trigger();
+                visual->waitForUserFeedback("sample near orange state");
+            }
+
             for (unsigned int a = 0; a < attempts; ++a)
+            {
                 if (uvss->sampleNear(states_[i], temp, radius))
                 {
+
                     if (si_->checkMotion(states_[i - 1], states_[i]) &&
                         // the penultimate state needs an additional check
                         // (see comment at the top of outermost for-loop)
                         (i < n1 - 1 || si_->checkMotion(states_[i], states_[i + 1])))
                     {
                         success = true;
+
+                        if (visual)
+                        {
+                            visual->viz6()->state(states_[i], tools::MEDIUM, tools::GREEN);
+                            visual->viz6()->trigger();
+                            visual->waitForUserFeedback("sampled state VALID edge");
+                        }
+
                         break;
                     }
+                    else
+                        if (visual)
+                        {
+                            visual->viz6()->state(states_[i], tools::MEDIUM, tools::RED);
+                            visual->viz6()->trigger();
+                            visual->waitForUserFeedback("sampled state");
+                        }
+
                 }
                 else
                     break;
+            }
             if (!success)
             {
                 result = false;
                 break;
             }
         }
+    }
 
     // free potentially allocated memory
     if (temp)

@@ -41,6 +41,7 @@
 #include "ompl/base/Path.h"
 #include <vector>
 #include <utility>
+#include <ompl/tools/debug/Visualizer.h>
 
 namespace ompl
 {
@@ -170,7 +171,7 @@ namespace ompl
                 no changes are attempted, the both values are true.
 
                 \note If repairing a path fails, the path may still be altered */
-            std::pair<bool, bool> checkAndRepair(unsigned int attempts);
+            std::pair<bool, bool> checkAndRepair(unsigned int attempts, tools::VisualizerPtr visual = tools::VisualizerPtr());
 
             /** \brief Overlay the path \e over on top of the current
                 path. States are added to the current path if needed

@@ -41,6 +41,7 @@
 
 #include <ompl/util/ClassForward.h>
 #include <ompl/base/State.h>
+#include <ompl/util/Deprecation.h>
 
 // C++
 #include <vector>
@@ -149,6 +150,7 @@ namespace ompl
             }
 
             /** \brief Visualize edge during runtime, externally */
+            OMPL_DEPRECATED
             virtual void edge(const ompl::base::State *stateA, const ompl::base::State *stateB, double cost) = 0;
 
             /** \brief Visualize edge with a level during runtime, externally */

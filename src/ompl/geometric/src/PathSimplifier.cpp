@@ -43,8 +43,8 @@
 #include <map>
 #include <utility>
 
-ompl::geometric::PathSimplifier::PathSimplifier(base::SpaceInformationPtr si, const base::GoalPtr &goal)
-  : si_(std::move(si)), freeStates_(true)
+ompl::geometric::PathSimplifier::PathSimplifier(base::SpaceInformationPtr si, const base::GoalPtr &goal, tools::VisualizerPtr visual)
+    : si_(std::move(si)), freeStates_(true), visual_(visual)
 {
     if (goal)
     {
@@ -170,6 +170,12 @@ bool ompl::geometric::PathSimplifier::reduceVertices(PathGeometric &path, unsign
                 result = true;
             }
         }
+
+    // visual_->viz6()->deleteAllMarkers();
+    // visual_->viz6()->path(&path, tools::LARGE, tools::BLACK, tools::BLUE);
+    // visual_->viz6()->trigger();
+    // visual_->waitForUserFeedback("after reduceVertices()");
+
     return result;
 }
 
@@ -425,6 +431,11 @@ void ompl::geometric::PathSimplifier::simplify(PathGeometric &path, const base::
     if (ptc == false)
         collapseCloseVertices(path);
 
+    // visual_->viz6()->deleteAllMarkers();
+    // visual_->viz6()->path(&path, tools::LARGE, tools::BLACK, tools::BLUE);
+    // visual_->viz6()->trigger();
+    // visual_->waitForUserFeedback("after collapseCloseVertices()");
+
     // try to reduce verices some more, if there is any point in doing so
     int times = 0;
     while (tryMore && ptc == false && ++times <= 5)
@@ -440,6 +451,11 @@ void ompl::geometric::PathSimplifier::simplify(PathGeometric &path, const base::
             bool shortcut = shortcutPath(path);                           // split path segments, not just vertices
             bool better_goal = gsr_ ? findBetterGoal(path, ptc) : false;  // Try to connect the path to a closer goal
 
+            // visual_->viz6()->deleteAllMarkers();
+            // visual_->viz6()->path(&path, tools::LARGE, tools::BLACK, tools::BLUE);
+            // visual_->viz6()->trigger();
+            // visual_->waitForUserFeedback("after shortcutPath()");
+
             tryMore = shortcut || better_goal;
         } while (ptc == false && tryMore && ++times <= 5);
 
@@ -447,16 +463,26 @@ void ompl::geometric::PathSimplifier::simplify(PathGeometric &path, const base::
         if (ptc == false)
             smoothBSpline(path, 3, path.length() / 100.0);
 
+        /*
+        visual_->viz6()->deleteAllMarkers();
+        visual_->viz6()->path(&path, tools::LARGE, tools::BLACK, tools::BLUE);
+        visual_->viz6()->trigger();
+        visual_->waitForUserFeedback("before checkAndRepair()");
+
         // we always run this if the metric-space algorithms were run.  In non-metric spaces this does not work.
-        const std::pair<bool, bool> &p = path.checkAndRepair(magic::MAX_VALID_SAMPLE_ATTEMPTS);
+        const std::pair<bool, bool> &p = path.checkAndRepair(magic::MAX_VALID_SAMPLE_ATTEMPTS, visual_);
         if (!p.second)
         {
-            //OMPL_INFORM("Path may slightly touch on an invalid region of the state space (PathSimplifier.cpp)");
+            OMPL_INFORM("Path may slightly touch on an invalid region of the state space (PathSimplifier.cpp)");
         }
-        // else
-        //     if (!p.first)
-        //         OMPL_DEBUG("The solution path was slightly touching on an invalid region of the state space, but it
-        //         was successfully fixed.");
+        else
+            if (!p.first)
+                OMPL_DEBUG("The solution path was slightly touching on an invalid region of the state space, but it was successfully fixed.");
+
+        visual_->viz6()->deleteAllMarkers();
+        visual_->viz6()->path(&path, tools::LARGE, tools::BLACK, tools::BLUE);
+        visual_->viz6()->trigger();
+        */
     }
 }
 
