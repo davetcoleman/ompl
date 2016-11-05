@@ -59,6 +59,10 @@ namespace ompl
 {
     namespace geometric
     {
+        /// @cond IGNORE
+        OMPL_CLASS_FORWARD(SPARStwo);
+        /// @endcond
+
         /**
            @anchor gSPARStwo
            @par Short description

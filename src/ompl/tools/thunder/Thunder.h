@@ -197,6 +197,12 @@ namespace ompl
             /** \brief Accumulated experiences to be later added to experience database */
             std::vector<ompl::geometric::PathGeometric> queuedSolutionPaths_;
 
+
+        public:
+
+            std::size_t diffNumVertices_;
+            std::size_t diffNumEdges_;
+
         };  // end of class Thunder
 
     }  // end of namespace

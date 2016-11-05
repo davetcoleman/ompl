@@ -590,6 +590,7 @@ void ompl::geometric::SPARSdb::printDebug(std::ostream &out) const
 
 bool ompl::geometric::SPARSdb::getGuardSpacingFactor(const double pathLength, int &numGuards, double &spacingFactor)
 {
+    verbose_ = true;
     static const double factorHigh = 1.9;
     static const double factorLow = 1.1;
     double minPathLength = sparseDelta_ * factorLow;
@@ -600,6 +601,8 @@ bool ompl::geometric::SPARSdb::getGuardSpacingFactor(const double pathLength, in
         OMPL_INFORM("Path length is too short to get a correct sparcing factor: length: %f, min: %f ", pathLength,
                     minPathLength);
         spacingFactor = factorLow;
+
+        verbose_ = false;
         return true;  // still attempt
     }
 
@@ -644,11 +647,17 @@ bool ompl::geometric::SPARSdb::getGuardSpacingFactor(const double pathLength, in
             continue;
         }
         else
+        {
+            verbose_ = false;
             return true;  // a good value
+        }
     }
 
     OMPL_ERROR("Unable to find correct spacing factor - perhaps this is a bug");
     spacingFactor = factorLow;
+
+    verbose_ = false;
+
     return true;  // still attempt
 }
 

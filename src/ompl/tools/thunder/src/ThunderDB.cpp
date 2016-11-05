@@ -145,7 +145,7 @@ bool ompl::tools::ThunderDB::addPath(ompl::geometric::PathGeometric &solutionPat
     }
 
     bool result;
-    double seconds = 120;  // 10; // a large number, should never need to use this
+    double seconds = 120;  // a large number, should never need to use this
     ompl::base::PlannerTerminationCondition ptc = ompl::base::timedPlannerTerminationCondition(seconds, 0.1);
 
     // Benchmark runtime

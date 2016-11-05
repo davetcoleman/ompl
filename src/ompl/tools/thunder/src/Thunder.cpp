@@ -161,8 +161,8 @@ void ompl::tools::Thunder::setup()
             experienceDB_->getSPARSdb()->setup();
 
             experienceDB_->getSPARSdb()->setStretchFactor(1.2);
-            experienceDB_->getSPARSdb()->setSparseDeltaFraction(
-                0.05);  // vertex visibility range  = maximum_extent * this_fraction
+            // vertex visibility range  = maximum_extent * this_fraction
+            //experienceDB_->getSPARSdb()->setSparseDeltaFraction(0.05);
             // experienceDB_->getSPARSdb()->setDenseDeltaFraction(0.001);
 
             experienceDB_->getSPARSdb()->printDebug();
@@ -535,6 +535,10 @@ bool ompl::tools::Thunder::doPostProcessing()
 {
     OMPL_INFORM("Performing post-processing");
 
+    // Log change in size of database
+    std::size_t prevNumVertices = experienceDB_->getSPARSdb()->getNumVertices();
+    std::size_t prevNumEdges = experienceDB_->getSPARSdb()->getNumEdges();
+
     for (auto &queuedSolutionPath : queuedSolutionPaths_)
     {
         // Time to add a path to experience database
@@ -547,6 +551,10 @@ bool ompl::tools::Thunder::doPostProcessing()
 
     // Remove all inserted paths from the queue
     queuedSolutionPaths_.clear();
+
+    // Log change in size of database
+    diffNumVertices_ = experienceDB_->getSPARSdb()->getNumVertices() - prevNumVertices;
+    diffNumEdges_ = experienceDB_->getSPARSdb()->getNumEdges() - prevNumEdges;
 
     return true;
 }
