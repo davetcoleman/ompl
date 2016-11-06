@@ -785,7 +785,8 @@ namespace ompl
             std::vector<Vertex> goalVertexCandidateNeighbors_;
 
             /** \brief Option to enable debugging output */
-            bool verbose_;
+            bool verbose_ = false;
+            bool vQuality_ = false;
         };
     }
 }

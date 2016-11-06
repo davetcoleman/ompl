@@ -207,11 +207,9 @@ ompl::base::PlannerStatus ompl::geometric::RRTConnect::solve(const base::Planner
     {
         TreeData &tree = startTree ? tStart_ : tGoal_;
 
-        // if (tree->size() % 20 == 0)
-        // {
-        //     std::cout << "tStart_->size() " << tStart_->size() << std::endl;
-        //     std::cout << "tGoal_->size() " << tGoal_->size() << std::endl;
-        // }
+        // Show status
+        if (tree->size() % 50 == 0)
+            std::cout << "tStart_->size() " << tStart_->size() << ", tGoal_->size() " << tGoal_->size() << std::endl;
 
         tgi.start = startTree;
         startTree = !startTree;

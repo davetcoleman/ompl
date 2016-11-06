@@ -117,7 +117,6 @@ ompl::geometric::SPARSdb::SPARSdb(const base::SpaceInformationPtr &si, tools::Vi
   , iterations_(0)
   , sparseDelta_(0.)
   , denseDelta_(0.)
-  , verbose_(false)
 {
     specs_.recognizedGoal = base::GOAL_SAMPLEABLE_REGION;
     specs_.approximateSolutions = false;
@@ -152,6 +151,12 @@ void ompl::geometric::SPARSdb::setup()
     double maxExt = si_->getMaximumExtent();
     sparseDelta_ = sparseDeltaFraction_ * maxExt;
     denseDelta_ = denseDeltaFraction_ * maxExt;
+
+    std::cout << "sparseDelta_: " << sparseDelta_ << std::endl;
+    std::cout << "maxExt: " << maxExt << std::endl;
+    std::cout << "sparseDeltaFraction_ " << sparseDeltaFraction_ << std::endl;
+    std::cout << "denseDelta_: " << denseDelta_ << std::endl;
+    std::cout << "denseDeltaFraction_: " << denseDeltaFraction_ << std::endl;
 
     if (!sampler_)
         sampler_ = si_->allocValidStateSampler();
@@ -446,7 +451,7 @@ bool ompl::geometric::SPARSdb::constructSolution(const Vertex start, const Verte
     catch (ompl::geometric::SPARSdb::foundGoalException &)
     {
         // the custom exception from CustomVisitor
-        if (verbose_ && false)
+        if (verbose_)
         {
             OMPL_INFORM("constructSolution: Astar found goal vertex ------------------------");
             OMPL_INFORM("distance to goal: %f", vertexDistances[goal]);
@@ -590,7 +595,6 @@ void ompl::geometric::SPARSdb::printDebug(std::ostream &out) const
 
 bool ompl::geometric::SPARSdb::getGuardSpacingFactor(const double pathLength, int &numGuards, double &spacingFactor)
 {
-    verbose_ = true;
     static const double factorHigh = 1.9;
     static const double factorLow = 1.1;
     double minPathLength = sparseDelta_ * factorLow;
@@ -602,7 +606,6 @@ bool ompl::geometric::SPARSdb::getGuardSpacingFactor(const double pathLength, in
                     minPathLength);
         spacingFactor = factorLow;
 
-        verbose_ = false;
         return true;  // still attempt
     }
 
@@ -648,15 +651,12 @@ bool ompl::geometric::SPARSdb::getGuardSpacingFactor(const double pathLength, in
         }
         else
         {
-            verbose_ = false;
             return true;  // a good value
         }
     }
 
     OMPL_ERROR("Unable to find correct spacing factor - perhaps this is a bug");
     spacingFactor = factorLow;
-
-    verbose_ = false;
 
     return true;  // still attempt
 }
@@ -685,27 +685,35 @@ bool ompl::geometric::SPARSdb::addPathToRoadmap(const base::PlannerTerminationCo
                "%i",
                numGuards, solutionPath.getStateCount());
 
-    unsigned int n = 0;
-    const int n1 = solutionPath.getStateCount() - 1;
-    for (int i = 0; i < n1; ++i)
-        n += si_->getStateSpace()->validSegmentCount(solutionPath.getState(i), solutionPath.getState(i + 1));
+    // unsigned int segmentCount = 0;
+    // for (int i = 0; i < solutionPath.getStateCount() - 1; ++i)
+    //     segmentCount += si_->getStateSpace()->validSegmentCount(solutionPath.getState(i), solutionPath.getState(i + 1));
 
-    solutionPath.interpolate(n);
+    unsigned int segmentCount = solutionPath.length() / denseDelta_;
+
+    // DTC: disabled to make adding experiences way faster
+    bool useInterpolation = true;
+    if (useInterpolation)
+    {
+        //if (verbose_)
+        OMPL_INFORM("Using interpolation with valid segment count %u", segmentCount);
+        solutionPath.interpolate(segmentCount);
+    }
+    else
+    {
+        //if (verbose_)
+        OMPL_INFORM("Not using interpolation");
+    }
 
     // Debug
-    if (verbose_)
-    {
-        OMPL_INFORM("-------------------------------------------------------");
-        OMPL_INFORM("Attempting to add %d states to roadmap", solutionPath.getStateCount());
-        OMPL_INFORM("-------------------------------------------------------");
-    }
+    OMPL_INFORM("Attempting to add %d states to roadmap", solutionPath.getStateCount());
 
     // Try to add the start first, but don't force it
     addStateToRoadmap(ptc, solutionPath.getState(0));
 
-    visual_->viz1()->state(solutionPath.getState(solutionPath.getStateCount() - 1), tools::LARGE, tools::RED,
-                           sparseDelta_);
-    visual_->viz1()->trigger();
+    // visual_->viz1()->state(solutionPath.getState(solutionPath.getStateCount() - 1), tools::LARGE, tools::RED,
+    //                        sparseDelta_);
+    // visual_->viz1()->trigger();
 
     // Add solution states to SPARSdb one by one ---------------------------
 
@@ -724,7 +732,7 @@ bool ompl::geometric::SPARSdb::addPathToRoadmap(const base::PlannerTerminationCo
     {
         distanceFromLastState = si_->distance(solutionPath.getState(i), solutionPath.getState(lastStateID));
 
-        if (verbose_ && false)
+        if (verbose_)
         {
             OMPL_INFORM("Index %d at distance %f from last state ", i, distanceFromLastState);
         }
@@ -737,8 +745,8 @@ bool ompl::geometric::SPARSdb::addPathToRoadmap(const base::PlannerTerminationCo
             }
 
             // Show the candidate state in Rviz for path insertion of GUARDS
-            visual_->viz1()->state(solutionPath.getState(i), tools::SMALL, tools::GREEN, sparseDelta_);
-            visual_->viz1()->trigger();
+            //visual_->viz1()->state(solutionPath.getState(i), tools::SMALL, tools::GREEN, sparseDelta_);
+            //visual_->viz1()->trigger();
 
             // Add a single state to the roadmap
             if (!addStateToRoadmap(ptc, solutionPath.getState(i)))
@@ -803,9 +811,8 @@ bool ompl::geometric::SPARSdb::addPathToRoadmap(const base::PlannerTerminationCo
         }
 
         // Show the candidate state in Rviz for path insertion of BRIDGES (CONNECTIVITY)
-        visual_->viz1()->state(connectivityState, tools::SMALL, tools::BLUE, sparseDelta_);
-        visual_->viz1()->trigger();
-        sleep(0.5);
+        // visual_->viz1()->state(connectivityState, tools::SMALL, tools::BLUE, sparseDelta_);
+        // visual_->viz1()->trigger();
 
         // Add a single state to the roadmap
         addStateToRoadmap(ptc, connectivityState);
@@ -842,8 +849,8 @@ bool ompl::geometric::SPARSdb::addPathToRoadmap(const base::PlannerTerminationCo
     // Add each state randomly
     for (unsigned long shuffledID : shuffledIDs)
     {
-        visual_->viz1()->state(solutionPath.getState(shuffledID), tools::SMALL, tools::GREEN, sparseDelta_);
-        visual_->viz1()->trigger();
+        // visual_->viz1()->state(solutionPath.getState(shuffledID), tools::SMALL, tools::GREEN, sparseDelta_);
+        // visual_->viz1()->trigger();
 
         // Add a single state to the roadmap
         addStateToRoadmap(ptc, solutionPath.getState(shuffledID));
@@ -1407,11 +1414,10 @@ void ompl::geometric::SPARSdb::findCloseRepresentatives(base::State *workState, 
         si_->freeState(closeRepresentative.second);
     closeRepresentatives.clear();
 
-    // denseDelta_ = 0.25 * sparseDelta_;
-    // nearSamplePoints_ /= 10; // HACK - this makes it look for the same number of samples as dimensions
+    //denseDelta_ = 0.25 * sparseDelta_;
 
     if (verbose_)
-        OMPL_INFORM(" ----- nearSamplePoints: %f, denseDelta: %f", nearSamplePoints_, denseDelta_);
+        OMPL_INFORM(" ----- nearSamplePoints: %u, denseDelta: %f sparseDelta: %f", nearSamplePoints_, denseDelta_, sparseDelta_);
 
     // Then, begin searching the space around new potential state candidateState
     for (unsigned int i = 0; i < nearSamplePoints_; ++i)
@@ -1419,35 +1425,39 @@ void ompl::geometric::SPARSdb::findCloseRepresentatives(base::State *workState, 
         if (ptc)  // Check if out of time
             break;
 
+        std::size_t count = 0;
         while (true)
         {
-            sampler_->sampleNear(workState, candidateState, denseDelta_);
+            // DTC: divide by 3 is a hack to actually get a neighbor that is close enough
+            sampler_->sampleNear(workState, candidateState, denseDelta_ / 4.0);
 
-            if (verbose_)
-                OMPL_INFORM(" ------ findCloseRepresentatives sampled state ");
+            count++;
 
             if (ptc)  // Check if out of time
                 break;
 
             if (!si_->isValid(workState))
             {
-                if (verbose_)
+                if (vQuality_)
                     OMPL_INFORM(" ------ notValid ");
                 continue;
             }
             if (si_->distance(candidateState, workState) > denseDelta_)
             {
-                if (verbose_)
-                    OMPL_INFORM(" ------ Distance too far ");
+                if (vQuality_)
+                    OMPL_INFORM(" ------ Distance too far");
+                    //OMPL_INFORM(" ------ Distance too far %f > %f", si_->distance(candidateState, workState), denseDelta_);
                 continue;
             }
             if (!si_->checkMotion(candidateState, workState))
             {
-                if (verbose_)
+                if (vQuality_)
                     OMPL_INFORM(" ------ Motion invalid ");
                 continue;
             }
+            break;
         }
+        //std::cout << "required " << count << " samples " << std::endl;
 
         if (ptc)  // Check if out of time
             break;
@@ -1638,10 +1648,8 @@ ompl::geometric::SPARSdb::Vertex ompl::geometric::SPARSdb::addGuard(base::State 
     {
         OMPL_INFORM(" ---- addGuard() of type %f", type);
     }
-    visual_->viz1()->state(state, tools::MEDIUM, tools::PURPLE,
-                           sparseDelta_);  // Candidate node has already (just) been added
-    visual_->viz1()->trigger();
-    sleep(0.1);
+    // visual_->viz1()->state(state, tools::MEDIUM, tools::PURPLE, sparseDelta_);  // Candidate node has already (just) been added
+    // visual_->viz1()->trigger();
 
     return m;
 }
@@ -1668,9 +1676,8 @@ void ompl::geometric::SPARSdb::connectGuards(Vertex v1, Vertex v2)
     disjointSets_.union_set(v1, v2);
 
     // Debug in Rviz
-    visual_->viz1()->edge(stateProperty_[v1], stateProperty_[v2], tools::MEDIUM, tools::BLUE);
-    visual_->viz1()->trigger();
-    sleep(0.8);
+    // visual_->viz1()->edge(stateProperty_[v1], stateProperty_[v2], tools::MEDIUM, tools::BLUE);
+    // visual_->viz1()->trigger();
 }
 
 bool ompl::geometric::SPARSdb::convertVertexPathToStatePath(std::vector<Vertex> &vertexPath,
@@ -1805,7 +1812,7 @@ void ompl::geometric::SPARSdb::setPlannerData(const base::PlannerData &data)
 
     // Temp disable verbose mode for loading database
     bool wasVerbose = verbose_;
-    verbose_ = false;
+   verbose_ = false;
 
     OMPL_INFORM("Loading vertices:");
     // Add the nodes to the graph
