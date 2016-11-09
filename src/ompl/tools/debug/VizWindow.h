@@ -170,6 +170,10 @@ namespace ompl
 
             /** \brief Trigger visualizer to refresh/repaint/display all graphics */
             virtual void trigger(std::size_t queueSize = 0) = 0;
+            void triggerEvery(std::size_t queueSize)
+            {
+                trigger(queueSize);
+            }
 
             /** \brief Trigger visualizer to clear all graphics */
             virtual void deleteAllMarkers() = 0;

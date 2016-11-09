@@ -57,6 +57,12 @@ namespace ompl
            [[more]](http://msl.cs.uiuc.edu/~lavalle/rrtpubs.html)
         */
 
+    /// @cond IGNORE
+    /** \brief Forward declaration of ompl::base::BoltPlanner */
+    OMPL_CLASS_FORWARD(RRTConnect);
+    /// @endcond
+
+
         /** \brief RRT-Connect (RRTConnect) */
         class RRTConnect : public base::Planner
         {
