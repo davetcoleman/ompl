@@ -548,13 +548,14 @@ bool ompl::tools::Thunder::doPostProcessing()
         OMPL_INFORM("Finished inserting experience path in %f seconds", insertionTime);
         stats_.totalInsertionTime_ += insertionTime;  // used for averaging
     }
-
     // Remove all inserted paths from the queue
     queuedSolutionPaths_.clear();
 
     // Log change in size of database
     diffNumVertices_ = experienceDB_->getSPARSdb()->getNumVertices() - prevNumVertices;
     diffNumEdges_ = experienceDB_->getSPARSdb()->getNumEdges() - prevNumEdges;
+
+    OMPL_INFORM("Done performing post-processing");
 
     return true;
 }

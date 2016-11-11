@@ -207,10 +207,6 @@ ompl::base::PlannerStatus ompl::geometric::RRTConnect::solve(const base::Planner
     {
         TreeData &tree = startTree ? tStart_ : tGoal_;
 
-        // Show status
-        if (tree->size() % 50 == 0)
-            std::cout << "tStart_->size() " << tStart_->size() << ", tGoal_->size() " << tGoal_->size() << std::endl;
-
         tgi.start = startTree;
         startTree = !startTree;
         TreeData &otherTree = startTree ? tStart_ : tGoal_;
@@ -238,8 +234,15 @@ ompl::base::PlannerStatus ompl::geometric::RRTConnect::solve(const base::Planner
 
         GrowState gs = growTree(tree, tgi, rmotion);
 
+        if (ptc)
+            break;
+
         if (gs != TRAPPED)
         {
+            // Show status
+            if (tree->size() % 100 == 0)
+                std::cout << "RRTConnect - Start Tree " << tStart_->size() << ", Goal Tree " << tGoal_->size() << std::endl;
+
             /* remember which motion was just added */
             Motion *addedMotion = tgi.xmotion;
 
@@ -260,6 +263,9 @@ ompl::base::PlannerStatus ompl::geometric::RRTConnect::solve(const base::Planner
             /* if we connected the trees in a valid way (start and goal pair is valid)*/
             if (gsc == REACHED && goal->isStartGoalPairValid(startMotion->root, goalMotion->root))
             {
+                if (ptc)
+                    break;
+
                 // it must be the case that either the start tree or the goal tree has made some progress
                 // so one of the parents is not nullptr. We go one step 'back' to avoid having a duplicate state
                 // on the solution path
