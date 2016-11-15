@@ -184,6 +184,11 @@ namespace ompl
                 pdef_->addStartState(state);
             }
 
+            void addStartState(const base::State *state)
+            {
+                pdef_->addStartState(state);
+            }
+
             /** \brief Clear the currently set starting states */
             void clearStartStates()
             {
@@ -200,6 +205,7 @@ namespace ompl
             /** \brief A simple form of setGoal(). The goal will be an instance of ompl::base::GoalState */
             void setGoalState(const base::ScopedState<> &goal,
                               const double threshold = std::numeric_limits<double>::epsilon());
+            void setGoalState(const base::State *goal, const double threshold = std::numeric_limits<double>::epsilon());
 
             /** \brief Set the goal for planning. This call is not
                 needed if setStartAndGoalStates() has been called. */

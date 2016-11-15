@@ -110,6 +110,12 @@ void ompl::geometric::SimpleSetup::setGoalState(const base::ScopedState<> &goal,
     psk_ = std::make_shared<PathSimplifier>(si_, pdef_->getGoal());
 }
 
+void ompl::geometric::SimpleSetup::setGoalState(const base::State *goal, const double threshold)
+{
+    pdef_->setGoalState(goal, threshold);
+    psk_ = std::make_shared<PathSimplifier>(si_, pdef_->getGoal());
+}
+
 /** \brief Set the goal for planning. This call is not
     needed if setStartAndGoalStates() has been called. */
 void ompl::geometric::SimpleSetup::setGoal(const base::GoalPtr &goal)
