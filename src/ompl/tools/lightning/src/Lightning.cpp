@@ -464,3 +464,8 @@ bool ompl::tools::Lightning::reversePathIfNecessary(og::PathGeometric &path1, og
 
     return false;
 }
+
+std::size_t ompl::tools::Lightning::getStatesCount()
+{
+    return experienceDB_->getStatesCount();
+}
